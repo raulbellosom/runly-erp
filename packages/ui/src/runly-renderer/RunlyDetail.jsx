@@ -35,6 +35,7 @@ import {
   resolveHeroModel,
   resolveKpis,
   splitSectionsByColumn,
+  normalizeComponentSection,
 } from "./detail-presentation.js";
 import {
   HeroContainer,
@@ -356,6 +357,10 @@ function normalizeSections(schema, fieldMap) {
           icon: sectionIcon,
           relationList: normalizeRelationListConfig(entry.relationList),
         };
+      }
+
+      if (sectionType === "component") {
+        return normalizeComponentSection(entry, sectionIndex, sectionTitle, sectionIcon);
       }
 
       const fieldDefs = (Array.isArray(entry.fields) ? entry.fields : [])
@@ -900,6 +905,7 @@ export function RunlyDetail({
   token,
   apiBaseUrl,
   companyId = null,
+  componentRegistry = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const fieldMap = useMemo(() => normalizeFieldMap(fields), [fields]);
@@ -1001,6 +1007,20 @@ export function RunlyDetail({
           companyId={companyId}
         />
       ) : null}
+
+      {section.type === "component" ? (() => {
+        const Comp = componentRegistry?.resolve?.(section.component) ?? null;
+        if (!Comp) {
+          return (
+            <div className="rounded-xl border border-dashed border-[hsl(var(--border))] px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]">
+              Componente "{section.component}" no está registrado.
+            </div>
+          );
+        }
+        return (
+          <Comp data={data} apiBaseUrl={apiBaseUrl} token={token} companyId={companyId} />
+        );
+      })() : null}
 
       {section.type === "fields" ? (
         <div className="space-y-4">
