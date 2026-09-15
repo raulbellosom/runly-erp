@@ -1,5 +1,6 @@
 import { ActivityTimeline } from "@runly/ui";
 import { runly } from "../../../lib/runly";
+import { HR_EMPLOYEE_ACTIVITY_FIELD_LABELS } from "../lib/activity-field-labels.js";
 
 /**
  * Embeddable activity panel for HR Employee detail.
@@ -19,6 +20,7 @@ export default function HrEmployeeActivityPanel({ employeeId, token }) {
         limit={50}
         heightClass="max-h-[480px]"
         emptyMessage="Sin actividad registrada para este colaborador."
+        changeLabels={HR_EMPLOYEE_ACTIVITY_FIELD_LABELS}
       />
     </div>
   );
