@@ -30,6 +30,7 @@ import {
 import { resolveColorHex } from "./runly-form-utils.js";
 import { formatTableDate } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
+import { ImageAssetCell } from "./ImageAssetCell.jsx";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -844,6 +845,17 @@ export function RunlyTable({
                       ) : (
                         <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>
                       );
+                    } else if (col.type === "image-asset") {
+                      cellContent = (
+                        <ImageAssetCell
+                          value={value}
+                          row={row}
+                          token={token}
+                          apiBaseUrl={apiBaseUrl}
+                          companyId={companyId}
+                          column={col}
+                        />
+                      );
                     } else if (col.type === "markdown") {
                       cellContent = stripMarkdown(value);
                     } else if (col.type === "date") {
@@ -858,7 +870,7 @@ export function RunlyTable({
                     } else {
                       cellContent = renderValue(value);
                     }
-                    const truncateCell = !col.component && col.type !== "color" && col.type !== "image";
+                    const truncateCell = !col.component && col.type !== "color" && col.type !== "image" && col.type !== "image-asset";
                     return (
                       <TableCell
                         key={`${col.key}-${rowIndex}`}
