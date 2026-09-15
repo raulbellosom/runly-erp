@@ -14,6 +14,10 @@ import CoverageTypeBadge from "../modules/runly.fleet/components/CoverageTypeBad
 import LeadStatusBadge from "../modules/runly.growth/components/LeadStatusBadge.jsx";
 import LeadPriorityBadge from "../modules/runly.growth/components/LeadPriorityBadge.jsx";
 
+import InventoryDetailAssignmentSection from "../modules/runly.inventory/components/InventoryDetailAssignmentSection.jsx";
+import InventoryDetailCommentsSection from "../modules/runly.inventory/components/InventoryDetailCommentsSection.jsx";
+import InventoryDetailHistorySection from "../modules/runly.inventory/components/InventoryDetailHistorySection.jsx";
+
 const _isDev = Boolean(import.meta.env?.DEV);
 
 function warnDev(message) {
@@ -48,6 +52,19 @@ componentRegistry.register("runly.fleet:CoverageTypeBadge", CoverageTypeBadge);
 
 componentRegistry.register("runly.growth:LeadStatusBadge", LeadStatusBadge);
 componentRegistry.register("runly.growth:LeadPriorityBadge", LeadPriorityBadge);
+
+componentRegistry.register(
+  "runly.inventory:AssignmentSection",
+  InventoryDetailAssignmentSection,
+);
+componentRegistry.register(
+  "runly.inventory:CommentsSection",
+  InventoryDetailCommentsSection,
+);
+componentRegistry.register(
+  "runly.inventory:HistorySection",
+  InventoryDetailHistorySection,
+);
 
 // Dynamic bundle registration is done at runtime by ModuleBundleLoader
 // for modules that still use the bundle system (has_bundle=true).
