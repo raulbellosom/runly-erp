@@ -717,6 +717,41 @@ describe('deleteItem', () => {
 })
 
 // ---------------------------------------------------------------------------
+// updateItem
+// ---------------------------------------------------------------------------
+
+describe('updateItem', () => {
+  it('sends full flat before/after snapshots to logAndPublish', async () => {
+    let capturedAudit = null
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({
+          id: ITEM_ID, companyId: COMPANY_ID, enabled: true,
+          name: 'Laptop XPS', purchasePrice: 100,
+          category: null, brand: null, location: null,
+        }),
+        update: async () => ({
+          id: ITEM_ID, name: 'Laptop XPS', purchasePrice: 150,
+          category: null, brand: null, location: null,
+        }),
+      },
+    })
+    const activityBridge = {
+      logAndPublish: async (args) => { capturedAudit = args },
+    }
+    const svc = createInventoryService({ prisma, activityBridge })
+    await svc.updateItem(ITEM_ID, { purchasePrice: 150 }, COMPANY_ID)
+
+    assert.ok(capturedAudit, 'logAndPublish was called')
+    assert.equal(capturedAudit.auditEntry.action, 'inventory.item.updated')
+    assert.equal(capturedAudit.auditEntry.before.purchasePrice, 100)
+    assert.equal(capturedAudit.auditEntry.after.purchasePrice, 150)
+    assert.equal(capturedAudit.auditEntry.before.name, 'Laptop XPS')
+    assert.equal(capturedAudit.auditEntry.after.name, 'Laptop XPS')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // setItemFileCover / reorderItemFiles
 // ---------------------------------------------------------------------------
 

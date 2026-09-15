@@ -154,6 +154,33 @@ export function createInventoryService({ prisma, activityBridge }) {
     return firstImage?.fileAssetId ?? null;
   }
 
+  // Same flat shape getItem()/listItems() already expose (relation IDs
+  // resolved to names), used to build before/after audit snapshots so
+  // activity-bridge.js's computeFieldChanges can diff them into readable
+  // field-level changes instead of raw category/brand/location UUIDs.
+  function toFlatSnapshot(item) {
+    if (!item) return null
+    return {
+      name: item.name ?? null,
+      assetTag: item.assetTag ?? null,
+      itemType: item.itemType ?? null,
+      categoryName: item.category?.name ?? null,
+      brandName: item.brand?.name ?? null,
+      locationName: item.location?.name ?? null,
+      model: item.model ?? null,
+      serialNumber: item.serialNumber ?? null,
+      partNumber: item.partNumber ?? null,
+      status: item.status ?? null,
+      purchaseDate: item.purchaseDate ?? null,
+      purchasePrice: item.purchasePrice != null ? Number(item.purchasePrice) : null,
+      vendorName: item.vendorName ?? null,
+      invoiceNumber: item.invoiceNumber ?? null,
+      warrantyExpiry: item.warrantyExpiry ?? null,
+      warrantyNotes: item.warrantyNotes ?? null,
+      notes: item.notes ?? null,
+    }
+  }
+
   async function getItem(id, companyId) {
     assertCompany(companyId);
     const item = await prisma.invItem.findFirst({
@@ -341,7 +368,14 @@ export function createInventoryService({ prisma, activityBridge }) {
 
   async function updateItem(id, data, companyId) {
     assertCompany(companyId);
-    const existing = await prisma.invItem.findFirst({ where: { id, companyId, enabled: true } });
+    const existing = await prisma.invItem.findFirst({
+      where: { id, companyId, enabled: true },
+      include: {
+        category: { select: { id: true, name: true } },
+        brand: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+      },
+    });
     if (!existing) throw new InventoryServiceError('Item not found', 404);
     await assertRefInCompany('invCategory', data.categoryId, companyId, 'La categoria');
     await assertRefInCompany('invBrand', data.brandId, companyId, 'La marca');
@@ -422,7 +456,8 @@ export function createInventoryService({ prisma, activityBridge }) {
           entityType: 'InvItem',
           entityId: id,
           action: 'inventory.item.updated',
-          after: { fields: Object.keys(updateData), name: result?.name ?? null },
+          before: toFlatSnapshot(existing),
+          after: toFlatSnapshot(result),
         },
         hint: { verb: 'updated', label: result?.name ?? id },
         companyId,
@@ -446,7 +481,8 @@ export function createInventoryService({ prisma, activityBridge }) {
         entityType: 'InvItem',
         entityId: id,
         action: 'inventory.item.updated',
-        after: { fields: Object.keys(updateData), name: updated?.name ?? null },
+        before: toFlatSnapshot(existing),
+        after: toFlatSnapshot(updated),
       },
       hint: { verb: 'updated', label: updated.name ?? id },
       companyId,
