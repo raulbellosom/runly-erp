@@ -20,7 +20,7 @@ import { LoadingState } from "./LoadingState.jsx";
 import { OfficeAttachmentAction } from "./OfficeAttachmentAction.jsx";
 import { Alert, AlertDescription, AlertTitle } from "./Alert.jsx";
 import { Input } from "./Input.jsx";
-import { FileViewer } from "./FileViewer.jsx";
+import { AdvancedFileViewer } from "./AdvancedFileViewer.jsx";
 import {
   resolveAttachmentFileType,
   useAttachmentsController,
@@ -873,23 +873,23 @@ export function AttachmentsPanel({
         )}
       </div>
 
-      <FileViewer
+      <AdvancedFileViewer
         open={Boolean(controller.viewerItem)}
-        onClose={controller.closeViewer}
-        file={controller.viewerItem}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) controller.closeViewer();
+        }}
         files={viewerFiles}
         activeIndex={viewerIndex}
-        onActiveIndexChange={(nextIndex) => {
+        onIndexChange={(nextIndex) => {
           const target = controller.associatedItems[nextIndex];
           if (!target) return;
           handleOpenAssociated(target);
         }}
-        onResolveFile={async (item) => {
+        onResolveSignedUrl={async (item) => {
           if (item?.signedUrl) return item.signedUrl;
           if (!item?.fileAssetId) return null;
           return controller.resolveSignedUrl(item.fileAssetId);
         }}
-        title="Documento"
       />
     </div>
   );
