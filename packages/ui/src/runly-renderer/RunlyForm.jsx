@@ -24,6 +24,8 @@ import {
 import { MarkdownField } from "../components/MarkdownField.jsx";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.jsx";
 import { DatePickerField } from "../components/DatePickerField.jsx";
+import { FormCompletionRing } from "../components/FormCompletionRing.jsx";
+import { FormPreviewPanel } from "../components/FormPreviewPanel.jsx";
 import { ReportPartsEditor } from "./ReportPartsEditor.jsx";
 import { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
 import { DynamicFieldsSection, buildCustomFieldsPayload } from "./DynamicFieldsSection.jsx";
@@ -91,6 +93,29 @@ function isFieldVisible(field, formValues) {
     return false;
   }
   return true;
+}
+
+function formatDisplayValue(field, value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (field.type === "currency" || field.type === "decimal") {
+    const amount = Number(value ?? 0);
+    return Number.isFinite(amount)
+      ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount)
+      : null;
+  }
+  if (field.type === "date") {
+    const str = String(value);
+    const datePart = str.includes("T") ? str.slice(0, 10) : str;
+    const [year, month, day] = datePart.split("-");
+    return year && month && day ? `${day}/${month}/${year}` : str;
+  }
+  if (field.type === "boolean") return value ? "Sí" : "No";
+  if (field.type === "select" || field.type === "relation") {
+    const options = normalizeOptions(field.options);
+    const found = options.find((o) => String(o.value) === String(value));
+    return found?.label ?? String(value);
+  }
+  return String(value);
 }
 
 function buildResetInitialDataToken(initialData, mode) {
@@ -902,25 +927,7 @@ export function RunlyForm({
     };
 
     if (field.readonly) {
-      let displayValue;
-      if (value === undefined || value === null || value === "") {
-        displayValue = "—";
-      } else if (field.type === "currency" || field.type === "decimal") {
-        const amount = Number(value ?? 0);
-        displayValue = Number.isFinite(amount)
-          ? new Intl.NumberFormat("es-MX", {
-              style: "currency",
-              currency: "MXN",
-            }).format(amount)
-          : "—";
-      } else if (field.type === "date") {
-        const str = String(value);
-        const datePart = str.includes("T") ? str.slice(0, 10) : str;
-        const [year, month, day] = datePart.split("-");
-        displayValue = year && month && day ? `${day}/${month}/${year}` : str;
-      } else {
-        displayValue = String(value);
-      }
+      const displayValue = formatDisplayValue(field, value) ?? "—";
       return (
         <div className="space-y-1.5">
           <p className="text-sm font-medium text-[hsl(var(--foreground))]">
@@ -1340,6 +1347,39 @@ export function RunlyForm({
     );
   };
 
+  const previewConfig = schema.preview ?? null;
+  const showCompletion = schema.showCompletion === true;
+
+  const allFieldNames = [...fieldMap.keys()];
+  const filledCount = allFieldNames.filter((name) => {
+    const field = fieldMap.get(name);
+    if (!isFieldVisible(field, formValues)) return false;
+    const value = formValues[name];
+    return value !== undefined && value !== null && String(value).trim() !== "";
+  }).length;
+  const completionPercent = allFieldNames.length > 0 ? (filledCount / allFieldNames.length) * 100 : 0;
+
+  const previewModel = previewConfig
+    ? {
+        title: previewConfig.titleField ? String(formValues[previewConfig.titleField] ?? "") : "",
+        subtitle: (Array.isArray(previewConfig.subtitleFields) ? previewConfig.subtitleFields : [])
+          .map((name) => formValues[name])
+          .filter((v) => v !== undefined && v !== null && String(v).trim() !== "")
+          .join(" · "),
+        rows: (Array.isArray(previewConfig.rows) ? previewConfig.rows : [])
+          .map((row) => {
+            const field = fieldMap.get(row.field);
+            if (!field) return null;
+            return {
+              key: row.field,
+              label: row.label ?? field.label,
+              value: formatDisplayValue(field, formValues[row.field]),
+            };
+          })
+          .filter(Boolean),
+      }
+    : null;
+
   return (
     <form id={id} className="space-y-6" onSubmit={handleSubmit}>
       {sections.length === 0 && (
@@ -1351,9 +1391,17 @@ export function RunlyForm({
         </Alert>
       )}
 
+      {showCompletion ? (
+        <FormCompletionRing
+          percent={completionPercent}
+          filledCount={filledCount}
+          totalCount={allFieldNames.length}
+        />
+      ) : null}
+
       <div
         className={
-          asideSections.length > 0
+          asideSections.length > 0 || previewModel
             ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]"
             : "space-y-3"
         }
@@ -1361,8 +1409,15 @@ export function RunlyForm({
         <div className="space-y-3">
           {mainSections.map((section) => renderSection(section))}
         </div>
-        {asideSections.length > 0 ? (
+        {asideSections.length > 0 || previewModel ? (
           <div className="space-y-3 xl:sticky xl:top-4 xl:self-start">
+            {previewModel ? (
+              <FormPreviewPanel
+                title={previewModel.title}
+                subtitle={previewModel.subtitle}
+                rows={previewModel.rows}
+              />
+            ) : null}
             {asideSections.map((section) => renderSection(section))}
           </div>
         ) : null}
