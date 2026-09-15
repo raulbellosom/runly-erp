@@ -479,6 +479,15 @@ export const fileBulkDownloadSchema = z.object({
   mode: z.enum(["direct", "zip"]),
 });
 
+export const filesReorderSchema = z.object({
+  moduleKey: z.string().trim().min(1),
+  entityType: z.string().trim().min(1),
+  entityId: z.string().uuid(),
+  orderedIds: z
+    .array(z.string().uuid())
+    .min(1, "Debes incluir al menos un archivo."),
+});
+
 export const createLedgerAccountSchema = z.object({
   name: z.string().trim().min(2, "El nombre es obligatorio.").max(120),
   type: z.enum(["banco", "caja", "cliente", "proveedor", "otro"]),

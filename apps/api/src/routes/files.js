@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createFilesWorkspaceRouter } from './files-workspace.js';
-import { fileBulkDownloadSchema, fileRenameSchema } from "@runly/validators";
+import { fileBulkDownloadSchema, fileRenameSchema, filesReorderSchema } from "@runly/validators";
 import { FilesServiceError } from "../services/files-service.js";
 import { FileAccessError } from "../services/files/access.js";
 import { getActivityContext, publishActivityFromContext } from "../services/activity-publisher.js";
@@ -371,6 +371,57 @@ app.delete(
   },
 );
 
+app.patch(
+  "/files/:id/cover",
+  authMiddleware,
+  requirePermission("files.assets.update"),
+  async (c) => {
+    try {
+      const authUserId = c.get("authUserId");
+      const id = c.req.param("id");
+      const file = await filesService.setFileCover({
+        authUserId,
+        activeContext: tenantActiveContext(c),
+        id,
+      });
+      return c.json({ data: file });
+    } catch (err) {
+      if (err instanceof FilesServiceError || err instanceof FileAccessError) {
+        return c.json({ error: err.message }, err.status);
+      }
+      return c.json({ error: "No se pudo marcar la portada." }, 500);
+    }
+  },
+);
+
+app.post(
+  "/files/reorder",
+  authMiddleware,
+  requirePermission("files.assets.update"),
+  async (c) => {
+    try {
+      const authUserId = c.get("authUserId");
+      const parsed = filesReorderSchema.safeParse(await c.req.json());
+      if (!parsed.success) {
+        return c.json(
+          { error: parsed.error.errors?.[0]?.message ?? "Datos invalidos." },
+          400,
+        );
+      }
+      const files = await filesService.reorderFiles({
+        authUserId,
+        activeContext: tenantActiveContext(c),
+        ...parsed.data,
+      });
+      return c.json({ data: files });
+    } catch (err) {
+      if (err instanceof FilesServiceError || err instanceof FileAccessError) {
+        return c.json({ error: err.message }, err.status);
+      }
+      return c.json({ error: "No se pudo reordenar." }, 500);
+    }
+  },
+);
 
   return app;
 }
