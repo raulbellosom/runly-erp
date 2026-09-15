@@ -709,6 +709,17 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           method: "DELETE",
           headers: withAuthHeaders(token),
         }),
+      setCover: (id, token) =>
+        request(`/files/${encodeURIComponent(id)}/cover`, {
+          method: "PATCH",
+          headers: withAuthHeaders(token),
+        }),
+      reorder: (payload, token) =>
+        request("/files/reorder", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(payload),
+        }),
     },
     ledger: {
       listAccounts: (token, options = {}) =>
