@@ -507,6 +507,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                       token={token}
                 companyId={companyId}
                       apiBaseUrl={apiBaseUrl}
+                      componentRegistry={componentRegistry}
                       onBack={heroEnabled ? goToList : undefined}
                       heroActions={heroEnabled ? detailActions : undefined}
                     />

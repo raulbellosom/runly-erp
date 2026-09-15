@@ -10,6 +10,7 @@ import DriverAssignedVehicleCell from "../modules/runly.fleet/components/DriverA
 import VehicleImageCell from "../modules/runly.fleet/components/VehicleImageCell.jsx";
 import InsuranceBadgeCell from "../modules/runly.fleet/components/InsuranceBadgeCell.jsx";
 import CoverageTypeBadge from "../modules/runly.fleet/components/CoverageTypeBadge.jsx";
+import FleetVehicleHistorySection from "../modules/runly.fleet/components/FleetVehicleHistorySection.jsx";
 
 import LeadStatusBadge from "../modules/runly.growth/components/LeadStatusBadge.jsx";
 import LeadPriorityBadge from "../modules/runly.growth/components/LeadPriorityBadge.jsx";
@@ -49,6 +50,10 @@ componentRegistry.register(
   InsuranceBadgeCell,
 );
 componentRegistry.register("runly.fleet:CoverageTypeBadge", CoverageTypeBadge);
+componentRegistry.register(
+  "runly.fleet:HistorySection",
+  FleetVehicleHistorySection,
+);
 
 componentRegistry.register("runly.growth:LeadStatusBadge", LeadStatusBadge);
 componentRegistry.register("runly.growth:LeadPriorityBadge", LeadPriorityBadge);

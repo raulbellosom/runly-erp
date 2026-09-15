@@ -529,6 +529,14 @@ const VEHICLE_DETAIL = {
           },
         },
       },
+      {
+        id: "history",
+        type: "component",
+        label: "Actividad",
+        icon: "History",
+        column: "aside",
+        component: "runly.fleet:HistorySection",
+      },
     ],
     headerActions: [
       {
