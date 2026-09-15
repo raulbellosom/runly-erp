@@ -26,6 +26,7 @@ import {
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { cn } from "../lib/utils.js";
 import { useIsolatedScroll } from "../hooks/useIsolatedScroll.js";
+import { useComboboxPopover, computeDropdownStyle } from "../hooks/useComboboxPopover.js";
 import { LoadingState } from "./LoadingState.jsx";
 import {
   FIELD_BASE,
@@ -47,57 +48,6 @@ import { TimeWheel } from "./TimeWheel.jsx";
 import { Button } from "./Button.jsx";
 
 export { FieldWrapper };
-
-// ─── computeDropdownStyle ─────────────────────────────────────────────────────
-// Calculates `position:fixed` coordinates for a floating dropdown anchored to
-// `containerEl`. Works correctly even when the dropdown is rendered inside an
-// ancestor that has `backdrop-filter` or `transform` — both properties create a
-// new containing block for `position:fixed` descendants (CSS spec). In that case
-// the browser treats the fixed element's top/left as relative to that ancestor,
-// so we subtract the ancestor's getBoundingClientRect offsets.
-function computeDropdownStyle(
-  containerEl,
-  dropHeight = 320,
-  minWidth = 220,
-  forPortal = false,
-) {
-  const r = containerEl.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - r.bottom;
-  const flipped = spaceBelow < dropHeight;
-  const viewportLeft = r.left;
-  const width = Math.max(r.width, minWidth);
-
-  // When rendering via createPortal (at document.body), position:fixed is always
-  // relative to the viewport — no ancestor adjustment needed.
-  if (forPortal) {
-    if (flipped) {
-      // Anchor the dropdown's bottom edge 4px above the trigger so the
-      // search input stays adjacent regardless of actual dropdown height.
-      return { bottom: window.innerHeight - r.top + 4, left: viewportLeft, width, flipped: true };
-    }
-    return { top: r.bottom + 4, left: viewportLeft, width, flipped: false };
-  }
-
-  const viewportTop = flipped
-    ? Math.max(0, r.top - dropHeight - 4)
-    : r.bottom + 4;
-
-  // Walk up the DOM and look for the nearest ancestor that acts as the containing
-  // block for fixed-positioned children (backdrop-filter or active transform).
-  let el = containerEl.parentElement;
-  while (el && el !== document.documentElement) {
-    const cs = window.getComputedStyle(el);
-    const bf = cs.backdropFilter || cs.webkitBackdropFilter || "none";
-    const tf = cs.transform || "none";
-    if (bf !== "none" || (tf !== "none" && tf !== "matrix(1, 0, 0, 1, 0, 0)")) {
-      const pr = el.getBoundingClientRect();
-      return { top: viewportTop - pr.top, left: viewportLeft - pr.left, width };
-    }
-    el = el.parentElement;
-  }
-
-  return { top: viewportTop, left: viewportLeft, width };
-}
 
 // ─── TextField ────────────────────────────────────────────────────────────────
 
@@ -1683,12 +1633,10 @@ export function ComboboxField({
   className,
 }) {
   const handleChange = onChange ?? onValueChange;
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState({});
-  const containerRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const searchRef = useRef(null);
+  const {
+    open, setOpen, search, setSearch, dropdownStyle,
+    containerRef, dropdownRef, searchRef, handleOpen: handlePopoverOpen, close,
+  } = useComboboxPopover({ dropHeight: 260, minWidth: 220 });
   // Portaled dropdown: keep wheel/touch scroll working inside a Dialog/Sheet.
   useIsolatedScroll(dropdownRef, open);
 
@@ -1703,38 +1651,15 @@ export function ComboboxField({
         ? []
         : options.slice(0, 200);
 
-  useEffect(() => {
-    function handleOutside(e) {
-      if (
-        !containerRef.current?.contains(e.target) &&
-        !dropdownRef.current?.contains(e.target)
-      ) {
-        setOpen(false);
-        setSearch("");
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
-
   function handleOpen() {
-    const willOpen = !open;
-    if (willOpen && containerRef.current) {
-      setDropdownStyle(
-        computeDropdownStyle(containerRef.current, 260, 220, true),
-      );
-    }
-    setOpen((o) => !o);
-    if (willOpen && options.length === 0) {
-      onSearchChange?.("");
-    }
-    setTimeout(() => searchRef.current?.focus(), 50);
+    handlePopoverOpen(() => {
+      if (options.length === 0) onSearchChange?.("");
+    });
   }
 
   function handleSelect(opt) {
     handleChange(opt.value);
-    setOpen(false);
-    setSearch("");
+    close();
   }
 
   return (
@@ -1796,7 +1721,7 @@ export function ComboboxField({
                 pointerEvents: "auto",
               }}
               className={cn(
-                "rounded-xl border border-border/80 bg-card text-foreground shadow-xl overflow-hidden",
+                "glass-shell rounded-xl overflow-hidden",
                 dropdownStyle.flipped && "flex flex-col-reverse",
               )}
             >
