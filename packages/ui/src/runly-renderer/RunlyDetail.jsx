@@ -52,6 +52,11 @@ const STATUS_LABELS = {
   disabled: "Desactivado",
   draft: "Borrador",
   finalized: "Finalizado",
+  available: "Disponible",
+  assigned: "Asignado",
+  lost: "Perdido",
+  stolen: "Robado",
+  disposed: "Desechado",
 };
 
 const STATUS_COLORS = {
@@ -63,6 +68,11 @@ const STATUS_COLORS = {
   disabled: "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
   draft: "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
   finalized: "bg-green-500/15 text-green-700 dark:text-green-400",
+  available: "bg-green-500/15 text-green-700 dark:text-green-400",
+  assigned: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  lost: "bg-red-500/15 text-red-700 dark:text-red-400",
+  stolen: "bg-red-500/15 text-red-700 dark:text-red-400",
+  disposed: "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
 };
 
 function formatDetailDate(value, includeTime = false) {
