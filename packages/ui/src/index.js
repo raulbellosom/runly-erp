@@ -217,6 +217,7 @@ export { SwatchField, DEFAULT_SWATCHES } from "./components/SwatchField.jsx";
 export { ProgressMeter } from "./components/ProgressMeter.jsx";
 export { RingProgress } from "./components/RingProgress.jsx";
 export { SectionCard } from "./components/SectionCard.jsx";
+export { DetailActionBar } from "./components/DetailActionBar.jsx";
 export { SearchInput } from "./components/SearchInput.jsx";
 export { FilterBar } from "./components/FilterBar.jsx";
 export { IconPickerField } from "./components/IconPickerField.jsx";
