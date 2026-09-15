@@ -767,6 +767,71 @@ export function createFilesService({ prisma, supabaseAdmin }) {
       return { ok: true };
     },
 
+    async setFileCover({ authUserId, activeContext, id }) {
+      const context = await getUserCompanyContext(authUserId, activeContext);
+      const { companyId } = context;
+      const file = await ensureFileBelongsToCompany({
+        fileId: id,
+        companyId,
+        context,
+        includeDisabled: false,
+      });
+      const sourceEntityId = file.metadata?.sourceEntityId ?? null;
+      if (!file.moduleKey || !file.entityType || !sourceEntityId) {
+        throw new FilesServiceError(
+          "Este archivo no pertenece a un grupo con portada.",
+          400,
+        );
+      }
+      await prisma.fileAsset.updateMany({
+        where: {
+          entityId: companyId,
+          moduleKey: file.moduleKey,
+          entityType: file.entityType,
+          metadata: { path: ["sourceEntityId"], equals: sourceEntityId },
+        },
+        data: { isCover: false },
+      });
+      return prisma.fileAsset.update({
+        where: { id: file.id },
+        data: { isCover: true },
+      });
+    },
+
+    // Scoped by entityId: companyId — every FileAsset created through the
+    // generic upload() above always sets entityId to the uploader's
+    // companyId (see upload(), "const entityId = context.companyId"), so
+    // this is real company scoping, not just HR-specific convention, and it
+    // means a group id from a different company can never match here even
+    // if the caller passes an entityId belonging to another company's record.
+    async reorderFiles({ authUserId, activeContext, moduleKey, entityType, entityId, orderedIds }) {
+      const { companyId } = await getUserCompanyContext(authUserId, activeContext);
+      if (!Array.isArray(orderedIds) || orderedIds.length === 0) return [];
+      const group = await prisma.fileAsset.findMany({
+        where: {
+          entityId: companyId,
+          moduleKey,
+          entityType,
+          metadata: { path: ["sourceEntityId"], equals: entityId },
+        },
+        select: { id: true },
+      });
+      const groupIds = new Set(group.map((row) => row.id));
+      const safeOrderedIds = orderedIds.filter((fileId) => groupIds.has(fileId));
+      await prisma.$transaction(
+        safeOrderedIds.map((fileId, index) =>
+          prisma.fileAsset.update({
+            where: { id: fileId },
+            data: { sortOrder: index },
+          }),
+        ),
+      );
+      return prisma.fileAsset.findMany({
+        where: { id: { in: safeOrderedIds } },
+        orderBy: { sortOrder: "asc" },
+      });
+    },
+
     async enrichFileAssets(fileAssets) {
       return enrichModuleAssets(fileAssets);
     },
