@@ -193,6 +193,31 @@ export function createInventoryRouter({
     }
   });
 
+  router.patch("/inventory/items/:id/files/:docId/cover", requirePermission("inventory.item.update"), async (c) => {
+    try {
+      const companyId = c.get("companyId");
+      const { id, docId } = c.req.param();
+      const record = await inventoryService.setItemFileCover(id, docId, companyId);
+      return c.json({ data: record });
+    } catch (err) {
+      if (isInvErr(err)) return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudo marcar la portada." }, 500);
+    }
+  });
+
+  router.patch("/inventory/items/:id/files/reorder", requirePermission("inventory.item.update"), async (c) => {
+    try {
+      const companyId = c.get("companyId");
+      const { id } = c.req.param();
+      const { items } = await c.req.json();
+      await inventoryService.reorderItemFiles(id, companyId, items);
+      return c.json({ ok: true });
+    } catch (err) {
+      if (isInvErr(err)) return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudo reordenar." }, 500);
+    }
+  });
+
   // ── Comments ─────────────────────────────────────────────────────────────
   router.get("/inventory/items/:id/comments", requirePermission("inventory.item.read"), async (c) => {
     try {
