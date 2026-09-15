@@ -1302,7 +1302,7 @@ export function RunlyForm({
       <div
         key={section.id}
         className={cn(
-          "rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-5 py-4 space-y-4",
+          "glass rounded-xl px-5 py-4 space-y-4",
           header && isCollapsible && !isCollapsed && "pb-5",
         )}
       >
