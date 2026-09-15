@@ -9,6 +9,7 @@ import {
   Button,
   TextField,
   CurrencyField,
+  DateField,
 } from "@runly/ui";
 import { useAdjustWalletBalance } from "../hooks/use-pfm-queries";
 import { formatMoney, todayIso, creditUsage } from "../lib/format";
@@ -87,9 +88,8 @@ export function AdjustBalanceSheet({ open, onOpenChange, wallet }) {
             value={Number(target) || 0}
             onChange={(v) => setTarget(String(v))}
           />
-          <TextField
+          <DateField
             label="Fecha"
-            type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />

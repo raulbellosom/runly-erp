@@ -374,9 +374,10 @@ function AssociatedCard({
   const typeStyle = getTypeStyle(item);
   const sizeText = item?.sizeBytes != null ? formatBytes(item.sizeBytes) : null;
   const dateText = item?.createdAt ? formatDate(item.createdAt) : null;
+  const metaText = [sizeText, dateText].filter(Boolean).join(" · ");
 
   return (
-    <article className="group flex items-center gap-2.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2.5 py-2 transition-colors hover:bg-[hsl(var(--muted))]/30">
+    <article className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-[hsl(var(--muted))]">
       {previewUrl ? (
         <button
           type="button"
@@ -393,24 +394,16 @@ function AssociatedCard({
 
       <div className="min-w-0 flex-1">
         <p
-          className="truncate text-sm font-medium text-[hsl(var(--foreground))]"
+          className="truncate text-xs font-medium text-[hsl(var(--foreground))]"
           title={item.fileName}
         >
           {item.fileName ?? "Archivo"}
         </p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-          <FileTypeBadge typeStyle={typeStyle} />
-          {sizeText && (
-            <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
-              {sizeText}
-            </span>
-          )}
-          {dateText && (
-            <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
-              {dateText}
-            </span>
-          )}
-        </div>
+        {metaText && (
+          <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
+            {metaText}
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
@@ -480,10 +473,10 @@ function AssociatedFilesList({
       <div className="space-y-3">
         {images.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
               Multimedia ({images.length})
             </p>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 md:grid-cols-6">
               {images.map((item, index) => {
                 const isVideo = String(item.mimeType ?? "").startsWith("video/");
                 return (
@@ -510,11 +503,11 @@ function AssociatedFilesList({
         {others.length > 0 && (
           <div>
             {images.length > 0 && (
-              <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
                 Documentos ({others.length})
               </p>
             )}
-            <div className="space-y-1.5">
+            <div className="space-y-0.5">
               {others.map((item) => (
                 <AssociatedCard
                   key={item.id}
