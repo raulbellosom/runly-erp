@@ -36,6 +36,7 @@ import {
 import { cn } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { normalizeField, normalizeSections } from "./runly-form-schema.js";
+import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
 import {
   PRESET_COLORS,
   CAR_COLORS,
@@ -93,29 +94,6 @@ function isFieldVisible(field, formValues) {
     return false;
   }
   return true;
-}
-
-function formatDisplayValue(field, value) {
-  if (value === undefined || value === null || value === "") return null;
-  if (field.type === "currency" || field.type === "decimal") {
-    const amount = Number(value ?? 0);
-    return Number.isFinite(amount)
-      ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount)
-      : null;
-  }
-  if (field.type === "date") {
-    const str = String(value);
-    const datePart = str.includes("T") ? str.slice(0, 10) : str;
-    const [year, month, day] = datePart.split("-");
-    return year && month && day ? `${day}/${month}/${year}` : str;
-  }
-  if (field.type === "boolean") return value ? "Sí" : "No";
-  if (field.type === "select" || field.type === "relation") {
-    const options = normalizeOptions(field.options);
-    const found = options.find((o) => String(o.value) === String(value));
-    return found?.label ?? String(value);
-  }
-  return String(value);
 }
 
 function buildResetInitialDataToken(initialData, mode) {
@@ -1349,36 +1327,8 @@ export function RunlyForm({
 
   const previewConfig = schema.preview ?? null;
   const showCompletion = schema.showCompletion === true;
-
-  const allFieldNames = [...fieldMap.keys()];
-  const filledCount = allFieldNames.filter((name) => {
-    const field = fieldMap.get(name);
-    if (!isFieldVisible(field, formValues)) return false;
-    const value = formValues[name];
-    return value !== undefined && value !== null && String(value).trim() !== "";
-  }).length;
-  const completionPercent = allFieldNames.length > 0 ? (filledCount / allFieldNames.length) * 100 : 0;
-
-  const previewModel = previewConfig
-    ? {
-        title: previewConfig.titleField ? String(formValues[previewConfig.titleField] ?? "") : "",
-        subtitle: (Array.isArray(previewConfig.subtitleFields) ? previewConfig.subtitleFields : [])
-          .map((name) => formValues[name])
-          .filter((v) => v !== undefined && v !== null && String(v).trim() !== "")
-          .join(" · "),
-        rows: (Array.isArray(previewConfig.rows) ? previewConfig.rows : [])
-          .map((row) => {
-            const field = fieldMap.get(row.field);
-            if (!field) return null;
-            return {
-              key: row.field,
-              label: row.label ?? field.label,
-              value: formatDisplayValue(field, formValues[row.field]),
-            };
-          })
-          .filter(Boolean),
-      }
-    : null;
+  const { allFieldNames, filledCount, completionPercent } = computeCompletion(fieldMap, formValues, isFieldVisible);
+  const previewModel = computePreviewModel(previewConfig, fieldMap, formValues);
 
   return (
     <form id={id} className="space-y-6" onSubmit={handleSubmit}>
