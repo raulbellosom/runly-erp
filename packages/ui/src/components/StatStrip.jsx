@@ -11,9 +11,50 @@ function StatIcon({ name, className }) {
 // Responsive key-figures strip.
 //   items: [{ key, label, value (ReactNode), icon (lucide name), href }]
 // Mobile: horizontal snap-scroll carousel. sm+: 3-up grid. lg+: 6-up grid.
-export function StatStrip({ items, className }) {
+//   bare: when true, renders as flat divided columns with no per-tile Card,
+//         for callers (HeroContainer) that place this beneath a `bare`
+//         DetailHero inside one shared outer card.
+export function StatStrip({ items, className, bare = false }) {
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   if (list.length === 0) return null;
+
+  if (bare) {
+    return (
+      <div
+        className={cn(
+          "grid grid-cols-2 divide-x divide-y divide-[hsl(var(--border))] border-t border-[hsl(var(--border))] sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-6",
+          className,
+        )}
+      >
+        {list.map((item) => {
+          const body = (
+            <div className="flex h-full flex-col justify-center gap-1 px-4 py-3 sm:px-5">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                <StatIcon name={item.icon} className="h-3 w-3 shrink-0" />
+                {item.label}
+              </span>
+              <span className="truncate text-sm font-semibold text-[hsl(var(--foreground))]">
+                {item.value}
+              </span>
+            </div>
+          );
+
+          if (item.href) {
+            return (
+              <a
+                key={item.key}
+                href={item.href}
+                className="block transition-colors hover:bg-[hsl(var(--muted))]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-inset"
+              >
+                {body}
+              </a>
+            );
+          }
+          return <div key={item.key}>{body}</div>;
+        })}
+      </div>
+    );
+  }
 
   return (
     <div

@@ -18,6 +18,10 @@ function GlyphIcon({ name, className, fallback = "FileText" }) {
 //   accentHex   string | null   (tints the fallback panel)
 //   chips       [{ key, label, value, icon, type, colorHex }]
 //   actions     ReactNode | null
+//   bare        bool — when true, renders just the inner content with no Card
+//               wrapper, for callers (HeroContainer) that place this inside
+//               their own outer card alongside a StatStrip (also `bare`), so
+//               the two read as one continuous card instead of two stacked ones
 export function DetailHero({
   title,
   subtitle,
@@ -28,10 +32,10 @@ export function DetailHero({
   accentHex,
   chips,
   actions,
+  bare = false,
 }) {
   const chipList = Array.isArray(chips) ? chips : [];
-  return (
-    <Card variant="shell" className="overflow-hidden p-4 sm:p-5">
+  const inner = (
       <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
         <div className="w-full shrink-0 sm:w-56">
           <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[hsl(var(--border))] sm:aspect-[4/3]">
@@ -114,6 +118,12 @@ export function DetailHero({
           ) : null}
         </div>
       </div>
+  );
+
+  if (bare) return <div className="p-4 sm:p-5">{inner}</div>;
+  return (
+    <Card variant="shell" className="overflow-hidden p-4 sm:p-5">
+      {inner}
     </Card>
   );
 }

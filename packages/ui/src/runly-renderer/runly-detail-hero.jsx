@@ -3,6 +3,7 @@
 // RunlyDetail.jsx to keep that file under the repo file-size budget.
 import { useEffect, useState } from "react";
 import { Badge } from "../components/Badge.jsx";
+import { Card } from "../components/Card.jsx";
 import { DetailHero } from "../components/DetailHero.jsx";
 import { StatStrip } from "../components/StatStrip.jsx";
 import { replacePathTokens } from "./detail-presentation.js";
@@ -152,8 +153,19 @@ export function HeroContainer({
   }));
 
   return (
-    <div className="space-y-4">
+    <Card
+      variant="shell"
+      className="overflow-hidden"
+      style={
+        heroModel.accentHex
+          ? {
+              backgroundImage: `radial-gradient(circle at 15% 20%, color-mix(in srgb, ${heroModel.accentHex} 12%, transparent), transparent 60%)`,
+            }
+          : undefined
+      }
+    >
       <DetailHero
+        bare
         title={heroModel.title}
         subtitle={heroModel.subtitle}
         statusNode={
@@ -166,7 +178,7 @@ export function HeroContainer({
         chips={heroModel.chips}
         actions={actions}
       />
-      {kpiRenderItems.length > 0 ? <StatStrip items={kpiRenderItems} /> : null}
-    </div>
+      {kpiRenderItems.length > 0 ? <StatStrip bare items={kpiRenderItems} /> : null}
+    </Card>
   );
 }
