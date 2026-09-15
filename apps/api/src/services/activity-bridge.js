@@ -153,6 +153,36 @@ const TRANSLATORS = {
     severity: "warning",
     link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
   }),
+  "fleet.vehicle.create": ({ actor, entityId, after }) => ({
+    type: "fleet.vehicle.create",
+    summary: `${actorName(actor)} registró el vehículo ${safeStr(after?.plate)}`.trim(),
+    severity: "success",
+    link: entityId ? `/app/m/runly.fleet/vehicles/${entityId}` : undefined,
+  }),
+  "fleet.vehicle.update": ({ actor, entityId, after }) => ({
+    type: "fleet.vehicle.update",
+    summary: `${actorName(actor)} actualizó el vehículo ${safeStr(after?.plate)}`.trim(),
+    severity: "info",
+    link: entityId ? `/app/m/runly.fleet/vehicles/${entityId}` : undefined,
+  }),
+  "fleet.vehicle.disable": ({ actor, entityId, after, metadata }) => ({
+    type: "fleet.vehicle.disable",
+    summary: `${actorName(actor)} ${metadata?.enabled === false ? "dio de baja" : "reactivó"} el vehículo ${safeStr(after?.plate)}`.trim(),
+    severity: metadata?.enabled === false ? "warning" : "success",
+    link: entityId ? `/app/m/runly.fleet/vehicles/${entityId}` : undefined,
+  }),
+  "fleet.vehicle.document.add": ({ actor, entityId, after }) => ({
+    type: "fleet.vehicle.document.add",
+    summary: `${actorName(actor)} agregó el documento ${safeStr(after?.label || after?.document_type)}`.trim(),
+    severity: "info",
+    link: entityId ? `/app/m/runly.fleet/vehicles/${entityId}` : undefined,
+  }),
+  "fleet.vehicle.document.remove": ({ actor, entityId, before }) => ({
+    type: "fleet.vehicle.document.remove",
+    summary: `${actorName(actor)} eliminó el documento ${safeStr(before?.label || before?.document_type)}`.trim(),
+    severity: "warning",
+    link: entityId ? `/app/m/runly.fleet/vehicles/${entityId}` : undefined,
+  }),
 };
 
 export function registerTranslator(action, translator) {

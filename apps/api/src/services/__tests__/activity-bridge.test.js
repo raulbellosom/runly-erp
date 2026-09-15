@@ -199,6 +199,58 @@ describe("activity-bridge", () => {
     assert.equal(a.severity, "warning");
   });
 
+  it("has translators registered for fleet vehicle actions", () => {
+    assert.ok(getTranslator("fleet.vehicle.create"));
+    assert.ok(getTranslator("fleet.vehicle.update"));
+    assert.ok(getTranslator("fleet.vehicle.disable"));
+    assert.ok(getTranslator("fleet.vehicle.document.add"));
+    assert.ok(getTranslator("fleet.vehicle.document.remove"));
+  });
+
+  it("translates fleet.vehicle.update into a real Spanish sentence with a diff", async () => {
+    const prisma = buildPrismaMock();
+    const activityService = buildActivityServiceMock();
+    const bridge = createActivityBridge({ prisma, activityService });
+    await bridge.publishFromAudit({
+      auditEntry: {
+        actorId: USER_ID,
+        action: "fleet.vehicle.update",
+        entityType: "Vehicle",
+        entityId: ENTITY_ID,
+        before: { plate: "PVR-8109", color: "Rojo" },
+        after: { plate: "PVR-8109", color: "Azul" },
+      },
+      companyId: COMPANY_ID,
+    });
+    const a = activityService._published[0];
+    assert.equal(a.type, "fleet.vehicle.update");
+    assert.ok(a.summary.includes("PVR-8109"));
+    assert.equal(a.link, `/app/m/runly.fleet/vehicles/${ENTITY_ID}`);
+    assert.deepEqual(a.payload.changes, [
+      { field: "color", oldValue: "Rojo", newValue: "Azul" },
+    ]);
+  });
+
+  it("translates fleet.vehicle.disable differently for disabling vs re-enabling", async () => {
+    const prisma = buildPrismaMock();
+    const activityService = buildActivityServiceMock();
+    const bridge = createActivityBridge({ prisma, activityService });
+    await bridge.publishFromAudit({
+      auditEntry: {
+        actorId: USER_ID,
+        action: "fleet.vehicle.disable",
+        entityType: "Vehicle",
+        entityId: ENTITY_ID,
+        after: { plate: "PVR-8109" },
+        metadata: { enabled: false },
+      },
+      companyId: COMPANY_ID,
+    });
+    const a = activityService._published[0];
+    assert.ok(a.summary.includes("dio de baja"));
+    assert.equal(a.severity, "warning");
+  });
+
   it("computeFieldChanges returns [] when nothing differs", () => {
     const changes = computeFieldChanges(
       { name: "Laptop", purchasePrice: 100 },
