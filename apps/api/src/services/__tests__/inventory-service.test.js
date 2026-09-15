@@ -609,3 +609,45 @@ describe('getItem', () => {
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// deleteItem
+// ---------------------------------------------------------------------------
+
+describe('deleteItem', () => {
+  it('soft-disables the item and logs an inventory.item.deleted audit entry with the item name', async () => {
+    let capturedAudit = null
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true, name: 'Laptop XPS' }),
+        update: async (args) => ({ id: args.where.id, enabled: false, name: 'Laptop XPS' }),
+      },
+    })
+    const activityBridge = {
+      logAndPublish: async (args) => { capturedAudit = args },
+    }
+    const svc = createInventoryService({ prisma, activityBridge })
+    const result = await svc.deleteItem(ITEM_ID, COMPANY_ID)
+
+    assert.equal(result.enabled, false)
+    assert.ok(capturedAudit, 'logAndPublish was called')
+    assert.equal(capturedAudit.auditEntry.action, 'inventory.item.deleted')
+    assert.equal(capturedAudit.auditEntry.entityId, ITEM_ID)
+    assert.equal(capturedAudit.auditEntry.entityType, 'InvItem')
+    assert.equal(capturedAudit.auditEntry.after.name, 'Laptop XPS')
+    assert.equal(capturedAudit.companyId, COMPANY_ID)
+  })
+
+  it('throws 404 if item not found', async () => {
+    const prisma = buildPrismaMock({ invItem: { findFirst: async () => null } })
+    const svc = createInventoryService({ prisma })
+    await assert.rejects(
+      () => svc.deleteItem(ITEM_ID, COMPANY_ID),
+      (err) => {
+        assert.ok(err instanceof InventoryServiceError)
+        assert.equal(err.status, 404)
+        return true
+      },
+    )
+  })
+})

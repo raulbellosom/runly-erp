@@ -396,7 +396,7 @@ export function createInventoryService({ prisma, activityBridge }) {
           entityType: 'InvItem',
           entityId: id,
           action: 'inventory.item.updated',
-          after: { fields: Object.keys(updateData) },
+          after: { fields: Object.keys(updateData), name: result?.name ?? null },
         },
         hint: { verb: 'updated', label: result?.name ?? id },
         companyId,
@@ -420,7 +420,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         entityType: 'InvItem',
         entityId: id,
         action: 'inventory.item.updated',
-        after: { fields: Object.keys(updateData) },
+        after: { fields: Object.keys(updateData), name: updated?.name ?? null },
       },
       hint: { verb: 'updated', label: updated.name ?? id },
       companyId,
@@ -432,7 +432,20 @@ export function createInventoryService({ prisma, activityBridge }) {
     assertCompany(companyId);
     const existing = await prisma.invItem.findFirst({ where: { id, companyId, enabled: true } });
     if (!existing) throw new InventoryServiceError('Item not found', 404);
-    return prisma.invItem.update({ where: { id }, data: { enabled: false } });
+    const updated = await prisma.invItem.update({ where: { id }, data: { enabled: false } });
+    await bridge.logAndPublish({
+      auditEntry: {
+        actorId: 'system',
+        moduleKey: 'runly.inventory',
+        entityType: 'InvItem',
+        entityId: id,
+        action: 'inventory.item.deleted',
+        after: { enabled: false, name: existing.name ?? null },
+      },
+      hint: { verb: 'deleted', label: existing.name ?? id },
+      companyId,
+    }).catch(() => {});
+    return updated;
   }
 
   // ── Assignments ────────────────────────────────────────────────────────────
@@ -469,7 +482,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         entityType: 'InvItem',
         entityId: itemId,
         action: 'inventory.item.assigned',
-        after: { employeeId },
+        after: { employeeId, name: item?.name ?? null },
       },
       hint: { verb: 'assigned', label: item.name ?? itemId },
       companyId,
@@ -513,7 +526,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         entityType: 'InvItem',
         entityId: itemId,
         action: 'inventory.item.returned',
-        after: { status: 'available' },
+        after: { status: 'available', name: item?.name ?? null },
       },
       hint: { verb: 'returned', label: item.name ?? itemId },
       companyId,
