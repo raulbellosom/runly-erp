@@ -103,6 +103,8 @@ function buildCalendarGrid(year, month) {
 
 // ── Calendar ─────────────────────────────────────────────────────────────────
 
+const YEAR_PAGE_SIZE = 12;
+
 export function Calendar({ value, onChange, onClose }) {
   const today = new Date();
   const selected = parseDate(value);
@@ -113,6 +115,7 @@ export function Calendar({ value, onChange, onClose }) {
   const [viewMonth, setViewMonth] = useState(
     selected?.getMonth() ?? today.getMonth(),
   );
+  const [view, setView] = useState("day");
 
   const cells = buildCalendarGrid(viewYear, viewMonth);
 
@@ -134,6 +137,16 @@ export function Calendar({ value, onChange, onClose }) {
     if (!day) return;
     onChange(toISO(viewYear, viewMonth, day));
     onClose();
+  }
+
+  function selectMonth(monthIndex) {
+    setViewMonth(monthIndex);
+    setView("day");
+  }
+
+  function selectYear(year) {
+    setViewYear(year);
+    setView("month");
   }
 
   const isToday = useCallback(
@@ -160,68 +173,160 @@ export function Calendar({ value, onChange, onClose }) {
     [selected, viewYear, viewMonth],
   );
 
+  const yearPageStart = viewYear - (((viewYear % YEAR_PAGE_SIZE) + YEAR_PAGE_SIZE) % YEAR_PAGE_SIZE);
+  const yearPage = Array.from({ length: YEAR_PAGE_SIZE }, (_, i) => yearPageStart + i);
+
+  const headerLeftAction =
+    view === "day" ? prevMonth : view === "year" ? () => setViewYear((y) => y - YEAR_PAGE_SIZE) : () => setViewYear((y) => y - 1);
+  const headerRightAction =
+    view === "day" ? nextMonth : view === "year" ? () => setViewYear((y) => y + YEAR_PAGE_SIZE) : () => setViewYear((y) => y + 1);
+  const headerLeftLabel = view === "day" ? "Mes anterior" : view === "year" ? "Años anteriores" : "Año anterior";
+  const headerRightLabel = view === "day" ? "Mes siguiente" : view === "year" ? "Años siguientes" : "Año siguiente";
+
   return (
     <div className="select-none w-full">
       <div className="flex items-center justify-between mb-3">
         <button
           type="button"
-          onClick={prevMonth}
+          onClick={headerLeftAction}
           className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[hsl(var(--muted))] transition-colors"
-          aria-label="Mes anterior"
+          aria-label={headerLeftLabel}
         >
           <ChevronLeft size={14} />
         </button>
-        <span className="text-sm font-semibold">
-          {MONTHS[viewMonth]} {viewYear}
-        </span>
+
+        {view === "day" && (
+          <span className="text-sm font-semibold flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setView("month")}
+              className="rounded px-1.5 py-0.5 hover:bg-[hsl(var(--muted))] transition-colors"
+            >
+              {MONTHS[viewMonth]}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("year")}
+              className="rounded px-1.5 py-0.5 hover:bg-[hsl(var(--muted))] transition-colors"
+            >
+              {viewYear}
+            </button>
+          </span>
+        )}
+        {view === "month" && (
+          <button
+            type="button"
+            onClick={() => setView("year")}
+            className="text-sm font-semibold rounded px-1.5 py-0.5 hover:bg-[hsl(var(--muted))] transition-colors"
+          >
+            {viewYear}
+          </button>
+        )}
+        {view === "year" && (
+          <span className="text-sm font-semibold">
+            {yearPageStart}–{yearPageStart + YEAR_PAGE_SIZE - 1}
+          </span>
+        )}
+
         <button
           type="button"
-          onClick={nextMonth}
+          onClick={headerRightAction}
           className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-[hsl(var(--muted))] transition-colors"
-          aria-label="Mes siguiente"
+          aria-label={headerRightLabel}
         >
           <ChevronRight size={14} />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 mb-1">
-        {DAYS_HEADER.map((d) => (
-          <div
-            key={d}
-            className="text-center text-[10px] font-medium text-[hsl(var(--muted-foreground))] py-1"
-          >
-            {d}
+      {view === "day" && (
+        <>
+          <div className="grid grid-cols-7 mb-1">
+            {DAYS_HEADER.map((d) => (
+              <div
+                key={d}
+                className="text-center text-[10px] font-medium text-[hsl(var(--muted-foreground))] py-1"
+              >
+                {d}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-7 gap-y-0.5">
+            {cells.map((day, i) => {
+              const sel = isSelected(day);
+              const tod = isToday(day);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={!day}
+                  onClick={() => selectDay(day)}
+                  className={cn(
+                    "h-8 w-8 mx-auto flex items-center justify-center rounded-full text-sm transition-colors",
+                    !day && "invisible",
+                    day &&
+                      !sel &&
+                      !tod &&
+                      "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
+                    tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
+                    sel &&
+                      "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:bg-[hsl(var(--primary))]/90",
+                  )}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
-      <div className="grid grid-cols-7 gap-y-0.5">
-        {cells.map((day, i) => {
-          const sel = isSelected(day);
-          const tod = isToday(day);
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={!day}
-              onClick={() => selectDay(day)}
-              className={cn(
-                "h-8 w-8 mx-auto flex items-center justify-center rounded-full text-sm transition-colors",
-                !day && "invisible",
-                day &&
-                  !sel &&
-                  !tod &&
-                  "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
-                tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
-                sel &&
-                  "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:bg-[hsl(var(--primary))]/90",
-              )}
-            >
-              {day}
-            </button>
-          );
-        })}
-      </div>
+      {view === "month" && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {MONTHS.map((label, index) => {
+            const sel = index === viewMonth && viewYear === (selected?.getFullYear() ?? NaN);
+            const tod = index === today.getMonth() && viewYear === today.getFullYear();
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => selectMonth(index)}
+                className={cn(
+                  "h-10 rounded-lg text-xs font-medium transition-colors",
+                  !sel && !tod && "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
+                  tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
+                  sel && "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]",
+                )}
+              >
+                {label.slice(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {view === "year" && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {yearPage.map((year) => {
+            const sel = year === (selected?.getFullYear() ?? NaN);
+            const tod = year === today.getFullYear();
+            return (
+              <button
+                key={year}
+                type="button"
+                onClick={() => selectYear(year)}
+                className={cn(
+                  "h-10 rounded-lg text-xs font-medium transition-colors",
+                  !sel && !tod && "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
+                  tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
+                  sel && "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]",
+                )}
+              >
+                {year}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
