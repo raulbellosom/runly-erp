@@ -43,6 +43,7 @@ import {
   initialsFromName,
 } from "./runly-detail-hero.jsx";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
+import { cn } from "../lib/utils.js";
 
 const STATUS_LABELS = {
   active: "Activo",
@@ -962,7 +963,14 @@ export function RunlyDetail({
     ) : null;
 
   const renderSection = (section) => (
-    <div key={section.id} className="glass-shell rounded-xl px-5 py-4 space-y-4">
+    <div
+      key={section.id}
+      className={cn(
+        "glass-shell rounded-xl px-5 py-4 space-y-4",
+        section.type === "fields" &&
+          "border-l-2 border-l-[hsl(var(--primary))] shadow-[inset_10px_0_18px_-16px_hsl(var(--primary)/0.5)]",
+      )}
+    >
       {section.title ? (
         <div className="pb-3 border-b border-[hsl(var(--border))] flex items-center gap-2">
           {(() => {
@@ -1049,7 +1057,7 @@ export function RunlyDetail({
                   <dt className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                     <FieldLabel field={field} />
                   </dt>
-                  <dd className="text-sm text-[hsl(var(--foreground))]">
+                  <dd className="text-sm font-semibold text-[hsl(var(--foreground))]">
                     {isMarkdown ? (
                       strValue ? (
                         <MarkdownViewer value={strValue} />
