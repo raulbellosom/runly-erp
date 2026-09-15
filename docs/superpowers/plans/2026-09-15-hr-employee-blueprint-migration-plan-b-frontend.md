@@ -16,7 +16,7 @@
 **Files:**
 - Modify: `packages/ui/src/hooks/useAttachmentsController.js`
 
-- [ ] **Step 1: Read the current guard and upload-complete branch**
+- [x] **Step 1: Read the current guard and upload-complete branch**
 
 The current code (for reference, do not skip re-reading the live file before editing — this plan was written against a specific line range that may have shifted):
 
@@ -68,7 +68,7 @@ and, later in the same function, after `fileAssetId` is resolved from the upload
         return { ok: true };
 ```
 
-- [ ] **Step 2: Relax the guard**
+- [x] **Step 2: Relax the guard**
 
 Replace:
 ```js
@@ -83,7 +83,7 @@ with:
       }
 ```
 
-- [ ] **Step 3: Skip the association POST when `addPath` isn't configured**
+- [x] **Step 3: Skip the association POST when `addPath` isn't configured**
 
 Replace:
 ```js
@@ -190,16 +190,16 @@ with:
         return { ok: true };
 ```
 
-- [ ] **Step 4: Build check**
+- [x] **Step 4: Build check**
 
 Run: `pnpm --filter @runly/desktop build:web`
 Expected: builds with no errors.
 
-- [ ] **Step 5: Regression check — Inventory/Fleet attachments still work**
+- [x] **Step 5: Regression check — Inventory/Fleet attachments still work**
 
 Since both Inventory and Fleet configure `addPath` explicitly, this change must be a no-op for them (the new `if (!config.addPath)` branch is never entered when `addPath` is set). Confirm by reading the diff: the only new code path is the early-return branch; every line of the pre-existing `addPath`-configured flow is unchanged. No test exists for this hook today (confirmed no `useAttachmentsController.test.js` upload-flow test exists, only the pure-function `resolveAttachmentFileType` tests from this session's earlier work) — do not add one now; this is a pure refactor with no new pure-function surface to unit test, and the real verification is Task 6's manual check across all three modules.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/ui/src/hooks/useAttachmentsController.js
@@ -213,7 +213,7 @@ git commit -m "feat(ui): make AttachmentsPanel's addPath optional for associatio
 **Files:**
 - Create: `apps/desktop/src/modules/runly.hr/components/OrgChartSection.jsx`
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `apps/desktop/src/modules/runly.hr/components/OrgChartSection.jsx` — ported directly from `HrEmployeeDetail.jsx` lines 284–458 (`ORG_AVATAR_COLORS`, `orgAvatarColor`, `OrgNode`, `OrgConnector`, `OrgChartPanel`), adapted to the `component`-section contract (`{ data }` instead of `{ employee }`), with the `STATUS_HERO`-derived `dot` lookup inlined as its own small map (the full `STATUS_HERO` object has `bg`/`ring` values only used by the hero header, not needed here):
 
@@ -395,7 +395,7 @@ export default function OrgChartSection({ data }) {
 
 Note the navigation path fix: the original used `/app/m/runly.hr/hr/employees/${id}` (a duplicated `/hr/hr/` segment — cross-check whether that's a real working route or a latent bug in the current code before Task 5's manual QA; this extraction uses the corrected `/app/m/runly.hr/employees/${id}` matching this plan's own route table in the parent spec, section 9. If the old `/hr/hr/` path was actually necessary due to some router nesting this plan hasn't seen, revert this specific path during Task 6 manual QA.)
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.hr/components/OrgChartSection.jsx
@@ -411,7 +411,7 @@ git commit -m "feat(hr): extract OrgChartSection as a standalone component-regis
 - Create: `apps/desktop/src/modules/runly.hr/components/AssignedEquipmentSection.jsx`
 - Modify: `apps/desktop/src/lib/moduleComponentRegistry.js`
 
-- [ ] **Step 1: Adapt `HrEmployeeActivityPanel` to the component contract**
+- [x] **Step 1: Adapt `HrEmployeeActivityPanel` to the component contract**
 
 Read the current file (already known from this session's earlier work):
 ```jsx
@@ -465,7 +465,7 @@ export default function HrEmployeeActivityPanel({ data, token }) {
 }
 ```
 
-- [ ] **Step 2: Create the assigned-equipment adapter**
+- [x] **Step 2: Create the assigned-equipment adapter**
 
 Create `apps/desktop/src/modules/runly.hr/components/AssignedEquipmentSection.jsx`:
 
@@ -482,7 +482,7 @@ export default function AssignedEquipmentSection({ data }) {
 }
 ```
 
-- [ ] **Step 3: Register all three in `moduleComponentRegistry.js`**
+- [x] **Step 3: Register all three in `moduleComponentRegistry.js`**
 
 In `apps/desktop/src/lib/moduleComponentRegistry.js`, add these imports near the existing `runly.inventory:*` imports:
 
@@ -503,12 +503,12 @@ componentRegistry.register(
 );
 ```
 
-- [ ] **Step 4: Build check**
+- [x] **Step 4: Build check**
 
 Run: `pnpm --filter @runly/desktop build:web`
 Expected: builds with no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.hr/components/HrEmployeeActivityPanel.jsx apps/desktop/src/modules/runly.hr/components/AssignedEquipmentSection.jsx apps/desktop/src/lib/moduleComponentRegistry.js
@@ -523,7 +523,7 @@ git commit -m "feat(hr): register OrgChartSection/HistorySection/AssignedEquipme
 - Create: `apps/desktop/src/modules/runly.hr/blueprints/hr-employee-detail.blueprint.js`
 - Create: `apps/desktop/src/modules/runly.hr/blueprints/hr-employee-form.blueprint.js`
 
-- [ ] **Step 1: Create the detail blueprint**
+- [x] **Step 1: Create the detail blueprint**
 
 Create `apps/desktop/src/modules/runly.hr/blueprints/hr-employee-detail.blueprint.js`:
 
@@ -675,7 +675,7 @@ Notes on fields used here that Plan A must supply for this to render correctly:
 - The `attachments.removePath`/`coverPath`/`reorderPath` here intentionally have **no `addPath`** — this blueprint relies on Task 1's `addPath`-optional fix. If Task 1 isn't applied first, uploads in this section will fail with "Carga de documentos no disponible."
 - `relation-card`'s `avatarField`/`idField` support dotted paths (`userProfile.id`) per `RelationCardSection`'s existing `getByPath` usage in `RunlyDetail.jsx` — confirmed generically supported, not HR-specific.
 
-- [ ] **Step 2: Create the form blueprint**
+- [x] **Step 2: Create the form blueprint**
 
 Create `apps/desktop/src/modules/runly.hr/blueprints/hr-employee-form.blueprint.js`:
 
@@ -829,7 +829,7 @@ Notes:
 - `userProfileId`'s relation `apiPath: '/identity/users'` — confirm this is the correct existing endpoint for listing linkable user accounts during Task 6's manual QA (the legacy form used a bespoke "Crear usuario" escape-hatch link rather than a full relation picker against this path; if `/identity/users` doesn't paginate/search the way `RelationSelectField` expects, this needs adjustment — flagged here rather than assumed correct, since Plan A/B's research did not verify this specific endpoint's shape).
 - Per the parent spec's accepted non-goal, department/job-title relations have **no inline-create** (`relation.create` is omitted) — creating a new one requires going to HR's catalogs screen first, exactly matching Inventory's accepted precedent.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.hr/blueprints/hr-employee-detail.blueprint.js apps/desktop/src/modules/runly.hr/blueprints/hr-employee-form.blueprint.js
@@ -844,12 +844,12 @@ git commit -m "feat(hr): add HR_EMPLOYEE_DETAIL and HR_EMPLOYEE_FORM blueprints"
 - Modify (full rewrite): `apps/desktop/src/modules/runly.hr/screens/HrEmployeeDetail.jsx`
 - Modify (full rewrite): `apps/desktop/src/modules/runly.hr/screens/HrEmployeeForm.jsx`
 
-- [ ] **Step 1: Confirm the exact current route params / permission-check pattern before rewriting**
+- [x] **Step 1: Confirm the exact current route params / permission-check pattern before rewriting**
 
 Run: `grep -n "hasPermission\|useParams\|useAuth()" apps/desktop/src/modules/runly.hr/screens/HrEmployeeDetail.jsx apps/desktop/src/modules/runly.hr/screens/HrEmployeeForm.jsx | head -20`
 Read the surrounding ~10 lines of each match — this plan's replacement screens below assume the same `useAuth()`/`userProfile.permissions`/`useParams` wildcard-route pattern already confirmed in this session's investigation (`hasPermission = (k) => Boolean(userProfile?.isAdmin || permissions.includes(k))`), but the exact route-param wildcard shape (`'*'`) must be re-confirmed against the live file before assuming the replacement below matches the router configuration exactly.
 
-- [ ] **Step 2: Replace `HrEmployeeDetail.jsx`**
+- [x] **Step 2: Replace `HrEmployeeDetail.jsx`**
 
 Replace the full contents of `apps/desktop/src/modules/runly.hr/screens/HrEmployeeDetail.jsx` with:
 
@@ -974,7 +974,7 @@ export default function HrEmployeeDetail() {
 
 This deletes, by full-file replacement, every line of the old `AuditPanel`/`AuditDetailModal`/`computeDiff`/`fmtFieldValue`/`FIELD_LABELS`/`ACTION_LABELS`/`OrgChartPanel`/`FilesPanel`/`STATUS_VARIANT`/`STATUS_LABEL`/`STATUS_HERO`/`SectionCard`/`InfoRow`/`MarkdownDisplay` local definitions that lived in this file — `OrgChartPanel` was ported to Task 2's `OrgChartSection.jsx` already; everything else (the audit diff viewer specifically) is intentionally not ported anywhere, per this migration's goal 3.
 
-- [ ] **Step 3: Replace `HrEmployeeForm.jsx`**
+- [x] **Step 3: Replace `HrEmployeeForm.jsx`**
 
 Replace the full contents of `apps/desktop/src/modules/runly.hr/screens/HrEmployeeForm.jsx` with:
 
@@ -1060,12 +1060,12 @@ export default function HrEmployeeForm() {
 
 This deletes, by full-file replacement, `fromEmployee`/`normalizeForApi`/`AvatarUploadZone`/the editable `FilesPanel`/`getFileKind`/`formatBytes`/`FileKindIcon`/`SectionCard`/`IL`/`createDepartmentMutation`/`createJobTitleMutation`/the combobox denormalization `onChange` handlers — all superseded by `RunlyForm` + the blueprint's `relation` fields + the standard `attachments` section.
 
-- [ ] **Step 4: Build check**
+- [x] **Step 4: Build check**
 
 Run: `pnpm --filter @runly/desktop build:web`
 Expected: builds with no errors. Pay attention to any "X is defined but never used" warnings surfaced by the build for imports this plan may have over-included (e.g. if `Users`/`Boxes`/other lucide icons end up unused in the final files) — trim them if the build/lint flags them in Task 6.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.hr/screens/HrEmployeeDetail.jsx apps/desktop/src/modules/runly.hr/screens/HrEmployeeForm.jsx
@@ -1078,12 +1078,12 @@ git commit -m "feat(hr): migrate employee detail/form screens to RunlyDetail/Run
 
 **Files:** None (verification only).
 
-- [ ] **Step 1: Lint**
+- [x] **Step 1: Lint**
 
 Run: `pnpm lint`
 Expected: no new errors (fix any unused-import warnings surfaced from Task 5's rewrite before considering this done).
 
-- [ ] **Step 2: Full workspace build**
+- [x] **Step 2: Full workspace build**
 
 Run: `pnpm build`
 Expected: `apps/api`, `apps/desktop`, `packages/ui` all build with no errors.
@@ -1108,3 +1108,20 @@ Since Task 1 changed shared `useAttachmentsController.js` code, re-verify (at le
 - [ ] **Step 5: Spec acceptance criteria**
 
 Walk through all 7 acceptance criteria in `docs/superpowers/specs/2026-09-15-hr-employee-blueprint-migration-design.md` section 25 against the running app, confirming each one explicitly.
+
+---
+
+## Completion notes (2026-09-15)
+
+Tasks 1-5 and Task 6 Steps 1-2 are implemented and automated-verified: `pnpm lint` clean, `pnpm build` green end-to-end including the Tauri native bundle (`apps/api`, `apps/desktop`, `packages/ui` all build with no errors), and the full backend suite (462 tests) still passes since Task 1 also touched files-service.js this session. **Steps 3-5 (manual browser QA, cross-module regression click-through, spec acceptance walkthrough) were NOT performed** — this agent session has no browser/UI automation tool available, so live interaction with the running app is not possible here. Do not treat this plan as fully done until a human (or a session with browser access) completes those three steps.
+
+Deviations from the plan as written, found by re-verifying assumptions against the live codebase before implementing (per Task 5 Step 1's own instruction to reconfirm the routing pattern):
+
+- **The screens keep their existing `employeeId`-prop contract, not `useParams()` wildcard parsing.** `HrScreen.jsx` is the actual route-mounted component for every `/hr/*` path; it parses the wildcard itself and renders `HrEmployeeDetail`/`HrEmployeeForm` as plain children with an `employeeId` prop (`isNewRoute`/`editEmployeeId`/`detailEmployeeId` branches). The plan's Task 5 draft assumed these two components were directly route-mounted with their own `useParams()` — that would never receive the route params at all under this codebase's actual architecture. Not a hypothetical: HrScreen.jsx was read and confirmed before writing the replacement screens.
+- **Every navigate() uses `/app/m/runly.hr/hr/employees/...`, not `/app/m/runly.hr/employees/...`.** The plan explicitly flagged this as an open question ("cross-check whether that's a real working route or a latent bug"). It is real: `ModuleOutlet.jsx` registers `"runly.hr:/hr/employees/:id"` (module key `runly.hr` + the module's own route path `/hr/employees/:id`), and every other HR screen (HrScreen.jsx, HrOrgChartScreen.jsx) already navigates to the doubled `/hr/hr/employees/...` path. Using the plan's assumed single-`/hr/` path would have produced dead links throughout the new screens and OrgChartSection.
+- **`hero.statusMap` was added** to the detail blueprint (`active`→"Activo", etc.) — omitted from the plan's draft, which would have shown the raw English status code in the hero badge, the same class of untranslated-value bug fixed earlier in this module's redesign (Fleet's `InsuranceScreen.jsx` already establishes `statusMap` as the real mechanism for this).
+- **Relation field corrections in `hr-employee-form.blueprint.js`**: `userProfileId` now points at `/hr/user-options` (a purpose-built, already company-scoped, pre-labeled endpoint) instead of the plan's `/identity/users`, which is unscoped and shaped differently. `/hr/user-options`, `/hr/departments`, and `/hr/job-titles` all only read the `?q=` query param (confirmed by reading their route handlers), not the relation picker's default `?search=`, so all three set `searchParam: 'q'` explicitly — omitting this would have made every keystroke in those three pickers a no-op filter-wise (the list would silently stay unfiltered rather than erroring). `supervisorEmployeeId`'s label now joins `['firstName', 'lastName']` instead of `firstName` alone, matching the legacy form's display and avoiding indistinguishable options when two employees share a first name.
+- **`OrgChartSection`/`InventoryEmployeeWidget`/`HistorySection` render no card/title chrome of their own.** `RunlyDetail`'s `renderSection` already wraps every section type (`component` included) in a card with a header derived from the blueprint's `label`/`icon`; a widget-owned header would have doubled up (visible duplicate title text, or a card-inside-a-card). `InventoryEmployeeWidget` was stripped of its own `Card`+"Equipos asignados" header — verified its only caller anywhere in the codebase was the legacy `HrEmployeeDetail.jsx` aside being deleted in this same plan, so this was safe.
+- **`OrgChartSection`'s ported styles use `var(--brand-primary)`**, not the legacy code's `hsl(var(--primary))` (an invalid CSS variable in this codebase — the root cause of an earlier "destello" rendering glitch fixed elsewhere in this module's redesign).
+- **`HrEmployeeForm.jsx` gained an `asideActions` block** (Ver colaborador + Habilitar/Deshabilitar, gated on `hr.employee.delete`) that the plan's draft omitted entirely. Matches Inventory's `InventoryItemForm.jsx`, which already establishes this "always-visible destructive/secondary action, never hidden" pattern for edit-mode forms.
+- **Fixed a real request-contract mismatch discovered while starting this plan** (documented in its own commit, `fix(files): align reorderFiles with the shared attachments hook's real contract`): Plan A's `reorderFiles`/`POST /files/reorder` shape didn't match what `useAttachmentsController.js`'s `reorderItems` actually sends (`PATCH`, `{items: [{id, sortOrder}]}` swap pairs — the same shape Inventory's `reorderItemFiles` already accepts). Rewrote the endpoint and service method before any blueprint could depend on the broken version.
