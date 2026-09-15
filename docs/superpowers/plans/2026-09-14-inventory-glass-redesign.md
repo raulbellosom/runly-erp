@@ -55,7 +55,7 @@ No changes to: `ModuleOutlet.jsx` (routes stay identical), `InventoryScreen.jsx`
 - Modify: `apps/api/src/services/inventory-service.js:135-157`
 - Test: `apps/api/src/services/__tests__/inventory-service.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `apps/api/src/services/__tests__/inventory-service.test.js` (after the last `describe` block, before the final closing of the file):
 
@@ -124,12 +124,12 @@ describe('getItem', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: FAIL — the 3 new `getItem` assertions fail because `result.categoryName` etc. are `undefined` (not computed yet). The "throws 404" test already passes (existing behavior).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `apps/api/src/services/inventory-service.js`, replace the `getItem` function body:
 
@@ -167,12 +167,12 @@ In `apps/api/src/services/inventory-service.js`, replace the `getItem` function 
   }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: PASS — all `getItem` tests green, all pre-existing tests in the file still green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/inventory-service.js apps/api/src/services/__tests__/inventory-service.test.js
@@ -187,7 +187,7 @@ git commit -m "feat(inventory): compute flat category/brand/location/assignee na
 - Modify: `apps/api/src/services/inventory-service.js` (`deleteItem` at line 423; the two `updateItem` bridge calls around lines 384-396 and 408-419; `assignItem` bridge call around line 457-468; `returnItem` bridge call around line 501-512)
 - Test: `apps/api/src/services/__tests__/inventory-service.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `apps/api/src/services/__tests__/inventory-service.test.js`:
 
@@ -235,12 +235,12 @@ describe('deleteItem', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: FAIL — `capturedAudit` stays `null` because `deleteItem` never calls `logAndPublish` today.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace `deleteItem` in `apps/api/src/services/inventory-service.js`:
 
@@ -314,12 +314,12 @@ becomes:
         after: { status: 'available', name: item?.name ?? null },
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: PASS — all `deleteItem` tests green, all pre-existing tests (createItem, assignItem, returnItem, etc.) still green since only an `after` payload key was added, no signature changed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/inventory-service.js apps/api/src/services/__tests__/inventory-service.test.js
@@ -334,7 +334,7 @@ git commit -m "feat(inventory): audit item deletion and include item name in aud
 - Modify: `apps/api/src/services/activity-bridge.js:21-126` (the `TRANSLATORS` map)
 - Test: `apps/api/src/services/__tests__/activity-bridge.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `apps/api/src/services/__tests__/activity-bridge.test.js`, inside the existing `describe("activity-bridge", ...)` block (add these `it(...)` calls right before the final closing `});` of that describe):
 
@@ -388,12 +388,12 @@ Append to `apps/api/src/services/__tests__/activity-bridge.test.js`, inside the 
   });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/activity-bridge.test.js`
 Expected: FAIL — `getTranslator("inventory.item.created")` etc. return `null`/`undefined` today.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `apps/api/src/services/activity-bridge.js`, add five entries to the `TRANSLATORS` map, right after the existing `"catalog.stock.adjust"` entry (before the map's closing `};` on line 126):
 
@@ -430,12 +430,12 @@ In `apps/api/src/services/activity-bridge.js`, add five entries to the `TRANSLAT
   }),
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/activity-bridge.test.js`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/activity-bridge.js apps/api/src/services/__tests__/activity-bridge.test.js
@@ -449,7 +449,7 @@ git commit -m "feat(activity-bridge): translate inventory.item.* audit actions i
 **Files:**
 - Modify: `apps/api/src/routes/inventory/index.js:74-85`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `apps/api/src/routes/inventory/index.js`, immediately after the existing `router.put("/inventory/items/:id", ...)` block (which stays untouched), add a `PATCH` alias calling the exact same service method:
 
@@ -471,12 +471,12 @@ In `apps/api/src/routes/inventory/index.js`, immediately after the existing `rou
   });
 ```
 
-- [ ] **Step 2: Verify with a syntax check**
+- [x] **Step 2: Verify with a syntax check**
 
 Run: `node --check apps/api/src/routes/inventory/index.js`
 Expected: no output (syntax OK).
 
-- [ ] **Step 3: Manual verification**
+- [x] **Step 3: Manual verification**
 
 Start the API (`pnpm dev:api`) and run (replace `$RUNLY_TOKEN` with a valid session token):
 
@@ -488,7 +488,7 @@ curl -X PATCH "http://localhost:4010/inventory/items/<an-existing-item-id>" \
 
 Expected: `200` with `{ "data": { ...,"name":"Laptop XPS 15 (test)" } }`, identical to what `PUT` on the same path already returns.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/api/src/routes/inventory/index.js
@@ -502,7 +502,7 @@ git commit -m "feat(inventory): add PATCH alias for item update to match RunlyFo
 **Files:**
 - Modify: `packages/ui/src/components/StatStrip.jsx:28`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `packages/ui/src/components/StatStrip.jsx`, change the `Card` variant from `"solid"` to `"default"` (the app's `Card` already renders `variant="default"` with the `.glass` utility class — see `packages/ui/src/components/Card.jsx:13`):
 
@@ -515,13 +515,13 @@ In `packages/ui/src/components/StatStrip.jsx`, change the `Card` variant from `"
 
 (only the `variant` value changes, from `"solid"` to `"default"`).
 
-- [ ] **Step 2: Verify with a syntax check**
+- [x] **Step 2: Verify with a syntax check**
 
 Run: `node --check packages/ui/src/components/StatStrip.jsx`
 
 This file uses JSX, so `node --check` will fail on the JSX syntax itself — that's expected and not a signal of a real problem for `.jsx` files in this repo (JSX is compiled by Vite, not run directly by Node). Skip `node --check` for every `.jsx` file in this plan; rely on `pnpm build` (Task 24) and manual QA instead.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/ui/src/components/StatStrip.jsx
@@ -535,11 +535,11 @@ git commit -m "style(ui): give StatStrip tiles the glass panel treatment"
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyTable.jsx` (4 occurrences, at lines 671, 728, 913, 964)
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `packages/ui/src/runly-renderer/RunlyTable.jsx`, replace every occurrence of the exact string `"rounded-2xl border border-[hsl(var(--border))] overflow-clip"` with `"rounded-2xl glass overflow-clip"` (the `.glass` utility already declares its own background/border/shadow/blur, so the manual `border border-[hsl(var(--border))]` is dropped in favor of it). Use a single find/replace across all 4 occurrences in the file — they are byte-identical strings at lines 671, 728, 913 and 964.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyTable.jsx
@@ -553,7 +553,7 @@ git commit -m "style(ui): give RunlyTable's outer panel the glass treatment"
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyForm.jsx:1301-1313`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `packages/ui/src/runly-renderer/RunlyForm.jsx`, the `renderSection` function currently wraps each section in:
 
@@ -589,7 +589,7 @@ Replace the wrapping `className` with the glass treatment (drop the manual `bord
     );
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyForm.jsx
@@ -603,7 +603,7 @@ git commit -m "style(ui): give RunlyForm section cards the glass treatment"
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyDetail.jsx:946-1049`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 `RunlyDetail`'s `renderSection` today returns a bare `<div className="space-y-4">` with no card/panel background at all (unlike `RunlyForm`'s sections). Wrap the whole returned element in a glass panel matching `RunlyForm`'s new treatment. Replace:
 
@@ -623,7 +623,7 @@ with:
 
 (the rest of the function body — the header block, the `attachments`/`relation-card`/`relation-list`/`fields`/`component` branches, and the closing `</div>` — stays exactly as-is; only the opening tag's `className` changes).
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyDetail.jsx
@@ -637,7 +637,7 @@ git commit -m "style(ui): wrap RunlyDetail sections in a glass panel"
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyDetail.jsx:46-66`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 `RunlyDetail.jsx` already has `STATUS_LABELS`/`STATUS_COLORS` dictionaries used by the generic `renderValue()` status-chip fallback (covers `active`/`inactive`/`maintenance`/`retired`/`pending`/`disabled`/`draft`/`finalized`). Inventory's `InvItem.status` values are `available`/`assigned`/`maintenance`/`retired`/`lost`/`stolen`/`disposed` (see `apps/desktop/src/modules/runly.inventory/lib/inventory-constants.js`) — `maintenance`/`retired` are already covered, the other five are not. Add the missing five keys to both dictionaries:
 
@@ -677,7 +677,7 @@ const STATUS_COLORS = {
 
 None of the five new keys collide with the eight existing ones, so no other blueprint's status rendering changes.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyDetail.jsx
@@ -692,7 +692,7 @@ git commit -m "feat(ui): add inventory status labels/colors to RunlyDetail's sta
 - Modify: `packages/ui/src/runly-renderer/detail-presentation.js`
 - Test: `packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js` (add `normalizeComponentSection` to the existing `import { ... } from "../detail-presentation.js";` list at the top, then add):
 
@@ -729,12 +729,12 @@ test("normalizeComponentSection falls back to a generated id", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js`
 Expected: FAIL with `normalizeComponentSection is not defined` (not exported yet).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `packages/ui/src/runly-renderer/detail-presentation.js`, add this exported function (after `splitSectionsByColumn`, at the end of the file):
 
@@ -755,12 +755,12 @@ export function normalizeComponentSection(entry, sectionIndex, title, icon) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js`
 Expected: PASS — all tests in the file green (existing `getByPath`/`replacePathTokens`/`buildChipList`/`resolveHeroModel`/`resolveKpis`/`splitSectionsByColumn` tests plus the 3 new ones).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/detail-presentation.js packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js
@@ -774,7 +774,7 @@ git commit -m "feat(ui): add normalizeComponentSection pure helper for RunlyDeta
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyDetail.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `packages/ui/src/runly-renderer/RunlyDetail.jsx`:
 
@@ -832,7 +832,7 @@ export function RunlyDetail({
       })() : null}
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyDetail.jsx
@@ -847,7 +847,7 @@ git commit -m "feat(ui): add \"component\" section type to RunlyDetail, resolved
 - Modify: `packages/ui/src/runly-renderer/runly-form-schema.js`
 - Test: `packages/ui/src/runly-renderer/__tests__/runly-form-schema.test.js` (new file)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `packages/ui/src/runly-renderer/__tests__/runly-form-schema.test.js`:
 
@@ -899,12 +899,12 @@ test("normalizeSections still handles a plain fields section unaffected by the n
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test packages/ui/src/runly-renderer/__tests__/runly-form-schema.test.js`
 Expected: FAIL — the `custom-fields` section currently falls through to the default "fields" branch, so `sections[0].type` is `"fields"` and `sections[0].customFields` is `undefined`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `packages/ui/src/runly-renderer/runly-form-schema.js`, inside `normalizeSections`, add a branch for `sectionType === "custom-fields"` right after the existing `"parts"`/`"parts-editor"` branch (before the generic `fields` handling):
 
@@ -940,12 +940,12 @@ In `packages/ui/src/runly-renderer/runly-form-schema.js`, inside `normalizeSecti
       }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test packages/ui/src/runly-renderer/__tests__/runly-form-schema.test.js`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/runly-form-schema.js packages/ui/src/runly-renderer/__tests__/runly-form-schema.test.js
@@ -959,7 +959,7 @@ git commit -m "feat(ui): add custom-fields section normalization to RunlyForm's 
 **Files:**
 - Create: `packages/ui/src/runly-renderer/DynamicFieldsSection.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Create `packages/ui/src/runly-renderer/DynamicFieldsSection.jsx`. This mirrors `InventoryCustomFieldsForm`'s field-type switch exactly, but drives plain `formValues`/`onChange` instead of `react-hook-form`'s `Controller` (because it lives inside `RunlyForm`, which manages its own local state, not RHF):
 
@@ -1118,7 +1118,7 @@ export function buildCustomFieldsPayload(formValues, definitions, valuePrefix) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/DynamicFieldsSection.jsx
@@ -1132,7 +1132,7 @@ git commit -m "feat(ui): add DynamicFieldsSection for RunlyForm's custom-fields 
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyForm.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `packages/ui/src/runly-renderer/RunlyForm.jsx`:
 
@@ -1226,7 +1226,7 @@ add:
     }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyForm.jsx packages/ui/src/runly-renderer/DynamicFieldsSection.jsx
@@ -1240,7 +1240,7 @@ git commit -m "feat(ui): wire custom-fields section rendering and submit payload
 **Files:**
 - Create: `packages/ui/src/components/FormCompletionRing.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Create `packages/ui/src/components/FormCompletionRing.jsx`:
 
@@ -1272,11 +1272,11 @@ export function FormCompletionRing({ percent, filledCount, totalCount }) {
 }
 ```
 
-- [ ] **Step 2: Export it from `packages/ui/src/index.js`**
+- [x] **Step 2: Export it from `packages/ui/src/index.js`**
 
 Add `export { FormCompletionRing } from "./components/FormCompletionRing.jsx";` alongside the other component exports in that file.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/ui/src/components/FormCompletionRing.jsx packages/ui/src/index.js
@@ -1290,7 +1290,7 @@ git commit -m "feat(ui): add FormCompletionRing component"
 **Files:**
 - Create: `packages/ui/src/components/FormPreviewPanel.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Create `packages/ui/src/components/FormPreviewPanel.jsx`:
 
@@ -1333,11 +1333,11 @@ export function FormPreviewPanel({ title, subtitle, rows, fallbackIcon = "FileTe
 }
 ```
 
-- [ ] **Step 2: Export it from `packages/ui/src/index.js`**
+- [x] **Step 2: Export it from `packages/ui/src/index.js`**
 
 Add `export { FormPreviewPanel } from "./components/FormPreviewPanel.jsx";`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/ui/src/components/FormPreviewPanel.jsx packages/ui/src/index.js
@@ -1351,7 +1351,7 @@ git commit -m "feat(ui): add FormPreviewPanel component"
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyForm.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `packages/ui/src/runly-renderer/RunlyForm.jsx`:
 
@@ -1535,7 +1535,7 @@ with:
 
 Both `showCompletion` and `preview` default to falsy/`null` when a blueprint's `schema` doesn't declare them (the existing `const schema = blueprint?.schema ?? {};` line already guarantees `schema.preview`/`schema.showCompletion` are `undefined` rather than throwing), so Fleet's and every other existing `FORM` blueprint's `RunlyForm` renders byte-for-byte the same as before this task.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyForm.jsx
@@ -1549,7 +1549,7 @@ git commit -m "feat(ui): wire opt-in schema.showCompletion and schema.preview in
 **Files:**
 - Create: `apps/desktop/src/modules/runly.inventory/components/InventoryDetailAssignmentSection.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 ```jsx
 import { InventoryAssignmentPanel } from './InventoryAssignmentPanel.jsx'
@@ -1562,7 +1562,7 @@ export default function InventoryDetailAssignmentSection({ data }) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/components/InventoryDetailAssignmentSection.jsx
@@ -1576,7 +1576,7 @@ git commit -m "feat(inventory): add RunlyDetail adapter for the assignment panel
 **Files:**
 - Create: `apps/desktop/src/modules/runly.inventory/components/InventoryDetailCommentsSection.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 ```jsx
 import { InventoryCommentThread } from './InventoryCommentThread.jsx'
@@ -1586,7 +1586,7 @@ export default function InventoryDetailCommentsSection({ data }) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/components/InventoryDetailCommentsSection.jsx
@@ -1600,7 +1600,7 @@ git commit -m "feat(inventory): add RunlyDetail adapter for the comment thread"
 **Files:**
 - Create: `apps/desktop/src/modules/runly.inventory/components/InventoryDetailHistorySection.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Mirrors `apps/desktop/src/modules/runly.hr/components/HrEmployeeActivityPanel.jsx` exactly, adapted to the `{ data, token }` contract and `InvItem`:
 
@@ -1628,7 +1628,7 @@ export default function InventoryDetailHistorySection({ data, token }) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/components/InventoryDetailHistorySection.jsx
@@ -1642,7 +1642,7 @@ git commit -m "feat(inventory): add RunlyDetail adapter for the audit history ti
 **Files:**
 - Modify: `apps/desktop/src/lib/moduleComponentRegistry.js`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `apps/desktop/src/lib/moduleComponentRegistry.js`, add the imports (alongside the existing `runly.fleet`/`runly.growth` imports):
 
@@ -1669,7 +1669,7 @@ componentRegistry.register(
 );
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/lib/moduleComponentRegistry.js
@@ -1683,7 +1683,7 @@ git commit -m "feat(inventory): register detail-section adapters in the module c
 **Files:**
 - Create: `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-form.blueprint.js`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 ```js
 import { ITEM_STATUSES, ITEM_TYPES } from '../lib/inventory-constants.js'
@@ -1842,7 +1842,7 @@ export const INVENTORY_ITEM_FORM = {
 export default INVENTORY_ITEM_FORM
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-form.blueprint.js
@@ -1856,7 +1856,7 @@ git commit -m "feat(inventory): add inventory.item.form RunlyForm blueprint"
 **Files:**
 - Create: `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-detail.blueprint.js`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 ```js
 import { ITEM_TYPES } from '../lib/inventory-constants.js'
@@ -1979,7 +1979,7 @@ export const INVENTORY_ITEM_DETAIL = {
 export default INVENTORY_ITEM_DETAIL
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-detail.blueprint.js
@@ -1993,7 +1993,7 @@ git commit -m "feat(inventory): add inventory.item.detail RunlyDetail blueprint"
 **Files:**
 - Rewrite: `apps/desktop/src/modules/runly.inventory/screens/InventoryItemForm.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Replace the full contents of `apps/desktop/src/modules/runly.inventory/screens/InventoryItemForm.jsx`:
 
@@ -2064,7 +2064,7 @@ Notes on what this drops relative to the previous hand-rolled screen, all delibe
 - `react-hook-form`/`Controller`, `CollapsibleSection`, `mapItemToForm`/`buildApiPayload`, the manual category/brand/location `CreatableComboboxField` + `onCreate` wiring, and the fixed bottom action bar are all now handled generically by `RunlyForm` per the blueprint (sections, `relation` fields with inline `create`, and its own sticky footer).
 - The comment thread that used to sit in the edit-mode sidebar (`InventoryCommentThread`) moves to the **detail** screen only (Task 25) — comments on a not-yet-saved-or-currently-being-edited record belong with the record's permanent view, matching how Fleet and every other blueprint-driven module in this codebase surfaces comments.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/screens/InventoryItemForm.jsx
@@ -2078,7 +2078,7 @@ git commit -m "refactor(inventory): rebuild the create/edit screen on RunlyForm"
 **Files:**
 - Rewrite: `apps/desktop/src/modules/runly.inventory/screens/InventoryItemDetail.jsx`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Replace the full contents of `apps/desktop/src/modules/runly.inventory/screens/InventoryItemDetail.jsx`:
 
@@ -2174,7 +2174,7 @@ export default function InventoryItemDetail() {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/screens/InventoryItemDetail.jsx
@@ -2187,7 +2187,7 @@ git commit -m "refactor(inventory): rebuild the detail screen on RunlyDetail"
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Static checks**
+- [x] **Step 1: Static checks**
 
 Run, in order, and confirm each is clean:
 
@@ -2199,11 +2199,14 @@ node --test apps/api/src/services/__tests__/inventory-service.test.js
 node --test apps/api/src/services/__tests__/activity-bridge.test.js
 node --test packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js
 node --test packages/ui/src/runly-renderer/__tests__/runly-form-schema.test.js
+node --test packages/ui/src/runly-renderer/__tests__/runly-form-preview.test.js
 pnpm lint
-pnpm build
+pnpm --filter @runly/desktop build:web
 ```
 
 Expected: every command exits 0 with no new errors.
+
+**Result (2026-09-14):** All green. `node --test` on the API suite: 33/33 passing across 9 describe blocks (inventory-service.test.js + activity-bridge.test.js). `node --test` on the UI renderer suites: 20/20 passing (detail-presentation, runly-form-schema, runly-form-preview). `pnpm lint`: clean, no output. `pnpm --filter @runly/desktop build:web`: `✓ built in 3.01s` (the plain top-level `pnpm build` also triggers a Tauri native build requiring the Rust toolchain, not appropriate for this check — substituted the Vite web build, which is what this repo's own verification passes use elsewhere). File-size check: `RunlyForm.jsx` 1455, `RunlyDetail.jsx` 1138, `RunlyTable.jsx` 1244 (all under the 1500 hard ceiling); `apps/api/src/services/inventory-service.js` is now 1010 lines — just over the 1000-line soft limit (was 989 before this feature), not addressed here since splitting it is unrelated pre-existing scope.
 
 - [ ] **Step 2: Manual QA — desktop (1440px)**
 
