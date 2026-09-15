@@ -140,6 +140,7 @@ export function RunlyForm({
   inlineCreateDepth = 0,
   id,
   showFooter = true,
+  onCompletionChange,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -1175,8 +1176,8 @@ export function RunlyForm({
     const renderSectionHeader = () => {
       if (!section.title && !isCollapsible) return null;
       const SectionIcon = section.icon ? LucideIcons[section.icon] : null;
-      return (
-        <div className="pb-3 border-b border-[hsl(var(--border))] flex items-start justify-between gap-3">
+      const headerInner = (
+        <>
           <div className="flex items-center gap-2">
             {SectionIcon ? (
               <SectionIcon className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
@@ -1195,19 +1196,35 @@ export function RunlyForm({
             </div>
           </div>
           {isCollapsible ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleSection(section.id)}
-            >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[hsl(var(--muted-foreground))]">
               {isCollapsed ? (
                 <LucideIcons.ChevronDown className="h-4 w-4" />
               ) : (
                 <LucideIcons.ChevronUp className="h-4 w-4" />
               )}
-            </Button>
+            </span>
           ) : null}
+        </>
+      );
+
+      // The whole header row is the click target when a section can collapse —
+      // hunting for the small chevron button was the actual complaint. The
+      // chevron above is now a plain, non-interactive span so a click anywhere
+      // in the row only fires this one handler (no nested-button double toggle).
+      if (isCollapsible) {
+        return (
+          <button
+            type="button"
+            onClick={() => toggleSection(section.id)}
+            className="flex w-full items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-3 text-left transition-opacity hover:opacity-80"
+          >
+            {headerInner}
+          </button>
+        );
+      }
+      return (
+        <div className="pb-3 border-b border-[hsl(var(--border))] flex items-start justify-between gap-3">
+          {headerInner}
         </div>
       );
     };
@@ -1329,6 +1346,18 @@ export function RunlyForm({
   const showCompletion = schema.showCompletion === true;
   const { allFieldNames, filledCount, completionPercent } = computeCompletion(fieldMap, formValues, isFieldVisible);
   const previewModel = computePreviewModel(previewConfig, fieldMap, formValues);
+
+  // Reported unconditionally (regardless of schema.showCompletion) so a screen
+  // that wants to render its own FormCompletionRing in a custom header layout
+  // (instead of RunlyForm's default placement above the sections) can do so.
+  useEffect(() => {
+    onCompletionChange?.({
+      percent: completionPercent,
+      filledCount,
+      totalCount: allFieldNames.length,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completionPercent, filledCount, allFieldNames.length]);
 
   return (
     <form id={id} className="space-y-6" onSubmit={handleSubmit}>
