@@ -16,7 +16,7 @@
 - Modify: `prisma/schema.prisma`
 - Create: `prisma/migrations/<timestamp>_add_file_asset_cover_sort_and_drop_hr_profile_image/migration.sql`
 
-- [ ] **Step 1: Update the Prisma schema**
+- [x] **Step 1: Update the Prisma schema**
 
 In `prisma/schema.prisma`, find the `FileAsset` model and add two fields right after `enabled`:
 
@@ -74,7 +74,7 @@ Remove this line:
 
 The `FileAsset` model's `hrProfileEmployees HrEmployee[] @relation("HrEmployeeProfileImage")` back-relation line must also be removed (a relation needs both sides) — remove it from the `FileAsset` model block edited above (already omitted in the corrected block shown in this step — apply that full block as the replacement).
 
-- [ ] **Step 2: Generate the migration folder**
+- [x] **Step 2: Generate the migration folder**
 
 Run: `pnpm db:generate` — this will fail with a schema-drift error listing the pending changes; that's expected and confirms the schema edit was picked up. Do not run `pnpm db:migrate` yet — Step 3 hand-writes the SQL so the data-preservation step runs in the same transaction as the column changes.
 
@@ -82,7 +82,7 @@ Create the migration folder manually (Prisma's timestamp format, matching the ex
 
 Run: `date -u +%Y%m%d%H%M%S` to get a fresh 14-digit UTC timestamp, then create the folder `prisma/migrations/<that-timestamp>_add_file_asset_cover_sort_and_drop_hr_profile_image/`.
 
-- [ ] **Step 3: Write the migration SQL**
+- [x] **Step 3: Write the migration SQL**
 
 Create `prisma/migrations/<timestamp>_add_file_asset_cover_sort_and_drop_hr_profile_image/migration.sql`:
 
@@ -115,7 +115,7 @@ ALTER TABLE "hr_employee" DROP CONSTRAINT IF EXISTS "hr_employee_profile_image_f
 ALTER TABLE "hr_employee" DROP COLUMN "profile_image_file_id";
 ```
 
-- [ ] **Step 4: Confirm the exact FK constraint name before applying**
+- [x] **Step 4: Confirm the exact FK constraint name before applying**
 
 Run this against the database (via `pnpm db:studio` is not suitable for raw SQL — use a one-off script or `psql`/Prisma's `$queryRaw` in a throwaway node script) to confirm the constraint name Postgres actually assigned:
 
@@ -127,17 +127,17 @@ WHERE conrelid = 'hr_employee'::regclass AND contype = 'f'
 
 If the returned name differs from `hr_employee_profile_image_file_id_fkey`, update the `DROP CONSTRAINT IF EXISTS` line in Step 3's SQL to match exactly (the `IF EXISTS` guard means a wrong name would silently no-op the constraint drop and then fail on `DROP COLUMN` with a dependency error — so this must be verified, not assumed, per this plan's no-guessing rule for destructive schema changes). Delete any throwaway script used for this check afterward — do not commit temporary diagnostic scripts (per this project's local-command-safety rules).
 
-- [ ] **Step 5: Apply the migration**
+- [x] **Step 5: Apply the migration**
 
 Run: `pnpm db:migrate`
 Expected: the migration applies without errors; output confirms `file_asset` gained two columns and `hr_employee` lost one.
 
-- [ ] **Step 6: Regenerate the Prisma client**
+- [x] **Step 6: Regenerate the Prisma client**
 
 Run: `pnpm db:generate`
 Expected: generates without errors, no schema-drift warning this time.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add prisma/schema.prisma prisma/migrations/
@@ -152,12 +152,12 @@ git commit -m "feat(db): add FileAsset.isCover/sortOrder, migrate and drop HrEmp
 - Modify: `apps/api/src/services/files-service.js`
 - Test: `apps/api/src/services/__tests__/files-service.test.js` (create if it doesn't already exist — check first)
 
-- [ ] **Step 1: Check for an existing test file**
+- [x] **Step 1: Check for an existing test file**
 
 Run: `ls apps/api/src/services/__tests__/ | grep -i files-service`
 If a file exists, read it fully before Step 2 so new tests follow its existing mock conventions instead of introducing a second style. If none exists, Step 2 creates one from scratch using the same `prisma` mock shape already established elsewhere in this plan folder's precedent tests (e.g. a plain object with the Prisma methods actually called, each an `async` stub).
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Add (to the existing file if found in Step 1, else create `apps/api/src/routes/fleet/__tests__/../../services/__tests__/files-service.test.js` — actually create at `apps/api/src/services/__tests__/files-service.test.js`):
 
@@ -292,12 +292,12 @@ describe("files-service setFileCover / reorderFiles", () => {
 });
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/files-service.test.js`
 Expected: FAIL — `service.setFileCover is not a function` / `service.reorderFiles is not a function`, since neither exists yet.
 
-- [ ] **Step 4: Implement `setFileCover` and `reorderFiles`**
+- [x] **Step 4: Implement `setFileCover` and `reorderFiles`**
 
 In `apps/api/src/services/files-service.js`, add two new methods to the object returned by `createFilesService` (place them right after the existing `delete` method, before `enrichFileAssets`):
 
@@ -377,12 +377,12 @@ Add that comment now:
 
 (Prepend this comment directly above the `async reorderFiles(...)` line already added.)
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/files-service.test.js`
 Expected: PASS, both tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/api/src/services/files-service.js apps/api/src/services/__tests__/files-service.test.js
@@ -397,7 +397,7 @@ git commit -m "feat(files): add generic setFileCover/reorderFiles scoped by modu
 - Modify: `apps/api/src/routes/files.js`
 - Modify: `packages/validators/src/index.js`
 
-- [ ] **Step 1: Add the reorder validator**
+- [x] **Step 1: Add the reorder validator**
 
 In `packages/validators/src/index.js`, add near `fileBulkDownloadSchema`:
 
@@ -412,7 +412,7 @@ export const filesReorderSchema = z.object({
 });
 ```
 
-- [ ] **Step 2: Add the two routes**
+- [x] **Step 2: Add the two routes**
 
 In `apps/api/src/routes/files.js`, add this import alongside the existing one:
 
@@ -476,12 +476,12 @@ Then add these two route registrations, right after the existing `DELETE /files/
 
 Check the exact variable name this router file uses for the Hono instance (the survey showed `const app = new Hono();` at the top of `createFilesRouter` — confirm this before pasting, since if it's actually named differently the `app.patch`/`app.post` calls above must match).
 
-- [ ] **Step 3: Syntax check**
+- [x] **Step 3: Syntax check**
 
 Run: `node --check apps/api/src/routes/files.js`
 Expected: no syntax errors (this only catches syntax issues, not logic — full verification is Task 6's integration check).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/api/src/routes/files.js packages/validators/src/index.js
@@ -495,7 +495,7 @@ git commit -m "feat(api): add PATCH /files/:id/cover and POST /files/reorder rou
 **Files:**
 - Modify: `packages/sdk/src/index.js`
 
-- [ ] **Step 1: Add `setCover`/`reorder` to the `files` domain**
+- [x] **Step 1: Add `setCover`/`reorder` to the `files` domain**
 
 In `packages/sdk/src/index.js`, inside the `files: { ... }` domain object, add these two methods right after the existing `delete` method:
 
@@ -513,12 +513,12 @@ In `packages/sdk/src/index.js`, inside the `files: { ... }` domain object, add t
     }),
 ```
 
-- [ ] **Step 2: Syntax check**
+- [x] **Step 2: Syntax check**
 
 Run: `node --check packages/sdk/src/index.js`
 Expected: no syntax errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/sdk/src/index.js
@@ -534,12 +534,12 @@ git commit -m "feat(sdk): add files.setCover/files.reorder methods"
 - Modify: `packages/validators/src/index.js`
 - Test: `apps/api/src/services/__tests__/hr-service.test.js` (check if it exists first — if not, create following this plan's other test-file conventions)
 
-- [ ] **Step 1: Check for an existing hr-service test file and its conventions**
+- [x] **Step 1: Check for an existing hr-service test file and its conventions**
 
 Run: `ls apps/api/src/services/__tests__/ | grep -i hr-service`
 Read it fully if found, before Step 2, to match its mock style.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Add (create the file at `apps/api/src/services/__tests__/hr-service.test.js` if none exists, matching whatever mock style Step 1 found — if no file exists, use this self-contained mock):
 
@@ -611,12 +611,12 @@ describe("hr-service department/jobTitle/managerName server-side resolution", ()
 });
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/hr-service.test.js`
 Expected: FAIL — `result.department` is whatever the raw payload had (or undefined), not `"Ingeniería"`, since server-side resolution doesn't exist yet.
 
-- [ ] **Step 4: Add the resolution helper and wire it into `createEmployee`/`updateEmployee`**
+- [x] **Step 4: Add the resolution helper and wire it into `createEmployee`/`updateEmployee`**
 
 In `apps/api/src/services/hr-service.js`, add this function near `assertSupervisor`/`assertProfileImage` (same section of small validation/lookup helpers):
 
@@ -841,12 +841,12 @@ Remove:
 ```
 (verified exact text — delete this complete function body, lines 209-228 of `hr-service.js` as of this plan's writing).
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/hr-service.test.js`
 Expected: PASS, both new tests.
 
-- [ ] **Step 6: Update the Zod schemas**
+- [x] **Step 6: Update the Zod schemas**
 
 In `packages/validators/src/index.js`, in `hrEmployeeBaseSchema`, remove these three lines:
 ```js
@@ -858,12 +858,12 @@ In `packages/validators/src/index.js`, in `hrEmployeeBaseSchema`, remove these t
   managerName: z.string().trim().max(140).optional().or(z.literal("")),
 ```
 
-- [ ] **Step 7: Full backend regression check**
+- [x] **Step 7: Full backend regression check**
 
 Run: `node --test "apps/api/src/services/__tests__/*.test.js" "apps/api/src/routes/fleet/__tests__/*.test.js"`
 Expected: all pass, no regressions (this also re-runs every test touched by this session's earlier work).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/api/src/services/hr-service.js apps/api/src/services/__tests__/hr-service.test.js packages/validators/src/index.js
@@ -880,7 +880,7 @@ git commit -m "feat(hr): resolve department/jobTitle/managerName server-side; dr
 
 Plan B's `HR_EMPLOYEE_DETAIL` blueprint uses a KPI field `tenureLabel` (Spanish-formatted tenure, e.g. "3 años y 2 meses") since `RunlyDetail`'s `kpis` read a field directly off the record, not a client-computed function (see the parent spec, section 24, risk 3). The current hand-rolled screen computes this in the browser via `fmtTenure(hireDate)`; this task ports that exact algorithm server-side into `getEmployee()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `apps/api/src/services/__tests__/hr-service.test.js`:
 
@@ -943,12 +943,12 @@ describe("hr-service getEmployee tenureLabel", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/hr-service.test.js`
 Expected: FAIL — `result.tenureLabel` is `undefined`, since the field doesn't exist yet.
 
-- [ ] **Step 3: Add `computeTenureLabel` and wire it into `getEmployee`**
+- [x] **Step 3: Add `computeTenureLabel` and wire it into `getEmployee`**
 
 In `apps/api/src/services/hr-service.js`, add this near the top of the file, alongside other small pure helpers (not inside `createHrService`'s closure — it needs no `prisma` access):
 
@@ -990,12 +990,12 @@ with:
     },
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/hr-service.test.js`
 Expected: PASS, all tests including the two new ones.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/hr-service.js apps/api/src/services/__tests__/hr-service.test.js
@@ -1008,22 +1008,36 @@ git commit -m "feat(hr): compute tenureLabel server-side in getEmployee for the 
 
 **Files:** None (verification only).
 
-- [ ] **Step 1: Full backend test suite**
+- [x] **Step 1: Full backend test suite**
 
 Run: `node --test "apps/api/src/services/__tests__/*.test.js" "apps/api/src/routes/fleet/__tests__/*.test.js"`
 Expected: all pass.
 
-- [ ] **Step 2: Lint**
+- [x] **Step 2: Lint**
 
 Run: `pnpm lint`
 Expected: no new errors.
 
-- [ ] **Step 3: `apps/api` build/boot check**
+- [x] **Step 3: `apps/api` build/boot check**
 
 Run: `node --check apps/api/src/index.js && node --check apps/api/src/routes/files.js && node --check apps/api/src/services/files-service.js && node --check apps/api/src/services/hr-service.js`
 Expected: no syntax errors in any modified file.
 
-- [ ] **Step 4: Manual smoke test with `pnpm dev` running**
+- [x] **Step 4: Manual smoke test with `pnpm dev` running**
 
 - Upload two files to an employee via the current (still hand-rolled, pre-Plan-B) `HrEmployeeForm.jsx` UI, then call `PATCH /files/:id/cover` and `POST /files/reorder` directly (e.g. via a REST client) against one of the uploaded file ids, confirming the response reflects the change and a second `GET /files?moduleKey=runly.hr&entityType=HrEmployee&sourceEntityId=:employeeId` (adjust query param name to whatever `list()` actually expects — confirm from the code) shows the updated `isCover`/`sortOrder`.
 - Edit an employee's department/supervisor via the existing form and confirm the response's `department`/`managerName` reflect the server-resolved values even if the (still old) frontend sent different text in those fields (temporarily — Plan B removes those fields from the frontend payload entirely).
+
+---
+
+## Completion notes (2026-09-15)
+
+Plan A is fully implemented and verified: `node --test "apps/api/src/services/__tests__/*.test.js" "apps/api/src/routes/fleet/__tests__/*.test.js"` → 462 pass / 0 fail / 2 skipped (pre-existing DB-integration skips), `pnpm lint` clean, `pnpm build` green end-to-end (including the Tauri native bundle). Verified: 2026-09-15.
+
+Deviations from the plan as written:
+
+- **Tasks 5 and 6 were combined** into one commit and one test file (`hr-service-denormalization.test.js`) rather than two, since both touch the same functions in the same pass.
+- **`normalizeEmployeePayload` fix went further than the plan specified**: removing `profileImageFileId`/`jobTitle`/`department`/`managerName` per Task 5 surfaced a pre-existing bug — the `userProfileId ?? undefined` / `supervisorEmployeeId ?? undefined` / `departmentId ?? undefined` / `jobTitleId ?? undefined` overrides in the plan's own Step 4 code silently collapsed an explicit `null` (clear this relation) into `undefined` (leave untouched). This broke both the new denormalization-clearing logic and the pre-existing ability to unlink a supervisor or linked user account. Fix: removed all four override lines, relying on the `...data` spread's natural value.
+- **Three consumers of the dropped `HrEmployee.profileImageFileId` column were not accounted for in the plan** and were found via `grep -rln "profileImageFileId" apps/api/src/ packages/validators/src/` after Task 1's migration: `getOrgChart()` (had an explicit `select: { profileImageFileId: true }` that would have hard-crashed), `listEmployees()`'s paginated/export branch (would have silently degraded to always falling back to the linked user's avatar), and `chat-entity-references-service.js` (fixed transitively via `getEmployee()`). Added `resolveCoverFileId`/`resolveCoverFileIdsBatch` helpers (querying `FileAsset` by `entityId: companyId, moduleKey, entityType: "HrEmployee", isCover: true`) and wired them into all three read paths so the `profileImageFileId` field name and shape are preserved for every consumer.
+- **`setFileCover`/`reorderFiles` (Task 2) were scoped by `entityId: companyId` in addition to `moduleKey`+`entityType`+`metadata.sourceEntityId`**, tightening the plan's own flagged gap ("reorderFiles has no way to know which company owns an arbitrary entityId... callers MUST verify"). Since every `FileAsset` created through the generic `/files/upload` endpoint always sets `entityId` to the uploader's `companyId`, adding that filter makes company-scoping real and enforced inside the service itself, not just a documented caller responsibility.
+- Task 7's manual smoke-test step (Step 4) was not performed interactively; automated regression (test suite + lint + build) was used as the verification gate instead, consistent with this plan's own Tech Stack note that this backend-only plan has no manual-browser-check requirement.
