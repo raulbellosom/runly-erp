@@ -30,7 +30,7 @@
 - Modify: `prisma/schema.prisma` (find `model InvItemFile` at line 3179)
 - Create: `prisma/migrations/20260914020000_add_inv_item_file_sort_cover/migration.sql`
 
-- [ ] **Step 1: Edit the Prisma model**
+- [x] **Step 1: Edit the Prisma model**
 
 In `prisma/schema.prisma`, find:
 
@@ -72,7 +72,7 @@ model InvItemFile {
 }
 ```
 
-- [ ] **Step 2: Write the migration SQL**
+- [x] **Step 2: Write the migration SQL**
 
 Create the directory `prisma/migrations/20260914020000_add_inv_item_file_sort_cover/` with a file `migration.sql`:
 
@@ -82,7 +82,7 @@ ALTER TABLE "inv_item_file" ADD COLUMN "sort_order" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "inv_item_file" ADD COLUMN "is_cover" BOOLEAN NOT NULL DEFAULT false;
 ```
 
-- [ ] **Step 3: Apply and regenerate**
+- [x] **Step 3: Apply and regenerate**
 
 Run:
 ```bash
@@ -91,7 +91,7 @@ pnpm db:migrate
 ```
 Expected: both commands exit 0. `pnpm db:migrate` applies the new migration without touching any existing migration file (do not edit any other file under `prisma/migrations/`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add prisma/schema.prisma prisma/migrations/20260914020000_add_inv_item_file_sort_cover
@@ -106,11 +106,11 @@ git commit -m "feat(db): add sortOrder and isCover columns to InvItemFile"
 - Modify: `apps/api/src/services/inventory-service.js` (add two new functions right after `removeItemFile`, which is around line 936-941 per the current file)
 - Test: `apps/api/src/services/__tests__/inventory-service.test.js`
 
-- [ ] **Step 1: Read current code**
+- [x] **Step 1: Read current code**
 
 Read `apps/api/src/services/inventory-service.js` in full to find the exact current text of `removeItemFile` (so the new functions can be inserted right after it) and the function's closing `return { success: true }; }` line, and to confirm the exported function list at the bottom of `createInventoryService` (the `return { ... }` object) needs both new functions added to it.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Append to `apps/api/src/services/__tests__/inventory-service.test.js`:
 
@@ -199,12 +199,12 @@ describe('reorderItemFiles', () => {
 
 Note: `buildPrismaMock`'s `$transaction` stub (already defined at the top of this test file) calls `fn(makeTx(overrides._tx ?? {}))` — so `setItemFileCover`'s transaction body must be written to actually use the `tx` parameter passed into its `prisma.$transaction(async (tx) => {...})` callback for both the `findFirst` existence check and the `updateMany`/`update` calls, exactly like `assignItem`'s existing transaction pattern in this same file. `reorderItemFiles` does NOT need to run inside `$transaction` per the existing `reorderCatalog` precedent (it uses a plain `Promise.all`-via-`$transaction([...])` array form, not a callback) — mirror `reorderCatalog`'s exact style: `prisma.$transaction(items.map(...))`, so the mock's `_root`/top-level `invItemFile.updateMany` stub (not `_tx`) is what gets called, matching the test above.
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: FAIL (`svc.setItemFileCover is not a function`, `svc.reorderItemFiles is not a function`).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Add these two functions to `apps/api/src/services/inventory-service.js`, right after `removeItemFile`:
 
@@ -249,12 +249,12 @@ Then find the `return { ... }` object at the end of `createInventoryService` (th
 
 IMPORTANT: `InventoryServiceError` thrown from *inside* a `prisma.$transaction(async (tx) => {...})` callback in `setItemFileCover` must propagate correctly out of the transaction (Prisma re-throws whatever error the callback throws, rolling back the transaction) — do not wrap it in a try/catch that swallows it.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: PASS — all tests in the file, including every pre-existing describe block.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/api/src/services/inventory-service.js apps/api/src/services/__tests__/inventory-service.test.js
@@ -269,7 +269,7 @@ git commit -m "feat(inventory): add setItemFileCover and reorderItemFiles servic
 - Modify: `apps/api/src/services/inventory-service.js` (`getItem`, `listItems`)
 - Test: `apps/api/src/services/__tests__/inventory-service.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to the `describe('getItem', ...)` block already added by a previous task (add these as new `it(...)` entries inside that existing describe, right before its closing `})`):
 
@@ -332,12 +332,12 @@ Append to the `describe('getItem', ...)` block already added by a previous task 
   })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: FAIL (`result.coverImageFileId` is `undefined`, and the mock's `invItemFile.findMany` stub is never called since `getItem` doesn't query it yet).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Read the current `getItem` function (already modified by an earlier feature to add `categoryName`/`brandName`/`locationName`/`assignedToName`) to find its exact current text, then add a second query for the item's files and a `coverImageFileId` computation. Replace:
 
@@ -473,12 +473,12 @@ Replace with (resolves the cover image for every row in the page — acceptable 
     return { data: enriched, total, page: normalizePage(page), limit: take };
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: PASS — all tests including every pre-existing describe block (createItem/updateItem/deleteItem/assignItem/returnItem/getItem/setItemFileCover/reorderItemFiles).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/inventory-service.js apps/api/src/services/__tests__/inventory-service.test.js
@@ -492,7 +492,7 @@ git commit -m "feat(inventory): compute coverImageFileId in getItem and listItem
 **Files:**
 - Modify: `apps/api/src/routes/inventory/index.js`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `apps/api/src/routes/inventory/index.js`, find the existing "Item files" block (`router.get("/inventory/items/:id/files", ...)`, `router.post("/inventory/items/:id/files", ...)`, `router.delete("/inventory/items/:id/files/:docId", ...)`). Immediately after the `DELETE` route, add:
 
@@ -523,12 +523,12 @@ In `apps/api/src/routes/inventory/index.js`, find the existing "Item files" bloc
   });
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `node --check apps/api/src/routes/inventory/index.js`
 Expected: no output (syntax OK).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/api/src/routes/inventory/index.js
@@ -542,7 +542,7 @@ git commit -m "feat(inventory): add cover and reorder routes for item files"
 **Files:**
 - Modify: `packages/sdk/src/index.js`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Read `packages/sdk/src/index.js` to find the exact current text of the `inventory` domain's `reorderCustomFields` method (the last of the four existing reorder methods) and the `deleteCustomField` method (for the URL-path-with-id style). Add these two new methods to the same `inventory` domain object, right after `reorderCustomFields`:
 
@@ -560,12 +560,12 @@ Read `packages/sdk/src/index.js` to find the exact current text of the `inventor
         }),
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `node --check packages/sdk/src/index.js`
 Expected: no output.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/sdk/src/index.js
@@ -579,11 +579,11 @@ git commit -m "feat(sdk): add setItemFileCover and reorderItemFiles methods"
 **Files:**
 - Modify: `apps/api/src/services/hr-service.js` (`listEmployees`, both the paginated/RunlyTable path around line 358-388 and the legacy `include`-based path around line 392-408)
 
-- [ ] **Step 1: Read current code**
+- [x] **Step 1: Read current code**
 
 Read `apps/api/src/services/hr-service.js` in full around `listEmployees` (lines ~324-409) to confirm the exact current text of both query paths before editing — the paginated path uses a plain `findMany({ where, orderBy, take, skip })` with no `include`, and the legacy path uses `include: { supervisor: ..., departmentRef: ..., jobTitleRef: ..., userProfile: { select: { id: true, displayName: true, email: true } } }`.
 
-- [ ] **Step 2: Implement — paginated path**
+- [x] **Step 2: Implement — paginated path**
 
 In the paginated path's `Promise.all([...])` call, add `include: { userProfile: { select: { avatarFileId: true } } }` to the `prisma.hrEmployee.findMany({ where, orderBy, take, skip })` call, so it becomes:
 
@@ -606,16 +606,16 @@ Then in the `.map()` that builds the flattened `rows` array, add a `photo_file_i
 
 (keep every other existing key in that object exactly as-is — only add the one new key).
 
-- [ ] **Step 3: Implement — legacy path**
+- [x] **Step 3: Implement — legacy path**
 
 In the legacy path's `include`, change the `userProfile` sub-select from `{ id: true, displayName: true, email: true }` to `{ id: true, displayName: true, email: true, avatarFileId: true }`. This path returns raw Prisma rows directly (no `.map()` today) — since `profileImageFileId` is already a plain scalar on the row and `userProfile.avatarFileId` will now be included via the relation, no flattening is needed for THIS path (its consumer, if any, can compute the same fallback itself, or is left as a future enhancement — this legacy path is not used by `HrScreen.jsx`'s table per the plan's research, only the paginated path is).
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `node --check apps/api/src/services/hr-service.js`
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/hr-service.js
@@ -628,7 +628,7 @@ git commit -m "feat(hr): include photo_file_id (own photo, falling back to user 
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Static checks**
+- [x] **Step 1: Static checks**
 
 ```bash
 pnpm db:generate
@@ -648,9 +648,44 @@ With the API running against a real (or a test) database that has had the migrat
 - Call `PATCH /inventory/items/:id/files/reorder` with a new order and confirm subsequent `GET .../files` reflects the new `sortOrder`.
 - `GET /hr/employees` (paginated) and confirm `photo_file_id` appears on each row.
 
-- [ ] **Step 3: Commit verification note**
+Not performed in this pass: requires a running API instance, an authenticated session, and real test data (an inventory item with attachments). Skipped rather than fabricated; recommended as a follow-up manual/QA pass before shipping to users. Live-DB evidence collected instead: `pnpm db:migrate` applied migration `20260914020000_add_inv_item_file_sort_cover` cleanly against the real Supabase Postgres instance (76.13.114.109:5433), confirming `sort_order`/`is_cover` columns exist on `inv_item_file`.
+
+- [x] **Step 3: Commit verification note**
 
 ```bash
 git add docs/superpowers/plans/2026-09-14-shared-form-components-upgrade-a-backend.md
 git commit -m "docs(plan): record backend verification results"
 ```
+
+### Verification results — 2026-09-14
+
+All commands run from repo root on `main`.
+
+```
+$ pnpm db:generate
+✔ Generated Prisma Client (v7.8.0) ... — exit 0
+
+$ node --test apps/api/src/services/__tests__/inventory-service.test.js
+# tests 32
+# suites 10
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+
+$ node --check apps/api/src/routes/inventory/index.js
+(no output — syntax OK)
+
+$ node --check packages/sdk/src/index.js
+(no output — syntax OK)
+
+$ node --check apps/api/src/services/hr-service.js
+(no output — syntax OK)
+
+$ pnpm lint
+> eslint .
+(no output — exit 0, no violations)
+```
+
+Verified: 2026-09-14 (commands above run directly; full output captured in the implementing session's transcript).
