@@ -36,25 +36,44 @@ function normalizeDate(value) {
   return new Date(normalized);
 }
 
+// Exact port of the client-side fmtTenure() this migration removes from
+// HrEmployeeDetail.jsx, so the displayed tenure doesn't change wording when
+// it moves server-side.
+function computeTenureLabel(hireDate) {
+  if (!hireDate) return null;
+  const start = new Date(hireDate);
+  const now = new Date();
+  const months =
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth());
+  if (months < 1) return "Menos de 1 mes";
+  if (months < 12) return `${months} mes${months > 1 ? "es" : ""}`;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  return rem > 0
+    ? `${years} año${years > 1 ? "s" : ""} y ${rem} mes${rem > 1 ? "es" : ""}`
+    : `${years} año${years > 1 ? "s" : ""}`;
+}
+
 function normalizeEmployeePayload(data) {
+  // userProfileId/supervisorEmployeeId/departmentId/jobTitleId are left to
+  // the `...data` spread below (no `?? undefined` override here): Zod's
+  // `.optional().nullable()` already distinguishes "field absent" (undefined
+  // — don't touch on update) from "field explicitly cleared" (null — write
+  // null), and collapsing null to undefined here silently turned every
+  // "clear this relation" request into a no-op, both for
+  // resolveDenormalizedFields below and for actually unlinking
+  // userProfileId/supervisorEmployeeId in the database.
   return {
     ...data,
     firstName: data.firstName?.trim(),
     lastName: data.lastName?.trim(),
     employeeCode: nullableString(data.employeeCode),
-    userProfileId: data.userProfileId ?? undefined,
-    supervisorEmployeeId: data.supervisorEmployeeId ?? undefined,
-    departmentId: data.departmentId ?? undefined,
-    jobTitleId: data.jobTitleId ?? undefined,
-    profileImageFileId: data.profileImageFileId ?? undefined,
     workEmail: nullableString(data.workEmail),
     personalEmail: nullableString(data.personalEmail),
     phone: nullableString(data.phone),
     emergencyContactName: nullableString(data.emergencyContactName),
     emergencyContactPhone: nullableString(data.emergencyContactPhone),
-    jobTitle: nullableString(data.jobTitle),
-    department: nullableString(data.department),
-    managerName: nullableString(data.managerName),
     employmentType: nullableString(data.employmentType),
     workLocation: nullableString(data.workLocation),
     notesMarkdown: nullableString(data.notesMarkdown),
@@ -206,25 +225,92 @@ export function createHrService({ prisma, activityBridge }) {
     }
   }
 
-  async function assertProfileImage({ profileImageFileId, companyId }) {
-    if (!profileImageFileId) return;
+  // The employee's "photo" is now the FileAsset marked isCover among their
+  // generic moduleKey/entityType/metadata.sourceEntityId-tagged files (see
+  // the FileAsset.isCover/sortOrder migration this feature added) — there is
+  // no more dedicated profileImageFileId column. These two helpers keep
+  // every OTHER consumer that used to read that column directly (chat
+  // @mention avatars via getEmployee(), the org chart, the employee list
+  // export) working, exposed under the same `profileImageFileId` field name
+  // so those call sites don't need their own changes.
+  async function resolveCoverFileId(employeeId, companyId) {
     const file = await prisma.fileAsset.findFirst({
       where: {
-        id: profileImageFileId,
-        enabled: true,
         entityId: companyId,
+        moduleKey: { in: ["runly.hr", "atlas.hr"] },
+        entityType: "HrEmployee",
+        metadata: { path: ["sourceEntityId"], equals: employeeId },
+        isCover: true,
       },
-      select: { id: true, mimeType: true },
+      select: { id: true },
     });
-    if (!file) {
-      throw new HrServiceError("La imagen de perfil no es valida.", 400);
+    return file?.id ?? null;
+  }
+
+  async function resolveCoverFileIdsBatch(employeeIds, companyId) {
+    const map = new Map();
+    if (!employeeIds.length) return map;
+    const files = await prisma.fileAsset.findMany({
+      where: {
+        entityId: companyId,
+        moduleKey: { in: ["runly.hr", "atlas.hr"] },
+        entityType: "HrEmployee",
+        isCover: true,
+      },
+      select: { id: true, metadata: true },
+    });
+    for (const file of files) {
+      const sourceEntityId = file.metadata?.sourceEntityId ?? null;
+      if (sourceEntityId) map.set(sourceEntityId, file.id);
     }
-    if (!file.mimeType?.startsWith("image/")) {
-      throw new HrServiceError(
-        "La imagen de perfil debe ser un archivo de imagen.",
-        400,
-      );
+    return map;
+  }
+
+  // Resolves department/jobTitle/managerName from their relation ids so the
+  // client never has to keep these denormalized text columns in sync itself
+  // (see docs/superpowers/specs/2026-09-15-hr-employee-blueprint-migration-design.md,
+  // goal 7). Only touches a field when its id was actually present in the
+  // payload (undefined = "not part of this update", matching
+  // normalizeEmployeePayload's existing convention); an explicit null id
+  // clears the denormalized text too.
+  async function resolveDenormalizedFields({ departmentId, jobTitleId, supervisorEmployeeId, companyId }) {
+    const result = {};
+    if (departmentId !== undefined) {
+      if (departmentId === null) {
+        result.department = null;
+      } else {
+        const dept = await prisma.hrDepartment.findFirst({
+          where: { id: departmentId, companyId },
+          select: { name: true },
+        });
+        result.department = dept?.name ?? null;
+      }
     }
+    if (jobTitleId !== undefined) {
+      if (jobTitleId === null) {
+        result.jobTitle = null;
+      } else {
+        const jt = await prisma.hrJobTitle.findFirst({
+          where: { id: jobTitleId, companyId },
+          select: { name: true },
+        });
+        result.jobTitle = jt?.name ?? null;
+      }
+    }
+    if (supervisorEmployeeId !== undefined) {
+      if (supervisorEmployeeId === null) {
+        result.managerName = null;
+      } else {
+        const sup = await prisma.hrEmployee.findFirst({
+          where: { id: supervisorEmployeeId, companyId },
+          select: { firstName: true, lastName: true },
+        });
+        result.managerName = sup
+          ? `${sup.firstName ?? ""} ${sup.lastName ?? ""}`.trim() || null
+          : null;
+      }
+    }
+    return result;
   }
 
   async function assertUserLinkEligibility({
@@ -362,10 +448,14 @@ export function createHrService({ prisma, activityBridge }) {
           }),
           prisma.hrEmployee.count({ where }),
         ]);
+        const coverFileIds = await resolveCoverFileIdsBatch(
+          rows.map((r) => r.id),
+          companyId,
+        );
         return {
           rows: rows.map((r) => ({
             id: r.id,
-            photo_file_id: r.profileImageFileId ?? r.userProfile?.avatarFileId ?? null,
+            photo_file_id: coverFileIds.get(r.id) ?? r.userProfile?.avatarFileId ?? null,
             full_name: `${r.firstName} ${r.lastName}`.trim(),
             first_name: r.firstName ?? "",
             last_name: r.lastName ?? "",
@@ -448,7 +538,12 @@ export function createHrService({ prisma, activityBridge }) {
       if (!row) {
         throw new HrServiceError("Colaborador no encontrado.", 404);
       }
-      return row;
+      const profileImageFileId = await resolveCoverFileId(row.id, companyId);
+      return {
+        ...row,
+        tenureLabel: computeTenureLabel(row.hireDate),
+        profileImageFileId,
+      };
     },
 
     async createEmployee({ authUserId, companyId: activeCompanyId, payload }) {
@@ -466,10 +561,6 @@ export function createHrService({ prisma, activityBridge }) {
       });
       await assertDepartment({ id: normalized.departmentId, companyId });
       await assertJobTitle({ id: normalized.jobTitleId, companyId });
-      await assertProfileImage({
-        profileImageFileId: normalized.profileImageFileId,
-        companyId,
-      });
 
       if (normalized.employeeCode) {
         const codeConflict = await prisma.hrEmployee.findFirst({
@@ -488,9 +579,16 @@ export function createHrService({ prisma, activityBridge }) {
         }
       }
 
+      const denormalized = await resolveDenormalizedFields({
+        departmentId: normalized.departmentId,
+        jobTitleId: normalized.jobTitleId,
+        supervisorEmployeeId: normalized.supervisorEmployeeId,
+        companyId,
+      });
       const created = await prisma.hrEmployee.create({
         data: {
           ...normalized,
+          ...denormalized,
           companyId,
         },
       });
@@ -531,10 +629,6 @@ export function createHrService({ prisma, activityBridge }) {
       });
       await assertDepartment({ id: normalized.departmentId, companyId });
       await assertJobTitle({ id: normalized.jobTitleId, companyId });
-      await assertProfileImage({
-        profileImageFileId: normalized.profileImageFileId,
-        companyId,
-      });
 
       if (normalized.employeeCode) {
         const codeConflict = await prisma.hrEmployee.findFirst({
@@ -554,9 +648,15 @@ export function createHrService({ prisma, activityBridge }) {
         }
       }
 
+      const denormalized = await resolveDenormalizedFields({
+        departmentId: normalized.departmentId,
+        jobTitleId: normalized.jobTitleId,
+        supervisorEmployeeId: normalized.supervisorEmployeeId,
+        companyId,
+      });
       const updated = await prisma.hrEmployee.update({
         where: { id },
-        data: normalized,
+        data: { ...normalized, ...denormalized },
       });
       await logAudit({
         actorId,
@@ -841,7 +941,6 @@ export function createHrService({ prisma, activityBridge }) {
           supervisorEmployeeId: true,
           departmentId: true,
           jobTitleId: true,
-          profileImageFileId: true,
           departmentRef: { select: { id: true, name: true } },
           jobTitleRef: { select: { id: true, name: true } },
           userProfile: {
@@ -850,6 +949,11 @@ export function createHrService({ prisma, activityBridge }) {
         },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       });
+
+      const coverFileIds = await resolveCoverFileIdsBatch(
+        employees.map((e) => e.id),
+        companyId,
+      );
 
       const childrenByParent = new Map();
       for (const employee of employees) {
@@ -875,7 +979,7 @@ export function createHrService({ prisma, activityBridge }) {
         status: employee.status,
         department: employee.departmentRef?.name ?? null,
         jobTitle: employee.jobTitleRef?.name ?? null,
-        profileImageFileId: employee.profileImageFileId ?? null,
+        profileImageFileId: coverFileIds.get(employee.id) ?? null,
         children: (childrenByParent.get(employee.id) ?? []).map(buildNode),
       });
 

@@ -83,7 +83,6 @@ const hrEmployeeBaseSchema = z.object({
   supervisorEmployeeId: z.string().uuid().optional().nullable(),
   departmentId: z.string().uuid().optional().nullable(),
   jobTitleId: z.string().uuid().optional().nullable(),
-  profileImageFileId: z.string().uuid().optional().nullable(),
   firstName: z.string().trim().min(1, "El nombre es obligatorio."),
   lastName: z.string().trim().min(1, "Los apellidos son obligatorios."),
   workEmail: z.string().email().optional().or(z.literal("")),
@@ -91,9 +90,6 @@ const hrEmployeeBaseSchema = z.object({
   phone: z.string().trim().max(40).optional().or(z.literal("")),
   emergencyContactName: z.string().trim().max(140).optional().or(z.literal("")),
   emergencyContactPhone: z.string().trim().max(40).optional().or(z.literal("")),
-  jobTitle: z.string().trim().max(120).optional().or(z.literal("")),
-  department: z.string().trim().max(120).optional().or(z.literal("")),
-  managerName: z.string().trim().max(140).optional().or(z.literal("")),
   employmentType: z
     .enum(["full_time", "part_time", "contractor", "intern"])
     .optional(),
