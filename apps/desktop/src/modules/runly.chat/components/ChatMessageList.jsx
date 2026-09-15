@@ -8,6 +8,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { groupMessagesByDate, formatDateSeparator } from "../lib/chatUtils";
 import { findOwnMember, isMentioned } from "../lib/chatPermissions";
 import { useChatPreferences } from "../hooks/useChatPreferences";
+import { MERIDIAN_NAME } from "../lib/meridian";
 
 function senderKey(msg) {
   return `${msg.sender_user_id ?? "guest"}::${msg.sender_type ?? "user"}`;
@@ -294,6 +295,17 @@ export function ChatMessageList({
   // been jumped to at least once — it does not just cycle forever.
   const ownRoleId = findOwnMember(members, currentUserId)?.roleId;
   const [visitedMentionIds, setVisitedMentionIds] = useState(() => new Set());
+
+  // typingUsers carries raw userIds (the "meridian" sentinel already swapped
+  // for MERIDIAN_NAME upstream) — resolve ids against the member list so the
+  // indicator shows a display name instead of a UUID.
+  const typingNames = useMemo(() => {
+    return (typingUsers ?? []).map((entry) => {
+      if (entry === MERIDIAN_NAME) return entry;
+      const member = members?.find((m) => m.userId === entry);
+      return member?.displayName ?? entry;
+    });
+  }, [typingUsers, members]);
 
   const unreadMentionIds = useMemo(() => {
     if (!unreadBoundary?.id || !messages?.length) return [];
@@ -593,7 +605,7 @@ export function ChatMessageList({
           ];
         })}
 
-        {typingUsers?.length > 0 && <TypingIndicator names={typingUsers} />}
+        {typingNames.length > 0 && <TypingIndicator names={typingNames} />}
 
         <div ref={bottomRef} />
       </div>

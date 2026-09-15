@@ -4,6 +4,8 @@ function Toaster({ ...props }) {
   return (
     <Sonner
       className="toaster group"
+      position="top-center"
+      mobileOffset={{ top: 'calc(var(--safe-top, 0px) + 12px)' }}
       expand
       closeButton
       toastOptions={{

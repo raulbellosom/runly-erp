@@ -47,10 +47,17 @@ export function useChatUpload(conversationId) {
 
     const { attachmentId, uploadUrl } = res.data;
 
+    // iOS Safari's fetch() unreliably uploads a Blob/File body assembled from
+    // more than one underlying part — exactly what a voice note becomes,
+    // since stopRecording() calls requestData() right before stop() (a
+    // separate iOS workaround) which forces two dataavailable chunks into the
+    // recorded Blob instead of one. Sending a plain ArrayBuffer sidesteps the
+    // bug (and gives fetch an exact Content-Length) for every upload, not
+    // just voice notes; buffering first is cheap at the 50MB attachment cap.
     const uploadRes = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": mimeType },
-      body: file,
+      body: await file.arrayBuffer(),
     });
 
     if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);

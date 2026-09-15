@@ -25,6 +25,25 @@ function clampVolume(value) {
   return Math.min(1, Math.max(0, value));
 }
 
+// Every real <audio> element here (unlike the WebAudio path) stays attached
+// to the DOM for the whole session — iOS ties autoplay permission to the
+// element instance, so it can't be torn down after use. But the moment one
+// of them is `.play()`ed — even the silent unlock WAV that primes autoplay
+// on the very first tap anywhere in the app — iOS Safari treats it as an
+// active media session and shows a persistent lock-screen "Now Playing"
+// widget (falling back to the document title, since no MediaMetadata is
+// ever set) even though nothing is audibly playing. Telling the OS
+// explicitly that nothing is playing clears/suppresses that widget without
+// touching the autoplay-unlock mechanics themselves.
+function clearMediaSession() {
+  try {
+    if (navigator.mediaSession) {
+      navigator.mediaSession.playbackState = "none";
+      navigator.mediaSession.metadata = null;
+    }
+  } catch {}
+}
+
 function getAudioContext() {
   if (audioContext?.state === "closed") audioContext = null;
   if (audioContext) return audioContext;
@@ -97,6 +116,7 @@ function primeAudioElement(name) {
     try { element.currentTime = 0; } catch {}
     element.src = CALL_SOUND_URLS[name];
     try { element.load?.(); } catch {}
+    clearMediaSession();
   }
 
   let playResult;
@@ -196,6 +216,7 @@ export function playCallSound(name, {
     elementAudio.volume = clampVolume(volume);
     try { elementAudio.currentTime = 0; } catch {}
     await elementAudio.play();
+    clearMediaSession();
     if (stopped) {
       elementAudio.pause();
       return true;
@@ -251,5 +272,6 @@ export function playCallSound(name, {
       try { elementAudio.currentTime = 0; } catch {}
       elementAudio.loop = false;
     }
+    clearMediaSession();
   };
 }
