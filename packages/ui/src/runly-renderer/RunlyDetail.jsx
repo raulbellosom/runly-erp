@@ -915,8 +915,10 @@ export function RunlyDetail({
   );
   const heroModel = useMemo(
     () =>
-      data && typeof data === "object" ? resolveHeroModel(schema, data) : null,
-    [schema, data],
+      data && typeof data === "object"
+        ? resolveHeroModel(schema, data, fieldMap)
+        : null,
+    [schema, data, fieldMap],
   );
   const kpiItems = useMemo(
     () => (data && typeof data === "object" ? resolveKpis(schema, data) : []),

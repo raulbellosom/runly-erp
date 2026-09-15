@@ -28,7 +28,24 @@ function isEmpty(value) {
   return value === undefined || value === null || String(value).trim() === "";
 }
 
-export function buildChipList(chipDefs, record) {
+// Fields declared with `type: "select"` + `options` in a section carry the
+// value->label mapping used to render them there (see RunlyDetail's
+// renderValue). The hero's subtitle/chips read the same raw record values but
+// bypass that mapping, so a select field would otherwise leak its raw stored
+// value (e.g. "equipment") instead of its label ("Equipo / Maquinaria").
+// `fieldMap` is the same Map RunlyDetail builds from `fields` + sections.
+function resolveDisplayLabel(fieldMap, fieldName, rawValue) {
+  if (isEmpty(rawValue)) return rawValue;
+  const field = fieldMap?.get ? fieldMap.get(fieldName) : null;
+  if (field?.type === "select" && Array.isArray(field.options)) {
+    const str = String(rawValue);
+    const opt = field.options.find((o) => String(o.value) === str);
+    if (opt?.label) return opt.label;
+  }
+  return rawValue;
+}
+
+export function buildChipList(chipDefs, record, fieldMap = null) {
   return (Array.isArray(chipDefs) ? chipDefs : [])
     .map((def) => {
       if (!def || typeof def !== "object" || !def.field) return null;
@@ -37,7 +54,7 @@ export function buildChipList(chipDefs, record) {
       const chip = {
         key: def.field,
         label: def.label ? String(def.label) : null,
-        value: raw,
+        value: resolveDisplayLabel(fieldMap, def.field, raw),
         type: def.type ?? "text",
         icon:
           typeof def.icon === "string" && def.icon.trim() ? def.icon.trim() : null,
@@ -48,13 +65,13 @@ export function buildChipList(chipDefs, record) {
     .filter(Boolean);
 }
 
-export function resolveHeroModel(schema, record) {
+export function resolveHeroModel(schema, record, fieldMap = null) {
   const hero = schema?.hero;
   if (!hero || typeof hero !== "object") return null;
 
   const titleRaw = hero.titleField ? getByPath(record, hero.titleField) : null;
   const subtitle = (Array.isArray(hero.subtitleFields) ? hero.subtitleFields : [])
-    .map((field) => getByPath(record, field))
+    .map((field) => resolveDisplayLabel(fieldMap, field, getByPath(record, field)))
     .filter((value) => !isEmpty(value))
     .map((value) => String(value))
     .join(" · ");
@@ -85,7 +102,7 @@ export function resolveHeroModel(schema, record) {
         ? hero.fallbackIcon.trim()
         : "FileText",
     accentHex: isEmpty(accentRaw) ? null : resolveColorHex(String(accentRaw)),
-    chips: buildChipList(hero.metaChips, record),
+    chips: buildChipList(hero.metaChips, record, fieldMap),
   };
 }
 

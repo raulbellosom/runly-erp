@@ -81,6 +81,29 @@ test("resolveHeroModel builds title, joined subtitle, image + accent", () => {
   assert.equal(model.statusMap, null);
 });
 
+test("resolveHeroModel and buildChipList resolve select-field labels via fieldMap", () => {
+  const fieldMap = new Map([
+    [
+      "itemType",
+      { type: "select", options: [{ value: "equipment", label: "Equipo / Maquinaria" }] },
+    ],
+  ]);
+  const schema = {
+    hero: {
+      titleField: "name",
+      subtitleFields: ["itemType", "model"],
+      metaChips: [{ field: "itemType", label: "Tipo" }],
+    },
+  };
+  const model = resolveHeroModel(
+    schema,
+    { name: "Asus TUF 15", itemType: "equipment", model: "TUF Gaming 15" },
+    fieldMap,
+  );
+  assert.equal(model.subtitle, "Equipo / Maquinaria · TUF Gaming 15");
+  assert.equal(model.chips[0].value, "Equipo / Maquinaria");
+});
+
 test("resolveHeroModel keeps statusMap and defaults fallbackIcon", () => {
   const model = resolveHeroModel(
     { hero: { titleField: "insurer_name", statusField: "is_active", statusMap: { true: "Vigente", false: "Vencida" } } },

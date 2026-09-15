@@ -807,7 +807,9 @@ export function useAttachmentsController({
     [apiBaseUrl, canWrite, companyId, config?.removePath, loadAssociated, recordId, setGlobalError, token],
   );
 
-  const canManageCover = Boolean(config?.coverPath);
+  // Gated on canWrite too: setCover/reorder no-op on a read-only view (see
+  // below), so the star/reorder affordances must not render there either.
+  const canManageCover = canWrite && Boolean(config?.coverPath);
 
   const setCover = useCallback(
     async (item, idOverride = null) => {
