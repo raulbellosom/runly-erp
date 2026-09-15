@@ -872,7 +872,139 @@ git commit -m "feat(hr): resolve department/jobTitle/managerName server-side; dr
 
 ---
 
-### Task 6: Full backend verification
+### Task 6: Add server-computed `tenureLabel` to `getEmployee()`
+
+**Files:**
+- Modify: `apps/api/src/services/hr-service.js`
+- Test: `apps/api/src/services/__tests__/hr-service.test.js`
+
+Plan B's `HR_EMPLOYEE_DETAIL` blueprint uses a KPI field `tenureLabel` (Spanish-formatted tenure, e.g. "3 años y 2 meses") since `RunlyDetail`'s `kpis` read a field directly off the record, not a client-computed function (see the parent spec, section 24, risk 3). The current hand-rolled screen computes this in the browser via `fmtTenure(hireDate)`; this task ports that exact algorithm server-side into `getEmployee()`.
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `apps/api/src/services/__tests__/hr-service.test.js`:
+
+```js
+describe("hr-service getEmployee tenureLabel", () => {
+  it("computes a Spanish tenure label from hireDate", async () => {
+    const hireDate = new Date();
+    hireDate.setFullYear(hireDate.getFullYear() - 3);
+    hireDate.setMonth(hireDate.getMonth() - 2);
+    const prisma = {
+      userProfile: { findUnique: async () => ({ id: PROFILE_ID }) },
+      membership: { findFirst: async () => ({ companyId: COMPANY_ID }) },
+      hrEmployee: {
+        findFirst: async () => ({
+          id: EMPLOYEE_ID,
+          companyId: COMPANY_ID,
+          hireDate,
+          supervisor: null,
+          reportees: [],
+          departmentRef: null,
+          jobTitleRef: null,
+          userProfile: null,
+        }),
+      },
+    };
+    const service = createHrService({ prisma });
+    const result = await service.getEmployee({
+      authUserId: AUTH_USER_ID,
+      companyId: COMPANY_ID,
+      id: EMPLOYEE_ID,
+    });
+    assert.equal(result.tenureLabel, "3 años y 2 meses");
+  });
+
+  it("returns null tenureLabel when there is no hireDate", async () => {
+    const prisma = {
+      userProfile: { findUnique: async () => ({ id: PROFILE_ID }) },
+      membership: { findFirst: async () => ({ companyId: COMPANY_ID }) },
+      hrEmployee: {
+        findFirst: async () => ({
+          id: EMPLOYEE_ID,
+          companyId: COMPANY_ID,
+          hireDate: null,
+          supervisor: null,
+          reportees: [],
+          departmentRef: null,
+          jobTitleRef: null,
+          userProfile: null,
+        }),
+      },
+    };
+    const service = createHrService({ prisma });
+    const result = await service.getEmployee({
+      authUserId: AUTH_USER_ID,
+      companyId: COMPANY_ID,
+      id: EMPLOYEE_ID,
+    });
+    assert.equal(result.tenureLabel, null);
+  });
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `node --test apps/api/src/services/__tests__/hr-service.test.js`
+Expected: FAIL — `result.tenureLabel` is `undefined`, since the field doesn't exist yet.
+
+- [ ] **Step 3: Add `computeTenureLabel` and wire it into `getEmployee`**
+
+In `apps/api/src/services/hr-service.js`, add this near the top of the file, alongside other small pure helpers (not inside `createHrService`'s closure — it needs no `prisma` access):
+
+```js
+// Exact port of the client-side fmtTenure() this migration removes from
+// HrEmployeeDetail.jsx, so the displayed tenure doesn't change wording when
+// it moves server-side.
+function computeTenureLabel(hireDate) {
+  if (!hireDate) return null;
+  const start = new Date(hireDate);
+  const now = new Date();
+  const months =
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth());
+  if (months < 1) return "Menos de 1 mes";
+  if (months < 12) return `${months} mes${months > 1 ? "es" : ""}`;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  return rem > 0
+    ? `${years} año${years > 1 ? "s" : ""} y ${rem} mes${rem > 1 ? "es" : ""}`
+    : `${years} año${years > 1 ? "s" : ""}`;
+}
+```
+
+Then in `getEmployee`, replace:
+```js
+      if (!row) {
+        throw new HrServiceError("Colaborador no encontrado.", 404);
+      }
+      return row;
+    },
+```
+with:
+```js
+      if (!row) {
+        throw new HrServiceError("Colaborador no encontrado.", 404);
+      }
+      return { ...row, tenureLabel: computeTenureLabel(row.hireDate) };
+    },
+```
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `node --test apps/api/src/services/__tests__/hr-service.test.js`
+Expected: PASS, all tests including the two new ones.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/api/src/services/hr-service.js apps/api/src/services/__tests__/hr-service.test.js
+git commit -m "feat(hr): compute tenureLabel server-side in getEmployee for the detail blueprint's KPI"
+```
+
+---
+
+### Task 7: Full backend verification
 
 **Files:** None (verification only).
 
