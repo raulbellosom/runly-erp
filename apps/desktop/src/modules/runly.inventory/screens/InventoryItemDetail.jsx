@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { RunlyDetail, LoadingState, ErrorState, ConfirmDialog, Button } from '@runly/ui'
-import { Trash2 } from 'lucide-react'
+import { RunlyDetail, LoadingState, ErrorState, ConfirmDialog, DetailActionBar } from '@runly/ui'
+import { ArrowLeft, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -61,18 +61,25 @@ export default function InventoryItemDetail() {
         onBack={() => navigate('/app/m/runly.inventory/inventory')}
         onEdit={() => navigate(`/app/m/runly.inventory/inventory/${id}/edit`)}
         heroActions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => navigate('/app/m/runly.inventory/inventory')}>
-              Volver
-            </Button>
-            <Button type="button" size="sm" onClick={() => navigate(`/app/m/runly.inventory/inventory/${id}/edit`)}>
-              Editar
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-              Eliminar
-            </Button>
-          </div>
+          <DetailActionBar
+            primary={{
+              label: 'Editar',
+              onClick: () => navigate(`/app/m/runly.inventory/inventory/${id}/edit`),
+            }}
+            secondary={[
+              {
+                label: 'Volver',
+                icon: <ArrowLeft className="h-4 w-4" />,
+                onClick: () => navigate('/app/m/runly.inventory/inventory'),
+              },
+              {
+                label: 'Eliminar',
+                icon: <Trash2 className="h-4 w-4" />,
+                onClick: () => setDeleteOpen(true),
+                destructive: true,
+              },
+            ]}
+          />
         }
       />
 
