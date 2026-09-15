@@ -1818,12 +1818,10 @@ export function RelationSelectField({
   placeholder = "Seleccionar...",
   className,
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState({});
-  const containerRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const searchRef = useRef(null);
+  const {
+    open, setOpen, search, setSearch, dropdownStyle,
+    containerRef, dropdownRef, searchRef, handleOpen: handlePopoverOpen, close,
+  } = useComboboxPopover({ dropHeight: 260, minWidth: 220 });
   // Portaled dropdown: keep wheel/touch scroll working inside a Dialog/Sheet.
   useIsolatedScroll(dropdownRef, open);
 
@@ -1832,31 +1830,25 @@ export function RelationSelectField({
       ? options.find((o) => String(o.value) === String(value))
       : undefined;
 
+  // Extra behavior beyond the shared hook's outside-click handling: reset the
+  // remote search query when the user clicks away without selecting, so the
+  // next open starts from the full option list instead of a stale filter.
   useEffect(() => {
-    function handleOutside(e) {
+    function handleOutsideSearchReset(e) {
       const inContainer = containerRef.current?.contains(e.target);
       const inDropdown = dropdownRef.current?.contains(e.target);
-      if (!inContainer && !inDropdown) {
-        if (search) onSearchChange?.("");
-        setOpen(false);
-        setSearch("");
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [search, onSearchChange]);
-
-  function handleOpen() {
-    if (!open && containerRef.current) {
-      setDropdownStyle(
-        computeDropdownStyle(containerRef.current, 260, 220, true),
-      );
-      if (options.length === 0 && !loading) {
+      if (!inContainer && !inDropdown && search) {
         onSearchChange?.("");
       }
     }
-    setOpen((o) => !o);
-    setTimeout(() => searchRef.current?.focus(), 50);
+    document.addEventListener("mousedown", handleOutsideSearchReset);
+    return () => document.removeEventListener("mousedown", handleOutsideSearchReset);
+  }, [search, onSearchChange]);
+
+  function handleOpen() {
+    handlePopoverOpen(() => {
+      if (options.length === 0 && !loading) onSearchChange?.("");
+    });
   }
 
   function handleSearchChange(e) {
@@ -1868,16 +1860,14 @@ export function RelationSelectField({
   function handleSelect(opt) {
     if (opt.disabled) return;
     onChange?.(opt.value);
-    setOpen(false);
-    setSearch("");
+    close();
   }
 
   function handleCreate() {
     if (createDisabled || typeof onCreate !== "function") return;
     const searchText = search.trim();
     onCreate(searchText);
-    setOpen(false);
-    setSearch("");
+    close();
   }
 
   const displayLabel =
@@ -1988,7 +1978,7 @@ export function RelationSelectField({
                 pointerEvents: "auto",
               }}
               className={cn(
-                "rounded-xl border border-border/80 bg-card text-foreground shadow-xl overflow-hidden",
+                "glass-shell rounded-xl overflow-hidden",
                 dropdownStyle.flipped && "flex flex-col-reverse",
               )}
             >
