@@ -944,7 +944,7 @@ export function RunlyDetail({
     ) : null;
 
   const renderSection = (section) => (
-    <div key={section.id} className="space-y-4">
+    <div key={section.id} className="glass rounded-xl px-5 py-4 space-y-4">
       {section.title ? (
         <div className="pb-3 border-b border-[hsl(var(--border))] flex items-center gap-2">
           {(() => {
