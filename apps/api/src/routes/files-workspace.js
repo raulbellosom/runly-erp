@@ -39,6 +39,10 @@ export function createFilesWorkspaceRouter({
         error instanceof FilesServiceError
       )
         return c.json({ error: error.message }, error.status);
+      // Anything else is unexpected — log it so a real bug (a DB constraint,
+      // a missing bucket, ...) doesn't hide behind this generic message with
+      // no trace of what actually happened.
+      console.error("[runly.files] workspace route error", error);
       return c.json(
         { error: "No se pudo completar la operación de documentos." },
         500,
