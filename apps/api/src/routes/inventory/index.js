@@ -84,6 +84,22 @@ export function createInventoryRouter({
     }
   });
 
+  // PATCH alias — RunlyForm (the shared blueprint-driven form renderer) always
+  // submits edits via PATCH, matching the convention already used by
+  // PATCH /fleet/vehicles/:id. The PUT route above is kept for any other caller.
+  router.patch("/inventory/items/:id", requirePermission("inventory.item.update"), async (c) => {
+    try {
+      const companyId = c.get("companyId");
+      const { id } = c.req.param();
+      const data = await c.req.json();
+      const item = await inventoryService.updateItem(id, data, companyId);
+      return c.json({ data: item });
+    } catch (err) {
+      if (isInvErr(err)) return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudo actualizar el item." }, 500);
+    }
+  });
+
   router.delete("/inventory/items/:id", requirePermission("inventory.item.delete"), async (c) => {
     try {
       const companyId = c.get("companyId");
