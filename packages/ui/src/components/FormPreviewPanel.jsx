@@ -12,7 +12,7 @@ function GlyphIcon({ name, className }) {
 export function FormPreviewPanel({ title, subtitle, rows, fallbackIcon = "FileText" }) {
   const list = Array.isArray(rows) ? rows : [];
   return (
-    <div className="glass sticky top-4 flex flex-col gap-4 rounded-2xl p-4">
+    <div className="glass-shell sticky top-4 flex flex-col gap-4 rounded-2xl p-4">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
         <GlyphIcon name={fallbackIcon} className="h-3.5 w-3.5" />
         Vista previa

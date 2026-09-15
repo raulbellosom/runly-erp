@@ -1315,7 +1315,7 @@ export function RunlyForm({
       <div
         key={section.id}
         className={cn(
-          "glass rounded-xl px-5 py-4 space-y-4",
+          "glass-shell rounded-xl px-5 py-4 space-y-4",
           header && isCollapsible && !isCollapsed && "pb-5",
         )}
       >
@@ -1428,8 +1428,7 @@ export function RunlyForm({
       {showFooter && (
         <div
           className={cn(
-            "sticky bottom-0 z-10 border-t border-[hsl(var(--border))] px-4 py-3 flex items-center justify-between gap-2",
-            "bg-[hsl(var(--surface-1))]",
+            "glass-shell sticky bottom-0 z-10 rounded-xl px-4 py-3 flex items-center justify-between gap-2",
           )}
         >
           <p className="text-xs text-[hsl(var(--muted-foreground))]">

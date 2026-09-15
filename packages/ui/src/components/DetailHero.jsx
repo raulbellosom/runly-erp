@@ -31,7 +31,7 @@ export function DetailHero({
 }) {
   const chipList = Array.isArray(chips) ? chips : [];
   return (
-    <Card variant="default" className="overflow-hidden p-4 sm:p-5">
+    <Card variant="shell" className="overflow-hidden p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
         <div className="w-full shrink-0 sm:w-56">
           <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[hsl(var(--border))] sm:aspect-[4/3]">

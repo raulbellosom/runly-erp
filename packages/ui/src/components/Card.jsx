@@ -11,6 +11,13 @@ const Card = forwardRef(function Card(
       className={cn(
         "rounded-2xl",
         variant === "default" && "glass",
+        // "shell" = near-opaque glass for structural content containers that
+        // sit directly on the app's plain page background (no colorful
+        // backdrop behind them, unlike auth/setup screens) — plain "glass" is
+        // nearly invisible there, especially in light mode (~68% opaque white
+        // on an already-white page). Same pattern SetupWizard/LoginScreen use
+        // for their main card, just applied to regular module content.
+        variant === "shell" && "glass-shell",
         variant === "solid" &&
           "bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-sm",
         variant === "bordered" &&
