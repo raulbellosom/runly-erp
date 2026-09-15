@@ -82,6 +82,8 @@ export const INVENTORY_ITEM_DETAIL = {
           listPath: '/inventory/items/:id/files',
           addPath: '/inventory/items/:id/files',
           removePath: '/inventory/items/:id/files/:docId',
+          coverPath: '/inventory/items/:id/files/:docId/cover',
+          reorderPath: '/inventory/items/:id/files/reorder',
           upload: { endpoint: '/files/upload', moduleKey: 'runly.inventory', entityType: 'InvItem' },
           signedUrl: { endpointTemplate: '/files/:fileId/signed-url' },
           fields: { fileAssetId: 'fileAssetId' },
