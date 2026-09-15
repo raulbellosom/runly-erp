@@ -356,12 +356,16 @@ export function createHrService({ prisma, activityBridge }) {
           ...buildSearchWhere(search),
         };
         const [rows, total] = await Promise.all([
-          prisma.hrEmployee.findMany({ where, orderBy, take, skip }),
+          prisma.hrEmployee.findMany({
+            where, orderBy, take, skip,
+            include: { userProfile: { select: { avatarFileId: true } } },
+          }),
           prisma.hrEmployee.count({ where }),
         ]);
         return {
           rows: rows.map((r) => ({
             id: r.id,
+            photo_file_id: r.profileImageFileId ?? r.userProfile?.avatarFileId ?? null,
             full_name: `${r.firstName} ${r.lastName}`.trim(),
             first_name: r.firstName ?? "",
             last_name: r.lastName ?? "",
@@ -401,7 +405,7 @@ export function createHrService({ prisma, activityBridge }) {
           supervisor: { select: { id: true, firstName: true, lastName: true } },
           departmentRef: { select: { id: true, name: true } },
           jobTitleRef: { select: { id: true, name: true } },
-          userProfile: { select: { id: true, displayName: true, email: true } },
+          userProfile: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
         },
         orderBy: [{ updatedAt: "desc" }],
         take,
