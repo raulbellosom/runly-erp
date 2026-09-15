@@ -141,6 +141,7 @@ export function RunlyForm({
   id,
   showFooter = true,
   onCompletionChange,
+  asideActions = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -1346,10 +1347,12 @@ export function RunlyForm({
   const showCompletion = schema.showCompletion === true;
   const { allFieldNames, filledCount, completionPercent } = computeCompletion(fieldMap, formValues, isFieldVisible);
   const previewModel = computePreviewModel(previewConfig, fieldMap, formValues);
+  const hasAsideColumn =
+    showCompletion || Boolean(asideActions) || Boolean(previewModel) || asideSections.length > 0;
 
   // Reported unconditionally (regardless of schema.showCompletion) so a screen
-  // that wants to render its own FormCompletionRing in a custom header layout
-  // (instead of RunlyForm's default placement above the sections) can do so.
+  // that wants to react to completion changes elsewhere (e.g. a page title
+  // badge) can do so in addition to the ring RunlyForm renders itself below.
   useEffect(() => {
     onCompletionChange?.({
       percent: completionPercent,
@@ -1370,26 +1373,20 @@ export function RunlyForm({
         </Alert>
       )}
 
-      {showCompletion ? (
-        <FormCompletionRing
-          percent={completionPercent}
-          filledCount={filledCount}
-          totalCount={allFieldNames.length}
-        />
-      ) : null}
-
-      <div
-        className={
-          asideSections.length > 0 || previewModel
-            ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]"
-            : "space-y-3"
-        }
-      >
+      <div className={hasAsideColumn ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]" : "space-y-3"}>
         <div className="space-y-3">
           {mainSections.map((section) => renderSection(section))}
         </div>
-        {asideSections.length > 0 || previewModel ? (
+        {hasAsideColumn ? (
           <div className="space-y-3 xl:sticky xl:top-4 xl:self-start">
+            {showCompletion ? (
+              <FormCompletionRing
+                percent={completionPercent}
+                filledCount={filledCount}
+                totalCount={allFieldNames.length}
+              />
+            ) : null}
+            {asideActions}
             {previewModel ? (
               <FormPreviewPanel
                 title={previewModel.title}
