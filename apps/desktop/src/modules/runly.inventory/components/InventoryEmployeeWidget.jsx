@@ -1,19 +1,22 @@
 import { useNavigate } from 'react-router-dom'
-import { Card, EmptyState, LoadingState } from '@runly/ui'
+import { EmptyState, LoadingState } from '@runly/ui'
 import { Boxes } from 'lucide-react'
 import { useInventoryItemsByEmployee } from '../hooks/useInventoryItems.js'
 import { InventoryStatusBadge } from './InventoryStatusBadge.jsx'
 
+// No own card/header chrome — this widget's sole caller,
+// runly.hr's AssignedEquipmentSection (a RunlyDetail "component" section),
+// already gets a card + "Equipos asignados" header from the blueprint's
+// label/icon via RunlyDetail's section wrapper.
 export function InventoryEmployeeWidget({ employeeId }) {
   const navigate = useNavigate()
   const { data, isLoading } = useInventoryItemsByEmployee(employeeId)
   const items = data?.data ?? data ?? []
 
   return (
-    <Card className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Equipos asignados</h3>
-        {items.length > 0 && (
+    <div className="space-y-3">
+      {items.length > 0 && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => navigate(`/app/m/runly.inventory/assignments?employee=${employeeId}`)}
@@ -21,8 +24,8 @@ export function InventoryEmployeeWidget({ employeeId }) {
           >
             Ver todos
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {isLoading ? (
         <LoadingState />
@@ -60,6 +63,6 @@ export function InventoryEmployeeWidget({ employeeId }) {
           )}
         </div>
       )}
-    </Card>
+    </div>
   )
 }

@@ -19,6 +19,10 @@ import InventoryDetailAssignmentSection from "../modules/runly.inventory/compone
 import InventoryDetailCommentsSection from "../modules/runly.inventory/components/InventoryDetailCommentsSection.jsx";
 import InventoryDetailHistorySection from "../modules/runly.inventory/components/InventoryDetailHistorySection.jsx";
 
+import HrEmployeeActivityPanel from "../modules/runly.hr/components/HrEmployeeActivityPanel.jsx";
+import OrgChartSection from "../modules/runly.hr/components/OrgChartSection.jsx";
+import AssignedEquipmentSection from "../modules/runly.hr/components/AssignedEquipmentSection.jsx";
+
 const _isDev = Boolean(import.meta.env?.DEV);
 
 function warnDev(message) {
@@ -69,6 +73,13 @@ componentRegistry.register(
 componentRegistry.register(
   "runly.inventory:HistorySection",
   InventoryDetailHistorySection,
+);
+
+componentRegistry.register("runly.hr:HistorySection", HrEmployeeActivityPanel);
+componentRegistry.register("runly.hr:OrgChartSection", OrgChartSection);
+componentRegistry.register(
+  "runly.hr:AssignedEquipmentSection",
+  AssignedEquipmentSection,
 );
 
 // Dynamic bundle registration is done at runtime by ModuleBundleLoader
