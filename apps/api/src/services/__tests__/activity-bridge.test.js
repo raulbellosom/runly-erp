@@ -4,6 +4,7 @@ import {
   createActivityBridge,
   getTranslator,
   registerTranslator,
+  computeFieldChanges,
 } from "../activity-bridge.js";
 
 const COMPANY_ID = "01900000-0000-7000-8000-000000000001";
@@ -196,5 +197,87 @@ describe("activity-bridge", () => {
     const a = activityService._published[0];
     assert.ok(a.summary.includes("Laptop XPS 15"));
     assert.equal(a.severity, "warning");
+  });
+
+  it("computeFieldChanges returns [] when nothing differs", () => {
+    const changes = computeFieldChanges(
+      { name: "Laptop", purchasePrice: 100 },
+      { name: "Laptop", purchasePrice: 100 },
+    );
+    assert.deepEqual(changes, []);
+  });
+
+  it("computeFieldChanges reports only fields whose value differs", () => {
+    const changes = computeFieldChanges(
+      { name: "Laptop", purchasePrice: 100, model: "XPS" },
+      { name: "Laptop", purchasePrice: 150, model: "XPS" },
+    );
+    assert.deepEqual(changes, [
+      { field: "purchasePrice", oldValue: 100, newValue: 150 },
+    ]);
+  });
+
+  it("computeFieldChanges excludes id/companyId/createdAt/updatedAt/enabled", () => {
+    const changes = computeFieldChanges(
+      { id: "a", companyId: "c1", createdAt: "t1", updatedAt: "t1", enabled: true, name: "X" },
+      { id: "a", companyId: "c1", createdAt: "t1", updatedAt: "t2", enabled: false, name: "Y" },
+    );
+    assert.deepEqual(changes, [{ field: "name", oldValue: "X", newValue: "Y" }]);
+  });
+
+  it("computeFieldChanges treats null and undefined as equal to each other", () => {
+    const changes = computeFieldChanges({ notes: null }, { notes: undefined });
+    assert.deepEqual(changes, []);
+  });
+
+  it("computeFieldChanges reports null -> value and value -> null", () => {
+    const changes = computeFieldChanges({ brandName: null }, { brandName: "Asus" });
+    assert.deepEqual(changes, [{ field: "brandName", oldValue: null, newValue: "Asus" }]);
+  });
+
+  it("computeFieldChanges returns [] when before or after is missing", () => {
+    assert.deepEqual(computeFieldChanges(null, { name: "X" }), []);
+    assert.deepEqual(computeFieldChanges({ name: "X" }, null), []);
+    assert.deepEqual(computeFieldChanges(null, null), []);
+  });
+
+  it("publishFromAudit attaches payload.changes when before/after are full snapshots", async () => {
+    const prisma = buildPrismaMock();
+    const activityService = buildActivityServiceMock();
+    const bridge = createActivityBridge({ prisma, activityService });
+    await bridge.publishFromAudit({
+      auditEntry: {
+        actorId: USER_ID,
+        action: "inventory.item.updated",
+        entityType: "InvItem",
+        entityId: ENTITY_ID,
+        before: { name: "Laptop", purchasePrice: 100 },
+        after: { name: "Laptop", purchasePrice: 150 },
+      },
+      companyId: COMPANY_ID,
+    });
+    const a = activityService._published[0];
+    assert.deepEqual(a.payload.changes, [
+      { field: "purchasePrice", oldValue: 100, newValue: 150 },
+    ]);
+  });
+
+  it("publishFromAudit omits payload when before/after produce no changes", async () => {
+    const prisma = buildPrismaMock();
+    const activityService = buildActivityServiceMock();
+    const bridge = createActivityBridge({ prisma, activityService });
+    await bridge.publishFromAudit({
+      auditEntry: {
+        actorId: USER_ID,
+        action: "inventory.item.updated",
+        entityType: "InvItem",
+        entityId: ENTITY_ID,
+        before: { name: "Laptop" },
+        after: { name: "Laptop" },
+      },
+      companyId: COMPANY_ID,
+    });
+    const a = activityService._published[0];
+    assert.equal(a.payload, undefined);
   });
 });

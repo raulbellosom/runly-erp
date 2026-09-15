@@ -163,6 +163,33 @@ export function getTranslator(action) {
   return TRANSLATORS[action] ?? null;
 }
 
+const NEVER_DIFF_FIELDS = new Set(["id", "companyId", "createdAt", "updatedAt", "enabled"]);
+
+// Compares two flat, JSON-serializable snapshots and returns only the fields
+// whose value actually changed (string-compared, so type/format differences
+// like a Date object vs. its own ISO string never register as a false
+// change). Pure and side-effect-free so any service can call it directly, and
+// publishFromAudit below uses it to auto-attach payload.changes whenever a
+// caller passes full snapshots instead of today's partial hints — see
+// docs/superpowers/specs/2026-09-15-inventory-modification-history-design.md.
+export function computeFieldChanges(before, after) {
+  if (!before || typeof before !== "object" || !after || typeof after !== "object") {
+    return [];
+  }
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  const changes = [];
+  for (const key of keys) {
+    if (NEVER_DIFF_FIELDS.has(key)) continue;
+    const oldValue = before[key] ?? null;
+    const newValue = after[key] ?? null;
+    const oldStr = oldValue === null ? "" : String(oldValue);
+    const newStr = newValue === null ? "" : String(newValue);
+    if (oldStr === newStr) continue;
+    changes.push({ field: key, oldValue, newValue });
+  }
+  return changes;
+}
+
 export function createActivityBridge({ activityService, prisma }) {
   async function resolveActor(actorId) {
     if (!actorId) return null;
@@ -204,6 +231,11 @@ export function createActivityBridge({ activityService, prisma }) {
       // Ningún translator registrado y sin hint: no publicamos para evitar spam.
       return null;
     }
+    const changes = computeFieldChanges(auditEntry.before, auditEntry.after);
+    const payload = {
+      ...(hint?.payload ?? base?.payload ?? null),
+      ...(changes.length > 0 ? { changes } : {}),
+    };
     const merged = {
       ...base,
       ...hint,
@@ -214,7 +246,7 @@ export function createActivityBridge({ activityService, prisma }) {
         `${actorName(actor)} realizó ${auditEntry.action}`,
       severity: hint?.severity ?? base?.severity ?? "info",
       link: hint?.link ?? base?.link,
-      payload: hint?.payload ?? base?.payload,
+      payload: Object.keys(payload).length > 0 ? payload : undefined,
       entityType: hint?.entityType ?? auditEntry.entityType ?? base?.entityType,
       entityId: hint?.entityId ?? auditEntry.entityId ?? base?.entityId,
       companyId,
