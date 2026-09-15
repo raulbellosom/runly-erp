@@ -144,6 +144,13 @@ export function resolveKpis(schema, record) {
     .filter(Boolean);
 }
 
+// Normalizes a blueprint section's raw `column` value to what
+// splitSectionsByColumn below (and every normalizeSections branch in
+// RunlyDetail.jsx) expects: "aside" or "main".
+export function normalizeSectionColumn(value) {
+  return String(value ?? "").trim().toLowerCase() === "aside" ? "aside" : "main";
+}
+
 export function splitSectionsByColumn(sections, layout) {
   const list = Array.isArray(sections) ? sections : [];
   if (String(layout ?? "") !== "two-column") {
@@ -169,6 +176,7 @@ export function normalizeComponentSection(entry, sectionIndex, title, icon) {
     title: title ?? null,
     type: "component",
     icon: icon ?? null,
+    column: normalizeSectionColumn(entry?.column),
     component: componentKey,
   };
 }

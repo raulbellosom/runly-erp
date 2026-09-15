@@ -36,6 +36,7 @@ import {
   resolveKpis,
   splitSectionsByColumn,
   normalizeComponentSection,
+  normalizeSectionColumn,
 } from "./detail-presentation.js";
 import {
   HeroContainer,
@@ -333,6 +334,7 @@ function normalizeSections(schema, fieldMap) {
           title: sectionTitle,
           type: "attachments",
           icon: sectionIcon,
+          column: normalizeSectionColumn(entry.column),
           attachments: attachmentsConfig,
         };
       }
@@ -343,6 +345,7 @@ function normalizeSections(schema, fieldMap) {
           title: sectionTitle,
           type: "relation-card",
           icon: sectionIcon,
+          column: normalizeSectionColumn(entry.column),
           relationCard: normalizeRelationCardConfig(
             entry.relationCard,
             sectionTitle,
@@ -356,6 +359,7 @@ function normalizeSections(schema, fieldMap) {
           title: sectionTitle,
           type: "relation-list",
           icon: sectionIcon,
+          column: normalizeSectionColumn(entry.column),
           relationList: normalizeRelationListConfig(entry.relationList),
         };
       }
@@ -395,6 +399,7 @@ function normalizeSections(schema, fieldMap) {
         type: "fields",
         columns,
         icon: sectionIcon,
+        column: normalizeSectionColumn(entry.column),
         fields: fieldNames,
       };
     })
@@ -968,7 +973,7 @@ export function RunlyDetail({
       className={cn(
         "glass-shell rounded-xl px-5 py-4 space-y-4",
         section.type === "fields" &&
-          "border-l-2 border-l-[hsl(var(--primary))] shadow-[inset_10px_0_18px_-16px_hsl(var(--primary)/0.5)]",
+          "border-l-2 border-l-(--brand-primary) shadow-[inset_10px_0_16px_-14px_var(--brand-primary)]",
       )}
     >
       {section.title ? (

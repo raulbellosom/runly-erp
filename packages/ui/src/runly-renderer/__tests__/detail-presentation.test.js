@@ -8,6 +8,7 @@ import {
   resolveKpis,
   splitSectionsByColumn,
   normalizeComponentSection,
+  normalizeSectionColumn,
 } from "../detail-presentation.js";
 
 test("getByPath reads dotted paths and tolerates gaps", () => {
@@ -166,7 +167,7 @@ test("normalizeComponentSection returns null without a component key", () => {
 
 test("normalizeComponentSection builds a component section descriptor", () => {
   const section = normalizeComponentSection(
-    { id: "history", component: "runly.inventory:HistorySection" },
+    { id: "history", component: "runly.inventory:HistorySection", column: "aside" },
     3,
     "Historial de auditoría",
     "History",
@@ -176,8 +177,19 @@ test("normalizeComponentSection builds a component section descriptor", () => {
     title: "Historial de auditoría",
     type: "component",
     icon: "History",
+    column: "aside",
     component: "runly.inventory:HistorySection",
   });
+});
+
+test("normalizeSectionColumn defaults to main and recognizes aside", () => {
+  assert.equal(normalizeSectionColumn(undefined), "main");
+  assert.equal(normalizeSectionColumn(null), "main");
+  assert.equal(normalizeSectionColumn(""), "main");
+  assert.equal(normalizeSectionColumn("main"), "main");
+  assert.equal(normalizeSectionColumn("aside"), "aside");
+  assert.equal(normalizeSectionColumn("ASIDE"), "aside");
+  assert.equal(normalizeSectionColumn("  aside  "), "aside");
 });
 
 test("normalizeComponentSection falls back to a generated id", () => {
