@@ -48,6 +48,13 @@ export default function InventoryScreen() {
       searchable: true,
       searchPlaceholder: 'Buscar item...',
       columns: [
+        {
+          field: 'coverImageFileId',
+          label: 'Imagen',
+          type: 'image-asset',
+          sortable: false,
+          imagesApiPath: '/inventory/items/:id/files',
+        },
         { field: 'assetTag',       label: 'Tag',         sortable: true  },
         { field: 'name',           label: 'Nombre',      sortable: true,  link: true },
         { field: 'categoryName',   label: 'Categoria',   sortable: false },

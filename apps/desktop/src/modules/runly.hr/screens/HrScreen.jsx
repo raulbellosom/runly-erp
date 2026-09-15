@@ -37,6 +37,12 @@ const HR_EMPLOYEES_BLUEPRINT = {
     searchable: true,
     searchPlaceholder: "Buscar colaborador...",
     columns: [
+      {
+        field: "photo_file_id",
+        label: "Foto",
+        type: "image-asset",
+        sortable: false,
+      },
       { field: "full_name", label: "Nombre", sortable: true, link: true },
       { field: "employee_code", label: "Codigo", sortable: false },
       { field: "job_title", label: "Puesto", sortable: false },
