@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyForm.jsx:127-144` (prop destructure), `:1345-1404` (render)
 
-- [ ] **Step 1: Add the `asideActions` prop to the destructure**
+- [x] **Step 1: Add the `asideActions` prop to the destructure**
 
 In `packages/ui/src/runly-renderer/RunlyForm.jsx`, change the prop destructure at the top of `RunlyForm`:
 
@@ -43,7 +43,7 @@ export function RunlyForm({
 
 (Only the final line, `asideActions = null,`, is new — every other line is unchanged, shown for exact placement.)
 
-- [ ] **Step 2: Move the completion ring and preview panel into one aside column**
+- [x] **Step 2: Move the completion ring and preview panel into one aside column**
 
 Find this block (currently around line 1345-1404):
 
@@ -171,17 +171,17 @@ Replace it with:
 
 Everything after this block (the inline-create `Dialog`, closing `</form>`) is unchanged — do not touch it.
 
-- [ ] **Step 3: Verify no other blueprint depends on the old ring placement**
+- [x] **Step 3: Verify no other blueprint depends on the old ring placement**
 
 Run: `grep -rn "showCompletion" apps/desktop/src packages/ui/src --include=*.js`
 Expected: only `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-form.blueprint.js` and `packages/ui/src/runly-renderer/runly-form-preview.js` (a comment) match — confirming no other module's `FORM` blueprint is affected by moving the ring into the aside column.
 
-- [ ] **Step 4: Build check**
+- [x] **Step 4: Build check**
 
 Run: `pnpm --filter @runly/ui build`
 Expected: builds with no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyForm.jsx
@@ -196,7 +196,7 @@ git commit -m "feat(ui): add RunlyForm asideActions prop, consolidate aside colu
 - Modify: `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-form.blueprint.js` (line 18)
 - Modify: `apps/desktop/src/modules/runly.inventory/screens/InventoryItemForm.jsx` (whole file)
 
-- [ ] **Step 1: Turn on `showCompletion` in the form blueprint**
+- [x] **Step 1: Turn on `showCompletion` in the form blueprint**
 
 In `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-form.blueprint.js`, change:
 
@@ -210,7 +210,7 @@ to:
     showCompletion: true,
 ```
 
-- [ ] **Step 2: Rewrite `InventoryItemForm.jsx` to use `asideActions` instead of its own outer grid**
+- [x] **Step 2: Rewrite `InventoryItemForm.jsx` to use `asideActions` instead of its own outer grid**
 
 Replace the full contents of `apps/desktop/src/modules/runly.inventory/screens/InventoryItemForm.jsx` with:
 
@@ -323,7 +323,7 @@ export default function InventoryItemForm() {
 
 This drops the old `FormCompletionRing` import/local `completion` state/outer `lg:grid-cols-[minmax(0,1fr)_280px]` wrapper entirely — `RunlyForm` now owns the whole sidebar.
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 Run: `pnpm --filter @runly/desktop build` (or `pnpm build` for the full workspace if that's the only way this repo exposes it — check `package.json` scripts if the filtered command errors)
 Expected: builds with no errors, no unused-import warnings for `FormCompletionRing`/the old grid classes.
@@ -334,7 +334,7 @@ Run: `pnpm dev`
 Then open `/app/m/runly.inventory/inventory/:id/edit` for an existing item at 1440px and 390px.
 Expected: one right-hand sidebar column containing, top to bottom, the completion ring, "Ver activo"/"Eliminar activo", then "Vista previa" — no third column. On `/app/m/runly.inventory/inventory/new`, the sidebar shows the ring and preview only (no Ver/Eliminar buttons, no empty gap where they'd be).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-form.blueprint.js apps/desktop/src/modules/runly.inventory/screens/InventoryItemForm.jsx
@@ -349,7 +349,7 @@ git commit -m "fix(inventory): consolidate create/edit sidebar into one column v
 - Create: `packages/ui/src/components/DetailActionBar.jsx`
 - Modify: `packages/ui/src/index.js`
 
-- [ ] **Step 1: Write the component**
+- [x] **Step 1: Write the component**
 
 Create `packages/ui/src/components/DetailActionBar.jsx`:
 
@@ -408,7 +408,7 @@ export function DetailActionBar({ primary = null, secondary = [] }) {
 }
 ```
 
-- [ ] **Step 2: Export it from the package entry point**
+- [x] **Step 2: Export it from the package entry point**
 
 In `packages/ui/src/index.js`, next to the existing `export { SectionCard } from "./components/SectionCard.jsx";` line, add:
 
@@ -416,12 +416,12 @@ In `packages/ui/src/index.js`, next to the existing `export { SectionCard } from
 export { DetailActionBar } from "./components/DetailActionBar.jsx";
 ```
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 Run: `pnpm --filter @runly/ui build`
 Expected: builds with no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/ui/src/components/DetailActionBar.jsx packages/ui/src/index.js
@@ -435,7 +435,7 @@ git commit -m "feat(ui): add DetailActionBar (primary action + overflow menu)"
 **Files:**
 - Modify: `apps/desktop/src/modules/runly.inventory/screens/InventoryItemDetail.jsx`
 
-- [ ] **Step 1: Replace the inline `heroActions` buttons**
+- [x] **Step 1: Replace the inline `heroActions` buttons**
 
 In `apps/desktop/src/modules/runly.inventory/screens/InventoryItemDetail.jsx`, change the imports:
 
@@ -474,7 +474,7 @@ Then replace the `heroActions` prop on `<RunlyDetail ... />`:
 
 The rest of the file (the `ConfirmDialog` block, `handleDelete`, etc.) stays exactly as-is — `setDeleteOpen(true)` from the menu item opens the same dialog it always has.
 
-- [ ] **Step 2: Build check**
+- [x] **Step 2: Build check**
 
 Run: `pnpm --filter @runly/desktop build`
 Expected: builds with no errors, no unused-import warning for `Button`.
@@ -484,7 +484,7 @@ Expected: builds with no errors, no unused-import warning for `Button`.
 Open `/app/m/runly.inventory/inventory/:id` at 1440px and 390px.
 Expected: a filled "Editar" button plus a "···" button; clicking "···" opens a menu with "Volver" and "Eliminar" (Eliminar in red); clicking "Eliminar" opens the same confirm dialog as before.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/screens/InventoryItemDetail.jsx
@@ -498,7 +498,7 @@ git commit -m "fix(inventory): use DetailActionBar for detail page actions"
 **Files:**
 - Modify: `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-detail.blueprint.js:75-116`
 
-- [ ] **Step 1: Reorder the `aside` sections and rename the history label**
+- [x] **Step 1: Reorder the `aside` sections and rename the history label**
 
 In `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-detail.blueprint.js`, the `sections` array currently has these four `column: 'aside'` entries in this order: `attachments`, `assignment`, `comments`, `history`. Replace that whole run (from the `attachments` entry's `{` through the `history` entry's closing `},`) with the same four entries in the order `attachments`, `assignment`, `history`, `comments`, and change `history`'s `label`:
 
@@ -548,7 +548,7 @@ In `apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-detail.bl
 
 Nothing else in the file changes — the `main`-column sections above this block, and the closing `],`/`}`/`export default` below it, stay exactly as they are.
 
-- [ ] **Step 2: Remove the history component's redundant card/header**
+- [x] **Step 2: Remove the history component's redundant card/header**
 
 `RunlyDetail`'s own `renderSection` already wraps every section (including `type: "component"` ones) in a `glass-shell` card with a header built from the blueprint's `label`/`icon` — that's how `InventoryDetailAssignmentSection.jsx` and `InventoryDetailCommentsSection.jsx` work today, each returning bare content with no card of its own. `InventoryDetailHistorySection.jsx` is the odd one out: it renders a *second*, nested card (`rounded-2xl border ... overflow-hidden`) with its own `<h3>Historial de auditoría</h3>` header inside the one `RunlyDetail` already provides — a pre-existing double-card/double-header bug that becomes more visible once this task moves the section higher up the sidebar. Fix it to match the other two adapters.
 
@@ -575,7 +575,7 @@ export default function InventoryDetailHistorySection({ data, token }) {
 
 `RunlyDetail`'s section wrapper (Task 5's blueprint change from Step 1, `label: 'Actividad'`, `icon: 'History'`) now supplies the one and only card/header for this section.
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 Run: `pnpm --filter @runly/desktop build`
 Expected: builds with no errors.
@@ -585,7 +585,7 @@ Expected: builds with no errors.
 Open `/app/m/runly.inventory/inventory/:id` for an item with an assignment, comments, and history.
 Expected: sidebar cards appear in the order Archivos, Asignación, Actividad, Comentarios; the "Actividad" card has exactly one header/border (no nested card-inside-a-card), matching the visual weight of the Asignación and Comentarios cards next to it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/blueprints/inventory-item-detail.blueprint.js apps/desktop/src/modules/runly.inventory/components/InventoryDetailHistorySection.jsx
@@ -599,7 +599,7 @@ git commit -m "fix(inventory): reorder detail sidebar (Archivos, Asignación, Ac
 **Files:**
 - Modify: `packages/ui/src/runly-renderer/RunlyDetail.jsx:1 (imports)`, `:962-965 (renderSection wrapper)`, `:1050 (dd className)`
 
-- [ ] **Step 1: Import `cn`**
+- [x] **Step 1: Import `cn`**
 
 In `packages/ui/src/runly-renderer/RunlyDetail.jsx`, add this import alongside the other relative imports near the top of the file (after the `buildApiHeaders` import is fine):
 
@@ -607,7 +607,7 @@ In `packages/ui/src/runly-renderer/RunlyDetail.jsx`, add this import alongside t
 import { cn } from "../lib/utils.js";
 ```
 
-- [ ] **Step 2: Add the accent border to `type: "fields"` section cards**
+- [x] **Step 2: Add the accent border to `type: "fields"` section cards**
 
 Find:
 
@@ -630,7 +630,7 @@ Replace with:
     >
 ```
 
-- [ ] **Step 3: Bold the field values**
+- [x] **Step 3: Bold the field values**
 
 Find:
 
@@ -644,12 +644,12 @@ Replace with:
                   <dd className="text-sm font-semibold text-[hsl(var(--foreground))]">
 ```
 
-- [ ] **Step 4: Existing tests still pass**
+- [x] **Step 4: Existing tests still pass**
 
 Run: `node --test packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js`
 Expected: all 14 tests pass (this change doesn't touch `detail-presentation.js`, just `RunlyDetail.jsx`'s JSX, so this is a regression check, not a new test for this task — there is no component-render test harness in this repo to assert JSX/class output against, per the Tech Stack note above).
 
-- [ ] **Step 5: Build check**
+- [x] **Step 5: Build check**
 
 Run: `pnpm --filter @runly/ui build`
 Expected: builds with no errors.
@@ -659,7 +659,7 @@ Expected: builds with no errors.
 Open the Inventory detail page and the Fleet vehicle detail page (an existing `RunlyDetail` consumer) at 1440px and 390px.
 Expected: every `type: "fields"` section card (Identificación, Ubicación y compra, Garantía, Notas in Inventory; the equivalent cards in Fleet) shows a left accent border/glow in the brand color, and every field value renders bold. No horizontal overflow at 390px. Cards for `attachments`/`component`/`relation-card`/`relation-list` sections do NOT get the accent (only `fields`-type cards do, per spec).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/ui/src/runly-renderer/RunlyDetail.jsx
@@ -672,17 +672,17 @@ git commit -m "feat(ui): add section-card accent border and bolder field values 
 
 **Files:** None (verification only).
 
-- [ ] **Step 1: Lint**
+- [x] **Step 1: Lint**
 
 Run: `pnpm lint`
 Expected: no new lint errors introduced by this plan's changes.
 
-- [ ] **Step 2: Full workspace build**
+- [x] **Step 2: Full workspace build**
 
 Run: `pnpm build`
 Expected: `apps/desktop` and `packages/ui` build with no errors.
 
-- [ ] **Step 3: Existing automated tests**
+- [x] **Step 3: Existing automated tests**
 
 Run: `node --test packages/ui/src/runly-renderer/__tests__/detail-presentation.test.js` and `node --test packages/ui/src/hooks/__tests__/useAttachmentsController.test.js`
 Expected: both suites green (unchanged by this plan, regression check only).
@@ -699,6 +699,6 @@ With `pnpm dev` running:
 
 Open Fleet's vehicle/driver detail and form screens (existing `RunlyDetail`/`RunlyForm` consumers). Expected: no layout regression beyond the intentional accent border + bold field values (Task 6) — Fleet doesn't declare `schema.showCompletion`/`schema.preview`, so Task 1/2's sidebar consolidation doesn't change anything there (its detail/form screens had no aside column change in behavior, only style inherited from Task 6).
 
-- [ ] **Step 6: Update `docs/TASKS.md` if this repo tracks follow-up work there**
+- [x] **Step 6: Update `docs/TASKS.md` if this repo tracks follow-up work there**
 
 Run: `grep -n "inventory-glass-redesign\|Inventory" docs/TASKS.md | head -20` to see whether the parent redesign has a tracked checklist entry that should note this follow-up's completion. If so, add a line noting this plan's completion with `Verified: 2026-09-15 (...)` evidence per `docs/spec-driven-development.md` Stage 6 rules; if not, skip this step (no entry to update).
