@@ -558,9 +558,10 @@ model FileAsset {
   uploadedById String? @db.Uuid @map("uploaded_by_id")
   metadata      Json?
   enabled       Boolean @default(true)
+  isCover       Boolean @default(false) @map("is_cover")
+  sortOrder     Int     @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  hrProfileEmployees HrEmployee[] @relation("HrEmployeeProfileImage")
   calendarFiles      CalendarEventFile[]
   invItemFiles       InvItemFile[] @relation("FileAssetInvItems")
   generatedDocuments GeneratedDocument[]
@@ -677,7 +678,6 @@ model HrEmployee {
   supervisorEmployeeId String? @db.Uuid @map("supervisor_employee_id")
   departmentId String? @db.Uuid @map("department_id")
   jobTitleId String? @db.Uuid @map("job_title_id")
-  profileImageFileId String? @db.Uuid @map("profile_image_file_id")
   employeeCode String? @map("employee_code")
   firstName String @map("first_name")
   lastName String @map("last_name")
@@ -705,7 +705,6 @@ model HrEmployee {
   reportees      HrEmployee[] @relation("HrEmployeeSupervisor")
   departmentRef  HrDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   jobTitleRef    HrJobTitle? @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
-  profileImageFile FileAsset? @relation("HrEmployeeProfileImage", fields: [profileImageFileId], references: [id], onDelete: SetNull)
 
   assignedInvItems InvItem[]       @relation("EmployeeAssignedItems")
   invAssignments   InvAssignment[] @relation("EmployeeInvAssignments")
