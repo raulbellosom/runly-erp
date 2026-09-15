@@ -62,12 +62,15 @@ async function fetchFirstImageAssetId(apiBaseUrl, token, docsPath, recordId, com
     });
     if (!res.ok) return null;
     const rows = extractArrayPayload(parseJsonSafe(await res.text()));
-    const image = rows.find((row) =>
-      String(row?.file_asset?.mimeType ?? row?.mimeType ?? "")
+    const images = rows.filter((row) =>
+      String(row?.fileAsset?.mimeType ?? row?.file_asset?.mimeType ?? row?.mimeType ?? "")
         .toLowerCase()
         .startsWith("image/"),
     );
-    return image?.file_asset_id ?? image?.fileAssetId ?? null;
+    // Prefer the attachment explicitly marked as cover (AttachmentsPanel's
+    // star action); fall back to the first image if none is marked yet.
+    const image = images.find((row) => row?.isCover === true || row?.is_cover === true) ?? images[0];
+    return image?.fileAssetId ?? image?.file_asset_id ?? null;
   } catch {
     return null;
   }

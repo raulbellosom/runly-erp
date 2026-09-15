@@ -324,7 +324,7 @@ function ImageGridTile({
               "absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full backdrop-blur-sm transition-opacity",
               isCover
                 ? "bg-amber-500/90 text-white opacity-100"
-                : "bg-black/50 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
+                : "bg-black/50 text-white opacity-100",
             ].join(" ")}
           >
             <Star className="h-3.5 w-3.5" fill={isCover ? "currentColor" : "none"} />

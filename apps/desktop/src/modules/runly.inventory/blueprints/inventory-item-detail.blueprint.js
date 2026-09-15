@@ -14,6 +14,7 @@ export const INVENTORY_ITEM_DETAIL = {
       titleField: 'name',
       subtitleFields: ['itemType', 'model'],
       statusField: 'status',
+      imageDocsPath: '/inventory/items/:id/files',
       fallbackIcon: 'Package',
       metaChips: [
         { field: 'assetTag', label: 'Etiqueta', icon: 'Hash' },
