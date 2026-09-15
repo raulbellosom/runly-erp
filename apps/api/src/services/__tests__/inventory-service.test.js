@@ -615,6 +615,63 @@ describe('getItem', () => {
       },
     )
   })
+
+  it('coverImageFileId resolves to the file marked isCover', async () => {
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({
+          id: ITEM_ID,
+          companyId: COMPANY_ID,
+          enabled: true,
+          category: null, brand: null, location: null, assignedTo: null,
+        }),
+      },
+      invItemFile: {
+        findMany: async () => [
+          { id: 'f1', fileAssetId: 'asset-1', isCover: false, sortOrder: 0, createdAt: new Date('2026-01-01'), fileAsset: { mimeType: 'image/png' } },
+          { id: 'f2', fileAssetId: 'asset-2', isCover: true, sortOrder: 1, createdAt: new Date('2026-01-02'), fileAsset: { mimeType: 'image/png' } },
+        ],
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.getItem(ITEM_ID, COMPANY_ID)
+    assert.equal(result.coverImageFileId, 'asset-2')
+  })
+
+  it('coverImageFileId falls back to the earliest image when nothing is marked cover', async () => {
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({
+          id: ITEM_ID, companyId: COMPANY_ID, enabled: true,
+          category: null, brand: null, location: null, assignedTo: null,
+        }),
+      },
+      invItemFile: {
+        findMany: async () => [
+          { id: 'f1', fileAssetId: 'pdf-1', isCover: false, sortOrder: 0, createdAt: new Date('2026-01-01'), fileAsset: { mimeType: 'application/pdf' } },
+          { id: 'f2', fileAssetId: 'asset-2', isCover: false, sortOrder: 1, createdAt: new Date('2026-01-02'), fileAsset: { mimeType: 'image/png' } },
+        ],
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.getItem(ITEM_ID, COMPANY_ID)
+    assert.equal(result.coverImageFileId, 'asset-2')
+  })
+
+  it('coverImageFileId is null when the item has no image attachments', async () => {
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({
+          id: ITEM_ID, companyId: COMPANY_ID, enabled: true,
+          category: null, brand: null, location: null, assignedTo: null,
+        }),
+      },
+      invItemFile: { findMany: async () => [] },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.getItem(ITEM_ID, COMPANY_ID)
+    assert.equal(result.coverImageFileId, null)
+  })
 })
 
 // ---------------------------------------------------------------------------

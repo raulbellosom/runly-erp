@@ -119,7 +119,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       prisma.invItem.count({ where }),
     ]);
 
-    const enriched = data.map(item => ({
+    const enriched = await Promise.all(data.map(async (item) => ({
       ...item,
       categoryName: item.category?.name ?? null,
       brandName: item.brand?.name ?? null,
@@ -127,9 +127,31 @@ export function createInventoryService({ prisma, activityBridge }) {
       assignedToName: item.assignedTo
         ? [item.assignedTo.firstName, item.assignedTo.lastName].filter(Boolean).join(' ')
         : null,
-    }));
+      coverImageFileId: await resolveCoverImageFileId(item.id),
+    })));
 
     return { data: enriched, total, page: normalizePage(page), limit: take };
+  }
+
+  // Resolves the "cover photo" for an inventory item: the file explicitly
+  // marked isCover, else the earliest-uploaded image attachment, else null.
+  // Only selects mimeType (not the full FileAsset row) to keep this cheap.
+  async function resolveCoverImageFileId(itemId) {
+    const files = await prisma.invItemFile.findMany({
+      where: { itemId },
+      select: {
+        fileAssetId: true,
+        isCover: true,
+        sortOrder: true,
+        createdAt: true,
+        fileAsset: { select: { mimeType: true } },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    const explicit = files.find((f) => f.isCover);
+    if (explicit) return explicit.fileAssetId;
+    const firstImage = files.find((f) => String(f.fileAsset?.mimeType ?? '').startsWith('image/'));
+    return firstImage?.fileAssetId ?? null;
   }
 
   async function getItem(id, companyId) {
@@ -149,10 +171,13 @@ export function createInventoryService({ prisma, activityBridge }) {
             field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true } },
           },
         },
-        // files intentionally omitted — fetched separately by /items/:id/files
+        // full file list intentionally omitted here — fetched separately by
+        // /items/:id/files; only resolveCoverImageFileId below queries InvItemFile,
+        // and only for mimeType/isCover/sortOrder, not the full row.
       },
     });
     if (!item) throw new InventoryServiceError('Item not found', 404);
+    const coverImageFileId = await resolveCoverImageFileId(id);
     return {
       ...item,
       categoryName: item.category?.name ?? null,
@@ -161,6 +186,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       assignedToName: item.assignedTo
         ? ([item.assignedTo.firstName, item.assignedTo.lastName].filter(Boolean).join(' ') || null)
         : null,
+      coverImageFileId,
     };
   }
 
