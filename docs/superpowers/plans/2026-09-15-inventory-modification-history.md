@@ -16,7 +16,7 @@
 - Modify: `apps/api/src/services/activity-bridge.js`
 - Test: `apps/api/src/services/__tests__/activity-bridge.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to the end of the `describe("activity-bridge", ...)` block in `apps/api/src/services/__tests__/activity-bridge.test.js` (before the final closing `});`), and add `computeFieldChanges` to the existing import at the top of the file:
 
@@ -73,12 +73,12 @@ import {
   });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/activity-bridge.test.js`
 Expected: FAIL — `computeFieldChanges is not a function` (or similar import error), since it doesn't exist yet.
 
-- [ ] **Step 3: Implement `computeFieldChanges`**
+- [x] **Step 3: Implement `computeFieldChanges`**
 
 In `apps/api/src/services/activity-bridge.js`, add this right after the `getTranslator` function and before `export function createActivityBridge({ activityService, prisma }) {`:
 
@@ -111,12 +111,12 @@ export function computeFieldChanges(before, after) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/activity-bridge.test.js`
 Expected: PASS, all tests including the 6 new ones.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/activity-bridge.js apps/api/src/services/__tests__/activity-bridge.test.js
@@ -131,7 +131,7 @@ git commit -m "feat(api): add computeFieldChanges pure diff helper to activity-b
 - Modify: `apps/api/src/services/activity-bridge.js`
 - Test: `apps/api/src/services/__tests__/activity-bridge.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `apps/api/src/services/__tests__/activity-bridge.test.js`:
 
@@ -177,12 +177,12 @@ Add to `apps/api/src/services/__tests__/activity-bridge.test.js`:
   });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `node --test apps/api/src/services/__tests__/activity-bridge.test.js`
 Expected: FAIL — `a.payload` is `undefined` in the first new test (changes never gets attached yet), and the "no changes" test may already incidentally pass (both are worth running to see the actual failure).
 
-- [ ] **Step 3: Update `publishFromAudit`**
+- [x] **Step 3: Update `publishFromAudit`**
 
 In `apps/api/src/services/activity-bridge.js`, replace:
 
@@ -241,12 +241,12 @@ with:
     return activityService.publish({ ...merged, source: "audit_bridge" });
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test apps/api/src/services/__tests__/activity-bridge.test.js`
 Expected: PASS, all tests (existing + 8 new from Task 1/2).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/services/activity-bridge.js apps/api/src/services/__tests__/activity-bridge.test.js
@@ -261,12 +261,12 @@ git commit -m "feat(api): auto-attach payload.changes in publishFromAudit from f
 - Modify: `apps/api/src/services/inventory-service.js`
 - Test: `apps/api/src/services/__tests__/inventory-service.test.js`
 
-- [ ] **Step 1: Confirm there's no existing `updateItem` describe block**
+- [x] **Step 1: Confirm there's no existing `updateItem` describe block**
 
 Run: `grep -n "describe('updateItem'" apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: no output — there is no `updateItem` test today, so Step 2 adds a new `describe('updateItem', ...)` block, placed after the existing `describe('deleteItem', ...)` block (which ends around line 704, right before the file's closing content) — follow that block's exact mocking style (`buildPrismaMock({ invItem: { findFirst, update } })`, `activityBridge.logAndPublish` capturing `capturedAudit`), shown below.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Add this new `describe` block to `apps/api/src/services/__tests__/inventory-service.test.js`, after the `describe('deleteItem', ...)` block's closing `})`:
 
@@ -309,12 +309,12 @@ describe('updateItem', () => {
 
 `ITEM_ID`, `COMPANY_ID`, `buildPrismaMock`, `createInventoryService`, `describe`, `it`, and `assert` are all already in scope at the top of this file (same imports/constants the `deleteItem` block above uses) — no new imports needed.
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: FAIL — `capturedAudit.auditEntry.before` is `undefined` (or the whole `before` key is missing), since `updateItem` doesn't send it yet.
 
-- [ ] **Step 4: Add `toFlatSnapshot` and wire it into `updateItem`**
+- [x] **Step 4: Add `toFlatSnapshot` and wire it into `updateItem`**
 
 In `apps/api/src/services/inventory-service.js`, add this helper function near `resolveCoverImageFileId` (top-level inside the service factory, same pattern as the other private helpers in this file):
 
@@ -440,17 +440,17 @@ with:
     return updated;
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `node --test apps/api/src/services/__tests__/inventory-service.test.js`
 Expected: PASS, all tests including the new one from Step 2.
 
-- [ ] **Step 6: Run the full API test suite as a regression check**
+- [x] **Step 6: Run the full API test suite as a regression check**
 
 Run: `node --test apps/api/src/services/__tests__/`
 Expected: PASS, no regressions in any other service test (this file is shared across many describe blocks).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/api/src/services/inventory-service.js apps/api/src/services/__tests__/inventory-service.test.js
@@ -464,7 +464,7 @@ git commit -m "feat(inventory): capture full before/after snapshots on item upda
 **Files:**
 - Modify: `packages/ui/src/components/ActivityTimeline.jsx`
 
-- [ ] **Step 1: Add the value-formatting helper and diff-row sub-component**
+- [x] **Step 1: Add the value-formatting helper and diff-row sub-component**
 
 In `packages/ui/src/components/ActivityTimeline.jsx`, add `ChevronDown` to the existing lucide-react import:
 
@@ -527,7 +527,7 @@ function ActivityChanges({ changes, changeLabels }) {
 }
 ```
 
-- [ ] **Step 2: Restructure `ActivityItem` to add the expand chevron without nesting `<button>` elements**
+- [x] **Step 2: Restructure `ActivityItem` to add the expand chevron without nesting `<button>` elements**
 
 Replace the full `ActivityItem` function:
 
@@ -650,7 +650,7 @@ function ActivityItem({ activity, onNavigate, onSelect, changeLabels }) {
 }
 ```
 
-- [ ] **Step 3: Pass `changeLabels` through `ActivityTimeline`**
+- [x] **Step 3: Pass `changeLabels` through `ActivityTimeline`**
 
 In the same file, add `changeLabels = null` to the `ActivityTimeline` prop destructure:
 
@@ -688,12 +688,12 @@ Then in the render, where `<ActivityItem ... />` is mapped, add the new prop:
             ))}
 ```
 
-- [ ] **Step 4: Build check**
+- [x] **Step 4: Build check**
 
 Run: `pnpm --filter @runly/desktop build:web`
 Expected: builds with no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/ui/src/components/ActivityTimeline.jsx
@@ -708,7 +708,7 @@ git commit -m "feat(ui): add expandable field-diff rows to ActivityTimeline"
 - Create: `apps/desktop/src/modules/runly.inventory/lib/activity-field-labels.js`
 - Modify: `apps/desktop/src/modules/runly.inventory/components/InventoryDetailHistorySection.jsx`
 
-- [ ] **Step 1: Create the field-label map**
+- [x] **Step 1: Create the field-label map**
 
 Create `apps/desktop/src/modules/runly.inventory/lib/activity-field-labels.js`:
 
@@ -748,7 +748,7 @@ export const INVENTORY_ACTIVITY_FIELD_LABELS = {
 }
 ```
 
-- [ ] **Step 2: Pass it into `ActivityTimeline`**
+- [x] **Step 2: Pass it into `ActivityTimeline`**
 
 Replace the full contents of `apps/desktop/src/modules/runly.inventory/components/InventoryDetailHistorySection.jsx`:
 
@@ -773,7 +773,7 @@ export default function InventoryDetailHistorySection({ data, token }) {
 }
 ```
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 Run: `pnpm --filter @runly/desktop build:web`
 Expected: builds with no errors.
@@ -783,7 +783,7 @@ Expected: builds with no errors.
 Run: `pnpm dev`. Edit an existing inventory item, changing purchase price, category, and notes in the same edit. Open its detail page, find the "actualizó el activo" entry in Actividad, click its chevron.
 Expected: three rows appear — "Precio de compra: $X.XX → $Y.YY", "Categoría: OldName → NewName", "Notas: <truncated old> → <truncated new>". An older entry from before this feature (if any test data has one) shows no chevron.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/desktop/src/modules/runly.inventory/lib/activity-field-labels.js apps/desktop/src/modules/runly.inventory/components/InventoryDetailHistorySection.jsx
@@ -796,17 +796,17 @@ git commit -m "feat(inventory): wire field labels into the Actividad diff view"
 
 **Files:** None (verification only).
 
-- [ ] **Step 1: Full backend test suite**
+- [x] **Step 1: Full backend test suite**
 
 Run: `node --test apps/api/src/services/__tests__/`
 Expected: all tests pass, including the new `activity-bridge.test.js` and `inventory-service.test.js` cases.
 
-- [ ] **Step 2: Lint**
+- [x] **Step 2: Lint**
 
 Run: `pnpm lint`
 Expected: no new errors.
 
-- [ ] **Step 3: Full workspace build**
+- [x] **Step 3: Full workspace build**
 
 Run: `pnpm build`
 Expected: `apps/api`, `apps/desktop`, `packages/ui` all build with no errors.
