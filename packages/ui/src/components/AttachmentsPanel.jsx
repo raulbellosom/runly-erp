@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Trash2,
   Upload,
+  Video,
   X,
 } from "lucide-react";
 import { LoadingState } from "./LoadingState.jsx";
@@ -254,8 +255,9 @@ function PendingCard({ item, hasRecord, onOpen, onRetry, onRemove, busy }) {
   );
 }
 
-function ImageGridTile({ item, previewUrl, loading, onClick }) {
+function ImageGridTile({ item, previewUrl, loading, mimeType, onClick }) {
   const [imgErr, setImgErr] = useState(false);
+  const isVideo = String(mimeType ?? "").startsWith("video/");
   return (
     <button
       type="button"
@@ -268,7 +270,11 @@ function ImageGridTile({ item, previewUrl, loading, onClick }) {
           <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
         </div>
       )}
-      {previewUrl && !imgErr ? (
+      {isVideo ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Video className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
+        </div>
+      ) : previewUrl && !imgErr ? (
         <img
           src={previewUrl}
           alt={item.fileName}
@@ -397,25 +403,33 @@ function AssociatedFilesList({
   canRemoveItem,
 }) {
   if (localView === "grid") {
-    const images = items.filter((i) => String(i.mimeType ?? "").startsWith("image/"));
-    const others = items.filter((i) => !String(i.mimeType ?? "").startsWith("image/"));
+    const isMedia = (mimeType) => {
+      const m = String(mimeType ?? "");
+      return m.startsWith("image/") || m.startsWith("video/");
+    };
+    const images = items.filter((i) => isMedia(i.mimeType));
+    const others = items.filter((i) => !isMedia(i.mimeType));
     return (
       <div className="space-y-3">
         {images.length > 0 && (
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
-              Imagenes ({images.length})
+              Multimedia ({images.length})
             </p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {images.map((item) => (
-                <ImageGridTile
-                  key={item.id}
-                  item={item}
-                  previewUrl={item.fileAssetId ? (thumbUrlsByAssetId[item.fileAssetId] ?? null) : null}
-                  loading={!thumbUrlsByAssetId[item.fileAssetId] && Boolean(item.fileAssetId)}
-                  onClick={() => onOpen(item)}
-                />
-              ))}
+              {images.map((item) => {
+                const isVideo = String(item.mimeType ?? "").startsWith("video/");
+                return (
+                  <ImageGridTile
+                    key={item.id}
+                    item={item}
+                    mimeType={item.mimeType}
+                    previewUrl={item.fileAssetId ? (thumbUrlsByAssetId[item.fileAssetId] ?? null) : null}
+                    loading={!isVideo && !thumbUrlsByAssetId[item.fileAssetId] && Boolean(item.fileAssetId)}
+                    onClick={() => onOpen(item)}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -423,7 +437,7 @@ function AssociatedFilesList({
           <div>
             {images.length > 0 && (
               <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
-                Archivos ({others.length})
+                Documentos ({others.length})
               </p>
             )}
             <div className="space-y-1.5">
@@ -484,7 +498,7 @@ export function AttachmentsPanel({
   readOnly = false,
   showHeading = true,
   showViewToggle = false,
-  defaultViewMode = "list",
+  defaultViewMode = "grid",
   className = "",
   onError,
   onChange,

@@ -109,6 +109,7 @@ const ARCHIVE_EXTENSIONS = new Set(["zip", "rar", "7z", "tar", "gz", "bz2", "xz"
 
 const FILE_TYPE_LABELS = {
   image: "Imagen",
+  video: "Video",
   pdf: "PDF",
   word: "Word",
   spreadsheet: "Excel",
@@ -122,6 +123,7 @@ function resolveFileTypeKind(mimeType, extension) {
   const normalizedExt = String(extension ?? "").trim().toLowerCase();
 
   if (normalizedMime.startsWith("image/")) return "image";
+  if (normalizedMime.startsWith("video/")) return "video";
   if (normalizedMime === "application/pdf" || normalizedExt === "pdf") return "pdf";
   if (
     normalizedMime.includes("msword") ||
