@@ -153,7 +153,15 @@ export function createInventoryService({ prisma, activityBridge }) {
       },
     });
     if (!item) throw new InventoryServiceError('Item not found', 404);
-    return item;
+    return {
+      ...item,
+      categoryName: item.category?.name ?? null,
+      brandName: item.brand?.name ?? null,
+      locationName: item.location?.name ?? null,
+      assignedToName: item.assignedTo
+        ? ([item.assignedTo.firstName, item.assignedTo.lastName].filter(Boolean).join(' ') || null)
+        : null,
+    };
   }
 
   async function createItem(data, companyId, creatorId) {

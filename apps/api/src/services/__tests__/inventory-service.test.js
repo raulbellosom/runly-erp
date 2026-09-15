@@ -546,3 +546,66 @@ describe('createComment return shape', () => {
     assert.deepEqual(result.mentionIds, [MENTION_ID])
   })
 })
+
+// ---------------------------------------------------------------------------
+// getItem
+// ---------------------------------------------------------------------------
+
+describe('getItem', () => {
+  it('computes categoryName/brandName/locationName/assignedToName like listItems does', async () => {
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({
+          id: ITEM_ID,
+          companyId: COMPANY_ID,
+          enabled: true,
+          category: { id: 'cat-1', name: 'Laptops' },
+          brand: { id: 'brand-1', name: 'Dell' },
+          location: { id: 'loc-1', name: 'Oficina Centro' },
+          assignedTo: { id: EMPLOYEE_ID, firstName: 'Ana', lastName: 'Lopez' },
+        }),
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.getItem(ITEM_ID, COMPANY_ID)
+    assert.equal(result.categoryName, 'Laptops')
+    assert.equal(result.brandName, 'Dell')
+    assert.equal(result.locationName, 'Oficina Centro')
+    assert.equal(result.assignedToName, 'Ana Lopez')
+  })
+
+  it('flat fields are null when relations are missing', async () => {
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({
+          id: ITEM_ID,
+          companyId: COMPANY_ID,
+          enabled: true,
+          category: null,
+          brand: null,
+          location: null,
+          assignedTo: null,
+        }),
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.getItem(ITEM_ID, COMPANY_ID)
+    assert.equal(result.categoryName, null)
+    assert.equal(result.brandName, null)
+    assert.equal(result.locationName, null)
+    assert.equal(result.assignedToName, null)
+  })
+
+  it('throws 404 if item not found', async () => {
+    const prisma = buildPrismaMock({ invItem: { findFirst: async () => null } })
+    const svc = createInventoryService({ prisma })
+    await assert.rejects(
+      () => svc.getItem(ITEM_ID, COMPANY_ID),
+      (err) => {
+        assert.ok(err instanceof InventoryServiceError)
+        assert.equal(err.status, 404)
+        return true
+      },
+    )
+  })
+})
