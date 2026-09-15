@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronDown,
+  ChevronUp,
   Download,
   Eye,
   File,
@@ -12,6 +14,7 @@ import {
   List,
   Loader2,
   RotateCcw,
+  Star,
   Trash2,
   Upload,
   Video,
@@ -46,6 +49,11 @@ function formatBytes(sizeBytes) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isMediaMimeType(mimeType) {
+  const m = String(mimeType ?? "");
+  return m.startsWith("image/") || m.startsWith("video/");
 }
 
 function normalizePlacement(value) {
@@ -255,41 +263,100 @@ function PendingCard({ item, hasRecord, onOpen, onRetry, onRemove, busy }) {
   );
 }
 
-function ImageGridTile({ item, previewUrl, loading, mimeType, onClick }) {
+function ImageGridTile({
+  item,
+  previewUrl,
+  loading,
+  mimeType,
+  onClick,
+  canManageCover = false,
+  isCover = false,
+  onSetCover,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
+}) {
   const [imgErr, setImgErr] = useState(false);
   const isVideo = String(mimeType ?? "").startsWith("video/");
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative group aspect-square rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] hover:border-[hsl(var(--primary)/0.6)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
-      title={item.fileName}
-    >
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
+    <div className="relative group aspect-square rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] hover:border-[hsl(var(--primary)/0.6)] transition-colors">
+      <button
+        type="button"
+        onClick={onClick}
+        className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+        title={item.fileName}
+      >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
+          </div>
+        )}
+        {isVideo ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Video className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
+          </div>
+        ) : previewUrl && !imgErr ? (
+          <img
+            src={previewUrl}
+            alt={item.fileName}
+            onError={() => setImgErr(true)}
+            className="w-full h-full object-cover"
+          />
+        ) : !loading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <FileImage className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
+          </div>
+        ) : null}
+        <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 translate-y-full group-hover:translate-y-0 transition-transform">
+          <p className="text-xs text-white truncate">{item.fileName}</p>
         </div>
+      </button>
+
+      {canManageCover && (
+        <>
+          <button
+            type="button"
+            onClick={onSetCover}
+            title={isCover ? "Portada actual" : "Usar como portada"}
+            aria-label={isCover ? "Portada actual" : "Usar como portada"}
+            className={[
+              "absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full backdrop-blur-sm transition-opacity",
+              isCover
+                ? "bg-amber-500/90 text-white opacity-100"
+                : "bg-black/50 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
+            ].join(" ")}
+          >
+            <Star className="h-3.5 w-3.5" fill={isCover ? "currentColor" : "none"} />
+          </button>
+
+          {(canMoveUp || canMoveDown) && (
+            <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={onMoveUp}
+                disabled={!canMoveUp}
+                title="Mover antes"
+                aria-label="Mover antes"
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white disabled:pointer-events-none disabled:opacity-30"
+              >
+                <ChevronUp className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={onMoveDown}
+                disabled={!canMoveDown}
+                title="Mover después"
+                aria-label="Mover después"
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white disabled:pointer-events-none disabled:opacity-30"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </>
       )}
-      {isVideo ? (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Video className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
-        </div>
-      ) : previewUrl && !imgErr ? (
-        <img
-          src={previewUrl}
-          alt={item.fileName}
-          onError={() => setImgErr(true)}
-          className="w-full h-full object-cover"
-        />
-      ) : !loading ? (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <FileImage className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
-        </div>
-      ) : null}
-      <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 translate-y-full group-hover:translate-y-0 transition-transform">
-        <p className="text-xs text-white truncate">{item.fileName}</p>
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -401,14 +468,14 @@ function AssociatedFilesList({
   removingId,
   canWrite,
   canRemoveItem,
+  canManageCover = false,
+  currentCoverId = null,
+  onSetCover,
+  onMoveImage,
 }) {
   if (localView === "grid") {
-    const isMedia = (mimeType) => {
-      const m = String(mimeType ?? "");
-      return m.startsWith("image/") || m.startsWith("video/");
-    };
-    const images = items.filter((i) => isMedia(i.mimeType));
-    const others = items.filter((i) => !isMedia(i.mimeType));
+    const images = items.filter((i) => isMediaMimeType(i.mimeType));
+    const others = items.filter((i) => !isMediaMimeType(i.mimeType));
     return (
       <div className="space-y-3">
         {images.length > 0 && (
@@ -417,7 +484,7 @@ function AssociatedFilesList({
               Multimedia ({images.length})
             </p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {images.map((item) => {
+              {images.map((item, index) => {
                 const isVideo = String(item.mimeType ?? "").startsWith("video/");
                 return (
                   <ImageGridTile
@@ -427,6 +494,13 @@ function AssociatedFilesList({
                     previewUrl={item.fileAssetId ? (thumbUrlsByAssetId[item.fileAssetId] ?? null) : null}
                     loading={!isVideo && !thumbUrlsByAssetId[item.fileAssetId] && Boolean(item.fileAssetId)}
                     onClick={() => onOpen(item)}
+                    canManageCover={canManageCover}
+                    isCover={canManageCover && item.id === currentCoverId}
+                    onSetCover={() => onSetCover?.(item)}
+                    canMoveUp={canManageCover && index > 0}
+                    canMoveDown={canManageCover && index < images.length - 1}
+                    onMoveUp={() => onMoveImage?.(item, -1)}
+                    onMoveDown={() => onMoveImage?.(item, 1)}
                   />
                 );
               })}
@@ -702,6 +776,32 @@ export function AttachmentsPanel({
     setOpeningPendingId(null);
   };
 
+  const handleSetCover = async (item) => {
+    await controller.setCover(item);
+  };
+
+  const handleMoveImage = async (item, direction) => {
+    const mediaItems = controller.associatedItems.filter((i) => isMediaMimeType(i.mimeType));
+    const idx = mediaItems.findIndex((i) => i.id === item.id);
+    if (idx < 0) return;
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= mediaItems.length) return;
+    const a = mediaItems[idx];
+    const b = mediaItems[targetIdx];
+    if (!a.associationId || !b.associationId) return;
+    const aOrder = a.sortOrder ?? idx;
+    const bOrder = b.sortOrder ?? targetIdx;
+    await controller.reorderItems([
+      { id: a.associationId, sortOrder: bOrder },
+      { id: b.associationId, sortOrder: aOrder },
+    ]);
+  };
+
+  const currentCoverId = useMemo(
+    () => controller.associatedItems.find((i) => i.isCover)?.id ?? null,
+    [controller.associatedItems],
+  );
+
   const wrapperClass =
     dropzonePlacement === "aside"
       ? "rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
@@ -883,6 +983,10 @@ export function AttachmentsPanel({
             removingId={removingId}
             canWrite={controller.canWrite}
             canRemoveItem={canRemoveItem}
+            canManageCover={controller.canManageCover}
+            currentCoverId={currentCoverId}
+            onSetCover={handleSetCover}
+            onMoveImage={handleMoveImage}
           />
         )}
       </div>

@@ -12,6 +12,8 @@ const DEFAULT_FIELDS = {
   fileName: "originalName",
   mimeType: "mimeType",
   sizeBytes: "sizeBytes",
+  isCover: "isCover",
+  sortOrder: "sortOrder",
 };
 
 function joinUrl(baseUrl, apiPath) {
@@ -213,6 +215,8 @@ function normalizeAssociatedItem(rawItem, fields) {
     enabled: getByPath(rawItem, fields.enabled) ?? rawItem?.enabled ?? true,
     signedUrl: fileAsset?.signedUrl ?? rawItem?.signedUrl ?? null,
     signedUrlExpiresAt: fileAsset?.signedUrlExpiresAt ?? rawItem?.signedUrlExpiresAt ?? null,
+    isCover: Boolean(getByPath(rawItem, fields.isCover) ?? rawItem?.isCover ?? false),
+    sortOrder: getByPath(rawItem, fields.sortOrder) ?? rawItem?.sortOrder ?? null,
     raw: rawItem,
   };
 }
@@ -803,6 +807,78 @@ export function useAttachmentsController({
     [apiBaseUrl, canWrite, companyId, config?.removePath, loadAssociated, recordId, setGlobalError, token],
   );
 
+  const canManageCover = Boolean(config?.coverPath);
+
+  const setCover = useCallback(
+    async (item, idOverride = null) => {
+      const effectiveRecordId = idOverride ?? recordId;
+      if (!canWrite || !effectiveRecordId || !config?.coverPath) return { ok: false };
+      const docId = item.associationId;
+      if (!docId) {
+        setGlobalError("No se pudo actualizar la portada.");
+        return { ok: false };
+      }
+
+      try {
+        const endpointPath = replacePathTokens(config.coverPath, {
+          id: effectiveRecordId,
+          docId,
+        });
+        const response = await fetch(joinUrl(apiBaseUrl, endpointPath), {
+          method: "PATCH",
+          headers: buildApiHeaders(token, companyId),
+        });
+        const text = await response.text();
+        const payload = parseJsonSafe(text);
+
+        if (!response.ok) {
+          throw new Error(extractErrorMessage(payload, "No se pudo actualizar la portada."));
+        }
+
+        await loadAssociated(effectiveRecordId);
+        return { ok: true };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "No se pudo actualizar la portada.";
+        setGlobalError(message);
+        return { ok: false, error: message };
+      }
+    },
+    [apiBaseUrl, canWrite, companyId, config?.coverPath, loadAssociated, recordId, setGlobalError, token],
+  );
+
+  const reorderItems = useCallback(
+    async (orderedItems, idOverride = null) => {
+      const effectiveRecordId = idOverride ?? recordId;
+      if (!canWrite || !effectiveRecordId || !config?.reorderPath) return { ok: false };
+      if (!Array.isArray(orderedItems) || orderedItems.length === 0) return { ok: false };
+
+      try {
+        const endpointPath = replacePathTokens(config.reorderPath, { id: effectiveRecordId });
+        const response = await fetch(joinUrl(apiBaseUrl, endpointPath), {
+          method: "PATCH",
+          headers: buildApiHeaders(token, companyId, { "Content-Type": "application/json" }),
+          body: JSON.stringify({ items: orderedItems }),
+        });
+        const text = await response.text();
+        const payload = parseJsonSafe(text);
+
+        if (!response.ok) {
+          throw new Error(extractErrorMessage(payload, "No se pudieron reordenar los documentos."));
+        }
+
+        await loadAssociated(effectiveRecordId);
+        return { ok: true };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "No se pudieron reordenar los documentos.";
+        setGlobalError(message);
+        return { ok: false, error: message };
+      }
+    },
+    [apiBaseUrl, canWrite, companyId, config?.reorderPath, loadAssociated, recordId, setGlobalError, token],
+  );
+
   const closeViewer = useCallback(() => {
     setViewerItem((current) => {
       if (current?.__revokeOnClose && current?.url) {
@@ -848,6 +924,9 @@ export function useAttachmentsController({
     retryPending,
     removePending,
     removeAssociated,
+    canManageCover,
+    setCover,
+    reorderItems,
     openPending,
     openAssociated,
     downloadAssociated,
