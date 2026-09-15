@@ -3181,6 +3181,8 @@ model InvItemFile {
   itemId      String   @db.Uuid @map("item_id")
   fileAssetId String   @db.Uuid @map("file_asset_id")
   label       String?  @db.VarChar(100)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isCover     Boolean  @default(false) @map("is_cover")
   createdAt   DateTime @default(now()) @map("created_at")
 
   item      InvItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
