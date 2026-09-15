@@ -27,7 +27,7 @@ export default function InventoryItemDetail() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <LoadingState />
       </div>
     )
@@ -37,7 +37,7 @@ export default function InventoryItemDetail() {
 
   if (!item) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <ErrorState title="Item no encontrado" />
       </div>
     )
@@ -50,7 +50,7 @@ export default function InventoryItemDetail() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6 min-h-dvh">
       <RunlyDetail
         blueprint={INVENTORY_ITEM_DETAIL}
         data={item}
