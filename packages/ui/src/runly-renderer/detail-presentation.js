@@ -140,3 +140,18 @@ export function splitSectionsByColumn(sections, layout) {
   }
   return { twoColumn: true, main, aside };
 }
+
+export function normalizeComponentSection(entry, sectionIndex, title, icon) {
+  const componentKey =
+    typeof entry?.component === "string" && entry.component.trim()
+      ? entry.component.trim()
+      : "";
+  if (!componentKey) return null;
+  return {
+    id: entry.id ?? entry.key ?? `section-${sectionIndex}`,
+    title: title ?? null,
+    type: "component",
+    icon: icon ?? null,
+    component: componentKey,
+  };
+}

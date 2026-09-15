@@ -7,6 +7,7 @@ import {
   resolveHeroModel,
   resolveKpis,
   splitSectionsByColumn,
+  normalizeComponentSection,
 } from "../detail-presentation.js";
 
 test("getByPath reads dotted paths and tolerates gaps", () => {
@@ -133,4 +134,35 @@ test("splitSectionsByColumn: two-column partitions by section.column", () => {
   assert.equal(r.twoColumn, true);
   assert.deepEqual(r.main.map((s) => s.id), ["spec", "fin"]);
   assert.deepEqual(r.aside.map((s) => s.id), ["driver", "docs"]);
+});
+
+test("normalizeComponentSection returns null without a component key", () => {
+  assert.equal(normalizeComponentSection({}, 0, "Historial", "History"), null);
+  assert.equal(normalizeComponentSection({ component: "  " }, 0, null, null), null);
+});
+
+test("normalizeComponentSection builds a component section descriptor", () => {
+  const section = normalizeComponentSection(
+    { id: "history", component: "runly.inventory:HistorySection" },
+    3,
+    "Historial de auditoría",
+    "History",
+  );
+  assert.deepEqual(section, {
+    id: "history",
+    title: "Historial de auditoría",
+    type: "component",
+    icon: "History",
+    component: "runly.inventory:HistorySection",
+  });
+});
+
+test("normalizeComponentSection falls back to a generated id", () => {
+  const section = normalizeComponentSection(
+    { component: "runly.inventory:AssignmentSection" },
+    2,
+    null,
+    null,
+  );
+  assert.equal(section.id, "section-2");
 });
