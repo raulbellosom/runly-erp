@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   AlertOctagon,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -59,12 +60,58 @@ function actorInitials(actor) {
   );
 }
 
-function ActivityItem({ activity, onNavigate, onSelect }) {
+function formatChangeValue(rawValue, fieldMeta) {
+  if (rawValue === null || rawValue === undefined || rawValue === "") return "—";
+  const type = fieldMeta?.type ?? "text";
+  if (type === "select" && Array.isArray(fieldMeta?.options)) {
+    const opt = fieldMeta.options.find((o) => String(o.value) === String(rawValue));
+    if (opt?.label) return opt.label;
+  }
+  if (type === "date" || type === "datetime") {
+    const d = new Date(rawValue);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("es-MX");
+    return String(rawValue);
+  }
+  if (type === "currency") {
+    const n = Number(rawValue);
+    if (Number.isFinite(n)) {
+      return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
+    }
+  }
+  const str = String(rawValue);
+  if (type === "markdown" && str.length > 80) return `${str.slice(0, 80)}…`;
+  return str;
+}
+
+function ActivityChanges({ changes, changeLabels }) {
+  return (
+    <ul className="mt-2 space-y-1 border-t border-[hsl(var(--border))] pt-2 pl-12">
+      {changes.map((change) => {
+        const meta = changeLabels?.[change.field];
+        const label = meta?.label ?? change.field;
+        return (
+          <li
+            key={change.field}
+            className="break-words text-xs text-[hsl(var(--muted-foreground))]"
+          >
+            <span className="font-medium text-[hsl(var(--foreground))]">{label}:</span>{" "}
+            {formatChangeValue(change.oldValue, meta)} → {formatChangeValue(change.newValue, meta)}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ActivityItem({ activity, onNavigate, onSelect, changeLabels }) {
   const Icon = SEVERITY_ICONS[activity.severity] ?? Info;
   const sevClass = SEVERITY_CLASSES[activity.severity] ?? SEVERITY_CLASSES.info;
   const navigable = Boolean(activity.link && onNavigate);
   const selectable = Boolean(onSelect);
   const clickable = navigable || selectable;
+  const changes = Array.isArray(activity.payload?.changes) ? activity.payload.changes : [];
+  const hasChanges = changes.length > 0;
+  const [expanded, setExpanded] = useState(false);
   function handleClick() {
     if (selectable) {
       onSelect(activity);
@@ -73,35 +120,53 @@ function ActivityItem({ activity, onNavigate, onSelect }) {
     if (navigable) onNavigate(activity.link);
   }
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={!clickable}
-      className={`w-full text-left flex items-start gap-3 rounded-xl p-3 transition-colors ${
-        clickable
-          ? "hover:bg-[hsl(var(--muted))] cursor-pointer"
-          : "cursor-default"
-      }`}
-    >
-      <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${sevClass}`}
-      >
-        <Icon size={16} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm text-[hsl(var(--foreground))] line-clamp-2">
-          {activity.summary}
-        </span>
-        <span className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(var(--muted-foreground))]">
-          <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[hsl(var(--muted))] text-[10px] font-semibold">
-            {actorInitials(activity.actor)}
+    <div className="w-full rounded-xl p-3 transition-colors hover:bg-[hsl(var(--muted))]">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={!clickable}
+          className={`flex flex-1 min-w-0 items-start gap-3 text-left ${
+            clickable ? "cursor-pointer" : "cursor-default"
+          }`}
+        >
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${sevClass}`}
+          >
+            <Icon size={16} />
           </span>
-          <span className="truncate">{actorLabel(activity.actor)}</span>
-          <span>·</span>
-          <span>{formatRelative(activity.createdAt)}</span>
-        </span>
-      </span>
-    </button>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-[hsl(var(--foreground))] line-clamp-2">
+              {activity.summary}
+            </span>
+            <span className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(var(--muted-foreground))]">
+              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[hsl(var(--muted))] text-[10px] font-semibold">
+                {actorInitials(activity.actor)}
+              </span>
+              <span className="truncate">{actorLabel(activity.actor)}</span>
+              <span>·</span>
+              <span>{formatRelative(activity.createdAt)}</span>
+            </span>
+          </span>
+        </button>
+        {hasChanges ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={expanded ? "Ocultar cambios" : "Ver cambios"}
+            aria-expanded={expanded}
+            className="mt-1 shrink-0 rounded-lg p-1 text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+          >
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          </button>
+        ) : null}
+      </div>
+      {hasChanges && expanded ? (
+        <ActivityChanges changes={changes} changeLabels={changeLabels} />
+      ) : null}
+    </div>
   );
 }
 
@@ -161,6 +226,7 @@ export function ActivityTimeline({
   items: controlledItems,
   loading: controlledLoading,
   error: controlledError,
+  changeLabels = null,
 }) {
   const isControlled = Array.isArray(controlledItems);
   const [internalItems, setItems] = useState([]);
@@ -278,6 +344,7 @@ export function ActivityTimeline({
                 activity={a}
                 onNavigate={onNavigate}
                 onSelect={onSelect}
+                changeLabels={changeLabels}
               />
             ))}
           </div>
