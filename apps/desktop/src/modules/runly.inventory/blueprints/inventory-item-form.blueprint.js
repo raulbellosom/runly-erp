@@ -11,11 +11,10 @@ export const INVENTORY_ITEM_FORM = {
     component: 'RunlyForm',
     apiPath: '/inventory/items',
     formMode: 'page',
-    // The completion ring renders inside InventoryItemForm.jsx's own PageHeader
-    // (via RunlyForm's onCompletionChange callback) instead of RunlyForm's
-    // default placement, so it sits next to the title instead of as its own
-    // isolated full-width block.
-    showCompletion: false,
+    // Renders inside RunlyForm's own consolidated sidebar, above the Ver/Eliminar
+    // buttons InventoryItemForm.jsx passes via `asideActions` and the preview
+    // panel below — see RunlyForm.jsx's aside column.
+    showCompletion: true,
     preview: {
       titleField: 'name',
       subtitleFields: ['model'],
