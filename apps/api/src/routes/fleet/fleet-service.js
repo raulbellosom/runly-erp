@@ -9,6 +9,8 @@ import {
   firstRow,
   hasOwn,
 } from "./service-helpers.js";
+import { createActivityService } from "../../services/activity-service.js";
+import { createActivityBridge } from "../../services/activity-bridge.js";
 
 const MODULE_KEY = "runly.fleet";
 const UUID_REGEX =
@@ -123,7 +125,14 @@ async function withDbErrorMapping(fn) {
   }
 }
 
-export function createFleetService({ prisma }) {
+export function createFleetService({ prisma, activityBridge }) {
+  const bridge =
+    activityBridge ??
+    createActivityBridge({
+      prisma,
+      activityService: createActivityService({ prisma }),
+    });
+
   async function logAudit({
     actorId,
     entityType,
@@ -132,9 +141,10 @@ export function createFleetService({ prisma }) {
     before = null,
     after = null,
     metadata = null,
+    companyId,
   }) {
-    await prisma.auditLog.create({
-      data: {
+    await bridge.logAndPublish({
+      auditEntry: {
         actorId: actorId ?? null,
         moduleKey: MODULE_KEY,
         entityType,
@@ -144,7 +154,39 @@ export function createFleetService({ prisma }) {
         after,
         metadata,
       },
+      companyId,
     });
+  }
+
+  // Curated subset of getVehicle()'s columns, used to build before/after audit
+  // snapshots for fleet.vehicle.update. Deliberately excludes internal/system
+  // columns (id, company_id, created_at, updated_at, enabled) and computed
+  // fields that aren't meaningful as a "changed field" (cover_image_file_asset_id,
+  // active_insurance_policy, driver_phone/license/photo, the concatenated
+  // display name) — only the fields a user actually edits on the vehicle form.
+  function toFleetVehicleSnapshot(row) {
+    if (!row) return null;
+    return {
+      plate: row.plate ?? null,
+      vehicle_brand_name: row.vehicle_brand_name ?? row.brand ?? null,
+      vehicle_model_name: row.vehicle_model_name ?? row.model_name ?? null,
+      vehicle_type_name: row.vehicle_type_name ?? null,
+      year: row.year ?? null,
+      color: row.color ?? null,
+      status: row.status ?? null,
+      driver_name: row.driver_name ?? null,
+      economic_group_number: row.economic_group_number ?? null,
+      economic_individual_number: row.economic_individual_number ?? null,
+      notes: row.notes ?? null,
+      is_financed: row.is_financed ?? null,
+      financing_institution: row.financing_institution ?? null,
+      financing_contract_number: row.financing_contract_number ?? null,
+      financing_start_date: row.financing_start_date ?? null,
+      financing_end_date: row.financing_end_date ?? null,
+      financing_monthly_payment:
+        row.financing_monthly_payment != null ? Number(row.financing_monthly_payment) : null,
+      financing_notes: row.financing_notes ?? null,
+    };
   }
 
   async function listVehicles({ companyId, page, pageSize, status, search }) {
@@ -495,6 +537,7 @@ export function createFleetService({ prisma }) {
         action: "fleet.vehicle.create",
         before: null,
         after: row,
+        companyId: safeCompanyId,
       });
 
       return row;
@@ -625,13 +668,21 @@ export function createFleetService({ prisma }) {
 
       if (!updated) throw new FleetServiceError("Vehiculo no encontrado.", 404);
 
+      // Re-fetch through getVehicle() so "after" carries the same resolved
+      // (driver/brand/model/type name) shape "before" already has — the raw
+      // UPDATE...RETURNING * row doesn't include those joined columns, and
+      // diffing mismatched shapes would report every resolved field as a
+      // false "changed to null".
+      const after = await getVehicle({ companyId: safeCompanyId, id: safeId });
+
       await logAudit({
         actorId,
         entityType: "Vehicle",
         entityId: updated.id,
         action: "fleet.vehicle.update",
-        before,
-        after: updated,
+        before: toFleetVehicleSnapshot(before),
+        after: toFleetVehicleSnapshot(after),
+        companyId: safeCompanyId,
       });
 
       return updated;
@@ -670,9 +721,10 @@ export function createFleetService({ prisma }) {
       entityType: "Vehicle",
       entityId: updated.id,
       action: "fleet.vehicle.disable",
-      before,
-      after: updated,
+      before: toFleetVehicleSnapshot(before),
+      after: toFleetVehicleSnapshot(before),
       metadata: { enabled: Boolean(enabled) },
+      companyId: safeCompanyId,
     });
 
     return updated;
@@ -732,6 +784,7 @@ export function createFleetService({ prisma }) {
       action: "fleet.vehicle.document.add",
       before: null,
       after: doc,
+      companyId: safeCompanyId,
     });
     return doc;
   }
@@ -765,6 +818,7 @@ export function createFleetService({ prisma }) {
       action: "fleet.vehicle.document.remove",
       before: updated,
       after: { ...updated, enabled: false },
+      companyId: safeCompanyId,
     });
     return updated;
   }
