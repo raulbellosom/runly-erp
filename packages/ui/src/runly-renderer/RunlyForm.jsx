@@ -26,6 +26,7 @@ import { AttachmentsPanel } from "../components/AttachmentsPanel.jsx";
 import { DatePickerField } from "../components/DatePickerField.jsx";
 import { ReportPartsEditor } from "./ReportPartsEditor.jsx";
 import { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
+import { DynamicFieldsSection, buildCustomFieldsPayload } from "./DynamicFieldsSection.jsx";
 import {
   normalizeSpanishLabel,
   normalizeRelationDescriptor,
@@ -55,7 +56,7 @@ import {
 // Module-level cache for relation field options. Persists across modal open/close cycles.
 const _relationOptionsCache = new Map();
 
-const MAIN_SECTION_TYPES = new Set(["fields", "parts", "attachments"]);
+const MAIN_SECTION_TYPES = new Set(["fields", "parts", "attachments", "custom-fields"]);
 const _RELATION_CACHE_TTL = 5 * 60 * 1000;
 
 function matchesFieldRule(rule, formValues) {
@@ -176,6 +177,7 @@ export function RunlyForm({
   const [reportParts, setReportParts] = useState(() =>
     normalizeReportParts(initialData?.parts),
   );
+  const [customFieldDefs, setCustomFieldDefs] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -828,6 +830,16 @@ export function RunlyForm({
     if (sections.some((section) => section.type === "parts")) {
       payload.parts = normalizeReportParts(reportParts);
     }
+    const customFieldsSection = sections.find((section) => section.type === "custom-fields");
+    if (customFieldsSection) {
+      const defs = customFieldDefs[customFieldsSection.id] ?? [];
+      const customValues = buildCustomFieldsPayload(
+        formValues,
+        defs,
+        customFieldsSection.customFields?.valuePrefix,
+      );
+      if (customValues.length > 0) payload.customValues = customValues;
+    }
     setSubmitting(true);
     try {
       const endpoint = isEditMode
@@ -1250,6 +1262,22 @@ export function RunlyForm({
               </p>
             ) : null}
           </div>
+        );
+      }
+
+      if (section.type === "custom-fields") {
+        return (
+          <DynamicFieldsSection
+            config={section.customFields}
+            formValues={formValues}
+            onFieldChange={handleChange}
+            apiBaseUrl={apiBaseUrl}
+            token={token}
+            companyId={companyId}
+            onDefinitionsChange={(defs) =>
+              setCustomFieldDefs((prev) => ({ ...prev, [section.id]: defs }))
+            }
+          />
         );
       }
 
