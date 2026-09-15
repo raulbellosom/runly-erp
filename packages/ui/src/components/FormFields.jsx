@@ -2144,12 +2144,10 @@ export function CreatableComboboxField({
   emptyText = "Sin resultados",
   className,
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState({});
-  const containerRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const searchRef = useRef(null);
+  const {
+    open, setOpen, search, setSearch, dropdownStyle,
+    containerRef, dropdownRef, searchRef, handleOpen: handlePopoverOpen, close,
+  } = useComboboxPopover({ dropHeight: 260, minWidth: 220 });
   // Portaled dropdown: keep wheel/touch scroll working inside a Dialog/Sheet.
   useIsolatedScroll(dropdownRef, open);
 
@@ -2165,40 +2163,19 @@ export function CreatableComboboxField({
     trimmed.length > 0 &&
     !options.some((o) => o.label.toLowerCase() === trimmed.toLowerCase());
 
-  useEffect(() => {
-    function handleOutside(e) {
-      if (
-        !containerRef.current?.contains(e.target) &&
-        !dropdownRef.current?.contains(e.target)
-      ) {
-        setOpen(false);
-        setSearch("");
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
-
   function handleOpen() {
-    const willOpen = !open;
-    if (willOpen && containerRef.current) {
-      setDropdownStyle(computeDropdownStyle(containerRef.current, 260, 220, true));
-    }
-    setOpen((o) => !o);
-    setTimeout(() => searchRef.current?.focus(), 50);
+    handlePopoverOpen();
   }
 
   function handleSelect(opt) {
     onChange(opt.value);
-    setOpen(false);
-    setSearch("");
+    close();
   }
 
   function handleCreate() {
     if (!trimmed || isCreating) return;
     onCreate(trimmed);
-    setOpen(false);
-    setSearch("");
+    close();
   }
 
   return (
@@ -2260,7 +2237,7 @@ export function CreatableComboboxField({
                 pointerEvents: "auto",
               }}
               className={cn(
-                "rounded-xl border border-border/80 bg-card text-foreground shadow-xl overflow-hidden",
+                "glass-shell rounded-xl overflow-hidden",
                 dropdownStyle.flipped && "flex flex-col-reverse",
               )}
             >
