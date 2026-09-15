@@ -211,6 +211,7 @@ export { ErrorState } from "./components/ErrorState.jsx";
 export { StatCard } from "./components/StatCard.jsx";
 export { StatStrip } from "./components/StatStrip.jsx";
 export { DetailHero } from "./components/DetailHero.jsx";
+export { FormCompletionRing } from "./components/FormCompletionRing.jsx";
 export { SwatchField, DEFAULT_SWATCHES } from "./components/SwatchField.jsx";
 export { ProgressMeter } from "./components/ProgressMeter.jsx";
 export { RingProgress } from "./components/RingProgress.jsx";
