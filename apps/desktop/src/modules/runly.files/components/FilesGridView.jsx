@@ -1,7 +1,12 @@
-import { Button, TypeBadge } from "@runly/ui";
+import {
+  Button,
+  TypeBadge,
+  FileVisual,
+  getFileKind,
+  getKindLabel,
+  getKindAccent,
+} from "@runly/ui";
 import { Download, Eye, Trash2 } from "lucide-react";
-import { FileVisual } from "./FileVisual";
-import { getFileKind, getKindLabel, getKindAccent } from "../lib/file-kind";
 
 export function FilesGridView({
   files,

@@ -41,7 +41,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { AdvancedFileViewer } from "../../runly.files/components/AdvancedFileViewer";
+import { AdvancedFileViewer } from "@runly/ui";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
 

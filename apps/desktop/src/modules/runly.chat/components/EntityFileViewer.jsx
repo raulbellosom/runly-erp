@@ -9,7 +9,7 @@
 // attachments already get, instead of a plain download link.
 import { useCallback, useRef } from "react";
 import { useOfficeActions } from "@runly/ui";
-import { AdvancedFileViewer } from "../../runly.files/components/AdvancedFileViewer";
+import { AdvancedFileViewer } from "@runly/ui";
 import { runly } from "../../../lib/runly";
 import { useAuth } from "../../../auth/AuthProvider";
 

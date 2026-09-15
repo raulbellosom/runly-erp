@@ -231,6 +231,14 @@ export { DistDropZone } from "./components/DistDropZone.jsx";
 export { FileUploader } from "./components/FileUploader.jsx";
 export { FileViewer } from "./components/FileViewer.jsx";
 export { AdvancedFileViewer } from "./components/AdvancedFileViewer.jsx";
+export { FileVisual } from "./components/FileVisual.jsx";
+export {
+  getFileKind,
+  getKindLabel,
+  getKindAccent,
+  formatBytes,
+  formatDate,
+} from "./lib/file-kind.js";
 export { AttachmentsPanel } from "./components/AttachmentsPanel.jsx";
 export { DocumentsPanel } from "./components/DocumentsPanel.jsx";
 export { ImageViewer } from "./components/ImageViewer.jsx";

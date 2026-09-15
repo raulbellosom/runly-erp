@@ -1,13 +1,18 @@
 import { useEffect, useRef } from "react";
-import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from "@runly/ui";
-import { Pencil } from "lucide-react";
 import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Input,
+  FileVisual,
   formatBytes,
   formatDate,
   getFileKind,
   getKindLabel,
-} from "../lib/file-kind";
-import { FileVisual } from "./FileVisual";
+} from "@runly/ui";
+import { Pencil } from "lucide-react";
 
 function MetaRow({ label, value }) {
   return (

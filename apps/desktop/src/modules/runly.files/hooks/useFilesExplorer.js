@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { getFileKind } from "../lib/file-kind";
+import { getFileKind } from "@runly/ui";
 
 const NAVIGABLE_ORIGIN_MODULES = new Set([
   "runly.files",

@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useOfficeActions } from "@runly/ui";
-import { AdvancedFileViewer } from "../../runly.files/components/AdvancedFileViewer";
+import { AdvancedFileViewer } from "@runly/ui";
 import { runly } from "../../../lib/runly";
 import { isAudioAttachment } from "../lib/chatUtils";
 import { isSignedUrlUsable } from "../lib/signedUrl";

@@ -41,10 +41,9 @@ import { FileSharingDialog } from "../components/FileSharingDialog";
 import { FileInvitations } from "../components/FileInvitations";
 import { FilesCardView } from "../components/FilesCardView";
 import { FilesGridView } from "../components/FilesGridView";
-import { AdvancedFileViewer } from "../components/AdvancedFileViewer";
+import { AdvancedFileViewer, getFileKind } from "@runly/ui";
 import { FileDetailPanel } from "../components/FileDetailPanel";
 import { FileRenameModal } from "../components/FileRenameModal";
-import { getFileKind } from "../lib/file-kind";
 
 function useFileIdFromPath(pathname) {
   return useMemo(() => {

@@ -25,7 +25,7 @@ import {
   SwitchField,
   TextField,
 } from "@runly/ui";
-import { AdvancedFileViewer } from "../../runly.files/components/AdvancedFileViewer";
+import { AdvancedFileViewer } from "@runly/ui";
 import UserPermissionGrantsCard from "../components/UserPermissionGrantsCard";
 import {
   ArrowLeft,

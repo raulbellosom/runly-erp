@@ -7,15 +7,13 @@ import {
   SheetHeader,
   SheetTitle,
   useOfficeActions,
-} from "@runly/ui";
-import { getOfficeFormat } from "@runly/core";
-import { ExternalLink, FileSearch } from "lucide-react";
-import {
   formatBytes,
   formatDate,
   getKindLabel,
   getFileKind,
-} from "../lib/file-kind";
+} from "@runly/ui";
+import { getOfficeFormat } from "@runly/core";
+import { ExternalLink, FileSearch } from "lucide-react";
 import { resolveFileOrigin } from "../lib/file-origin-resolver";
 
 function Row({ label, value }) {

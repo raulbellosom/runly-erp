@@ -6,7 +6,7 @@ import {
   Button, Tabs, TabsList, TabsTrigger, TabsContent,
   Accordion, AccordionItem, AccordionTrigger, AccordionContent,
 } from "@runly/ui";
-import { AdvancedFileViewer } from "../../runly.files/components/AdvancedFileViewer";
+import { AdvancedFileViewer } from "@runly/ui";
 import { ChannelGeneralTab } from "./ChannelGeneralTab";
 import { ChannelMembersTab } from "./ChannelMembersTab";
 import { ChannelRolesTab } from "./ChannelRolesTab";

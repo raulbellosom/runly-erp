@@ -1,4 +1,15 @@
-import { Badge, Button, Card, TypeBadge } from "@runly/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  TypeBadge,
+  FileVisual,
+  formatBytes,
+  formatDate,
+  getFileKind,
+  getKindLabel,
+  getKindAccent,
+} from "@runly/ui";
 import {
   Download,
   Eye,
@@ -7,14 +18,6 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { FileVisual } from "./FileVisual";
-import {
-  formatBytes,
-  formatDate,
-  getFileKind,
-  getKindLabel,
-  getKindAccent,
-} from "../lib/file-kind";
 
 export function FilesCardView({
   files,

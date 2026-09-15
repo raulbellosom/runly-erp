@@ -1,5 +1,18 @@
 import { useMemo } from "react";
-import { DataTable, Checkbox, Button, ActionMenu, Badge, TypeBadge } from "@runly/ui";
+import {
+  DataTable,
+  Checkbox,
+  Button,
+  ActionMenu,
+  Badge,
+  TypeBadge,
+  FileVisual,
+  formatBytes,
+  formatDate,
+  getFileKind,
+  getKindLabel,
+  getKindAccent,
+} from "@runly/ui";
 import {
   Download,
   Link2,
@@ -11,14 +24,6 @@ import {
   Building2,
   Power,
 } from "lucide-react";
-import { FileVisual } from "./FileVisual";
-import {
-  formatBytes,
-  formatDate,
-  getFileKind,
-  getKindLabel,
-  getKindAccent,
-} from "../lib/file-kind";
 
 export function FilesWorkspaceTable({
   files,

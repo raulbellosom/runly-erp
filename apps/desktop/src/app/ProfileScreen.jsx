@@ -17,7 +17,7 @@ import {
   Skeleton,
   TextField,
 } from "@runly/ui";
-import { AdvancedFileViewer } from "../modules/runly.files/components/AdvancedFileViewer";
+import { AdvancedFileViewer } from "@runly/ui";
 import { Country, State, City } from "country-state-city";
 import {
   CalendarDays,
