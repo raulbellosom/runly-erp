@@ -4,9 +4,9 @@ import { cn } from "../lib/utils.js";
 // A primary action button plus visible secondary/destructive action buttons,
 // all shown directly (no overflow menu — users should see every action at a
 // glance rather than hunt for one behind a "...").  Meant for RunlyDetail's
-// `heroActions` slot.
-//   primary   { label, onClick, icon? } | null
-//   secondary [{ label, onClick, icon?, destructive? }]
+// `heroActions` slot (and RunlyCrudView's own detail-page action bar).
+//   primary   { label, onClick, icon?, loading?, disabled? } | null
+//   secondary [{ label, onClick, icon?, destructive?, loading?, disabled? }]
 export function DetailActionBar({ primary = null, secondary = [] }) {
   const items = (Array.isArray(secondary) ? secondary : []).filter(Boolean);
 
@@ -18,6 +18,8 @@ export function DetailActionBar({ primary = null, secondary = [] }) {
           type="button"
           variant="outline"
           onClick={item.onClick}
+          loading={item.loading}
+          disabled={item.disabled}
           className={cn(
             item.destructive &&
               "text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:border-red-900/60 dark:hover:bg-red-950/40",
@@ -28,7 +30,12 @@ export function DetailActionBar({ primary = null, secondary = [] }) {
         </Button>
       ))}
       {primary ? (
-        <Button type="button" onClick={primary.onClick}>
+        <Button
+          type="button"
+          onClick={primary.onClick}
+          loading={primary.loading}
+          disabled={primary.disabled}
+        >
           {primary.icon}
           {primary.label}
         </Button>

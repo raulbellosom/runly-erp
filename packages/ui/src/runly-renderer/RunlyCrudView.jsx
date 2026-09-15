@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
 import { Button } from "../components/Button.jsx";
+import { DetailActionBar } from "../components/DetailActionBar.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { FormSkeleton } from "../components/Skeleton.jsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.jsx";
@@ -450,35 +451,31 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
           {mode === "detail" && currentDetailBlueprint && (() => {
             const heroEnabled = Boolean(currentDetailBlueprint?.schema?.hero);
             const detailActions = (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" onClick={goToList}>
-                  <ArrowLeft className="mr-1.5 h-4 w-4" />
-                  Volver
-                </Button>
-                {detailHeaderActions
-                  .filter((action) => isActionVisible(action, recordData))
-                  .map((action) => {
-                    const actionKey = String(action.key ?? action.label ?? "action");
-                    const variant = action.variant ?? "outline";
-                    return (
-                      <Button
-                        key={actionKey}
-                        type="button"
-                        size="sm"
-                        variant={variant}
-                        loading={headerActionLoadingKey === actionKey}
-                        onClick={() => executeHeaderAction(action)}
-                      >
-                        {action.label ?? "Accion"}
-                      </Button>
-                    );
-                  })}
-                {currentFormBlueprint && (
-                  <Button size="sm" onClick={() => setMode("edit")}>
-                    Editar
-                  </Button>
-                )}
-              </div>
+              <DetailActionBar
+                primary={
+                  currentFormBlueprint
+                    ? { label: "Editar", onClick: () => setMode("edit") }
+                    : null
+                }
+                secondary={[
+                  {
+                    label: "Volver",
+                    icon: <ArrowLeft className="h-4 w-4" />,
+                    onClick: goToList,
+                  },
+                  ...detailHeaderActions
+                    .filter((action) => isActionVisible(action, recordData))
+                    .map((action) => {
+                      const actionKey = String(action.key ?? action.label ?? "action");
+                      return {
+                        label: action.label ?? "Accion",
+                        onClick: () => executeHeaderAction(action),
+                        loading: headerActionLoadingKey === actionKey,
+                        destructive: action.variant === "destructive",
+                      };
+                    }),
+                ]}
+              />
             );
             return (
               <>
