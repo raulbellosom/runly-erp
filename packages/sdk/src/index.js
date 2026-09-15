@@ -2287,6 +2287,17 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           headers: withAuthHeaders(token),
           body: JSON.stringify({ items }),
         }),
+      setItemFileCover: (itemId, docId, token) =>
+        request(`/inventory/items/${encodeURIComponent(itemId)}/files/${encodeURIComponent(docId)}/cover`, {
+          method: "PATCH",
+          headers: withAuthHeaders(token),
+        }),
+      reorderItemFiles: (itemId, items, token) =>
+        request(`/inventory/items/${encodeURIComponent(itemId)}/files/reorder`, {
+          method: "PATCH",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify({ items }),
+        }),
     },
     notes: {
       list: (params, token) =>
