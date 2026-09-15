@@ -398,7 +398,7 @@ export function useAttachmentsController({
         return { ok: false, error: "Archivo pendiente inválido." };
       }
 
-      if (!canUpload || !config?.addPath) {
+      if (!canUpload) {
         return { ok: false, error: "Carga de documentos no disponible." };
       }
 
@@ -447,6 +447,30 @@ export function useAttachmentsController({
               : item,
           ),
         );
+
+        // Modules with a per-entity association table (Inventory's
+        // InvItemFile, Fleet's fleet_vehicle_document) configure `addPath` to
+        // create that association row. Modules using the generic FileAsset
+        // moduleKey/entityType/metadata.sourceEntityId tagging (HR's
+        // employee documents) have no such table — the upload itself is the
+        // complete "add" operation, and the FileAsset's own id doubles as
+        // its associationId.
+        if (!config.addPath) {
+          setPendingItems((prev) =>
+            prev.map((item) =>
+              item.id === pending.id
+                ? {
+                    ...item,
+                    status: "success",
+                    progress: 100,
+                    error: "",
+                    associationId: fileAssetId,
+                  }
+                : item,
+            ),
+          );
+          return { ok: true };
+        }
 
         const associationPayload = { file_asset_id: fileAssetId };
         if (pending.documentType?.trim()) {
