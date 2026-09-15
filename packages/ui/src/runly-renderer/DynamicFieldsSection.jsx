@@ -84,6 +84,7 @@ export function DynamicFieldsSection({
 }) {
   const [definitions, setDefinitions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const categoryValue = config?.categoryField ? formValues[config.categoryField] : null;
 
   useEffect(() => {
@@ -91,9 +92,11 @@ export function DynamicFieldsSection({
     async function load() {
       if (!config?.apiPath || !categoryValue) {
         setDefinitions([]);
+        setError(null);
         return;
       }
       setLoading(true);
+      setError(null);
       try {
         const url = new URL(joinUrl(apiBaseUrl, config.apiPath));
         url.searchParams.set("categoryId", String(categoryValue));
@@ -105,8 +108,11 @@ export function DynamicFieldsSection({
           setDefinitions(rows);
           onDefinitionsChange?.(rows);
         }
-      } catch {
-        if (!cancelled) setDefinitions([]);
+      } catch (err) {
+        if (!cancelled) {
+          setDefinitions([]);
+          setError(err instanceof Error ? err.message : "No se pudieron cargar los campos personalizados.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -117,9 +123,29 @@ export function DynamicFieldsSection({
     };
   }, [apiBaseUrl, token, companyId, config?.apiPath, categoryValue]);
 
-  if (!categoryValue) return null;
-  if (loading) return <p className="text-sm text-[hsl(var(--muted-foreground))]">Cargando campos...</p>;
-  if (definitions.length === 0) return null;
+  // Every branch below renders something visible — a silent empty section
+  // reads as broken to the user, whether the cause is "no category chosen
+  // yet", "this category has no custom fields", or a failed fetch.
+  if (!categoryValue) {
+    return (
+      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+        Selecciona una categoría para ver sus campos personalizados.
+      </p>
+    );
+  }
+  if (loading) {
+    return <p className="text-sm text-[hsl(var(--muted-foreground))]">Cargando campos...</p>;
+  }
+  if (error) {
+    return <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>;
+  }
+  if (definitions.length === 0) {
+    return (
+      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+        Esta categoría no tiene campos personalizados configurados.
+      </p>
+    );
+  }
 
   const prefix = config.valuePrefix ?? "customValues";
   return (
