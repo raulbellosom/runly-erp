@@ -129,6 +129,36 @@ export function normalizeSections(schema, fieldMap) {
         };
       }
 
+      if (sectionType === "custom-fields") {
+        const cfg = entry.customFields ?? {};
+        return {
+          id: entry.id ?? entry.key ?? `section-${sectionIndex}`,
+          title: normalizeSpanishLabel(
+            entry.title ?? entry.label ?? "Campos personalizados",
+          ),
+          type: "custom-fields",
+          icon:
+            typeof entry.icon === "string" && entry.icon.trim()
+              ? entry.icon.trim()
+              : null,
+          ...toSectionMeta(entry),
+          customFields: {
+            apiPath:
+              typeof cfg.apiPath === "string" && cfg.apiPath.trim()
+                ? cfg.apiPath.trim()
+                : null,
+            categoryField:
+              typeof cfg.categoryField === "string" && cfg.categoryField.trim()
+                ? cfg.categoryField.trim()
+                : null,
+            valuePrefix:
+              typeof cfg.valuePrefix === "string" && cfg.valuePrefix.trim()
+                ? cfg.valuePrefix.trim()
+                : "customValues",
+          },
+        };
+      }
+
       const sectionFields = (Array.isArray(entry.fields) ? entry.fields : [])
         .map((item) => normalizeSectionField(item))
         .filter(Boolean);
