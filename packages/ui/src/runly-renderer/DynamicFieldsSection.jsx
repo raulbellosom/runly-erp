@@ -141,9 +141,17 @@ export function DynamicFieldsSection({
   }
   if (definitions.length === 0) {
     return (
-      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-        Esta categoría no tiene campos personalizados configurados.
-      </p>
+      <div className="flex flex-wrap items-center gap-1.5 text-sm text-[hsl(var(--muted-foreground))]">
+        <span>Esta categoría no tiene campos personalizados configurados.</span>
+        {config?.manageUrl ? (
+          <a
+            href={config.manageUrl}
+            className="font-medium text-[hsl(var(--primary))] hover:underline"
+          >
+            Crear campo personalizado
+          </a>
+        ) : null}
+      </div>
     );
   }
 

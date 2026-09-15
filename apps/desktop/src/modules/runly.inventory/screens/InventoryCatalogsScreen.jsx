@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   PageHeader,
   Button,
@@ -533,7 +534,15 @@ function CustomFieldsTab() {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
+const VALID_TABS = new Set(['categories', 'brands', 'locations', 'custom-fields'])
+
 export default function InventoryCatalogsScreen() {
+  const [searchParams] = useSearchParams()
+  const initialTab = useMemo(() => {
+    const requested = searchParams.get('tab')
+    return VALID_TABS.has(requested) ? requested : 'categories'
+  }, [searchParams])
+
   return (
     <div className="p-4 md:p-6 space-y-6 min-h-dvh">
       <PageHeader
@@ -542,7 +551,7 @@ export default function InventoryCatalogsScreen() {
         description="Administra categorias, marcas, ubicaciones y campos personalizados. Arrastra para reordenar."
       />
 
-      <Tabs defaultValue="categories">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="categories">Categorias</TabsTrigger>
           <TabsTrigger value="brands">Marcas</TabsTrigger>

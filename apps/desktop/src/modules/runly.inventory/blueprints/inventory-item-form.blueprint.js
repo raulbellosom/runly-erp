@@ -11,7 +11,11 @@ export const INVENTORY_ITEM_FORM = {
     component: 'RunlyForm',
     apiPath: '/inventory/items',
     formMode: 'page',
-    showCompletion: true,
+    // The completion ring renders inside InventoryItemForm.jsx's own PageHeader
+    // (via RunlyForm's onCompletionChange callback) instead of RunlyForm's
+    // default placement, so it sits next to the title instead of as its own
+    // isolated full-width block.
+    showCompletion: false,
     preview: {
       titleField: 'name',
       subtitleFields: ['model'],
@@ -111,6 +115,7 @@ export const INVENTORY_ITEM_FORM = {
           apiPath: '/inventory/custom-fields',
           categoryField: 'categoryId',
           valuePrefix: 'customValues',
+          manageUrl: '/app/m/runly.inventory/inventory/catalogs?tab=custom-fields',
         },
       },
       {
