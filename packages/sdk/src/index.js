@@ -714,11 +714,11 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           method: "PATCH",
           headers: withAuthHeaders(token),
         }),
-      reorder: (payload, token) =>
+      reorder: (items, token) =>
         request("/files/reorder", {
-          method: "POST",
+          method: "PATCH",
           headers: withAuthHeaders(token),
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ items }),
         }),
     },
     ledger: {

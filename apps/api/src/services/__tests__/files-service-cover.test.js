@@ -133,7 +133,7 @@ describe("files-service setFileCover", () => {
 });
 
 describe("files-service reorderFiles", () => {
-  it("writes sequential sortOrder for the given group, in the requested order", async () => {
+  it("writes sortOrder for each {id, sortOrder} pair, matching Inventory's swap-pair contract", async () => {
     const prisma = buildPrismaMock([
       { id: FILE_A, entityId: COMPANY_ID, moduleKey: "runly.hr", entityType: "HrEmployee", metadata: { sourceEntityId: EMPLOYEE_ID }, isCover: false, sortOrder: 0 },
       { id: FILE_B, entityId: COMPANY_ID, moduleKey: "runly.hr", entityType: "HrEmployee", metadata: { sourceEntityId: EMPLOYEE_ID }, isCover: false, sortOrder: 1 },
@@ -142,29 +142,29 @@ describe("files-service reorderFiles", () => {
     const result = await service.reorderFiles({
       authUserId: AUTH_USER_ID,
       activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
-      moduleKey: "runly.hr",
-      entityType: "HrEmployee",
-      entityId: EMPLOYEE_ID,
-      orderedIds: [FILE_B, FILE_A],
+      items: [
+        { id: FILE_A, sortOrder: 1 },
+        { id: FILE_B, sortOrder: 0 },
+      ],
     });
-    assert.deepEqual(result.map((r) => r.id), [FILE_B, FILE_A]);
-    assert.equal(result[0].sortOrder, 0);
-    assert.equal(result[1].sortOrder, 1);
+    assert.deepEqual(result, { ok: true });
+    const a = await prisma.fileAsset.findFirst({ where: { id: FILE_A } });
+    const b = await prisma.fileAsset.findFirst({ where: { id: FILE_B } });
+    assert.equal(a.sortOrder, 1);
+    assert.equal(b.sortOrder, 0);
   });
 
-  it("never reorders files belonging to a different company, even if entityId matches", async () => {
+  it("rejects a file belonging to a different company", async () => {
     const prisma = buildPrismaMock([
       { id: FILE_A, entityId: OTHER_COMPANY_ID, moduleKey: "runly.hr", entityType: "HrEmployee", metadata: { sourceEntityId: EMPLOYEE_ID }, isCover: false, sortOrder: 0 },
     ]);
     const service = createFilesService({ prisma, supabaseAdmin: {} });
-    const result = await service.reorderFiles({
-      authUserId: AUTH_USER_ID,
-      activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
-      moduleKey: "runly.hr",
-      entityType: "HrEmployee",
-      entityId: EMPLOYEE_ID,
-      orderedIds: [FILE_A],
-    });
-    assert.deepEqual(result, []);
+    await assert.rejects(() =>
+      service.reorderFiles({
+        authUserId: AUTH_USER_ID,
+        activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
+        items: [{ id: FILE_A, sortOrder: 0 }],
+      }),
+    );
   });
 });

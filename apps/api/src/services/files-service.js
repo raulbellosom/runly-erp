@@ -798,38 +798,33 @@ export function createFilesService({ prisma, supabaseAdmin }) {
       });
     },
 
-    // Scoped by entityId: companyId — every FileAsset created through the
-    // generic upload() above always sets entityId to the uploader's
-    // companyId (see upload(), "const entityId = context.companyId"), so
-    // this is real company scoping, not just HR-specific convention, and it
-    // means a group id from a different company can never match here even
-    // if the caller passes an entityId belonging to another company's record.
-    async reorderFiles({ authUserId, activeContext, moduleKey, entityType, entityId, orderedIds }) {
-      const { companyId } = await getUserCompanyContext(authUserId, activeContext);
-      if (!Array.isArray(orderedIds) || orderedIds.length === 0) return [];
-      const group = await prisma.fileAsset.findMany({
-        where: {
-          entityId: companyId,
-          moduleKey,
-          entityType,
-          metadata: { path: ["sourceEntityId"], equals: entityId },
-        },
-        select: { id: true },
-      });
-      const groupIds = new Set(group.map((row) => row.id));
-      const safeOrderedIds = orderedIds.filter((fileId) => groupIds.has(fileId));
+    // Mirrors useAttachmentsController.js's reorderItems/AttachmentsPanel's
+    // handleMoveImage exactly: the client sends a small set of {id,
+    // sortOrder} pairs to swap (not a full ordered list), the same shape
+    // Inventory's reorderItemFiles already accepts. Each id is verified via
+    // ensureFileBelongsToCompany (real access control, not just an
+    // entityId === companyId filter) before its sortOrder is written.
+    async reorderFiles({ authUserId, activeContext, items }) {
+      const context = await getUserCompanyContext(authUserId, activeContext);
+      const { companyId } = context;
+      if (!Array.isArray(items) || items.length === 0) return { ok: true };
+      const validated = [];
+      for (const entry of items) {
+        if (!entry || typeof entry.id !== "string") continue;
+        const file = await ensureFileBelongsToCompany({
+          fileId: entry.id,
+          companyId,
+          context,
+          includeDisabled: false,
+        });
+        validated.push({ id: file.id, sortOrder: Number(entry.sortOrder) || 0 });
+      }
       await prisma.$transaction(
-        safeOrderedIds.map((fileId, index) =>
-          prisma.fileAsset.update({
-            where: { id: fileId },
-            data: { sortOrder: index },
-          }),
+        validated.map(({ id, sortOrder }) =>
+          prisma.fileAsset.update({ where: { id }, data: { sortOrder } }),
         ),
       );
-      return prisma.fileAsset.findMany({
-        where: { id: { in: safeOrderedIds } },
-        orderBy: { sortOrder: "asc" },
-      });
+      return { ok: true };
     },
 
     async enrichFileAssets(fileAssets) {
