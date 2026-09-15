@@ -108,7 +108,14 @@ function buildPrismaMock(overrides = {}) {
       create: async (args) => ({ ...args.data }),
       ...(overrides.invMention ?? {}),
     },
-    $transaction: async (fn) => fn(makeTx(overrides._tx ?? {})),
+    invItemFile: {
+      findFirst: async () => null,
+      findMany: async () => [],
+      updateMany: async () => ({ count: 0 }),
+      ...(overrides.invItemFile ?? {}),
+    },
+    $transaction: async (fnOrArray) =>
+      Array.isArray(fnOrArray) ? Promise.all(fnOrArray) : fnOrArray(makeTx(overrides._tx ?? {})),
     ...(overrides._root ?? {}),
   }
 }
@@ -648,6 +655,87 @@ describe('deleteItem', () => {
         assert.equal(err.status, 404)
         return true
       },
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// setItemFileCover / reorderItemFiles
+// ---------------------------------------------------------------------------
+
+describe('setItemFileCover', () => {
+  it('marks the target file as cover and clears any other cover on the same item', async () => {
+    let updateManyArgs = null
+    let updateArgs = null
+    const prisma = buildPrismaMock({
+      invItem: { findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }) },
+      _tx: {
+        invItemFile: {
+          findFirst: async () => ({ id: 'file-1', itemId: ITEM_ID }),
+          updateMany: async (args) => { updateManyArgs = args; return { count: 2 } },
+          update: async (args) => { updateArgs = args; return { id: args.where.id, isCover: true } },
+        },
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.setItemFileCover(ITEM_ID, 'file-1', COMPANY_ID)
+
+    assert.equal(result.isCover, true)
+    assert.deepEqual(updateManyArgs.where, { itemId: ITEM_ID })
+    assert.deepEqual(updateManyArgs.data, { isCover: false })
+    assert.equal(updateArgs.where.id, 'file-1')
+    assert.equal(updateArgs.data.isCover, true)
+  })
+
+  it('throws 404 if the item does not belong to the company', async () => {
+    const prisma = buildPrismaMock({ invItem: { findFirst: async () => null } })
+    const svc = createInventoryService({ prisma })
+    await assert.rejects(
+      () => svc.setItemFileCover(ITEM_ID, 'file-1', COMPANY_ID),
+      (err) => { assert.ok(err instanceof InventoryServiceError); assert.equal(err.status, 404); return true },
+    )
+  })
+
+  it('throws 404 if the file association does not belong to the item', async () => {
+    const prisma = buildPrismaMock({
+      invItem: { findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }) },
+      _tx: { invItemFile: { findFirst: async () => null } },
+    })
+    const svc = createInventoryService({ prisma })
+    await assert.rejects(
+      () => svc.setItemFileCover(ITEM_ID, 'file-1', COMPANY_ID),
+      (err) => { assert.ok(err instanceof InventoryServiceError); assert.equal(err.status, 404); return true },
+    )
+  })
+})
+
+describe('reorderItemFiles', () => {
+  it('scopes each updateMany by itemId, not companyId', async () => {
+    const calls = []
+    const prisma = buildPrismaMock({
+      invItem: { findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }) },
+      invItemFile: {
+        updateMany: async (args) => { calls.push(args); return { count: 1 } },
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    await svc.reorderItemFiles(ITEM_ID, COMPANY_ID, [
+      { id: 'file-1', sortOrder: 0 },
+      { id: 'file-2', sortOrder: 1 },
+    ])
+
+    assert.equal(calls.length, 2)
+    assert.deepEqual(calls[0].where, { id: 'file-1', itemId: ITEM_ID })
+    assert.deepEqual(calls[0].data, { sortOrder: 0 })
+    assert.deepEqual(calls[1].where, { id: 'file-2', itemId: ITEM_ID })
+  })
+
+  it('throws 404 if the item does not belong to the company', async () => {
+    const prisma = buildPrismaMock({ invItem: { findFirst: async () => null } })
+    const svc = createInventoryService({ prisma })
+    await assert.rejects(
+      () => svc.reorderItemFiles(ITEM_ID, COMPANY_ID, [{ id: 'file-1', sortOrder: 0 }]),
+      (err) => { assert.ok(err instanceof InventoryServiceError); assert.equal(err.status, 404); return true },
     )
   })
 })

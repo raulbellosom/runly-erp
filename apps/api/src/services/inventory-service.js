@@ -959,6 +959,41 @@ export function createInventoryService({ prisma, activityBridge }) {
     return { success: true };
   }
 
+  async function setItemFileCover(itemId, docId, companyId) {
+    assertCompany(companyId);
+    const item = await prisma.invItem.findFirst({
+      where: { id: itemId, companyId, enabled: true },
+      select: { id: true },
+    });
+    if (!item) throw new InventoryServiceError('Item not found', 404);
+    return prisma.$transaction(async (tx) => {
+      const row = await tx.invItemFile.findFirst({ where: { id: docId, itemId } });
+      if (!row) throw new InventoryServiceError('File association not found', 404);
+      await tx.invItemFile.updateMany({ where: { itemId }, data: { isCover: false } });
+      return tx.invItemFile.update({ where: { id: docId }, data: { isCover: true } });
+    });
+  }
+
+  async function reorderItemFiles(itemId, companyId, items) {
+    assertCompany(companyId);
+    const item = await prisma.invItem.findFirst({
+      where: { id: itemId, companyId, enabled: true },
+      select: { id: true },
+    });
+    if (!item) throw new InventoryServiceError('Item not found', 404);
+    if (!Array.isArray(items)) return;
+    await prisma.$transaction(
+      items
+        .filter((entry) => entry && typeof entry.id === 'string')
+        .map(({ id, sortOrder }) =>
+          prisma.invItemFile.updateMany({
+            where: { id, itemId },
+            data: { sortOrder: Number(sortOrder) || 0 },
+          }),
+        ),
+    );
+  }
+
   return {
     // Items
     listItems,
@@ -970,6 +1005,8 @@ export function createInventoryService({ prisma, activityBridge }) {
     listItemFiles,
     addItemFile,
     removeItemFile,
+    setItemFileCover,
+    reorderItemFiles,
     // Assignments
     assignItem,
     returnItem,
