@@ -123,6 +123,36 @@ const TRANSLATORS = {
     severity: "info",
     link: entityId ? `/m/runly.catalog/${entityId}` : undefined,
   }),
+  "inventory.item.created": ({ actor, entityId, after }) => ({
+    type: "inventory.item.created",
+    summary: `${actorName(actor)} dio de alta el activo ${safeStr(after?.name)}`.trim(),
+    severity: "success",
+    link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
+  }),
+  "inventory.item.updated": ({ actor, entityId, after }) => ({
+    type: "inventory.item.updated",
+    summary: `${actorName(actor)} actualizó el activo ${safeStr(after?.name)}`.trim(),
+    severity: "info",
+    link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
+  }),
+  "inventory.item.assigned": ({ actor, entityId, after }) => ({
+    type: "inventory.item.assigned",
+    summary: `${actorName(actor)} asignó el activo ${safeStr(after?.name)}`.trim(),
+    severity: "success",
+    link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
+  }),
+  "inventory.item.returned": ({ actor, entityId, after }) => ({
+    type: "inventory.item.returned",
+    summary: `${actorName(actor)} registró la devolución del activo ${safeStr(after?.name)}`.trim(),
+    severity: "info",
+    link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
+  }),
+  "inventory.item.deleted": ({ actor, entityId, after }) => ({
+    type: "inventory.item.deleted",
+    summary: `${actorName(actor)} dio de baja el activo ${safeStr(after?.name)}`.trim(),
+    severity: "warning",
+    link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
+  }),
 };
 
 export function registerTranslator(action, translator) {

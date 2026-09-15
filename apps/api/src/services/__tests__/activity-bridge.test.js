@@ -149,4 +149,52 @@ describe("activity-bridge", () => {
     }));
     assert.ok(getTranslator("test.custom.action"));
   });
+
+  it("has translators registered for inventory item actions", () => {
+    assert.ok(getTranslator("inventory.item.created"));
+    assert.ok(getTranslator("inventory.item.updated"));
+    assert.ok(getTranslator("inventory.item.assigned"));
+    assert.ok(getTranslator("inventory.item.returned"));
+    assert.ok(getTranslator("inventory.item.deleted"));
+  });
+
+  it("translates inventory.item.created into a real Spanish sentence with a link", async () => {
+    const prisma = buildPrismaMock();
+    const activityService = buildActivityServiceMock();
+    const bridge = createActivityBridge({ prisma, activityService });
+    await bridge.publishFromAudit({
+      auditEntry: {
+        actorId: USER_ID,
+        action: "inventory.item.created",
+        entityType: "InvItem",
+        entityId: ENTITY_ID,
+        after: { name: "Laptop XPS 15", assetTag: "INV-2026-0001" },
+      },
+      companyId: COMPANY_ID,
+    });
+    const a = activityService._published[0];
+    assert.equal(a.type, "inventory.item.created");
+    assert.ok(a.summary.includes("Laptop XPS 15"));
+    assert.equal(a.link, `/app/m/runly.inventory/inventory/${ENTITY_ID}`);
+    assert.equal(a.severity, "success");
+  });
+
+  it("translates inventory.item.deleted using the item name captured in after", async () => {
+    const prisma = buildPrismaMock();
+    const activityService = buildActivityServiceMock();
+    const bridge = createActivityBridge({ prisma, activityService });
+    await bridge.publishFromAudit({
+      auditEntry: {
+        actorId: USER_ID,
+        action: "inventory.item.deleted",
+        entityType: "InvItem",
+        entityId: ENTITY_ID,
+        after: { enabled: false, name: "Laptop XPS 15" },
+      },
+      companyId: COMPANY_ID,
+    });
+    const a = activityService._published[0];
+    assert.ok(a.summary.includes("Laptop XPS 15"));
+    assert.equal(a.severity, "warning");
+  });
 });
