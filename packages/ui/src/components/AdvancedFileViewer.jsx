@@ -26,7 +26,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@runly/ui";
+} from "./ContextMenu.jsx";
 import { getOfficeFormat } from "@runly/core";
 import { getFileKind, getKindLabel, formatBytes } from "../lib/file-kind";
 import { FileVisual } from "./FileVisual";
