@@ -126,17 +126,17 @@ export function AdvancedFileViewer({
   const [filmstripOpen, setFilmstripOpen] = useState(true);
   const [naturalSize, setNaturalSize] = useState(null);   // { w, h } from <img onLoad>
   const [containerSize, setContainerSize] = useState(null); // { w, h } from ResizeObserver
-  // Real video thumbnails (browser-painted first frame, same trick as
-  // MessageAttachments.jsx's VideoCard) resolved only for a small window
-  // around the active index -- resolving+loading all of them at once for a
-  // 21-item gallery is exactly the loading-cost problem the filmstrip must
-  // avoid. Farther-away videos just show the generic file icon until they
-  // enter the window.
-  const [videoThumbUrls, setVideoThumbUrls] = useState({});
+  // Real thumbnails for image/video files (browser-painted first frame for
+  // video, same trick as MessageAttachments.jsx's VideoCard) resolved only
+  // for a small window around the active index -- resolving+loading all of
+  // them at once for a 21-item gallery is exactly the loading-cost problem
+  // the filmstrip must avoid. Farther-away files just show the generic file
+  // icon until they enter the window.
+  const [mediaThumbUrls, setMediaThumbUrls] = useState({});
 
   const imageContainerRef = useRef(null);
   const thumbRefs = useRef(new Map());
-  const videoThumbFetching = useRef(new Set());
+  const mediaThumbFetching = useRef(new Set());
   const pointersRef = useRef(new Map());
   const gestureRef = useRef({
     mode: null,
@@ -197,6 +197,20 @@ export function AdvancedFileViewer({
       };
     }
 
+    // The filmstrip's windowed thumbnail resolver (below) already fetches a
+    // signed URL for any image/video within +/-THUMB_WINDOW of wherever the
+    // user has been browsing — reuse it instead of re-fetching, so paging to
+    // an adjacent file (the common case) swaps instantly with no spinner
+    // flash instead of re-running the whole async round trip on every click.
+    const cached = mediaThumbUrls[file.id];
+    if (cached) {
+      setSignedUrl(cached);
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
     async function loadSignedUrl() {
       try {
         setLoading(true);
@@ -212,7 +226,7 @@ export function AdvancedFileViewer({
     return () => {
       active = false;
     };
-  }, [open, file?.id, onResolveSignedUrl]);
+  }, [open, file?.id, onResolveSignedUrl, mediaThumbUrls]);
 
   useEffect(() => {
     if (zoom <= 1) {
@@ -228,7 +242,9 @@ export function AdvancedFileViewer({
     el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [activeIndex, filmstripOpen]);
 
-  // Resolve real thumbnails for video files within +/-3 of the active index.
+  // Resolve real thumbnails for image/video files within +/-3 of the active
+  // index (see the mediaThumbUrls state comment above for why this is
+  // windowed instead of resolving the whole gallery at once).
   const THUMB_WINDOW = 3;
   useEffect(() => {
     if (!open || !filmstripOpen || !onResolveSignedUrl || (files?.length ?? 0) <= 1) return;
@@ -236,23 +252,25 @@ export function AdvancedFileViewer({
     const end = Math.min(files.length - 1, activeIndex + THUMB_WINDOW);
     for (let i = start; i <= end; i++) {
       const f = files[i];
-      if (!f || getFileKind(f) !== "video") continue;
-      if (videoThumbUrls[f.id] || videoThumbFetching.current.has(f.id)) continue;
-      videoThumbFetching.current.add(f.id);
+      if (!f) continue;
+      const fKind = getFileKind(f);
+      if (fKind !== "video" && fKind !== "image") continue;
+      if (mediaThumbUrls[f.id] || mediaThumbFetching.current.has(f.id)) continue;
+      mediaThumbFetching.current.add(f.id);
       // onResolveSignedUrl may be sync (a blob-URL resolver) or async — normalise
       // before chaining so a plain string / null return never throws
       // ".then of null/undefined" out of this effect (which the app-level
       // ErrorBoundary would surface as a full-screen "SIN CONEXION").
       Promise.resolve(onResolveSignedUrl(f))
         .then((url) => {
-          if (url) setVideoThumbUrls((prev) => ({ ...prev, [f.id]: url }));
+          if (url) setMediaThumbUrls((prev) => ({ ...prev, [f.id]: url }));
         })
         .finally(() => {
-          videoThumbFetching.current.delete(f.id);
+          mediaThumbFetching.current.delete(f.id);
         });
     }
-    // videoThumbUrls intentionally omitted: it's only read here as an
-    // already-fetched guard, and videoThumbFetching's ref-based in-flight
+    // mediaThumbUrls intentionally omitted: it's only read here as an
+    // already-fetched guard, and mediaThumbFetching's ref-based in-flight
     // guard is what actually prevents duplicate requests.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, activeIndex, files, filmstripOpen, onResolveSignedUrl]);
@@ -929,8 +947,11 @@ export function AdvancedFileViewer({
               </div>
             )}
 
-            {/* Overlaid navigation arrows (multi-file) */}
-            {(files?.length ?? 0) > 1 && !loading && signedUrl && (
+            {/* Overlaid navigation arrows (multi-file). Independent of `loading`/
+                `signedUrl` — this is generic chrome, not the active file's
+                content, so it must stay put while the next file's content
+                loads instead of flashing away and back on every click. */}
+            {(files?.length ?? 0) > 1 && (
               <>
                 {canPrev && (
                   <button
@@ -956,13 +977,19 @@ export function AdvancedFileViewer({
             {/* ── FLOATING GLASS FILMSTRIP (multi-file) ───────
                 Overlays the content area (iOS Photos style) instead of a
                 docked bar cramped against the bottom toolbar. Auto-hides
-                while a pinch/pan gesture is running. */}
-            {(files?.length ?? 0) > 1 && !loading && signedUrl && (
+                while a pinch/pan gesture is running. Independent of `loading`
+                for the same reason as the nav arrows above. */}
+            {(files?.length ?? 0) > 1 && (
               <>
                 {filmstripOpen ? (
                   <div
                     className={[
-                      "absolute left-1/2 -translate-x-1/2 bottom-3 z-20",
+                      // PDFViewer renders its own full-height bottom toolbar
+                      // inside this same content box (see the "PDF viewer"
+                      // block above) — bottom-3 alone would float this right
+                      // on top of it, so PDF gets pushed above that bar.
+                      "absolute left-1/2 -translate-x-1/2 z-20",
+                      kind === "pdf" ? "bottom-15" : "bottom-3",
                       "max-w-[calc(100%-1.5rem)] glass rounded-2xl p-1.5",
                       "flex items-center gap-1.5",
                       "transition-all duration-200",
@@ -974,8 +1001,7 @@ export function AdvancedFileViewer({
                     <div className="flex items-center gap-2 overflow-x-auto px-0.5 py-0.5">
                       {files.map((f, i) => {
                         const fKind = getFileKind(f);
-                        const videoThumbUrl =
-                          fKind === "video" ? videoThumbUrls[f.id] : null;
+                        const mediaThumbUrl = mediaThumbUrls[f.id] ?? null;
                         return (
                           <button
                             key={f.id ?? i}
@@ -989,16 +1015,16 @@ export function AdvancedFileViewer({
                             className={[
                               "h-12 w-12 shrink-0 rounded-lg overflow-hidden transition-all duration-150",
                               i === activeIndex
-                                ? "ring-2 ring-[hsl(var(--primary))] opacity-100"
+                                ? "ring-2 ring-(--brand-primary) opacity-100"
                                 : "opacity-50 hover:opacity-90",
                             ].join(" ")}
                           >
-                            {videoThumbUrl ? (
+                            {fKind === "video" && mediaThumbUrl ? (
                               // #t=0.1 forces the browser to seek and paint
                               // that frame as a thumbnail — same trick as
                               // MessageAttachments.jsx's VideoCard.
                               <video
-                                src={`${videoThumbUrl}#t=0.1`}
+                                src={`${mediaThumbUrl}#t=0.1`}
                                 className="h-12 w-12 object-cover pointer-events-none"
                                 muted
                                 playsInline
@@ -1007,7 +1033,7 @@ export function AdvancedFileViewer({
                             ) : (
                               <FileVisual
                                 file={f}
-                                previewUrl={f.thumbnailUrl ?? null}
+                                previewUrl={fKind === "image" ? mediaThumbUrl : null}
                                 className="h-12 w-12 object-cover"
                               />
                             )}
@@ -1030,7 +1056,8 @@ export function AdvancedFileViewer({
                     aria-label="Mostrar miniaturas"
                     title="Mostrar miniaturas"
                     className={[
-                      "absolute left-1/2 -translate-x-1/2 bottom-3 z-20",
+                      "absolute left-1/2 -translate-x-1/2 z-20",
+                      kind === "pdf" ? "bottom-15" : "bottom-3",
                       "h-8 px-3 glass rounded-full flex items-center gap-1.5",
                       "text-[11px] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]",
                       "transition-all duration-200",
@@ -1124,8 +1151,11 @@ export function AdvancedFileViewer({
           {/* Always reserved at the same height once a file is loaded, so
               the modal's shape stays uniform across file kinds instead of
               growing/shrinking as you page between an image and a video —
-              only the image kind actually populates it with controls. */}
-          {!loading && signedUrl && (
+              only the image kind actually populates it with controls.
+              Skipped for "pdf": PDFViewer already renders its own full-height
+              toolbar (page nav + zoom/rotate/flip) at its own bottom edge —
+              reserving this one too would stack two toolbars for PDFs only. */}
+          {!loading && signedUrl && kind !== "pdf" && (
             <div className="flex items-center justify-center gap-1.5 px-3 h-12 safe-bottom shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]/60 overflow-x-auto">
               {kind === "image" && (
                 <>
