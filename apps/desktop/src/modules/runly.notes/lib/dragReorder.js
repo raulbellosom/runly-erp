@@ -48,11 +48,9 @@ export function groupIntoRows(blockRects) {
 export function pickDropIndex(blockRects, clientX, clientY) {
   const rows = groupIntoRows(blockRects)
   let flatIndex = 0
-  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-    const row = rows[rowIdx]
+  for (const row of rows) {
     const rowBottom = Math.max(...row.map((r) => r.bottom))
-    const isLastRow = rowIdx === rows.length - 1
-    if (clientY < rowBottom || isLastRow) {
+    if (clientY < rowBottom) {
       if (row.length === 1) {
         const r = row[0]
         return clientY < r.top + (r.bottom - r.top) / 2 ? flatIndex : flatIndex + 1

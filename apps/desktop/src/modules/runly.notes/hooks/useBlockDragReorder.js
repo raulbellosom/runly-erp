@@ -60,10 +60,43 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     const boxEl = getBoxEl()
     if (boxEl) boxEl.style.opacity = ''
     dragRef.current = null
+    window.removeEventListener('pointerup', onWindowPointerUp)
+    window.removeEventListener('pointercancel', onWindowPointerCancel)
+  }
+
+  // Fallback for when the release/cancel event doesn't reach the dragged
+  // element itself (pointer capture can be lost if the pointer leaves the
+  // browser window, a modifier interrupts the gesture, etc.) — without
+  // this, that leaves the floating clone/indicator permanently orphaned
+  // since nothing else would ever call cleanupDrag for that gesture.
+  function onWindowPointerUp(e) {
+    finishDrag(e)
+  }
+  function onWindowPointerCancel(e) {
+    abortDrag(e)
+  }
+
+  function finishDrag(e) {
+    const active = dragRef.current
+    if (!active || active.pointerId !== e.pointerId) return
+    const { originalPos, candidatePos } = active
+    cleanupDrag()
+    if (candidatePos !== originalPos) moveNode(editor, originalPos, candidatePos)
+    wasDragRef.current = true
+  }
+
+  function abortDrag(e) {
+    const active = dragRef.current
+    if (!active || active.pointerId !== e.pointerId) return
+    cleanupDrag()
   }
 
   function startDrag(e) {
     if (typeof getPos !== 'function') return
+    // Self-healing: if a previous gesture's clone/indicator never got
+    // cleaned up (e.g. an interrupted drag left dragRef populated), clear
+    // it before starting a new one instead of leaving it orphaned forever.
+    if (dragRef.current) cleanupDrag()
     const boxEl = getBoxEl()
     const frameEl = getFrameEl()
     if (!boxEl || !frameEl) return
@@ -107,6 +140,8 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       grabDY: e.clientY - rect.top,
       candidatePos: originalPos,
     }
+    window.addEventListener('pointerup', onWindowPointerUp)
+    window.addEventListener('pointercancel', onWindowPointerCancel)
   }
 
   function onPointerDown(e) {
@@ -175,12 +210,8 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
   }
 
   function onPointerUp(e) {
-    const active = dragRef.current
-    if (active && active.pointerId === e.pointerId) {
-      const { originalPos, candidatePos } = active
-      cleanupDrag()
-      if (candidatePos !== originalPos) moveNode(editor, originalPos, candidatePos)
-      wasDragRef.current = true
+    if (dragRef.current && dragRef.current.pointerId === e.pointerId) {
+      finishDrag(e)
       return
     }
     const press = pressRef.current
@@ -191,9 +222,8 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
   }
 
   function onPointerCancel(e) {
-    const active = dragRef.current
-    if (active && active.pointerId === e.pointerId) {
-      cleanupDrag()
+    if (dragRef.current && dragRef.current.pointerId === e.pointerId) {
+      abortDrag(e)
       return
     }
     const press = pressRef.current

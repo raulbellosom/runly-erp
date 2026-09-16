@@ -129,6 +129,18 @@ test('pickDropIndex: pointer below every row inserts at the very end', () => {
   assert.equal(pickDropIndex(rects, 150, 500), 1)
 })
 
+test('pickDropIndex: pointer well below a floated pair inserts at the end, not beside either of them (regression)', () => {
+  // Two floated images side by side (a single row), then a large gap below
+  // them with nothing else in the document. Dropping far below the row
+  // must land at the end (its own new line) — not get attributed to "beside
+  // the left/right image" just because it's technically the last row.
+  const rects = [
+    { offset: 0, top: 100, bottom: 300, left: 0, width: 150 },
+    { offset: 10, top: 100, bottom: 300, left: 150, width: 150 },
+  ]
+  assert.equal(pickDropIndex(rects, 75, 600), 2)
+})
+
 test('computeIndicatorRect: positions at the candidate block\'s own top-left when dropping before it', () => {
   const rects = [
     { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
