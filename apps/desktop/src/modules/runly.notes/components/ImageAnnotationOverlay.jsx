@@ -11,7 +11,7 @@ import {
   cropToViewBox, elementFracToImageSpace, effectiveNaturalSize,
   normalizeRotation, rotateAnnotations,
 } from '../lib/imageCrop.js'
-import { clampImageWidthPct } from '../lib/imageSize.js'
+import { clampImageWidthPct, computeCornerResize } from '../lib/imageSize.js'
 import { useRotatedFillSize } from '../hooks/useRotatedFillSize.js'
 import { ImageCropModal } from './ImageCropModal.jsx'
 
@@ -41,7 +41,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const rotWrapRef = useRef(null) // sized/positioned per crop; useRotatedFillSize measures this
   const dragRef = useRef(null) // { pointerId, dropPos } — image reorder
   const drawRef = useRef(null) // { pointerId } — annotation drawing
-  const resizeRef = useRef(null) // { pointerId, startX, startWidthPct, columnWidthPx }
+  const resizeRef = useRef(null) // { pointerId, startX, startY, startWidthPx, startHeightPx, containerWidthPx }
 
   const [mode, setMode] = useState('view') // 'view' | 'edit'
   const [tool, setTool] = useState('pen')
@@ -54,6 +54,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const [natural, setNatural] = useState(null) // { w, h }
   const [selected, setSelected] = useState(false) // click-to-select for resize (Word/PPT style)
   const [liveWidthPct, setLiveWidthPct] = useState(null) // resize drag preview
+  const [liveAspectRatio, setLiveAspectRatio] = useState(null) // resize drag preview
 
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
@@ -133,27 +134,44 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
     const rect = boxRef.current.getBoundingClientRect()
-    // Back out the full column width from the current (possibly already
-    // scaled) rendered width, so the drag math stays correct at any scale.
-    const columnWidthPx = rect.width / (widthPct / 100)
-    resizeRef.current = { pointerId: e.pointerId, startX: e.clientX, startWidthPct: widthPct, columnWidthPx }
+    const containerWidthPx = rect.width / (widthPct / 100)
+    resizeRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidthPx: rect.width,
+      startHeightPx: rect.height,
+      containerWidthPx,
+    }
     setLiveWidthPct(widthPct)
+    setLiveAspectRatio(node.attrs.aspectRatio ?? (effNat ? effNat.w / effNat.h : rect.width / rect.height))
   }
 
   function onResizePointerMove(e) {
     const r = resizeRef.current
     if (!r || r.pointerId !== e.pointerId) return
-    const deltaPct = ((e.clientX - r.startX) / r.columnWidthPx) * 100
-    setLiveWidthPct(clampImageWidthPct(r.startWidthPct + deltaPct))
+    const { widthPct: newWidthPct, aspectRatio } = computeCornerResize({
+      startWidthPx: r.startWidthPx,
+      startHeightPx: r.startHeightPx,
+      containerWidthPx: r.containerWidthPx,
+      deltaX: e.clientX - r.startX,
+      deltaY: e.clientY - r.startY,
+    })
+    setLiveWidthPct(newWidthPct)
+    setLiveAspectRatio(aspectRatio)
   }
 
   function onResizePointerUp(e) {
     const r = resizeRef.current
     if (!r || r.pointerId !== e.pointerId) return
     resizeRef.current = null
-    const finalPct = liveWidthPct
+    const finalWidthPct = liveWidthPct
+    const finalAspectRatio = liveAspectRatio
     setLiveWidthPct(null)
-    if (finalPct != null) updateAttributes({ width: Math.round(finalPct) })
+    setLiveAspectRatio(null)
+    if (finalWidthPct != null) {
+      updateAttributes({ width: finalWidthPct, aspectRatio: finalAspectRatio })
+    }
   }
 
   // ── annotation drawing (Pointer Events) ─────────────────────────────────
@@ -391,8 +409,11 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   // image can't hide controls that sit just outside its edges. Sized via
   // the ROTATED effective natural aspect; falls back to the crop rect's own
   // aspect before the image has loaded (self-corrects once it has).
+  const displayAspectRatio = liveAspectRatio ?? node.attrs.aspectRatio ?? null
   const frameStyle = {
-    aspectRatio: effNat
+    aspectRatio: displayAspectRatio
+      ? String(displayAspectRatio)
+      : effNat
       ? String((effectiveCrop.w * effNat.w) / (effectiveCrop.h * effNat.h))
       : String(effectiveCrop.w / effectiveCrop.h),
   }
@@ -616,22 +637,35 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
         )}
 
         {editable && mode === 'view' && selected && (
-          // Word/PowerPoint-style corner resize handle — drag horizontally to
-          // scale the image; height follows automatically (img is height:auto).
-          <button
-            aria-label="Cambiar tamaño de la imagen"
-            title="Arrastra para cambiar el tamaño"
-            onPointerDown={onResizePointerDown}
-            onPointerMove={onResizePointerMove}
-            onPointerUp={onResizePointerUp}
-            onPointerCancel={onResizePointerUp}
-            // 44px hit area (Apple/Android minimum touch target), same trick
-            // as ImageCropModal's corner handles — visually just the dot.
-            className="absolute right-0 bottom-0 w-11 h-11 -m-5 flex items-center justify-center cursor-nwse-resize"
-            style={{ touchAction: 'none' }}
-          >
-            <span className="w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white dark:border-[hsl(var(--background))] shadow" />
-          </button>
+          // Free 4-corner resize — all 4 anchor at the fixed top-left corner
+          // (the node lives in document flow, not a free canvas), so every
+          // handle shares the same onResizePointer* math; the cursor style
+          // is just a visual hint matching each corner's diagonal.
+          <>
+            {[
+              { pos: 'top-left', posClass: 'left-0 top-0', cursor: 'cursor-nwse-resize' },
+              { pos: 'top-right', posClass: 'right-0 top-0', cursor: 'cursor-nesw-resize' },
+              { pos: 'bottom-left', posClass: 'left-0 bottom-0', cursor: 'cursor-nesw-resize' },
+              { pos: 'bottom-right', posClass: 'right-0 bottom-0', cursor: 'cursor-nwse-resize' },
+            ].map(({ pos, posClass, cursor }) => (
+              <button
+                key={pos}
+                aria-label="Cambiar tamaño de la imagen"
+                title="Arrastra para cambiar el tamaño"
+                onPointerDown={onResizePointerDown}
+                onPointerMove={onResizePointerMove}
+                onPointerUp={onResizePointerUp}
+                onPointerCancel={onResizePointerUp}
+                // 44px hit area (Apple/Android minimum touch target), same
+                // trick as ImageCropModal's corner handles — visually just
+                // the dot.
+                className={`absolute ${posClass} w-11 h-11 -m-5 flex items-center justify-center ${cursor}`}
+                style={{ touchAction: 'none' }}
+              >
+                <span className="w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white dark:border-[hsl(var(--background))] shadow" />
+              </button>
+            ))}
+          </>
         )}
       </div>
 
