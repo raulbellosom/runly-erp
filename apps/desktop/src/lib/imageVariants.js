@@ -13,6 +13,10 @@ export const IMAGE_VARIANT_PRESETS = {
   // crop and no letterbox. Use for arbitrary-aspect content images (e.g. note
   // body images) where cropping to a fixed box would cut off real content.
   content: { width: 1600, quality: 80 },
+  // Tiny, heavily-compressed version used as a blurred loading placeholder
+  // for arbitrary-aspect content images (note body images) — no forced
+  // height, same aspect-preserving shape as `content`, just far smaller.
+  lqip: { width: 24, quality: 30 },
 };
 
 const PUBLIC_OBJECT_PATH = '/storage/v1/object/public/';
