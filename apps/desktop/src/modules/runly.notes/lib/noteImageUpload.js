@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
-import { runly } from '../../../lib/runly'
-import { supabase } from '../../../lib/supabase'
+import { runly } from '../../../lib/runly.js'
+import { supabase } from '../../../lib/supabase.js'
 import { computeInitialImageWidthPct } from './imageSize.js'
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
