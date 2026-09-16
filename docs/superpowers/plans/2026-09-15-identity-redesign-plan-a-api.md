@@ -790,6 +790,25 @@ app.get(
     try {
       const id = c.req.param("id");
       const tenant = c.get("tenantContext");
+
+      // Same visibility rule as GET /identity/roles (read-only — company-wide
+      // and system-wide roles are both listable, unlike the edit-only
+      // loadCompanyEditableRole helper the mutation routes use, which would
+      // wrongly 404 a system-wide role for a non-system-admin here). Without
+      // this, a caller could probe an arbitrary roleId from another company
+      // and learn which of ITS users hold it, via the userProfile filter
+      // below alone.
+      const role = await prisma.role.findUnique({
+        where: { id },
+        select: { id: true, companyId: true },
+      });
+      const roleVisible =
+        role &&
+        (tenant.isSystemAdmin || role.companyId === null || role.companyId === tenant.companyId);
+      if (!roleVisible) {
+        return c.json({ error: "Rol no encontrado." }, 404);
+      }
+
       const where = {
         roleId: id,
         enabled: true,
@@ -797,6 +816,7 @@ app.get(
       };
       const memberships = await prisma.membership.findMany({
         where,
+        distinct: ["userId"],
         include: {
           userProfile: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
           company: { select: { name: true } },
