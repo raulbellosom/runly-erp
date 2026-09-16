@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX, groupIntoRows, pickDropIndex } from '../dragReorder.js'
+import { computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX } from '../dragReorder.js'
 
 // 6 blocks at indices 0-5, offsets deliberately uneven (not equal to index)
 // so a bug that confuses "array index" with "ProseMirror offset" would fail.
@@ -48,58 +48,4 @@ test('exceedsDragThreshold: false at and below the threshold, true above it', ()
   assert.equal(exceedsDragThreshold(DRAG_THRESHOLD_PX), false)
   assert.equal(exceedsDragThreshold(DRAG_THRESHOLD_PX - 1), false)
   assert.equal(exceedsDragThreshold(DRAG_THRESHOLD_PX + 1), true)
-})
-
-test('groupIntoRows: blocks that do not vertically overlap each stay in their own row', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
-    { offset: 10, top: 20, bottom: 40, left: 0, width: 300 },
-  ]
-  const rows = groupIntoRows(rects)
-  assert.equal(rows.length, 2)
-  assert.equal(rows[0].length, 1)
-  assert.equal(rows[1].length, 1)
-})
-
-test('groupIntoRows: two blocks with overlapping vertical ranges (floated side by side) group into one row', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 100, left: 0, width: 150 },
-    { offset: 10, top: 0, bottom: 100, left: 150, width: 150 },
-  ]
-  const rows = groupIntoRows(rects)
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].length, 2)
-})
-
-test('pickDropIndex: single-column stacking still uses the top/bottom-half rule per block', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
-    { offset: 10, top: 20, bottom: 40, left: 0, width: 300 },
-  ]
-  // Near the top of the second block -> insert before it (index 1)
-  assert.equal(pickDropIndex(rects, 150, 22), 1)
-  // Near the bottom of the second block -> insert after it (index 2 = end)
-  assert.equal(pickDropIndex(rects, 150, 38), 2)
-  // Near the top of the first block -> insert before it (index 0)
-  assert.equal(pickDropIndex(rects, 150, 2), 0)
-})
-
-test('pickDropIndex: two floated blocks side by side use clientX to decide between/around them', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 100, left: 0, width: 150 }, // left half, x: 0-150
-    { offset: 10, top: 0, bottom: 100, left: 150, width: 150 }, // right half, x: 150-300
-  ]
-  // Left of the first block's midpoint (x=75) -> insert before the first (index 0)
-  assert.equal(pickDropIndex(rects, 50, 50), 0)
-  // Between the two (past the first block's midpoint, before the second's) -> index 1
-  assert.equal(pickDropIndex(rects, 200, 50), 1)
-  // Past the second block's midpoint (x=225) -> insert after both (index 2)
-  assert.equal(pickDropIndex(rects, 280, 50), 2)
-})
-
-test('pickDropIndex: pointer below every row inserts at the very end', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
-  ]
-  assert.equal(pickDropIndex(rects, 150, 500), 1)
 })

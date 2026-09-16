@@ -470,18 +470,6 @@ body,
   caret-color: #f59e0b;
 }
 
-/* Without this, a note ending with a floated (resized) image and nothing
-   after it to clear the float collapses the editor's own height around
-   that image (the classic CSS "collapsing float" bug) — breaking the
-   editor's background and the tap-below-content behavior from the mobile
-   image-editing fixes. Standard clearfix: an empty pseudo-element forces
-   this container to include floated children in its own height. */
-.tiptap::after {
-  content: '';
-  display: table;
-  clear: both;
-}
-
 /* First paragraph = Apple-Notes-style title */
 .tiptap > p:first-child {
   font-size: 1.625rem !important;
