@@ -2643,6 +2643,108 @@ app.patch(
 );
 
 app.post(
+  "/identity/users/:id/memberships",
+  authMiddleware,
+  requirePermission("identity.users.update"),
+  async (c) => {
+    try {
+      const id = c.req.param("id");
+      const tenant = c.get("tenantContext");
+      const context = c.get("userContext");
+      if (!(await assertUserInCompany(id, tenant.companyId))) {
+        return c.json({ error: "Usuario no encontrado." }, 404);
+      }
+
+      const body = await c.req.json();
+      const fields = createMembershipSchema.parse(body);
+
+      const company = await prisma.company.findUnique({
+        where: { id: fields.companyId },
+        select: { id: true },
+      });
+      if (!company) return c.json({ error: "Empresa no encontrada." }, 404);
+
+      let targetRole = null;
+      if (fields.roleId) {
+        targetRole = await prisma.role.findUnique({
+          where: { id: fields.roleId },
+          select: { key: true, companyId: true },
+        });
+        if (!targetRole) return c.json({ error: "Rol no encontrado." }, 404);
+
+        const scopeCheck = checkMembershipRoleScope({
+          roleCompanyId: targetRole.companyId,
+          membershipCompanyId: fields.companyId,
+        });
+        if (!scopeCheck.ok) return c.json({ error: scopeCheck.error }, scopeCheck.status);
+
+        const protectedCheck = checkProtectedRoleAssignment({
+          roleKey: targetRole.key,
+          protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
+          actorCanManageRoles: Boolean(
+            context?.isAdmin || context?.permissionSet?.has("identity.roles.update"),
+          ),
+        });
+        if (!protectedCheck.ok) return c.json({ error: protectedCheck.error }, protectedCheck.status);
+      }
+
+      const existingMemberships = await prisma.membership.findMany({
+        where: { userId: id, companyId: fields.companyId },
+      });
+      const existing = findExistingMembership({
+        memberships: existingMemberships,
+        companyId: fields.companyId,
+      });
+
+      if (existing?.enabled) {
+        return c.json({ error: "El usuario ya tiene acceso a esta empresa." }, 400);
+      }
+
+      const membership = existing
+        ? await prisma.membership.update({
+            where: { id: existing.id },
+            data: { enabled: true, roleId: fields.roleId ?? existing.roleId },
+            include: { role: true, company: true },
+          })
+        : await prisma.membership.create({
+            data: { userId: id, companyId: fields.companyId, roleId: fields.roleId ?? null },
+            include: { role: true, company: true },
+          });
+
+      cacheDelByPrefix("user_ctx:");
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: "identity.membership.create",
+        severity: "success",
+        entityType: "Membership",
+        entityId: membership.id,
+        summary: `${actorName} asigno a ${membership.company?.name ?? "una empresa"} al usuario`,
+      });
+
+      return c.json(
+        {
+          data: {
+            id: membership.id,
+            companyId: membership.companyId,
+            companyName: membership.company?.name ?? null,
+            roleId: membership.roleId,
+            roleKey: membership.role?.key ?? null,
+            roleName: membership.role?.name ?? null,
+            enabled: membership.enabled,
+          },
+        },
+        existing ? 200 : 201,
+      );
+    } catch (err) {
+      if (err?.name === "ZodError") {
+        return c.json({ error: err.errors[0]?.message ?? "Datos inválidos." }, 400);
+      }
+      return c.json({ error: "No se pudo asignar la empresa." }, 500);
+    }
+  },
+);
+
+app.post(
   "/identity/users",
   authMiddleware,
   requirePermission("identity.users.create"),
