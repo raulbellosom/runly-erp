@@ -10,6 +10,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { useIsDark } from '../hooks/useIsDark.js'
 import { uploadAndInsertNoteImage } from '../lib/noteImageUpload.js'
 import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog.jsx'
+import { getTableMenuActions, tableMenuSections } from '../lib/tableMenuActions.js'
 
 const TEXT_COLORS_LIGHT = [
   '#0f172a', '#475569', '#94a3b8', '#cbd5e1',
@@ -414,15 +415,19 @@ export function NoteToolbar({ noteId, token }) {
               </button>
             </PopoverTrigger>
             <PopoverContent className="p-1 w-52" side="bottom" align="start">
-              <TableMenuItem label="Agregar columna a la derecha" onClick={() => editor.chain().focus().addColumnAfter().run()} />
-              <TableMenuItem label="Agregar columna a la izquierda" onClick={() => editor.chain().focus().addColumnBefore().run()} />
-              <TableMenuItem label="Agregar fila abajo" onClick={() => editor.chain().focus().addRowAfter().run()} />
-              <TableMenuItem label="Agregar fila arriba" onClick={() => editor.chain().focus().addRowBefore().run()} />
-              <div className="my-1 border-t border-border" />
-              <TableMenuItem label="Eliminar columna" onClick={() => editor.chain().focus().deleteColumn().run()} destructive />
-              <TableMenuItem label="Eliminar fila" onClick={() => editor.chain().focus().deleteRow().run()} destructive />
-              <div className="my-1 border-t border-border" />
-              <TableMenuItem label="Eliminar tabla" onClick={() => editor.chain().focus().deleteTable().run()} destructive />
+              {tableMenuSections(getTableMenuActions(editor)).map((section, si) => (
+                <div key={section.group}>
+                  {si > 0 && <div className="my-1 border-t border-border" />}
+                  {section.items.map((action) => (
+                    <TableMenuItem
+                      key={action.label}
+                      label={action.label}
+                      onClick={action.onClick}
+                      destructive={action.destructive}
+                    />
+                  ))}
+                </div>
+              ))}
             </PopoverContent>
           </Popover>
         </>
