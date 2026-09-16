@@ -1,39 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Button, PageHeader, Skeleton } from "@runly/ui";
-import { ArrowRight, KeyRound, Shield, UserCheck, Users } from "lucide-react";
+import { Badge, Button, PageHeader, Skeleton, StatStrip } from "@runly/ui";
+import { ArrowRight, Shield, Users } from "lucide-react";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
-
-// ── Stat card ─────────────────────────────────────────────────────────────────
-
-function StatCard({ icon: Icon, label, value, sub, color, loading }) {
-  return (
-    <div className="glass rounded-2xl border border-[hsl(var(--border))] p-5 flex items-start gap-4">
-      <div
-        className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: `${color}20` }}
-      >
-        <Icon className="h-5 w-5" style={{ color }} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-[hsl(var(--muted-foreground))] font-medium uppercase tracking-wide">
-          {label}
-        </p>
-        {loading ? (
-          <Skeleton className="mt-1.5 h-7 w-16" />
-        ) : (
-          <p className="text-2xl font-bold tabular-nums text-[hsl(var(--foreground))] mt-0.5">
-            {value ?? "—"}
-          </p>
-        )}
-        {sub && !loading && (
-          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{sub}</p>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Quick link card ───────────────────────────────────────────────────────────
 
@@ -112,17 +82,13 @@ export default function IdentityOverview() {
   const roles = rolesQuery.data?.data ?? [];
 
   const activeUsers = users.filter((u) => u.status === "ACTIVE" || u.enabled !== false);
-  const activeRoles = roles.filter((r) => r.enabled);
-  const systemRoles = roles.filter((r) => r.system);
   const customRoles = roles.filter((r) => !r.system);
 
   const isLoadingUsers = canReadUsers && usersQuery.isLoading;
   const isLoadingRoles = canReadRoles && rolesQuery.isLoading;
 
   const brandColor = "var(--brand-primary)";
-  const emerald = "#10b981";
   const violet = "#8b5cf6";
-  const amber = "#f59e0b";
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -141,42 +107,34 @@ export default function IdentityOverview() {
       />
 
       {/* Stat grid */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          icon={Users}
-          label="Usuarios"
-          value={canReadUsers ? users.length : "—"}
-          sub={canReadUsers && !isLoadingUsers ? `${activeUsers.length} activos` : undefined}
-          color={brandColor}
-          loading={isLoadingUsers}
-        />
-        <StatCard
-          icon={UserCheck}
-          label="Activos"
-          value={canReadUsers ? activeUsers.length : "—"}
-          sub={canReadUsers && !isLoadingUsers && users.length > 0
-            ? `${Math.round((activeUsers.length / users.length) * 100)}% del total`
-            : undefined}
-          color={emerald}
-          loading={isLoadingUsers}
-        />
-        <StatCard
-          icon={Shield}
-          label="Roles"
-          value={canReadRoles ? roles.length : "—"}
-          sub={canReadRoles && !isLoadingRoles ? `${activeRoles.length} activos` : undefined}
-          color={violet}
-          loading={isLoadingRoles}
-        />
-        <StatCard
-          icon={KeyRound}
-          label="Roles personalizados"
-          value={canReadRoles ? customRoles.length : "—"}
-          sub={canReadRoles && !isLoadingRoles ? `${systemRoles.length} de sistema` : undefined}
-          color={amber}
-          loading={isLoadingRoles}
-        />
-      </div>
+      <StatStrip
+        items={[
+          {
+            key: "users",
+            label: "Usuarios",
+            icon: "Users",
+            value: isLoadingUsers ? "…" : canReadUsers ? String(users.length) : "—",
+          },
+          {
+            key: "active",
+            label: "Activos",
+            icon: "UserCheck",
+            value: isLoadingUsers ? "…" : canReadUsers ? String(activeUsers.length) : "—",
+          },
+          {
+            key: "roles",
+            label: "Roles",
+            icon: "Shield",
+            value: isLoadingRoles ? "…" : canReadRoles ? String(roles.length) : "—",
+          },
+          {
+            key: "custom-roles",
+            label: "Roles personalizados",
+            icon: "KeyRound",
+            value: isLoadingRoles ? "…" : canReadRoles ? String(customRoles.length) : "—",
+          },
+        ]}
+      />
 
       {/* Quick access */}
       <div>
