@@ -178,7 +178,7 @@ function BulkSwitch({ selectedCount, totalCount, disabled, onToggle }) {
         totalCount > 0 && (
           <Badge
             variant="outline"
-            className="text-[10px] uppercase tracking-wide text-[hsl(var(--muted-foreground))]"
+            className="text-[10px] uppercase tracking-wide text-[hsl(var(--muted-foreground))] dark:text-slate-400"
           >
             Ninguno
           </Badge>
@@ -203,13 +203,16 @@ function PermissionRow({ checked, disabled, locked, label, description, onChange
         <p className="text-sm font-medium leading-tight flex items-center gap-2">
           {label}
           {locked && (
-            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+            <Badge
+              variant="secondary"
+              className="text-[10px] uppercase tracking-wide dark:bg-white/10 dark:text-slate-200 dark:border-white/15"
+            >
               Del rol
             </Badge>
           )}
         </p>
         {description && (
-          <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-0.5 leading-relaxed">
+          <p className="text-[11px] text-[hsl(var(--muted-foreground))] dark:text-slate-400 mt-0.5 leading-relaxed">
             {description}
           </p>
         )}
@@ -472,7 +475,7 @@ export default function PermissionFeatureTree({
       </div>
 
       {/* Summary bar */}
-      <div className="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
+      <div className="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))] dark:text-slate-400">
         <span>
           <span className="tabular-nums font-semibold text-[hsl(var(--foreground))]">
             {totalAssigned}
@@ -503,7 +506,7 @@ export default function PermissionFeatureTree({
           <p className="text-sm font-medium text-[hsl(var(--foreground))]">
             Sin resultados
           </p>
-          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+          <p className="text-xs text-[hsl(var(--muted-foreground))] dark:text-slate-400 mt-1">
             No hay permisos que coincidan con los filtros aplicados.
           </p>
         </div>
@@ -533,15 +536,11 @@ export default function PermissionFeatureTree({
               moduleFull ? "ring-1 ring-emerald-500/40" : "",
             ].join(" ")}
           >
-            {/* Collapsible module header — split into a button + sibling switch to avoid button-in-button */}
-            <div
-              className={[
-                "w-full px-4 py-3 border-b border-[hsl(var(--border))] flex items-center gap-3 transition-colors",
-                moduleFull
-                  ? "bg-emerald-500/10 hover:bg-emerald-500/15"
-                  : "glass-subtle hover:bg-[hsl(var(--muted))]/30",
-              ].join(" ")}
-            >
+            {/* Collapsible module header — split into a button + sibling switch to avoid button-in-button.
+                Deliberately NOT green-tinted when moduleFull: the card's emerald ring plus the "Todos"
+                badge already signal "fully assigned" — stacking a translucent green header background
+                on top of those made the header text hard to read (green-on-green) in dark mode. */}
+            <div className="w-full px-4 py-3 border-b border-[hsl(var(--border))] flex items-center gap-3 transition-colors glass-subtle hover:bg-[hsl(var(--muted))]/30">
               <button
                 type="button"
                 onClick={() => toggleModule(moduleItem.key)}
@@ -562,7 +561,7 @@ export default function PermissionFeatureTree({
                       "text-[11px] mt-0.5",
                       moduleFull
                         ? "text-emerald-600 dark:text-emerald-400 font-medium"
-                        : "text-[hsl(var(--muted-foreground))]",
+                        : "text-[hsl(var(--muted-foreground))] dark:text-slate-400",
                     ].join(" ")}
                   >
                     {moduleFull
@@ -605,7 +604,7 @@ export default function PermissionFeatureTree({
                     >
                       {/* Feature header */}
                       <div className="px-4 py-2.5 bg-[hsl(var(--muted))]/20 border-b border-[hsl(var(--border))]/60 flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
+                        <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] dark:text-slate-300 uppercase tracking-wide">
                           {featureItem.label}
                         </p>
                         <BulkSwitch
