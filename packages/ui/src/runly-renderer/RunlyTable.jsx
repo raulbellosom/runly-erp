@@ -161,6 +161,20 @@ function normalizeColumns(schema) {
         sortable: Boolean(entry.sortable),
         defaultVisible: entry.defaultVisible !== false,
         isLink,
+        // type: "image-asset" (ImageAssetCell) options — see its own doc
+        // comment for what each does.
+        imagesApiPath:
+          typeof entry.imagesApiPath === "string" && entry.imagesApiPath.trim()
+            ? entry.imagesApiPath.trim()
+            : null,
+        avatarUserField:
+          typeof entry.avatarUserField === "string" && entry.avatarUserField.trim()
+            ? entry.avatarUserField.trim()
+            : null,
+        avatarLabelField:
+          typeof entry.avatarLabelField === "string" && entry.avatarLabelField.trim()
+            ? entry.avatarLabelField.trim()
+            : null,
       };
     })
     .filter(Boolean);
