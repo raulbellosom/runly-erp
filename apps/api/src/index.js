@@ -4930,6 +4930,41 @@ app.put(
   },
 );
 
+// PATCH alias — RunlyForm (the shared blueprint-driven form renderer) always
+// submits edits via PATCH, matching the convention already used by
+// PATCH /fleet/vehicles/:id and PATCH /inventory/items/:id. The PUT route
+// above is kept for any other caller.
+app.patch(
+  "/hr/employees/:id",
+  authMiddleware,
+  requirePermission("hr.employee.update"),
+  async (c) => {
+    try {
+      const authUserId = c.get("authUserId");
+      const id = c.req.param("id");
+      const parsed = hrEmployeeUpdateSchema.safeParse(await c.req.json());
+      if (!parsed.success) {
+        return c.json(
+          { error: parsed.error.errors?.[0]?.message ?? "Datos invalidos." },
+          400,
+        );
+      }
+      const row = await hrService.updateEmployee({
+        authUserId,
+        companyId: c.get("companyId"),
+        id,
+        payload: parsed.data,
+      });
+      return c.json({ data: row });
+    } catch (err) {
+      if (err instanceof HrServiceError) {
+        return c.json({ error: err.message }, err.status);
+      }
+      return c.json({ error: "No se pudo actualizar el colaborador." }, 500);
+    }
+  },
+);
+
 app.patch(
   "/hr/employees/:id/enabled",
   authMiddleware,

@@ -142,6 +142,7 @@ export function RunlyForm({
   showFooter = true,
   onCompletionChange,
   asideActions = null,
+  onAttachmentsChange,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -199,6 +200,7 @@ export function RunlyForm({
     prefillData: {},
     searchText: "",
   });
+  const [quickCreatingField, setQuickCreatingField] = useState(null);
   const [nestedBlueprintRows, setNestedBlueprintRows] = useState(null);
   // Stable fields array for the nested inline-create form. Recomputed only when the
   // blueprint changes, not on every outer render.
@@ -669,14 +671,13 @@ export function RunlyForm({
     [allowInlineCreate, inlineCreateDepth, resolveInlineCreateBlueprint],
   );
 
-  const handleInlineCreateSuccess = useCallback(
-    async (result) => {
-      const fieldName = inlineCreateState.fieldName;
-      const descriptor = inlineCreateState.descriptor;
-      if (!fieldName || !descriptor) {
-        closeInlineCreate();
-        return;
-      }
+  // Shared by the modal-create success handler and quick-create: selects the
+  // newly created record, refreshes the option list, and surfaces any
+  // partial-failure state. Kept independent of inlineCreateState so quick
+  // create (which never opens the modal) can call it directly.
+  const applyCreatedRelationResult = useCallback(
+    async (fieldName, descriptor, result) => {
+      if (!fieldName || !descriptor) return;
 
       const createdRecord = extractCreatedRecord(result);
       const createdIdRaw =
@@ -760,15 +761,70 @@ export function RunlyForm({
       } else {
         setRelationInlineErrors((prev) => ({ ...prev, [fieldName]: "" }));
       }
+    },
+    [loadRelationOptions],
+  );
 
+  const handleInlineCreateSuccess = useCallback(
+    async (result) => {
+      await applyCreatedRelationResult(
+        inlineCreateState.fieldName,
+        inlineCreateState.descriptor,
+        result,
+      );
       closeInlineCreate();
     },
     [
+      applyCreatedRelationResult,
       closeInlineCreate,
       inlineCreateState.descriptor,
       inlineCreateState.fieldName,
-      loadRelationOptions,
     ],
+  );
+
+  const handleQuickCreate = useCallback(
+    async (fieldName, descriptor, searchText) => {
+      if (descriptor?.create?.mode !== "quick") return;
+      const trimmed = String(searchText ?? "").trim();
+      if (!trimmed) return;
+
+      setQuickCreatingField(fieldName);
+      setRelationInlineErrors((prev) => ({ ...prev, [fieldName]: "" }));
+      try {
+        const response = await fetch(
+          joinUrl(apiBaseUrl, descriptor.create.apiPath),
+          {
+            method: "POST",
+            headers: buildApiHeaders(token, companyId, {
+              "Content-Type": "application/json",
+            }),
+            body: JSON.stringify({ [descriptor.create.nameField]: trimmed }),
+          },
+        );
+        const text = await response.text();
+        let payload = null;
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch {
+          payload = null;
+        }
+        if (!response.ok) {
+          throw new Error(payload?.error || "No se pudo crear el registro.");
+        }
+        await applyCreatedRelationResult(fieldName, descriptor, payload);
+      } catch (err) {
+        setRelationInlineErrors((prev) => ({
+          ...prev,
+          [fieldName]:
+            err instanceof Error && err.message
+              ? err.message
+              : "No se pudo crear el registro.",
+        }));
+      } finally {
+        setQuickCreatingField(null);
+      }
+    },
+    [apiBaseUrl, applyCreatedRelationResult, companyId, token],
   );
 
   const validate = () => {
@@ -1134,15 +1190,20 @@ export function RunlyForm({
             createActionLabel={createActionLabel}
             createActionMode={descriptor.create?.allowedWhen ?? "always"}
             createFromSearch={descriptor.create?.prefillFromSearch === true}
+            isCreating={quickCreatingField === field.name}
             createDisabled={
               !canInlineCreate ||
+              quickCreatingField === field.name ||
               (inlineCreateState.open &&
                 inlineCreateState.fieldName === field.name)
             }
             onCreate={
               canInlineCreate
-                ? (searchText) =>
-                    openInlineCreate(field.name, descriptor, searchText)
+                ? descriptor.create.mode === "quick"
+                  ? (searchText) =>
+                      handleQuickCreate(field.name, descriptor, searchText)
+                  : (searchText) =>
+                      openInlineCreate(field.name, descriptor, searchText)
                 : undefined
             }
           />
@@ -1247,6 +1308,7 @@ export function RunlyForm({
             onControllerReady={(controller) =>
               registerAttachmentsController(section.id, controller)
             }
+            onChange={onAttachmentsChange}
           />
         );
       }

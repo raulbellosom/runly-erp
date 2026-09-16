@@ -80,6 +80,7 @@ export default function HrEmployeeDetail({ employeeId }) {
         companyId={activeCompanyId}
         apiBaseUrl={API_BASE}
         componentRegistry={componentRegistry}
+        onAttachmentsChange={() => queryClient.invalidateQueries({ queryKey: ['hr-employee', employeeId] })}
         heroActions={
           <DetailActionBar
             primary={

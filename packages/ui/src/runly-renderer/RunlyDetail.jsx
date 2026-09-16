@@ -948,6 +948,7 @@ export function RunlyDetail({
   apiBaseUrl,
   companyId = null,
   componentRegistry = null,
+  onAttachmentsChange,
 }) {
   const schema = blueprint?.schema ?? {};
   const fieldMap = useMemo(() => normalizeFieldMap(fields), [fields]);
@@ -1036,6 +1037,7 @@ export function RunlyDetail({
           context="detail"
           readOnly
           showHeading={false}
+          onChange={onAttachmentsChange}
         />
       ) : null}
 

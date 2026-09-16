@@ -118,6 +118,14 @@ export default function HrEmployeeForm({ employeeId }) {
             navigate(savedId ? `/app/m/runly.hr/hr/employees/${savedId}` : '/app/m/runly.hr/hr/employees')
           }}
           onCancel={() => navigate(-1)}
+          // Marking a cover photo (or any upload/remove) saves immediately via
+          // AttachmentsPanel, independent of the form's own save — without
+          // this, the detail screen's cached ['hr-employee', id] query (5min
+          // staleTime) would keep showing the old photo after navigating
+          // there, even right after the change.
+          onAttachmentsChange={() => {
+            if (employeeId) queryClient.invalidateQueries({ queryKey: ['hr-employee', employeeId] })
+          }}
         />
       </div>
 
