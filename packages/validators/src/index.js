@@ -468,6 +468,20 @@ export const createUserSchema = z.object({
   roleId: z.string().uuid().optional(),
 });
 
+export const createMembershipSchema = z.object({
+  companyId: z.string().uuid("Empresa inválida."),
+  roleId: z.string().uuid("Rol inválido.").nullable().optional(),
+});
+
+export const updateMembershipSchema = z
+  .object({
+    roleId: z.string().uuid("Rol inválido.").nullable().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((data) => data.roleId !== undefined || data.enabled !== undefined, {
+    message: "Debes enviar roleId o enabled.",
+  });
+
 export const fileBulkDownloadSchema = z.object({
   fileIds: z
     .array(
