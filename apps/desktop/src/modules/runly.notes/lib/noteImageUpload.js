@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import { ReactRenderer } from '@tiptap/react'
 import { runly } from '../../../lib/runly.js'
 import { supabase } from '../../../lib/supabase.js'
 import { computeInitialImageWidthPct } from './imageSize.js'
@@ -78,10 +79,19 @@ export async function uploadAndInsertNoteImage(file, { editor, noteId, token }) 
   }
 }
 
+function isCoarsePointerDevice() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+}
+
 // Opens a native file picker and runs uploadAndInsertNoteImage on the chosen
 // file. Used where there's no persistent <input type="file"> element to
-// reuse (e.g. the slash command menu).
+// reuse (e.g. the slash command menu). On a touch device, offers the same
+// camera-vs-gallery choice as the toolbar's image button instead.
 export function pickAndUploadNoteImage({ editor, noteId, token }) {
+  if (isCoarsePointerDevice()) {
+    pickViaSourceSheet({ editor, noteId, token })
+    return
+  }
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*'
@@ -93,4 +103,34 @@ export function pickAndUploadNoteImage({ editor, noteId, token }) {
   }
   document.body.appendChild(input)
   input.click()
+}
+
+// Mounts a detached ImageSourceSheet (open by default) so the slash command
+// — which runs outside any note screen's own component tree — can still
+// offer the camera-vs-gallery choice already used by NoteToolbar.jsx.
+// `@runly/ui` is imported dynamically (not at module top level) so this
+// module stays importable from the plain Node test runner, which has no JSX
+// loader for the rest of the @runly/ui component tree.
+async function pickViaSourceSheet({ editor, noteId, token }) {
+  const { ImageSourceSheet } = await import('@runly/ui')
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+
+  function cleanup() {
+    renderer.destroy()
+    host.remove()
+  }
+
+  const renderer = new ReactRenderer(ImageSourceSheet, {
+    editor,
+    props: {
+      open: true,
+      onOpenChange: (next) => { if (!next) cleanup() },
+      onPickFile: (file) => {
+        uploadAndInsertNoteImage(file, { editor, noteId, token })
+        cleanup()
+      },
+    },
+  })
+  host.appendChild(renderer.element)
 }
