@@ -59,6 +59,18 @@ export const AnnotatableImage = Node.create({
         renderHTML: (attrs) =>
           attrs.rotation ? { 'data-rotation': String(attrs.rotation) } : {},
       },
+      // Set once the user free-resizes an image via a corner handle
+      // (ImageAnnotationOverlay.jsx). null = derive the frame's aspect ratio
+      // from the natural image size instead (current/default behavior).
+      aspectRatio: {
+        default: null,
+        parseHTML: (el) => {
+          const raw = Number(el.getAttribute('data-aspect-ratio'))
+          return Number.isFinite(raw) && raw > 0 ? raw : null
+        },
+        renderHTML: (attrs) =>
+          attrs.aspectRatio ? { 'data-aspect-ratio': String(attrs.aspectRatio) } : {},
+      },
     }
   },
 
