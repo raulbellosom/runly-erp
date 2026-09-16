@@ -2493,6 +2493,41 @@ app.get(
   },
 );
 
+app.get(
+  "/identity/users/:id",
+  authMiddleware,
+  requirePermission("identity.users.read"),
+  async (c) => {
+    try {
+      const id = c.req.param("id");
+      const tenant = c.get("tenantContext");
+      if (!(await assertUserInCompany(id, tenant.companyId))) {
+        return c.json({ error: "Usuario no encontrado." }, 404);
+      }
+      const user = await prisma.userProfile.findUnique({
+        where: { id },
+        include: {
+          memberships: {
+            include: { role: true, company: true },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+      if (!user) return c.json({ error: "Usuario no encontrado." }, 404);
+
+      const avatarFileIds = user.avatarFileId ? [user.avatarFileId] : [];
+      const avatarUrlMap = await buildAvatarUrlMapByFileIds(avatarFileIds);
+      const serialized = serializeIdentityUser(user, avatarUrlMap);
+
+      return c.json({
+        data: { ...serialized, membershipsTotal: serialized.memberships.length },
+      });
+    } catch {
+      return c.json({ error: "No se pudo cargar el usuario." }, 500);
+    }
+  },
+);
+
 app.post(
   "/identity/users",
   authMiddleware,
