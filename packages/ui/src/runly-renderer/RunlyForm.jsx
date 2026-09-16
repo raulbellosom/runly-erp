@@ -44,6 +44,7 @@ import {
   buildInitialValues,
   castValueByType,
   resolveRecordId,
+  extractCreatedRecord,
   toMoney,
   normalizeReportParts,
   computePartsCost,
@@ -348,7 +349,6 @@ export function RunlyForm({
       [sectionId]: !Boolean(prev[sectionId]),
     }));
   }, []);
-
 
   const validate = () => {
     const nextErrors = {};
