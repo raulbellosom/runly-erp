@@ -1,131 +1,57 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import {
-  Badge,
   Button,
-  EmptyState,
+  ConfirmDialog,
+  RunlyDetail,
+  DetailActionBar,
   ErrorState,
-  PageHeader,
+  LoadingState,
   Sheet,
   SheetContent,
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  Skeleton,
   TextField,
-  UnsavedChangesBar,
 } from "@runly/ui";
-import { ArrowLeft, KeyRound, Pencil, Power, PowerOff, Shield } from "lucide-react";
+import { ArrowLeft, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
+import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
+import { getApiUrl } from "../../../lib/runtimeConfig.js";
 import { runly } from "../../../lib/runly";
-import PermissionFeatureTree from "../components/PermissionFeatureTree";
+import { IDENTITY_ROLE_DETAIL } from "../blueprints/identity-role-detail.blueprint.js";
+import { componentRegistry } from "../../../lib/moduleComponentRegistry.js";
 
-function getRoleIdFromPath(pathname) {
-  const chunks = pathname.split("/").filter(Boolean);
-  return chunks[chunks.length - 1] ?? "";
-}
-
-// ── Loading skeleton ───────────────────────────────────────────────────────────
-
-function RoleEditorSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="glass rounded-2xl border border-[hsl(var(--border))] px-5 py-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-3.5 w-28" />
-          </div>
-        </div>
-      </div>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div
-          key={i}
-          className="rounded-2xl border border-[hsl(var(--border))] overflow-hidden"
-        >
-          <div className="px-4 py-3 bg-[hsl(var(--muted))]/40 border-b">
-            <Skeleton className="h-4 w-24" />
-          </div>
-          <div className="p-4 space-y-3">
-            {Array.from({ length: 4 }).map((_, j) => (
-              <Skeleton key={j} className="h-12 w-full rounded-xl" />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Main screen ────────────────────────────────────────────────────────────────
+const API_BASE = getApiUrl();
 
 export default function RoleEditorScreen() {
+  const { id: roleId } = useParams();
   const { session, userProfile } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
   const token = session?.access_token;
-  const roleId = getRoleIdFromPath(location.pathname);
+  const navigate = useNavigate();
+  const { activeCompanyId } = useActiveCompany();
+  const queryClient = useQueryClient();
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const permissions = userProfile?.permissions ?? [];
-  const hasPermission = (key) =>
-    Boolean(userProfile?.isAdmin || permissions.includes(key));
+  const hasPermission = (key) => Boolean(userProfile?.isAdmin || permissions.includes(key));
   const canReadRoles = hasPermission("identity.roles.read");
   const canManageRoles = hasPermission("identity.roles.update");
-  const canReadPermissions = hasPermission("identity.permissions.read");
-  const canManagePermissions = hasPermission("identity.permissions.update");
-
-  const queryClient = useQueryClient();
-  const [pendingKeys, setPendingKeys] = useState(null);
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const canDeleteRoles = hasPermission("identity.roles.delete");
 
   const rolesQuery = useQuery({
     queryKey: ["identity-roles"],
     queryFn: () => runly.identity.listRoles(token),
     enabled: Boolean(token) && canReadRoles,
   });
-
-  const permissionsQuery = useQuery({
-    queryKey: ["identity-permissions"],
-    queryFn: () => runly.identity.listPermissions(token),
-    enabled: Boolean(token) && canReadPermissions,
-  });
-
-  const roles = rolesQuery.data?.data ?? [];
-  const permData = permissionsQuery.data?.data ?? {};
-  const allPermissions = permData.permissions ?? [];
-
-  const role = useMemo(
-    () => roles.find((r) => r.id === roleId) ?? null,
-    [roles, roleId],
-  );
-
-  useEffect(() => {
-    if (role) {
-      setPendingKeys(new Set(role.permissionKeys ?? []));
-    } else {
-      setPendingKeys(null);
-    }
-  }, [roleId, role?.permissionKeys?.join(",")]);
-
-  const savedKeys = useMemo(
-    () => new Set(role?.permissionKeys ?? []),
-    [role],
-  );
-
-  const isDirty = useMemo(() => {
-    if (!pendingKeys || !role) return false;
-    if (pendingKeys.size !== savedKeys.size) return true;
-    for (const k of pendingKeys) if (!savedKeys.has(k)) return true;
-    return false;
-  }, [pendingKeys, savedKeys, role]);
+  const role = (rolesQuery.data?.data ?? []).find((r) => r.id === roleId) ?? null;
 
   const toggleRoleMutation = useMutation({
-    mutationFn: ({ id, enabled }) =>
-      runly.identity.setRoleEnabled(id, enabled, token),
+    mutationFn: ({ id, enabled }) => runly.identity.setRoleEnabled(id, enabled, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["identity-roles"] });
       toast.success("Estado actualizado");
@@ -143,37 +69,15 @@ export default function RoleEditorScreen() {
     onError: () => toast.error("No se pudo actualizar el rol"),
   });
 
-  const savePermsMutation = useMutation({
-    mutationFn: ({ id, keys }) =>
-      runly.identity.setRolePermissions(id, [...keys], token),
+  const deleteRoleMutation = useMutation({
+    mutationFn: (id) => runly.identity.deleteRole(id, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["identity-roles"] });
-      toast.success("Permisos guardados");
+      toast.success("Rol eliminado");
+      navigate("/app/m/runly.identity/identity/roles");
     },
-    onError: () => toast.error("No se pudieron guardar los permisos"),
+    onError: (err) => toast.error(err?.message || "No se pudo eliminar el rol"),
   });
-
-  function togglePermission(key) {
-    if (!canManagePermissions) return;
-    setPendingKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function togglePermissionGroup(keys, checked) {
-    if (!canManagePermissions) return;
-    setPendingKeys((prev) => {
-      const next = new Set(prev);
-      for (const key of keys) {
-        if (checked) next.add(key);
-        else next.delete(key);
-      }
-      return next;
-    });
-  }
 
   const {
     register,
@@ -193,178 +97,65 @@ export default function RoleEditorScreen() {
     updateRoleMutation.mutate({ id: role.id, data });
   }
 
-  const isLoading =
-    rolesQuery.isLoading ||
-    (canReadPermissions && permissionsQuery.isLoading);
-  const isError =
-    rolesQuery.isError || (canReadPermissions && permissionsQuery.isError);
+  if (!canReadRoles) {
+    return (
+      <div className="p-4 md:p-6">
+        <ErrorState title="No tienes permisos para consultar roles." />
+      </div>
+    );
+  }
+  if (rolesQuery.isLoading) {
+    return (
+      <div className="p-4 md:p-6">
+        <LoadingState message="Cargando rol" />
+      </div>
+    );
+  }
+  if (!role) {
+    return (
+      <div className="p-4 md:p-6">
+        <ErrorState title="Rol no encontrado" />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="flex-1 p-4 md:p-6 space-y-6">
-        <PageHeader
-          eyebrow="Runly Identity · Roles"
-          title={role?.name ?? (rolesQuery.isLoading ? "Cargando..." : "Rol no encontrado")}
-          description={role?.description || (role ? "Sin descripcion" : "")}
-          actions={
-            <Button
-              variant="outline"
-              onClick={() =>
-                navigate("/app/m/runly.identity/identity/roles")
-              }
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver a roles
-            </Button>
-          }
-        />
-
-        {isLoading ? (
-          <RoleEditorSkeleton />
-        ) : isError ? (
-          <ErrorState
-            title="Error al cargar datos"
-            onRetry={() => {
-              rolesQuery.refetch();
-              if (canReadPermissions) permissionsQuery.refetch();
-            }}
+    <div className="p-4 md:p-6 space-y-6 min-h-dvh">
+      <RunlyDetail
+        blueprint={IDENTITY_ROLE_DETAIL}
+        data={role}
+        token={token}
+        companyId={activeCompanyId}
+        apiBaseUrl={API_BASE}
+        componentRegistry={componentRegistry}
+        heroActions={
+          <DetailActionBar
+            primary={
+              canManageRoles && !role.system ? { label: "Editar", icon: <Pencil className="h-4 w-4" />, onClick: openEditSheet } : null
+            }
+            secondary={[
+              { label: "Volver a roles", icon: <ArrowLeft className="h-4 w-4" />, onClick: () => navigate("/app/m/runly.identity/identity/roles") },
+              canManageRoles && !role.system
+                ? {
+                    label: role.enabled ? "Desactivar" : "Activar",
+                    icon: role.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />,
+                    onClick: () => toggleRoleMutation.mutate({ id: role.id, enabled: !role.enabled }),
+                    loading: toggleRoleMutation.isPending,
+                  }
+                : null,
+              canDeleteRoles && !role.system
+                ? {
+                    label: "Eliminar rol",
+                    icon: <Trash2 className="h-4 w-4" />,
+                    onClick: () => setDeleteOpen(true),
+                    destructive: true,
+                  }
+                : null,
+            ].filter(Boolean)}
           />
-        ) : !role ? (
-          <EmptyState
-            icon={Shield}
-            title="Rol no encontrado"
-            description="Este rol no existe o no esta disponible."
-            action={{
-              label: "Volver a roles",
-              onClick: () =>
-                navigate("/app/m/runly.identity/identity/roles"),
-            }}
-          />
-        ) : (
-          <>
-            {/* ── Role info card ─────────────────────────────────────────── */}
-            <div className="glass rounded-2xl border border-[hsl(var(--border))] px-5 py-4">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-11 w-11 rounded-xl bg-[--brand-primary]/15 flex items-center justify-center shrink-0 ring-1 ring-[--brand-primary]/20">
-                    <Shield className="h-5 w-5 text-[--brand-primary]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-[hsl(var(--foreground))] truncate">
-                      {role.name}
-                    </p>
-                    <p className="text-xs font-mono text-[hsl(var(--muted-foreground))] truncate mt-0.5">
-                      {role.key}
-                    </p>
-                  </div>
-                </div>
+        }
+      />
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {role.system && (
-                    <Badge variant="glass">Sistema</Badge>
-                  )}
-                  <Badge variant={role.enabled ? "success" : "secondary"}>
-                    {role.enabled ? "Activo" : "Inactivo"}
-                  </Badge>
-                  {canManageRoles && !role.system && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={openEditSheet}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={toggleRoleMutation.isPending}
-                        onClick={() =>
-                          toggleRoleMutation.mutate({
-                            id: role.id,
-                            enabled: !role.enabled,
-                          })
-                        }
-                      >
-                        {role.enabled ? (
-                          <>
-                            <PowerOff className="h-3.5 w-3.5" />
-                            Desactivar
-                          </>
-                        ) : (
-                          <>
-                            <Power className="h-3.5 w-3.5" />
-                            Activar
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Stat strip */}
-              <div className="mt-4 pt-3 border-t border-[hsl(var(--border))]/50 flex items-center gap-5 text-xs text-[hsl(var(--muted-foreground))]">
-                <div className="flex items-center gap-1.5">
-                  <KeyRound className="h-3.5 w-3.5 shrink-0" />
-                  <span className="tabular-nums">
-                    {pendingKeys?.size ?? savedKeys.size} permisos asignados
-                  </span>
-                </div>
-                {!canManagePermissions && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    Solo lectura
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* ── Permission tree ────────────────────────────────────────── */}
-            {!canReadPermissions ? (
-              <EmptyState
-                icon={KeyRound}
-                title="Sin acceso al catalogo de permisos"
-                description="Necesitas el permiso identity.permissions.read para ver el catalogo."
-              />
-            ) : allPermissions.length === 0 ? (
-              <EmptyState
-                icon={KeyRound}
-                title="Sin permisos disponibles"
-                description="No hay permisos definidos en el sistema."
-              />
-            ) : (
-              <PermissionFeatureTree
-                key={roleId}
-                allPermissions={allPermissions}
-                pendingKeys={pendingKeys ?? savedKeys}
-                baselineKeys={savedKeys}
-                onTogglePermission={togglePermission}
-                onBulkToggle={togglePermissionGroup}
-                disabled={
-                  !canManagePermissions || savePermsMutation.isPending
-                }
-              />
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ── Floating save bar ────────────────────────────────────────────────── */}
-      {isDirty && canManagePermissions && (
-        <UnsavedChangesBar
-          className="px-4 md:px-6"
-          message="Cambios sin guardar en permisos"
-          saving={savePermsMutation.isPending}
-          saveLabel="Guardar permisos"
-          onDiscard={() => setPendingKeys(new Set(savedKeys))}
-          onSave={() =>
-            savePermsMutation.mutate({ id: role.id, keys: pendingKeys })
-          }
-        />
-      )}
-
-      {/* ── Edit role sheet ──────────────────────────────────────────────────── */}
       <Sheet
         open={editSheetOpen}
         onOpenChange={(v) => {
@@ -376,19 +167,13 @@ export default function RoleEditorScreen() {
             <SheetTitle>Editar rol</SheetTitle>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto py-4">
-            <form
-              id="edit-role-form"
-              onSubmit={handleSubmit(onEditSubmit)}
-              className="space-y-4"
-            >
+            <form id="edit-role-form" onSubmit={handleSubmit(onEditSubmit)} className="space-y-4">
               <TextField
                 label="Nombre visible"
                 required
                 placeholder="Supervisor de ventas"
                 error={errors.name?.message}
-                {...register("name", {
-                  required: "El nombre es obligatorio",
-                })}
+                {...register("name", { required: "El nombre es obligatorio" })}
               />
               <TextField
                 label="Descripcion"
@@ -398,25 +183,29 @@ export default function RoleEditorScreen() {
             </form>
           </div>
           <SheetFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setEditSheetOpen(false)}
-              disabled={updateRoleMutation.isPending}
-            >
+            <Button variant="outline" onClick={() => setEditSheetOpen(false)} disabled={updateRoleMutation.isPending}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              form="edit-role-form"
-              disabled={updateRoleMutation.isPending}
-            >
-              {updateRoleMutation.isPending
-                ? "Guardando..."
-                : "Guardar cambios"}
+            <Button type="submit" form="edit-role-form" disabled={updateRoleMutation.isPending}>
+              {updateRoleMutation.isPending ? "Guardando..." : "Guardar cambios"}
             </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={(v) => !v && setDeleteOpen(false)}
+        title="Eliminar rol"
+        description={
+          (role?.memberCount ?? 0) > 0
+            ? `El rol "${role?.name}" tiene ${role.memberCount} ${role.memberCount === 1 ? "usuario asignado" : "usuarios asignados"}. Al eliminarlo quedaran sin rol y perderan todos los permisos asociados a este rol.`
+            : `¿Confirmas que quieres eliminar "${role?.name}"? Esta accion no se puede deshacer.`
+        }
+        confirmLabel={(role?.memberCount ?? 0) > 0 ? "Eliminar de todas formas" : "Eliminar"}
+        onConfirm={() => deleteRoleMutation.mutate(role.id)}
+        loading={deleteRoleMutation.isPending}
+      />
     </div>
   );
 }
