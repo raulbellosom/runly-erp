@@ -678,10 +678,25 @@ body,
 .tiptap .resize-cursor .column-resize-handle {
   opacity: 1;
 }
+/* :hover never fires on touch, so the handle would otherwise stay invisible
+   forever on phones even though the touch->mouse bridge (NoteEditor.jsx)
+   already forwards touch events to it. Always show it, and widen the strip
+   for a more forgiving touch target. */
+@media (pointer: coarse) {
+  .tiptap .column-resize-handle {
+    opacity: 1;
+    width: 12px;
+    right: -6px;
+  }
+}
 .tiptap .tableWrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin: 0.75rem 0;
+  /* Breathing room so the image resize handle's -m-5 extended hit-area
+     (ImageAnnotationOverlay.jsx) isn't clipped by this wrapper's overflow
+     when the image sits in the table's last column/row. */
+  padding: 0 0.5rem 0.5rem 0;
 }
 .tiptap .resize-cursor { cursor: col-resize; }
 
