@@ -364,6 +364,8 @@ Plans: `docs/superpowers/plans/2026-06-27-atlas-notes-A-backend.md`, `2026-06-27
 - [x] Frontend: `NotesScreen`, `PublicNoteScreen`, `NoteEditor` (TipTap + Yjs via `SupabaseYjsProvider`), `DrawingCanvas`, `ImageAnnotationOverlay`, `NoteShareModal`, folders/tags sidebar
 - [x] `atlas-notes` bucket — confirmed exists 2026-08-24 (`storage.listBuckets()`). It's `public: true` by deliberate 2026-08-03 user choice (permanent embedded-image URLs), not an oversight — no action needed.
 - [ ] Live QA: collaborative editing between two sessions; public route `/p/notes/:slug`
+- [x] Tables/images/mobile design (`docs/superpowers/specs/2026-09-16-notes-tables-images-mobile-design.md`, Plan A + Plan B): image + drawing insertable in table cells (`SlashCommand.jsx` guard narrowed), 4 free corner resize handles + `aspectRatio` node attribute, `ImageSourceSheet` (camera vs. gallery) wired into toolbar/slash-command/cover picker, touch-visible column-resize handle, `TableFloatingMenu` bottom-sheet table options on coarse pointer. Code complete, `node --test` (102/102) + `pnpm lint` + full `vite build` all clean.
+  Verified: 2026-09-16 (automated only — `node --test apps/desktop/src/modules/runly.notes/lib/__tests__/*.test.js` 102/102 pass, `pnpm lint` clean, `vite build` clean). Manual QA at 390px/1440px, both themes (per `docs/ai-context/ui-screen-audit-checklist.md`) still pending — needs a live browser pass.
 
 Verified: 2026-07-17 (implementation confirmed by file inventory and applied migrations via `prisma migrate status`; no live QA recorded)
 
