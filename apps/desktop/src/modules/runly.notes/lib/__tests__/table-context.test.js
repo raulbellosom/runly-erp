@@ -37,3 +37,14 @@ test('isInsideTableCell: false when there is no table ancestor at all', () => {
   const state = { doc: { resolve: () => $pos } }
   assert.equal(isInsideTableCell(state, 0), false)
 })
+
+test('isInsideTableCell: false (not a crash) when resolve() throws for a stale/out-of-range position', () => {
+  const state = {
+    doc: {
+      resolve: () => {
+        throw new RangeError('Position 384 out of range')
+      },
+    },
+  }
+  assert.equal(isInsideTableCell(state, 384), false)
+})
