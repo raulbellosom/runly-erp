@@ -34,7 +34,7 @@ Approved
 2. A user's detail and edit views are split into two focused screens/routes instead of one 759-line dual-mode component.
 3. A user's assignments to companies (memberships), including companies where the assignment is currently disabled, can be viewed, added to, and edited (role, enabled state) from the user's detail screen — not just the first membership.
 4. Roles (list, detail) moves to the same blueprint pattern: `RunlyCrudView` (table + card views) for the list, `RunlyDetail` (hero + KPIs) wrapping the existing permission-tree editor for the detail.
-5. Overview and Reportes de chat are restyled to reuse `StatStrip` and `RunlyTable` respectively instead of ad hoc local components.
+5. Overview is restyled to reuse `StatStrip` instead of its ad hoc local `StatCard` component; Reportes de chat gets matching visual polish (see Non-goal 9 for why it keeps its current `DataTable`).
 6. `RunlyForm` gains a generic `type: "component"` section capability (mirroring the one `RunlyDetail` already has), and the country/state/city/address picker is extracted into a single reusable `@runly/ui` component (`AddressFieldsSection`) instead of being duplicated by every screen that needs an address.
 7. `GET /identity/users/:id` exists as a dedicated single-record fetch, matching the pattern already used by `runly.hr` (`GET /hr/employees/:id`), and the response includes all of a user's memberships (including disabled ones) and a total count.
 8. No source file touched by this feature exceeds 1000 lines (hard ceiling 1500), per project convention.
@@ -49,6 +49,7 @@ Approved
 6. `CompanyAddress.jsx` is not touched. The new `AddressFieldsSection` component is built for reuse by other screens later, but migrating `CompanyAddress.jsx` to it is deferred (Future enhancements).
 7. Roles list drops its current three view modes (table/card/grid) down to one (table only) when migrated to `RunlyCrudView` — confirmed during planning that `RunlyCrudView` has no built-in table/card toggle (it only ever renders `RunlyTable` for browsing) and that `RunlyCardView` has zero existing consumers anywhere in the app, so wiring it in here would be unproven, unprecedented integration work, not a reuse of an established pattern. Card and grid views are dropped rather than rebuilt.
 8. No RME3 migration. `runly.identity` remains a core module with its manifest in `apps/api/src/manifests/official/core-modules.js` and its routes inline in `apps/api/src/index.js` — this feature does not convert it to `defineRunlyModule`/`modules/custom/*`. Section 5 of `docs/spec-driven-development.md` (Runly Module Checklist) is N/A for this reason.
+9. Reportes de chat is NOT converted to a `TABLE`-kind blueprint. Confirmed during planning: its backing endpoint (`GET /chat/reports` in `apps/api/src/routes/chat/moderation-routes.js`) only accepts `?status=` and returns a plain array with no pagination envelope, so it doesn't satisfy `RunlyTable`'s `schema.apiPath` contract (`page`/`pageSize`/`search`). Adding pagination to the chat moderation API would be scope creep into `runly.chat`. This screen keeps its current hand-wired `DataTable`, restyled only.
 
 ## 7. User stories
 
@@ -72,7 +73,7 @@ Approved
 - Roles list: `RunlyCrudView` in table view only (matching the pattern already used by `runly.fleet`'s `VehiclesScreen.jsx`), with search and the existing "Estado" filter carried into the table blueprint's `filters`. No `ViewModeSwitch` — table/card/grid toggle is dropped entirely (see Non-goal 7). "Nuevo rol" keeps opening the existing 3-field Sheet (key/nombre/descripción) — not converted to a blueprint form.
 - Roles detail: hero (nombre as title, clave as subtitle, Sistema/Activo badges), KPI strip (Permisos asignados, Usuarios con este rol), main column keeps the existing `PermissionFeatureTree` editor with its `UnsavedChangesBar` save flow (via a thin `PermissionTreeSection` wrapper), aside column adds `RoleMembersSection` (avatar + name list of users holding the role, linking to each user's detail page). Editing nombre/descripción keeps opening the existing Sheet from a hero action.
 - Overview: the four hand-built `StatCard` tiles are replaced by one `StatStrip` (Usuarios, Activos, Roles, Roles personalizados); quick-link cards and the "roles recientes" list keep their current behavior, restyled to match.
-- Reportes de chat: filter + table are rebuilt as a `TABLE`-kind blueprint rendered via `RunlyTable`, preserving today's columns (reportante, reportado, motivo, nota, estado, fecha) and the existing resolve/dismiss/disable-user actions and `ConfirmDialog`.
+- Reportes de chat: keeps its current hand-wired `DataTable` and filter (see Non-goal 9), restyled with the module's glass-shell spacing; the existing columns (reportante, reportado, motivo, nota, estado, fecha) and resolve/dismiss/disable-user actions/`ConfirmDialog` are unchanged.
 - Loading/error/empty states: every screen keeps using `LoadingState`/`ErrorState`/`EmptyState` as today; no new state UX is introduced beyond what the underlying `RunlyTable`/`RunlyDetail`/`RunlyForm` renderers already provide out of the box.
 
 ## 9. Routes/screens
@@ -192,7 +193,7 @@ New blueprint files (all under `apps/desktop/src/modules/runly.identity/blueprin
 - `identity-user-form.blueprint.js` — `kind: FORM`, `showCompletion: true`. Sections: "Identidad", "Perfil" (plain field lists), "Dirección" (`type: component`, `component: 'runly.identity:AddressFieldsSection'`, `fields: [country, state, city, colony, street, extNumber, intNumber, postalCode]`).
 - `identity-role-table.blueprint.js` — `kind: TABLE`, columns: nombre, clave, permisos (count), estado; filter: estado.
 - `identity-role-detail.blueprint.js` — `kind: DETAIL`, `layout: two-column`. `hero`: titleField `name`, subtitleFields `[key]`, statusField `enabled`, metaChips `[system]`. `kpis`: Permisos asignados, Usuarios con este rol. `sections`: `PermissionTreeSection` (`column: main`, `type: component`), `RoleMembersSection` (`column: aside`, `type: component`).
-- `identity-chat-report-table.blueprint.js` — `kind: TABLE`, columns: reportante, reportado, motivo, nota, estado, fecha; filter: estado.
+- None for Reportes de chat — see Non-goal 9; it keeps its current hand-wired `DataTable`, not a blueprint.
 
 ## 18. RBAC/permissions
 
@@ -278,7 +279,7 @@ Existing audit entries (`identity.user.create/update/delete`, `identity.role.cre
 - Manual: as a user with `identity.users.update`, add a second company membership to a test user, confirm it appears immediately and persists after a reload.
 - Manual: attempt to disable a test user's own last membership while logged in as that user (if reachable) or via direct API call as that user — confirm `400`.
 - Manual: attempt to assign a company-scoped role across companies via `PATCH .../memberships/:id` — confirm `400`.
-- Manual: confirm Roles list table/card toggle, Role detail KPI counts, Overview StatStrip, and Reportes de chat table all render and behave as before against a seeded dataset.
+- Manual: confirm the Roles list table, Role detail KPI counts, Overview StatStrip, and Reportes de chat table all render and behave as before against a seeded dataset.
 - Manual: confirm no source file touched by this feature exceeds 1000 lines (`git diff --stat` review + line counts on new/modified files).
 
 ## 27. Rollback plan
