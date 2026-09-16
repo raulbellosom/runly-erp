@@ -211,6 +211,7 @@ export { ErrorState } from "./components/ErrorState.jsx";
 export { StatCard } from "./components/StatCard.jsx";
 export { StatStrip } from "./components/StatStrip.jsx";
 export { DetailHero } from "./components/DetailHero.jsx";
+export { AddressFieldsSection } from "./components/AddressFieldsSection.jsx";
 export { FormCompletionRing } from "./components/FormCompletionRing.jsx";
 export { FormPreviewPanel } from "./components/FormPreviewPanel.jsx";
 export { SwatchField, DEFAULT_SWATCHES } from "./components/SwatchField.jsx";

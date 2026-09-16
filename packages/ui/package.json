@@ -29,6 +29,7 @@
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "latest",
+    "country-state-city": "^3.2.1",
     "date-fns": "^4.3.0",
     "lucide-react": "latest",
     "react-hook-form": "^7.75.0",
