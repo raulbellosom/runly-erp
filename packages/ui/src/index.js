@@ -254,6 +254,7 @@ export {
   getStoredViewMode,
 } from "./components/ViewModeSwitch.jsx";
 export { MobileFiltersSheet } from "./components/MobileFiltersSheet.jsx";
+export { ImageSourceSheet } from "./components/ImageSourceSheet.jsx";
 export { ListLayout } from "./components/ListLayout.jsx";
 export { useAttachmentsController, resolveAttachmentFileType } from "./hooks/useAttachmentsController.js";
 export { useIsMobile } from "./hooks/useIsMobile.js";

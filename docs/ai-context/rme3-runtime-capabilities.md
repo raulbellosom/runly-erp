@@ -482,6 +482,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `DocumentsPanel` | Documents list panel |
 | `ImageViewer` | Image lightbox |
 | `ImageUploader` | Image crop and upload widget |
+| `ImageSourceSheet` | Camera-vs-gallery picker for touch devices — gate with `useCoarsePointer()`; on a fine-pointer device just open a plain `<input type="file">` directly instead. Props: `open, onOpenChange, onPickFile, accept?`. |
 | `SwatchField` | Pick an accent colour from a small preset palette (`swatches` prop, defaults to `DEFAULT_SWATCHES`). Use instead of a raw `<input type="color">` when only a themeable accent is needed. |
 | `DatePickerField` | Standalone date picker |
 | `PageFooter` | Page footer bar |
