@@ -9,6 +9,7 @@ import {
   addRotation,
 } from '../lib/imageCrop.js'
 import { useRotatedFillSize } from '../hooks/useRotatedFillSize.js'
+import { getLoadedNaturalSize } from '../lib/imageLoadState.js'
 
 const PRESETS = [
   { id: 'free', label: 'Libre', ratio: null },
@@ -52,6 +53,7 @@ export function ImageCropModal({ open, onOpenChange, src, crop, rotation: initia
   const rotWrapRef = useRef(null) // sized/positioned per the current crop rect; useRotatedFillSize measures this
   const pointersRef = useRef(new Map()) // active pointerId -> {x,y}, for 1-finger pan / 2-finger pinch
   const gestureRef = useRef(null) // { type:'pan', pointerId, startX, startY, startCenter } | { type:'pinch', startDist, startZoom }
+  const imgElRef = useRef(null) // the <img> DOM node — checked for an already-loaded image on open
 
   const [rotation, setRotation] = useState(normalizeRotation(initialRotation))
   const [preset, setPreset] = useState('free')
@@ -117,6 +119,17 @@ export function ImageCropModal({ open, onOpenChange, src, crop, rotation: initia
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, viewfinderRatioFrac, effNat?.w, effNat?.h])
+
+  // A cached image (already displayed inline in the note before this modal's
+  // own <img> mounts) can finish loading before onLoad's listener attaches,
+  // so `nat` would otherwise never get set. Check synchronously whenever the
+  // modal opens or the image changes, in addition to keeping onLoad below
+  // for the not-yet-cached case.
+  useEffect(() => {
+    if (!open) return
+    const size = getLoadedNaturalSize(imgElRef.current ?? {})
+    if (size) setNat(size)
+  }, [open, src])
 
   // Non-passive wheel listener (desktop): scroll to zoom. React's synthetic
   // wheel handler is passive by default, which would make preventDefault a
@@ -293,6 +306,7 @@ export function ImageCropModal({ open, onOpenChange, src, crop, rotation: initia
               }}
             >
               <img
+                ref={imgElRef}
                 src={src}
                 alt=""
                 draggable={false}
