@@ -14,6 +14,7 @@ import pg from "pg";
 const { PrismaClient } = pkg;
 import { createClient } from "@supabase/supabase-js";
 import {
+  createMembershipSchema,
   createUserSchema,
   hrCatalogCreateSchema,
   hrCatalogEnabledSchema,
@@ -23,6 +24,7 @@ import {
   hrEmployeeUpdateSchema,
   moduleInstallSchema,
   setupInitializeSchema,
+  updateMembershipSchema,
 } from "@runly/validators";
 import {
   formatLogTimestamp,
@@ -41,6 +43,12 @@ import {
   createPermissionKeysCache,
   COMPANY_ADMIN_ROLE_KEYS,
 } from "./lib/tenant-context.js";
+import {
+  checkMembershipRoleScope,
+  checkProtectedRoleAssignment,
+  checkSelfLockout,
+  findExistingMembership,
+} from "./lib/identity-memberships.js";
 import {
   createContactsService,
   ContactsServiceError,
@@ -2527,6 +2535,109 @@ app.get(
       });
     } catch {
       return c.json({ error: "No se pudo cargar el usuario." }, 500);
+    }
+  },
+);
+
+app.patch(
+  "/identity/users/:id/memberships/:membershipId",
+  authMiddleware,
+  requirePermission("identity.users.update"),
+  async (c) => {
+    try {
+      const id = c.req.param("id");
+      const membershipId = c.req.param("membershipId");
+      const tenant = c.get("tenantContext");
+      const context = c.get("userContext");
+      if (!(await assertUserInCompany(id, tenant.companyId))) {
+        return c.json({ error: "Usuario no encontrado." }, 404);
+      }
+
+      const body = await c.req.json();
+      const fields = updateMembershipSchema.parse(body);
+
+      const membership = await prisma.membership.findUnique({
+        where: { id: membershipId },
+        include: { role: { select: { key: true } } },
+      });
+      if (!membership || membership.userId !== id) {
+        return c.json({ error: "La membresia no corresponde a este usuario." }, 400);
+      }
+
+      if (fields.roleId !== undefined && fields.roleId !== null) {
+        const targetRole = await prisma.role.findUnique({
+          where: { id: fields.roleId },
+          select: { key: true, companyId: true },
+        });
+        if (!targetRole) return c.json({ error: "Rol no encontrado." }, 404);
+
+        const scopeCheck = checkMembershipRoleScope({
+          roleCompanyId: targetRole.companyId,
+          membershipCompanyId: membership.companyId,
+        });
+        if (!scopeCheck.ok) return c.json({ error: scopeCheck.error }, scopeCheck.status);
+
+        const protectedCheck = checkProtectedRoleAssignment({
+          roleKey: targetRole.key,
+          protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
+          actorCanManageRoles: Boolean(
+            context?.isAdmin || context?.permissionSet?.has("identity.roles.update"),
+          ),
+        });
+        if (!protectedCheck.ok) return c.json({ error: protectedCheck.error }, protectedCheck.status);
+      }
+
+      if (fields.enabled === false) {
+        const enabledMemberships = await prisma.membership.findMany({
+          where: { userId: id, enabled: true },
+          select: { id: true },
+        });
+        const lockoutCheck = checkSelfLockout({
+          isActingOnSelf: id === context?.profile?.id,
+          enabledMembershipIds: enabledMemberships.map((m) => m.id),
+          membershipId,
+          disabling: true,
+        });
+        if (!lockoutCheck.ok) return c.json({ error: lockoutCheck.error }, lockoutCheck.status);
+      }
+
+      const before = { roleId: membership.roleId, enabled: membership.enabled };
+      const updated = await prisma.membership.update({
+        where: { id: membershipId },
+        data: {
+          ...(fields.roleId !== undefined ? { roleId: fields.roleId } : {}),
+          ...(fields.enabled !== undefined ? { enabled: fields.enabled } : {}),
+        },
+        include: { role: true, company: true },
+      });
+
+      cacheDelByPrefix("user_ctx:");
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: "identity.membership.update",
+        severity: "info",
+        entityType: "Membership",
+        entityId: membershipId,
+        summary: `${actorName} actualizo la membresia de ${updated.company?.name ?? "una empresa"}`,
+      });
+
+      return c.json({
+        data: {
+          id: updated.id,
+          companyId: updated.companyId,
+          companyName: updated.company?.name ?? null,
+          roleId: updated.roleId,
+          roleKey: updated.role?.key ?? null,
+          roleName: updated.role?.name ?? null,
+          enabled: updated.enabled,
+        },
+        before,
+      });
+    } catch (err) {
+      if (err?.name === "ZodError") {
+        return c.json({ error: err.errors[0]?.message ?? "Datos inválidos." }, 400);
+      }
+      return c.json({ error: "No se pudo actualizar la membresia." }, 500);
     }
   },
 );
