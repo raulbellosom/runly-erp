@@ -10,6 +10,7 @@ import { supabase } from '../../../lib/supabase'
 import { SupabaseYjsProvider, bytesToBase64 } from '../lib/SupabaseYjsProvider.js'
 import { buildExtensions } from '../lib/editor-extensions.js'
 import { usePresence } from '../hooks/usePresence.js'
+import { shouldFocusDocumentEnd } from '../lib/clickBelowContent.js'
 import { NoteToolbar } from './NoteToolbar.jsx'
 import { TableFloatingMenu } from './TableFloatingMenu.jsx'
 import { NoteCoverBanner } from './NoteCoverBanner.jsx'
@@ -155,6 +156,7 @@ function EditorLoading({ scrollable }) {
 function NoteEditorSurface({ note, readOnly, scrollable, token, session, userProfile, engine }) {
   const queryClient = useQueryClient()
   const containerRef = useRef(null)
+  const editorInstanceRef = useRef(null)
   const ydoc = engine?.ydoc ?? null
   const provider = engine?.provider ?? null
 
@@ -373,7 +375,10 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
       extensions={extensions}
       content={engine ? '' : (note.content || '')}
       editable={!readOnly}
-      onCreate={seedIfNeeded}
+      onCreate={(props) => {
+        editorInstanceRef.current = props.editor
+        seedIfNeeded(props)
+      }}
       onUpdate={handleUpdate}
       editorProps={{
         attributes: {
@@ -431,10 +436,19 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
     </EditorProvider>
   )
 
+  function handleContainerClick(e) {
+    if (shouldFocusDocumentEnd(e.target, e.currentTarget)) {
+      editorInstanceRef.current?.commands.focus('end')
+    }
+  }
+
   return (
     <div ref={containerRef} className="flex flex-col h-full overflow-hidden">
       {scrollable ? (
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          onClick={readOnly ? undefined : handleContainerClick}
+        >
           {editorProvider}
         </div>
       ) : (
