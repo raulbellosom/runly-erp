@@ -89,8 +89,8 @@ export default function ChatReportsScreen() {
       />
 
       {canRead ? (
-        <>
-          <div className="max-w-xs">
+        <div className="space-y-4">
+          <div className="glass-shell max-w-xs rounded-xl p-3">
             <SelectField
               label="Estado"
               value={statusFilter}
@@ -114,7 +114,7 @@ export default function ChatReportsScreen() {
             emptyDescription="No hay reportes de chat con este filtro."
             emptyIcon={Flag}
           />
-        </>
+        </div>
       ) : (
         <ErrorState description="No tienes permisos para consultar reportes de chat." />
       )}
