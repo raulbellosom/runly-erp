@@ -25,6 +25,11 @@ export const HR_EMPLOYEE_DETAIL = {
       subtitleFields: ['jobTitle', 'department'],
       statusField: 'status',
       statusMap: STATUS_LABEL_MAP,
+      // getEmployee() resolves this to the employee's own cover photo (from
+      // Archivos), falling back to the linked user account's avatar. Kept
+      // ahead of imageDocsPath, whose own /files lookup never sees that
+      // fallback and only covers a photo uploaded directly to this record.
+      imageField: 'profileImageFileId',
       imageDocsPath: '/files?moduleKey=runly.hr&entityType=HrEmployee&sourceEntityId=:id',
       fallbackIcon: 'User',
       metaChips: [
