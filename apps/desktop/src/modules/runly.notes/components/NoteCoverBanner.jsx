@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ImagePlus, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ImageSourceSheet, useCoarsePointer } from '@runly/ui'
 import { runly } from '../../../lib/runly'
 import { supabase } from '../../../lib/supabase'
 import { withImageVariant } from '../../../lib/imageVariants.js'
@@ -18,6 +19,8 @@ export function NoteCoverBanner({ coverUrl, editable, noteId, token, onChange, o
   // cover retries the transform.
   const [failedUrl, setFailedUrl] = useState(null)
   const imgFallback = failedUrl === coverUrl
+  const isCoarsePointer = useCoarsePointer()
+  const [coverSheetOpen, setCoverSheetOpen] = useState(false)
 
   if (!coverUrl && !editable) return null
 
@@ -50,29 +53,49 @@ export function NoteCoverBanner({ coverUrl, editable, noteId, token, onChange, o
     }
   }
 
+  const coverSheet = (
+    <ImageSourceSheet open={coverSheetOpen} onOpenChange={setCoverSheetOpen} onPickFile={handleFile} />
+  )
+
   if (!coverUrl) {
     return (
       <div className="px-8 pt-4">
-        <label
-          className={[
-            'inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors',
-            uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted hover:text-foreground',
-          ].join(' ')}
-        >
-          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
-          Agregar portada
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
+        {isCoarsePointer ? (
+          <button
+            type="button"
             disabled={uploading}
-            onChange={e => {
-              const file = e.target.files?.[0]
-              e.target.value = ''
-              if (file) handleFile(file)
-            }}
-          />
-        </label>
+            onClick={() => setCoverSheetOpen(true)}
+            className={[
+              'inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground rounded-lg px-2.5 py-1.5 transition-colors',
+              uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted hover:text-foreground',
+            ].join(' ')}
+          >
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+            Agregar portada
+          </button>
+        ) : (
+          <label
+            className={[
+              'inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors',
+              uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted hover:text-foreground',
+            ].join(' ')}
+          >
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+            Agregar portada
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploading}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) handleFile(file)
+              }}
+            />
+          </label>
+        )}
+        {coverSheet}
       </div>
     )
   }
@@ -89,26 +112,41 @@ export function NoteCoverBanner({ coverUrl, editable, noteId, token, onChange, o
       />
       {editable && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover/cover:opacity-100 transition-opacity">
-          <label
-            className={[
-              'flex items-center gap-1.5 text-xs font-medium bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1.5 cursor-pointer shadow-sm transition-colors',
-              uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted',
-            ].join(' ')}
-          >
-            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-            Cambiar portada
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
+          {isCoarsePointer ? (
+            <button
+              type="button"
               disabled={uploading}
-              onChange={e => {
-                const file = e.target.files?.[0]
-                e.target.value = ''
-                if (file) handleFile(file)
-              }}
-            />
-          </label>
+              onClick={() => setCoverSheetOpen(true)}
+              className={[
+                'flex items-center gap-1.5 text-xs font-medium bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1.5 shadow-sm transition-colors',
+                uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted',
+              ].join(' ')}
+            >
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
+              Cambiar portada
+            </button>
+          ) : (
+            <label
+              className={[
+                'flex items-center gap-1.5 text-xs font-medium bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1.5 cursor-pointer shadow-sm transition-colors',
+                uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted',
+              ].join(' ')}
+            >
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
+              Cambiar portada
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) handleFile(file)
+                }}
+              />
+            </label>
+          )}
           <button
             onClick={onRemove}
             className="flex items-center gap-1.5 text-xs font-medium bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1.5 shadow-sm hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
@@ -118,6 +156,7 @@ export function NoteCoverBanner({ coverUrl, editable, noteId, token, onChange, o
           </button>
         </div>
       )}
+      {coverSheet}
     </div>
   )
 }
