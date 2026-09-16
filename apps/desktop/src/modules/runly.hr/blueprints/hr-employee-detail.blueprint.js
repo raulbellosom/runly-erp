@@ -83,6 +83,7 @@ export const HR_EMPLOYEE_DETAIL = {
           subtitleFields: ['userProfile.email'],
           avatarField: 'userProfile.avatarFileId',
           fallbackTitle: 'Sin cuenta de usuario vinculada.',
+          hrefTemplate: '/app/m/runly.identity/identity/users/:id',
           icon: 'UserCheck',
         },
       },

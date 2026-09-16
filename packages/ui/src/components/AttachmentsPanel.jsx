@@ -620,8 +620,9 @@ export function AttachmentsPanel({
     !disabled &&
     !readOnly &&
     (context !== "detail" || hasRecord);
-  const canManageAssociations =
-    hasRecord && Boolean(config?.addPath && config?.removePath);
+  // addPath is optional (see useAttachmentsController): when absent, the
+  // upload itself is the "add" operation, so only removePath is required.
+  const canManageAssociations = hasRecord && Boolean(config?.removePath);
 
   const viewerFiles = useMemo(
     () =>
