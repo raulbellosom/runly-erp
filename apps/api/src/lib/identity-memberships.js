@@ -21,7 +21,7 @@ export function checkProtectedRoleAssignment({ roleKey, protectedKeys, actorCanM
   return {
     ok: false,
     status: 403,
-    error: "Asignar el rol Runly Admin o System Admin requiere permisos de gestion de roles.",
+    error: "Asignar el rol Runly Admin o System Admin requiere permisos de gestión de roles.",
   };
 }
 
