@@ -23,6 +23,8 @@ import HrEmployeeActivityPanel from "../modules/runly.hr/components/HrEmployeeAc
 import OrgChartSection from "../modules/runly.hr/components/OrgChartSection.jsx";
 import AssignedEquipmentSection from "../modules/runly.hr/components/AssignedEquipmentSection.jsx";
 
+import { AddressFieldsSection } from "@runly/ui";
+
 const _isDev = Boolean(import.meta.env?.DEV);
 
 function warnDev(message) {
@@ -80,6 +82,11 @@ componentRegistry.register("runly.hr:OrgChartSection", OrgChartSection);
 componentRegistry.register(
   "runly.hr:AssignedEquipmentSection",
   AssignedEquipmentSection,
+);
+
+componentRegistry.register(
+  "runly.identity:AddressFieldsSection",
+  AddressFieldsSection,
 );
 
 // Dynamic bundle registration is done at runtime by ModuleBundleLoader
