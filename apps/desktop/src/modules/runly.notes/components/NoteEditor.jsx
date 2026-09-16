@@ -11,6 +11,7 @@ import { SupabaseYjsProvider, bytesToBase64 } from '../lib/SupabaseYjsProvider.j
 import { buildExtensions } from '../lib/editor-extensions.js'
 import { usePresence } from '../hooks/usePresence.js'
 import { NoteToolbar } from './NoteToolbar.jsx'
+import { TableFloatingMenu } from './TableFloatingMenu.jsx'
 import { NoteCoverBanner } from './NoteCoverBanner.jsx'
 import { NoteIconPickerContent } from './NoteIconPicker.jsx'
 import { PresenceStack } from './PresenceStack.jsx'
@@ -426,7 +427,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
         </>
       }
     >
-      {/* EditorProvider renders children inside editor context */}
+      {!readOnly && <TableFloatingMenu />}
     </EditorProvider>
   )
 
