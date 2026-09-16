@@ -70,9 +70,15 @@ export async function uploadAndInsertNoteImage(file, { editor, noteId, token }) 
       naturalHeight: naturalSize.naturalHeight,
       columnWidthPx: getContentColumnWidthPx(editor),
     })
+    // Stored immediately (not only on corner-resize) so the image's frame is
+    // sized correctly from its very first render — no layout shift while
+    // waiting for the full-resolution <img> to load.
+    const aspectRatio = naturalSize.naturalWidth && naturalSize.naturalHeight
+      ? naturalSize.naturalWidth / naturalSize.naturalHeight
+      : null
     editor.chain().focus().insertContent({
       type: 'image',
-      attrs: { src: presign.publicUrl, alt: file.name, width },
+      attrs: { src: presign.publicUrl, alt: file.name, width, aspectRatio },
     }).run()
   } catch (err) {
     toast.error(err?.message ?? 'No se pudo subir la imagen.')
