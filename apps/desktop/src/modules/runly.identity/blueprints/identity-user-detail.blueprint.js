@@ -72,7 +72,7 @@ export const IDENTITY_USER_DETAIL = {
         type: "component",
         label: "Permisos",
         icon: "KeyRound",
-        column: "aside",
+        column: "main",
         component: "runly.identity:PermissionGrantsSection",
       },
       {
