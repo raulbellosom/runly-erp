@@ -738,6 +738,7 @@ app.get(
   async (c) => {
     try {
       const companies = await prisma.company.findMany({
+        where: { enabled: true },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       });
