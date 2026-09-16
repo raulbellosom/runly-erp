@@ -29,14 +29,14 @@ export function SlashCommandMenu({ items, command, ref }) {
 
   if (items.length === 0) {
     return (
-      <div className="relative z-50 w-64 rounded-lg border border-border bg-popover shadow-lg p-3 text-xs text-muted-foreground">
+      <div className="relative z-50 w-64 rounded-xl glass-strong p-3 text-xs text-muted-foreground">
         Sin resultados
       </div>
     )
   }
 
   return (
-    <div className="relative z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1">
+    <div className="relative z-50 w-64 max-h-72 overflow-y-auto rounded-xl glass-strong p-1">
       {items.map((item, index) => {
         const Icon = item.icon
         return (
