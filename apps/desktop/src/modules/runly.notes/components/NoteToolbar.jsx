@@ -6,7 +6,7 @@ import {
   Code, Code2, List, ListOrdered, ListChecks,
   Quote, Type, Highlighter, Image as ImageIcon, Loader2, HelpCircle,
 } from 'lucide-react'
-import { Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
+import { Popover, PopoverTrigger, PopoverContent, ImageSourceSheet, useCoarsePointer } from '@runly/ui'
 import { useIsDark } from '../hooks/useIsDark.js'
 import { uploadAndInsertNoteImage } from '../lib/noteImageUpload.js'
 import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog.jsx'
@@ -124,6 +124,8 @@ export function NoteToolbar({ noteId, token }) {
   const [linkOpen, setLinkOpen] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const isCoarsePointer = useCoarsePointer()
+  const [imageSheetOpen, setImageSheetOpen] = useState(false)
   if (!editor) return null
 
   const TEXT_COLORS = isDark ? TEXT_COLORS_DARK : TEXT_COLORS_LIGHT
@@ -296,30 +298,54 @@ export function NoteToolbar({ noteId, token }) {
       <Divider />
 
       {/* Image + drawing + link */}
-      <label
-        title="Insertar imagen"
-        className={[
-          'h-8 min-w-8 sm:h-7 sm:min-w-7 px-1.5 rounded flex items-center justify-center gap-1 text-sm transition-colors select-none cursor-pointer shrink-0',
-          uploadingImage
-            ? 'opacity-50 cursor-not-allowed'
-            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        ].join(' ')}
-      >
-        {uploadingImage
-          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          : <ImageIcon className="w-3.5 h-3.5" />}
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
+      {isCoarsePointer ? (
+        <button
+          type="button"
+          title="Insertar imagen"
           disabled={uploadingImage}
-          onChange={e => {
-            const file = e.target.files?.[0]
-            e.target.value = ''
-            if (file) handleImageFile(file)
-          }}
-        />
-      </label>
+          onClick={() => setImageSheetOpen(true)}
+          className={[
+            'h-8 min-w-8 sm:h-7 sm:min-w-7 px-1.5 rounded flex items-center justify-center gap-1 text-sm transition-colors select-none shrink-0',
+            uploadingImage
+              ? 'opacity-50 cursor-not-allowed'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          ].join(' ')}
+        >
+          {uploadingImage
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <ImageIcon className="w-3.5 h-3.5" />}
+        </button>
+      ) : (
+        <label
+          title="Insertar imagen"
+          className={[
+            'h-8 min-w-8 sm:h-7 sm:min-w-7 px-1.5 rounded flex items-center justify-center gap-1 text-sm transition-colors select-none cursor-pointer shrink-0',
+            uploadingImage
+              ? 'opacity-50 cursor-not-allowed'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          ].join(' ')}
+        >
+          {uploadingImage
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <ImageIcon className="w-3.5 h-3.5" />}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploadingImage}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) handleImageFile(file)
+            }}
+          />
+        </label>
+      )}
+      <ImageSourceSheet
+        open={imageSheetOpen}
+        onOpenChange={setImageSheetOpen}
+        onPickFile={handleImageFile}
+      />
       <ToolbarButton
         onClick={() => editor.chain().focus().insertDrawingBlock().run()}
         title="Insertar canvas de dibujo"
