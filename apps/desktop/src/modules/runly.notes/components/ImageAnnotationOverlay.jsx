@@ -373,7 +373,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const displayWidthPct = liveWidthPct ?? widthPct
   // Outer box: controls the resizable width, carries the selection ring and
   // the pill/handle controls — never clipped, so they're never cut off.
-  const wrapperStyle = { userSelect: 'none', width: `${displayWidthPct}%` }
+  const wrapperStyle = { userSelect: 'none' }
   // Frame: clips to the crop window (overflow-hidden always — harmless when
   // effectiveCrop is the identity {0,0,1,1}, no crop set), so a cropped
   // image can't hide controls that sit just outside its edges. Sized via
@@ -411,8 +411,19 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
       }
     : { position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0 }
 
+  // A full-width image stacks exactly as before (display:block). A resized
+  // image floats instead, so whatever follows it in the note (text, another
+  // image) automatically wraps into the leftover space on the same row —
+  // see docs/superpowers/specs/2026-09-16-notes-side-by-side-layout-design.md.
+  // Tables are the one exception (they never wrap, by design — their own
+  // horizontal-scroll wrapper's `overflow-x: auto` already forces them onto
+  // their own line, no extra handling needed here).
+  const wrapperClass = displayWidthPct < 100
+    ? 'group/img relative my-2 float-left'
+    : 'group/img relative my-2 block w-full'
+
   return (
-    <NodeViewWrapper className="group/img relative my-2 block w-full">
+    <NodeViewWrapper className={wrapperClass} style={{ width: `${displayWidthPct}%` }}>
       <div
         ref={boxRef}
         onClick={onImageClick}
