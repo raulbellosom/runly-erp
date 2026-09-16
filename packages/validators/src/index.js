@@ -94,8 +94,11 @@ const hrEmployeeBaseSchema = z.object({
     .enum(["full_time", "part_time", "contractor", "intern"])
     .optional(),
   workLocation: z.string().trim().max(120).optional().or(z.literal("")),
-  hireDate: z.string().datetime().optional().or(z.literal("")),
-  terminationDate: z.string().datetime().optional().or(z.literal("")),
+  // hr_employee.hire_date/termination_date are @db.Date columns rendered by
+  // the generic blueprint 'date' field (DatePickerField), which sends plain
+  // YYYY-MM-DD — not a full ISO datetime.
+  hireDate: z.string().date().optional().or(z.literal("")),
+  terminationDate: z.string().date().optional().or(z.literal("")),
   status: z
     .enum(["active", "inactive", "vacation", "terminated"])
     .default("active"),
