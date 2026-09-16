@@ -428,10 +428,7 @@ export function createHrService({ prisma, activityBridge }) {
           ...buildSearchWhere(search),
         };
         const [rows, total] = await Promise.all([
-          prisma.hrEmployee.findMany({
-            where, orderBy, take, skip,
-            include: { userProfile: { select: { avatarFileId: true } } },
-          }),
+          prisma.hrEmployee.findMany({ where, orderBy, take, skip }),
           prisma.hrEmployee.count({ where }),
         ]);
         const coverFileIds = await resolveCoverFileIdsBatch(
@@ -441,7 +438,12 @@ export function createHrService({ prisma, activityBridge }) {
         return {
           rows: rows.map((r) => ({
             id: r.id,
-            photo_file_id: coverFileIds.get(r.id) ?? r.userProfile?.avatarFileId ?? null,
+            // Own FileAsset cover only — a linked account's avatar isn't a
+            // company-scoped file entity, so the client falls back to it via
+            // user_profile_id + the dedicated /identity/users/:id/avatar/
+            // signed-url route instead (see ImageAssetCell's avatarUserField).
+            photo_file_id: coverFileIds.get(r.id) ?? null,
+            user_profile_id: r.userProfileId ?? null,
             full_name: `${r.firstName} ${r.lastName}`.trim(),
             first_name: r.firstName ?? "",
             last_name: r.lastName ?? "",

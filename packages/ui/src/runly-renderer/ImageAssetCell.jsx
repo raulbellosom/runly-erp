@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { ImageIcon } from "lucide-react";
 import { AdvancedFileViewer } from "../components/AdvancedFileViewer.jsx";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { replacePathTokens } from "./detail-presentation.js";
+import { fetchUserAvatarSignedUrl, initialsFromName } from "./runly-detail-hero.jsx";
 
 function joinUrl(baseUrl, apiPath) {
   const base = String(baseUrl ?? "").trim().replace(/\/+$/, "");
@@ -18,8 +20,18 @@ function joinUrl(baseUrl, apiPath) {
 // row's id), clicking fetches that record's full file list first so the viewer
 // can navigate next/prev across all of the record's files; otherwise it opens
 // with just this one image.
+// Optional `column.avatarUserField`: when the row has no own file (`value`),
+// falls back to that row field (a linked user id) via the dedicated
+// /identity/users/:id/avatar/signed-url route — a user avatar isn't a
+// company-scoped file entity the generic route above can resolve.
+// Optional `column.avatarLabelField`: row field used to render initials
+// instead of a generic icon when there's no photo at all.
 export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, column }) {
   const fileAssetId = value ? String(value) : null;
+  const avatarUserId =
+    !fileAssetId && column?.avatarUserField
+      ? (row?.[column.avatarUserField] ? String(row[column.avatarUserField]) : null)
+      : null;
   const [thumbUrl, setThumbUrl] = useState(null);
   const [thumbLoading, setThumbLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -46,14 +58,17 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
 
   useEffect(() => {
     let cancelled = false;
-    if (!fileAssetId) {
+    if (!fileAssetId && !avatarUserId) {
       setThumbUrl(null);
       return () => {
         cancelled = true;
       };
     }
     setThumbLoading(true);
-    resolveSignedUrl(fileAssetId).then((url) => {
+    const resolve = fileAssetId
+      ? resolveSignedUrl(fileAssetId)
+      : fetchUserAvatarSignedUrl(apiBaseUrl, token, avatarUserId, companyId);
+    resolve.then((url) => {
       if (!cancelled) {
         setThumbUrl(url);
         setThumbLoading(false);
@@ -62,7 +77,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     return () => {
       cancelled = true;
     };
-  }, [fileAssetId, resolveSignedUrl]);
+  }, [fileAssetId, avatarUserId, resolveSignedUrl, apiBaseUrl, token, companyId]);
 
   const handleOpen = useCallback(async () => {
     if (!fileAssetId) return;
@@ -93,25 +108,33 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     }
   }, [fileAssetId, column?.imagesApiPath, row?.id, apiBaseUrl, token, companyId]);
 
-  if (!fileAssetId) {
+  const avatarLabel = column?.avatarLabelField ? row?.[column.avatarLabelField] : null;
+
+  if (!fileAssetId && !avatarUserId && !avatarLabel) {
     return <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>;
   }
+
+  // Only an own FileAsset (fileAssetId) opens the viewer — an avatar
+  // fallback has no file record to open, just a preview photo.
+  const clickable = Boolean(fileAssetId);
 
   return (
     <>
       <button
         type="button"
         onClick={handleOpen}
-        disabled={viewerLoading}
-        className="relative inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--ring))]"
+        disabled={viewerLoading || !clickable}
+        className="relative inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] enabled:hover:border-[hsl(var(--ring))]"
         aria-label="Ver imagen"
       >
         {thumbLoading || viewerLoading ? (
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
         ) : thumbUrl ? (
           <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+        ) : avatarLabel ? (
+          <span className="text-[11px] font-semibold">{initialsFromName(avatarLabel)}</span>
         ) : (
-          <span className="text-[10px] font-semibold">IMG</span>
+          <ImageIcon className="h-4 w-4" aria-hidden="true" />
         )}
       </button>
 

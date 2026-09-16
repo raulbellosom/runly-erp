@@ -42,6 +42,11 @@ const HR_EMPLOYEES_BLUEPRINT = {
         label: "Foto",
         type: "image-asset",
         sortable: false,
+        // Own cover photo wins; if the row has none, falls back to the
+        // linked account's avatar (user_profile_id); if there's no photo
+        // at all, shows initials from full_name instead of a bare icon.
+        avatarUserField: "user_profile_id",
+        avatarLabelField: "full_name",
       },
       { field: "full_name", label: "Nombre", sortable: true, link: true },
       { field: "employee_code", label: "Codigo", sortable: false },
