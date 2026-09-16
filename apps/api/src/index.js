@@ -2504,6 +2504,9 @@ app.get(
       if (!(await assertUserInCompany(id, tenant.companyId))) {
         return c.json({ error: "Usuario no encontrado." }, 404);
       }
+      // Intentionally includes disabled memberships too, unlike the list
+      // route above (which filters to enabled-only) — membershipsTotal below
+      // depends on seeing the full set.
       const user = await prisma.userProfile.findUnique({
         where: { id },
         include: {
