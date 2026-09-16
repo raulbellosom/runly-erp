@@ -36,7 +36,6 @@ import { normalizeField, normalizeSections } from "./runly-form-schema.js";
 import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
 import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
-  PRESET_COLORS,
   CAR_COLORS,
   resolveColorName,
   joinUrl,
