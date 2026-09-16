@@ -2495,12 +2495,10 @@ app.get(
         .filter(Boolean);
       const avatarUrlMap = await buildAvatarUrlMapByFileIds(avatarFileIds);
 
-      const seen = new Set();
       const data = [];
       for (const m of memberships) {
         const user = m.userProfile;
-        if (!user || seen.has(user.id)) continue;
-        seen.add(user.id);
+        if (!user) continue;
         data.push({
           id: user.id,
           displayName: user.displayName,
