@@ -614,7 +614,7 @@ app.post(
       if (!company) return c.json({ error: "Empresa no encontrada." }, 404);
 
       let targetRole = null;
-      if (fields.roleId) {
+      if (fields.roleId !== undefined && fields.roleId !== null) {
         targetRole = await prisma.role.findUnique({
           where: { id: fields.roleId },
           select: { key: true, companyId: true },
@@ -652,7 +652,10 @@ app.post(
       const membership = existing
         ? await prisma.membership.update({
             where: { id: existing.id },
-            data: { enabled: true, roleId: fields.roleId ?? existing.roleId },
+            data: {
+              enabled: true,
+              roleId: fields.roleId !== undefined ? fields.roleId : existing.roleId,
+            },
             include: { role: true, company: true },
           })
         : await prisma.membership.create({
