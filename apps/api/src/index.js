@@ -2747,6 +2747,23 @@ app.post(
   },
 );
 
+app.get(
+  "/identity/companies-options",
+  authMiddleware,
+  requirePermission("identity.users.update"),
+  async (c) => {
+    try {
+      const companies = await prisma.company.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+      return c.json({ data: companies });
+    } catch {
+      return c.json({ error: "No se pudieron cargar las empresas." }, 500);
+    }
+  },
+);
+
 app.post(
   "/identity/users",
   authMiddleware,
