@@ -68,7 +68,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   // rendering) can use one shape unconditionally.
   const effectiveCrop = crop ?? { x: 0, y: 0, w: 1, h: 1 }
   const effNat = effectiveNaturalSize(natural, rotation)
-  const fillSize = useRotatedFillSize(rotWrapRef, rotation)
+  const fillSize = useRotatedFillSize(rotWrapRef, rotation, effNat?.w, effNat?.h)
   const {
     onPointerDown: onDragPointerDown,
     onPointerMove: onDragPointerMove,

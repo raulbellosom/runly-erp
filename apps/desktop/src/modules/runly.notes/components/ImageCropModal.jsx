@@ -146,7 +146,7 @@ export function ImageCropModal({ open, onOpenChange, src, crop, rotation: initia
     return () => el.removeEventListener('wheel', onWheel)
   }, [open])
 
-  const fillSize = useRotatedFillSize(rotWrapRef, rotation)
+  const fillSize = useRotatedFillSize(rotWrapRef, rotation, effNat?.w, effNat?.h)
 
   function handleRotate() {
     setRotation((r) => addRotation(r, 90))
