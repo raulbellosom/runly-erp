@@ -159,6 +159,35 @@ export function normalizeSections(schema, fieldMap) {
         };
       }
 
+      if (sectionType === "component") {
+        const declaredFieldNames = (Array.isArray(entry.fields) ? entry.fields : [])
+          .map((name) => String(name ?? "").trim())
+          .filter(Boolean);
+        for (const name of declaredFieldNames) {
+          if (!fieldMap.has(name)) {
+            fieldMap.set(name, {
+              name,
+              label: name,
+              type: "text",
+              required: false,
+              readonly: false,
+              options: [],
+              visibleWhen: null,
+              hiddenWhen: null,
+            });
+          }
+        }
+        return {
+          id: entry.id ?? entry.key ?? `section-${sectionIndex}`,
+          title: (entry.title ?? entry.label) ? normalizeSpanishLabel(entry.title ?? entry.label) : null,
+          type: "component",
+          component: typeof entry.component === "string" ? entry.component.trim() : "",
+          fields: declaredFieldNames,
+          icon: typeof entry.icon === "string" && entry.icon.trim() ? entry.icon.trim() : null,
+          ...toSectionMeta(entry),
+        };
+      }
+
       const sectionFields = (Array.isArray(entry.fields) ? entry.fields : [])
         .map((item) => normalizeSectionField(item))
         .filter(Boolean);
