@@ -6,13 +6,8 @@ import {
   ErrorState,
   ConfirmDialog,
   DetailActionBar,
-  DistDropZone,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@runly/ui";
-import { ArrowLeft, Camera, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -52,13 +47,12 @@ export default function UserDetailScreen() {
     const segs = String(wildcard ?? "").replace(/^\/+/, "").split("/").filter(Boolean);
     return segs[2] ?? null;
   }, [wildcard]);
-  const { session, userProfile, refreshProfile } = useAuth();
+  const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const navigate = useNavigate();
   const { activeCompanyId } = useActiveCompany();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
 
   const permissions = userProfile?.permissions ?? [];
   const hasPermission = (k) => Boolean(userProfile?.isAdmin || permissions.includes(k));
@@ -72,22 +66,6 @@ export default function UserDetailScreen() {
     enabled: Boolean(token && userId),
   });
   const user = userQuery.data?.data ?? null;
-
-  const avatarMutation = useMutation({
-    mutationFn: (file) => runly.identity.uploadUserAvatar(userId, file, token),
-    onMutate: () => toast.loading("Subiendo foto de perfil..."),
-    onSuccess: async (_data, _vars, toastId) => {
-      await queryClient.invalidateQueries({ queryKey: ["identity-user", userId] });
-      await queryClient.invalidateQueries({ queryKey: ["identity-users"] });
-      if (isSelf) {
-        await queryClient.invalidateQueries({ queryKey: ["profile-me"] });
-        refreshProfile(session);
-      }
-      toast.success("Foto de perfil actualizada", { id: toastId });
-      setAvatarDialogOpen(false);
-    },
-    onError: (_err, _vars, toastId) => toast.error("No se pudo actualizar la foto de perfil", { id: toastId }),
-  });
 
   const deleteMutation = useMutation({
     mutationFn: () => runly.identity.deleteUser(userId, token),
@@ -146,13 +124,6 @@ export default function UserDetailScreen() {
                 icon: <ArrowLeft className="h-4 w-4" />,
                 onClick: () => navigate("/app/m/runly.identity/identity/users"),
               },
-              canUpdate
-                ? {
-                    label: "Cambiar foto",
-                    icon: <Camera className="h-4 w-4" />,
-                    onClick: () => setAvatarDialogOpen(true),
-                  }
-                : null,
               canDelete && !isSelf
                 ? {
                     label: "Eliminar usuario",
@@ -165,23 +136,6 @@ export default function UserDetailScreen() {
           />
         }
       />
-
-      <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cambiar foto de perfil</DialogTitle>
-          </DialogHeader>
-          <DistDropZone
-            variant="compact"
-            accept="image/*"
-            maxSizeMB={10}
-            onFile={(file) => avatarMutation.mutate(file)}
-            isUploading={avatarMutation.isPending}
-            emptyLabel="Arrastra o haz clic para subir una foto"
-            emptyHint="JPG, PNG o WebP · máximo 10 MB"
-          />
-        </DialogContent>
-      </Dialog>
 
       <ConfirmDialog
         open={deleteOpen}
