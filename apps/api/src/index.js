@@ -4574,6 +4574,7 @@ app.get(
       if (err instanceof HrServiceError) {
         return c.json({ error: err.message }, err.status);
       }
+      console.error("[GET /hr/employees]", err);
       return c.json({ error: "No se pudieron cargar colaboradores." }, 500);
     }
   },
