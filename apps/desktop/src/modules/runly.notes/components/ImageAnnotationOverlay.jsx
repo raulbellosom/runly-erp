@@ -55,6 +55,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const [selected, setSelected] = useState(false) // click-to-select for resize (Word/PPT style)
   const [liveWidthPct, setLiveWidthPct] = useState(null) // resize drag preview
   const [liveAspectRatio, setLiveAspectRatio] = useState(null) // resize drag preview
+  const [fullLoaded, setFullLoaded] = useState(false) // full-resolution <img> onLoad fired
 
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
@@ -399,6 +400,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   }
 
   const src = withImageVariant(node.attrs.src, 'content')
+  const lqipSrc = withImageVariant(node.attrs.src, 'lqip')
   const ActiveToolIcon = TOOLS.find((t) => t.id === tool)?.icon ?? PenLine
   const displayWidthPct = liveWidthPct ?? widthPct
   // Outer box: controls the resizable width, carries the selection ring and
@@ -579,12 +581,32 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
 
         <div className="relative rounded-b overflow-hidden" style={frameStyle}>
           <div ref={rotWrapRef} style={rotWrapStyle}>
+            {/* Tiny blurred placeholder — loads almost instantly (a few
+                hundred bytes) and shares the full image's aspect ratio, so
+                it corrects the frame size for legacy images that have no
+                stored aspectRatio, well before the full image arrives. */}
+            <img
+              src={lqipSrc}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              onLoad={(e) => setNatural((prev) => prev ?? { w: e.target.naturalWidth, h: e.target.naturalHeight })}
+              style={{
+                ...imgStyle,
+                filter: 'blur(16px)',
+                transform: imgStyle.transform ? `${imgStyle.transform} scale(1.15)` : undefined,
+              }}
+            />
             <img
               src={src}
               alt={node.attrs.alt ?? ''}
-              style={imgStyle}
               draggable={false}
-              onLoad={(e) => setNatural({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+              onLoad={(e) => { setNatural({ w: e.target.naturalWidth, h: e.target.naturalHeight }); setFullLoaded(true) }}
+              style={{
+                ...imgStyle,
+                opacity: fillSize && fullLoaded ? 1 : 0,
+                transition: 'opacity 200ms ease',
+              }}
             />
           </div>
           <svg
