@@ -16,75 +16,10 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { runly } from "../../../lib/runly";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { IDENTITY_USER_TABLE } from "../blueprints/identity-user-table.blueprint.js";
 
 const API_BASE_URL = getApiUrl();
 const PROTECTED_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
-
-const USERS_BLUEPRINT = {
-  key: "identity.users.table",
-  schema: {
-    apiPath: "/identity/users",
-    primaryField: "displayName",
-    searchable: true,
-    searchPlaceholder: "Buscar usuario...",
-    columns: [
-      { field: "avatarUrl", label: "Foto", type: "image", sortable: false },
-      { field: "displayName", label: "Usuario", sortable: true, link: true },
-      { field: "email", label: "Correo", sortable: true },
-      { field: "memberships.0.roleName", label: "Rol", sortable: false },
-      {
-        field: "enabled",
-        label: "Estado",
-        type: "select",
-        sortable: true,
-        options: [
-          { value: true, label: "Activo" },
-          { value: false, label: "Inactivo" },
-        ],
-      },
-      { field: "createdAt", label: "Creado", type: "date", sortable: true },
-      { field: "firstName", label: "Nombre", defaultVisible: false },
-      { field: "lastName", label: "Apellidos", defaultVisible: false },
-      { field: "phone", label: "Telefono", defaultVisible: false },
-      {
-        field: "gender",
-        label: "Sexo",
-        defaultVisible: false,
-        type: "select",
-        options: [
-          { value: "male", label: "Masculino" },
-          { value: "female", label: "Femenino" },
-          { value: "other", label: "Otro" },
-        ],
-      },
-      { field: "birthDate", label: "Fecha nacimiento", type: "date", defaultVisible: false },
-      { field: "country", label: "Pais", defaultVisible: false },
-      { field: "state", label: "Estado/Provincia", defaultVisible: false },
-      { field: "city", label: "Ciudad", defaultVisible: false },
-      { field: "colony", label: "Colonia", defaultVisible: false },
-      { field: "street", label: "Calle", defaultVisible: false },
-      { field: "postalCode", label: "Codigo postal", defaultVisible: false },
-      { field: "bio", label: "Bio", defaultVisible: false },
-    ],
-    filters: [
-      {
-        key: "enabled",
-        label: "Estado",
-        type: "select",
-        options: [
-          { value: "true", label: "Activo" },
-          { value: "false", label: "Inactivo" },
-        ],
-      },
-    ],
-    emptyState: { message: "No hay usuarios registrados." },
-    rowActions: [
-      { label: "Ver detalle" },
-      { label: "Editar" },
-      { label: "Eliminar" },
-    ],
-  },
-};
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -267,7 +202,7 @@ export default function UsersScreen() {
 
       {canReadUsers ? (
         <RunlyTable
-          blueprint={USERS_BLUEPRINT}
+          blueprint={IDENTITY_USER_TABLE}
           token={token}
           companyId={activeCompanyId}
           apiBaseUrl={API_BASE_URL}
