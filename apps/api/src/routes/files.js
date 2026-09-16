@@ -59,6 +59,33 @@ app.post(
         }
       }
 
+      if (
+        body.moduleKey === "runly.identity" &&
+        body.entityType === "UserProfile" &&
+        body.entityId
+      ) {
+        const actor = await prisma.userProfile.findUnique({
+          where: { authUserId },
+          select: { id: true },
+        });
+        if (actor?.id) {
+          await prisma.auditLog.create({
+            data: {
+              actorId: actor.id,
+              moduleKey: "runly.identity",
+              entityType: "UserProfile",
+              entityId: String(body.entityId),
+              action: "identity.user.file.attach",
+              metadata: {
+                fileId: asset.id,
+                originalName: asset.originalName,
+                mimeType: asset.mimeType,
+              },
+            },
+          });
+        }
+      }
+
       const { actorName } = getActivityContext(c);
       await publishActivityFromContext(prisma, c, {
         type: "files.assets.upload",

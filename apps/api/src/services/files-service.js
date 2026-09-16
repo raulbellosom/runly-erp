@@ -26,6 +26,7 @@ const ALLOWED_FILE_ENTITY_TYPES = [
   "GrowthLead",
   "GeneratedDocument",
   "PfmReceipt",
+  "UserProfile",
 ];
 const ALLOWED_EXACT_MIME_TYPES = new Set([
   ...Object.values(OFFICE_FORMATS).map(format => format.mimeType),
