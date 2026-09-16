@@ -22,7 +22,7 @@ export function TableFloatingMenu() {
         aria-label="Opciones de tabla"
         title="Opciones de tabla"
         className="fixed z-20 flex items-center justify-center w-12 h-12 rounded-full bg-amber-500 text-white shadow-lg active:scale-95 transition-transform"
-        style={{ right: '1rem', bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+        style={{ left: '1rem', bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <Table2 className="w-5 h-5" />
       </button>
