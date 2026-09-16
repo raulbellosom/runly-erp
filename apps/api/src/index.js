@@ -2449,6 +2449,55 @@ app.patch(
 );
 
 app.get(
+  "/identity/roles/:id/members",
+  authMiddleware,
+  requirePermission("identity.roles.read"),
+  async (c) => {
+    try {
+      const id = c.req.param("id");
+      const tenant = c.get("tenantContext");
+      const where = {
+        roleId: id,
+        enabled: true,
+        userProfile: tenant.isSystemAdmin ? {} : { memberships: { some: { enabled: true, companyId: tenant.companyId } } },
+      };
+      const memberships = await prisma.membership.findMany({
+        where,
+        include: {
+          userProfile: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
+          company: { select: { name: true } },
+        },
+        orderBy: { userProfile: { displayName: "asc" } },
+      });
+
+      const avatarFileIds = memberships
+        .map((m) => m.userProfile?.avatarFileId)
+        .filter(Boolean);
+      const avatarUrlMap = await buildAvatarUrlMapByFileIds(avatarFileIds);
+
+      const seen = new Set();
+      const data = [];
+      for (const m of memberships) {
+        const user = m.userProfile;
+        if (!user || seen.has(user.id)) continue;
+        seen.add(user.id);
+        data.push({
+          id: user.id,
+          displayName: user.displayName,
+          email: user.email,
+          avatarUrl: user.avatarFileId ? (avatarUrlMap.get(user.avatarFileId) ?? null) : null,
+          companyName: m.company?.name ?? null,
+        });
+      }
+
+      return c.json({ data });
+    } catch {
+      return c.json({ error: "No se pudieron cargar los usuarios del rol." }, 500);
+    }
+  },
+);
+
+app.get(
   "/identity/users",
   authMiddleware,
   requirePermission("identity.users.read"),
