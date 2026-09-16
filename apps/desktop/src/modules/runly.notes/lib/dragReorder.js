@@ -38,3 +38,57 @@ export function moveNode(editor, fromPos, targetPos) {
   tr.insert(mappedTarget, node.type.create(node.attrs, node.content, node.marks))
   view.dispatch(tr)
 }
+
+// ── press-and-hold drag reorder (mouse + touch via Pointer Events) ────────
+
+// Touch requires holding this long before a press-and-hold arms into an
+// active drag, so an ordinary scroll gesture starting on the image is never
+// hijacked — see docs/superpowers/specs/2026-09-16-notes-image-drag-reorder-design.md.
+export const LONG_PRESS_MS = 450
+// Movement past this distance (px) either cancels a pending touch long-press
+// (the user is scrolling) or, on mouse, arms the drag immediately.
+export const DRAG_THRESHOLD_PX = 8
+
+export function exceedsDragThreshold(deltaPx) {
+  return deltaPx > DRAG_THRESHOLD_PX
+}
+
+// Measures every top-level document child's on-screen rect, in document
+// order — the fixed "before" layout a drag gesture computes shifts against.
+// Not independently unit-tested (requires a live ProseMirror view/DOM),
+// matching the existing untested DOM-dependent helpers in this file.
+export function computeBlockRects(view) {
+  const { doc } = view.state
+  const rects = []
+  doc.forEach((_node, offset) => {
+    const dom = view.nodeDOM(offset)
+    if (!dom?.getBoundingClientRect) return
+    const rect = dom.getBoundingClientRect()
+    rects.push({ offset, top: rect.top, height: rect.height })
+  })
+  return rects
+}
+
+/**
+ * Pure: given every top-level block's rect (in document order, from
+ * computeBlockRects) and the dragged block's original/candidate array
+ * indices (NOT ProseMirror offsets — see the calling hook for how those are
+ * resolved), returns a Map from each block's `offset` to the pixel amount it
+ * should visually shift by. Every block strictly between the original and
+ * candidate position shifts by exactly `draggedHeightPx`, closing the gap
+ * left behind and opening an equivalent one at the candidate position;
+ * everything else maps to 0.
+ */
+export function computeShiftMap({ blockRects, originalIndex, candidateIndex, draggedHeightPx }) {
+  const map = new Map()
+  for (const b of blockRects) map.set(b.offset, 0)
+  if (originalIndex === candidateIndex) return map
+  const down = originalIndex < candidateIndex
+  const lo = down ? originalIndex + 1 : candidateIndex
+  const hi = down ? candidateIndex - 1 : originalIndex - 1
+  const shift = down ? -draggedHeightPx : draggedHeightPx
+  blockRects.forEach((b, i) => {
+    if (i >= lo && i <= hi) map.set(b.offset, shift)
+  })
+  return map
+}
