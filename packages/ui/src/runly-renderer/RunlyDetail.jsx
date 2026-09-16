@@ -211,6 +211,20 @@ function normalizeRelationCardConfig(config, sectionTitle) {
     ? config.subtitleTypes.map((t) => (typeof t === "string" ? t.trim() : ""))
     : [];
 
+  const contactActions = (
+    Array.isArray(config.contactActions) ? config.contactActions : []
+  )
+    .map((action) =>
+      action && typeof action === "object" && typeof action.field === "string" && action.field.trim()
+        ? {
+            type: typeof action.type === "string" ? action.type.trim() : null,
+            field: action.field.trim(),
+            label: typeof action.label === "string" ? action.label.trim() : null,
+          }
+        : null,
+    )
+    .filter(Boolean);
+
   return {
     idField:
       typeof config.idField === "string" && config.idField.trim()
@@ -234,6 +248,17 @@ function normalizeRelationCardConfig(config, sectionTitle) {
       typeof config.icon === "string" && config.icon.trim()
         ? config.icon.trim()
         : null,
+    avatarField:
+      typeof config.avatarField === "string" && config.avatarField.trim()
+        ? config.avatarField.trim()
+        : null,
+    // 'user': resolve via /identity/users/:id/avatar/signed-url (idField's
+    // value) instead of the generic files route avatarField would use.
+    avatarKind:
+      typeof config.avatarKind === "string" && config.avatarKind.trim()
+        ? config.avatarKind.trim()
+        : null,
+    contactActions,
   };
 }
 
