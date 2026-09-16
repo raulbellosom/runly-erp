@@ -7,8 +7,6 @@ import {
   MIN_IMAGE_WIDTH_PCT,
   MAX_IMAGE_WIDTH_PCT,
   computeCornerResize,
-  clampImageHeightPx,
-  MIN_IMAGE_HEIGHT_PX,
 } from '../imageSize.js'
 
 test('clampImageWidthPct: keeps an in-range value unchanged', () => {
@@ -53,44 +51,37 @@ test('computeInitialImageWidthPct: falls back to the default when a dimension is
   assert.equal(computeInitialImageWidthPct({ naturalWidth: 100, naturalHeight: 100, columnWidthPx: 0 }), DEFAULT_IMAGE_WIDTH_PCT)
 })
 
-test('computeCornerResize: grows width and height with the drag delta, from any corner', () => {
+test('computeCornerResize: is a uniform scale — the aspect ratio never changes, even when deltaX/deltaY imply different ratios', () => {
+  // deltaX alone would imply a 1.2x scale, deltaY alone a 1.025x scale —
+  // resize must still report the ORIGINAL 300/200 = 1.5 ratio, not one
+  // derived from independently moving width and height.
   const result = computeCornerResize({
-    startWidthPx: 300, startHeightPx: 200, containerWidthPx: 600, deltaX: 60, deltaY: 40,
+    startWidthPx: 300, startHeightPx: 200, containerWidthPx: 600, deltaX: 60, deltaY: 5,
   })
-  assert.equal(result.widthPct, 60) // (300+60)/600 * 100
-  assert.equal(result.aspectRatio, 1.5) // 360/240
+  assert.equal(result.widthPct, 60) // scale 1.2 (dominant axis: deltaX) -> (300*1.2)/600 * 100
+  assert.equal(result.aspectRatio, 1.5) // unchanged from startWidthPx/startHeightPx
 })
 
-test('computeCornerResize: shrinking width clamps at MIN_IMAGE_WIDTH_PCT', () => {
+test('computeCornerResize: uses whichever axis moved further to drive the (still uniform) scale', () => {
+  const result = computeCornerResize({
+    startWidthPx: 300, startHeightPx: 200, containerWidthPx: 600, deltaX: 5, deltaY: 100,
+  })
+  assert.equal(result.widthPct, 75) // scale 1.5 (dominant axis: deltaY) -> (300*1.5)/600 * 100
+  assert.equal(result.aspectRatio, 1.5) // still unchanged
+})
+
+test('computeCornerResize: shrinking clamps at MIN_IMAGE_WIDTH_PCT, aspect ratio still preserved', () => {
   const result = computeCornerResize({
     startWidthPx: 300, startHeightPx: 200, containerWidthPx: 600, deltaX: -400, deltaY: 0,
   })
   assert.equal(result.widthPct, MIN_IMAGE_WIDTH_PCT)
+  assert.equal(result.aspectRatio, 1.5)
 })
 
-test('computeCornerResize: growing width clamps at MAX_IMAGE_WIDTH_PCT', () => {
+test('computeCornerResize: growing clamps at MAX_IMAGE_WIDTH_PCT, aspect ratio still preserved', () => {
   const result = computeCornerResize({
     startWidthPx: 300, startHeightPx: 200, containerWidthPx: 600, deltaX: 900, deltaY: 0,
   })
   assert.equal(result.widthPct, MAX_IMAGE_WIDTH_PCT)
-})
-
-test('computeCornerResize: shrinking height clamps at MIN_IMAGE_HEIGHT_PX, width unaffected', () => {
-  const result = computeCornerResize({
-    startWidthPx: 300, startHeightPx: 50, containerWidthPx: 600, deltaX: 0, deltaY: -100,
-  })
-  assert.equal(result.widthPct, 50) // (300+0)/600 * 100, unchanged
-  assert.equal(result.aspectRatio, 300 / MIN_IMAGE_HEIGHT_PX)
-})
-
-test('clampImageHeightPx: keeps an in-range value unchanged', () => {
-  assert.equal(clampImageHeightPx(120), 120)
-})
-
-test('clampImageHeightPx: clamps below the minimum', () => {
-  assert.equal(clampImageHeightPx(10), MIN_IMAGE_HEIGHT_PX)
-})
-
-test('clampImageHeightPx: falls back to the minimum for non-finite input', () => {
-  assert.equal(clampImageHeightPx(NaN), MIN_IMAGE_HEIGHT_PX)
+  assert.equal(result.aspectRatio, 1.5)
 })
