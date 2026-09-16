@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX } from '../dragReorder.js'
+import { computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX, findTableAtSelection } from '../dragReorder.js'
 
 // 6 blocks at indices 0-5, offsets deliberately uneven (not equal to index)
 // so a bug that confuses "array index" with "ProseMirror offset" would fail.
@@ -48,4 +48,32 @@ test('exceedsDragThreshold: false at and below the threshold, true above it', ()
   assert.equal(exceedsDragThreshold(DRAG_THRESHOLD_PX), false)
   assert.equal(exceedsDragThreshold(DRAG_THRESHOLD_PX - 1), false)
   assert.equal(exceedsDragThreshold(DRAG_THRESHOLD_PX + 1), true)
+})
+
+// Minimal fake of a ProseMirror ResolvedPos — findTableAtSelection only
+// calls .depth, .node(d), and .before(d).
+function fakePos(nodesAtDepth) {
+  return {
+    depth: nodesAtDepth.length - 1,
+    node: (d) => nodesAtDepth[d],
+    before: (d) => d * 100,
+  }
+}
+
+test('findTableAtSelection: finds the table when the selection is nested inside it (e.g. in a cell)', () => {
+  const docNode = { type: { name: 'doc' } }
+  const tableNode = { type: { name: 'table' } }
+  const cellNode = { type: { name: 'tableCell' } }
+  const paragraphNode = { type: { name: 'paragraph' } }
+  const $from = fakePos([docNode, tableNode, cellNode, paragraphNode])
+  const result = findTableAtSelection({ selection: { $from } })
+  assert.equal(result.pos, 100)
+  assert.equal(result.node, tableNode)
+})
+
+test('findTableAtSelection: returns null when the selection is not inside a table', () => {
+  const docNode = { type: { name: 'doc' } }
+  const paragraphNode = { type: { name: 'paragraph' } }
+  const $from = fakePos([docNode, paragraphNode])
+  assert.equal(findTableAtSelection({ selection: { $from } }), null)
 })

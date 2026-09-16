@@ -92,3 +92,24 @@ export function computeShiftMap({ blockRects, originalIndex, candidateIndex, dra
   })
   return map
 }
+
+// ── table drag reorder ─────────────────────────────────────────────────────
+
+/**
+ * Pure: given editor state, walks up from the current selection looking for
+ * an ancestor `table` node and returns its top-level document position
+ * (the same shape `getPos()` returns for a NodeView) plus the node itself.
+ * Returns null when the selection isn't inside a table — the same
+ * condition `editor.isActive('table')` reports, computed independently
+ * here since callers need the actual position, not just a boolean.
+ */
+export function findTableAtSelection(state) {
+  const $pos = state.selection.$from
+  for (let d = $pos.depth; d > 0; d--) {
+    const node = $pos.node(d)
+    if (node.type.name === 'table') {
+      return { pos: $pos.before(d), node }
+    }
+  }
+  return null
+}
