@@ -278,6 +278,7 @@ export {
   shouldUsePageMode,
   CostsSummaryPanel,
   fetchSignedUrl,
+  fetchUserAvatarSignedUrl,
 } from "./runly-renderer/index.js";
 
 export { UserSearchModal } from "./components/UserSearchModal.jsx";

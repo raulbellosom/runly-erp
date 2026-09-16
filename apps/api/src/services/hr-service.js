@@ -508,7 +508,7 @@ export function createHrService({ prisma, activityBridge }) {
               id: true,
               firstName: true,
               lastName: true,
-              userProfile: { select: { avatarFileId: true } },
+              userProfile: { select: { id: true } },
             },
           },
           reportees: {
@@ -518,7 +518,7 @@ export function createHrService({ prisma, activityBridge }) {
               firstName: true,
               lastName: true,
               status: true,
-              userProfile: { select: { avatarFileId: true } },
+              userProfile: { select: { id: true } },
             },
             orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
           },
@@ -537,25 +537,28 @@ export function createHrService({ prisma, activityBridge }) {
       if (!row) {
         throw new HrServiceError("Colaborador no encontrado.", 404);
       }
-      // Own FileAsset cover wins; fall back to the linked account's avatar
-      // (same fallback listEmployees already applies) — for the employee
-      // itself and for the supervisor/reportees shown in the org chart.
+      // profileImageFileId is the employee's OWN FileAsset cover only — it's
+      // resolved client-side via the company-scoped /files/:id/signed-url,
+      // which HrEmployee-tagged files satisfy. A linked account's avatar is
+      // NOT resolvable through that route (avatars aren't a company-scoped
+      // entity type there — see files-service.js's ALLOWED_FILE_ENTITY_TYPES,
+      // and the dedicated /identity/users/:id/avatar/signed-url this needed).
+      // So the client falls back to that route using userProfile.id instead
+      // of a merged, unresolvable file id.
       const coverFileIds = await resolveCoverFileIdsBatch(
         [row.id, row.supervisor?.id, ...row.reportees.map((r) => r.id)].filter(Boolean),
         companyId,
       );
-      const photoFor = (employee) =>
-        coverFileIds.get(employee.id) ?? employee.userProfile?.avatarFileId ?? null;
       return {
         ...row,
         tenureLabel: computeTenureLabel(row.hireDate),
-        profileImageFileId: photoFor(row),
+        profileImageFileId: coverFileIds.get(row.id) ?? null,
         supervisor: row.supervisor
-          ? { ...row.supervisor, profileImageFileId: photoFor(row.supervisor) }
+          ? { ...row.supervisor, profileImageFileId: coverFileIds.get(row.supervisor.id) ?? null }
           : null,
         reportees: row.reportees.map((r) => ({
           ...r,
-          profileImageFileId: photoFor(r),
+          profileImageFileId: coverFileIds.get(r.id) ?? null,
         })),
       };
     },
@@ -993,8 +996,11 @@ export function createHrService({ prisma, activityBridge }) {
         status: employee.status,
         department: employee.departmentRef?.name ?? null,
         jobTitle: employee.jobTitleRef?.name ?? null,
-        profileImageFileId:
-          coverFileIds.get(employee.id) ?? employee.userProfile?.avatarFileId ?? null,
+        // Own FileAsset cover only — linkedUser.avatarFileId above is the
+        // fallback source, but it needs /identity/users/:id/avatar/signed-url
+        // (see getEmployee's comment), not the generic files route this ID
+        // would be resolved through.
+        profileImageFileId: coverFileIds.get(employee.id) ?? null,
         children: (childrenByParent.get(employee.id) ?? []).map(buildNode),
       });
 

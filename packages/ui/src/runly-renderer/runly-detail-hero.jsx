@@ -53,6 +53,25 @@ export async function fetchSignedUrl(apiBaseUrl, token, fileAssetId, companyId =
   }
 }
 
+// A user account's avatar is not a company-scoped file entity (see
+// files-service.js's ALLOWED_FILE_ENTITY_TYPES), so it can't be resolved
+// through fetchSignedUrl even when you know its FileAsset id — it needs
+// this dedicated, permission-gated-by-user-id route instead.
+export async function fetchUserAvatarSignedUrl(apiBaseUrl, token, userId, companyId = null) {
+  if (!userId) return null;
+  try {
+    const res = await fetch(
+      joinUrl(apiBaseUrl, `/identity/users/${encodeURIComponent(userId)}/avatar/signed-url`),
+      { headers: buildApiHeaders(token, companyId) },
+    );
+    if (!res.ok) return null;
+    const payload = parseJsonSafe(await res.text());
+    return payload?.data?.signedUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFirstImageAssetId(apiBaseUrl, token, docsPath, recordId, companyId = null) {
   if (!docsPath || !recordId) return null;
   try {
@@ -129,6 +148,19 @@ export function HeroContainer({
         );
       }
       if (!assetId) {
+        if (heroModel.avatarUserId) {
+          const avatarUrl = await fetchUserAvatarSignedUrl(
+            apiBaseUrl,
+            token,
+            heroModel.avatarUserId,
+            companyId,
+          );
+          if (!cancelled) {
+            setImageUrl(avatarUrl);
+            setImageLoading(false);
+          }
+          return;
+        }
         if (!cancelled) {
           setImageUrl(null);
           setImageLoading(false);
@@ -145,7 +177,15 @@ export function HeroContainer({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, token, companyId, heroModel.imageAssetId, heroModel.imageDocsPath, data?.id]);
+  }, [
+    apiBaseUrl,
+    token,
+    companyId,
+    heroModel.imageAssetId,
+    heroModel.imageDocsPath,
+    heroModel.avatarUserId,
+    data?.id,
+  ]);
 
   const kpiRenderItems = kpiItems.map((item) => ({
     key: item.key,

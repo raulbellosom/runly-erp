@@ -80,6 +80,9 @@ export function resolveHeroModel(schema, record, fieldMap = null) {
     ? (getByPath(record, hero.statusField) ?? null)
     : null;
   const imageRaw = hero.imageField ? getByPath(record, hero.imageField) : null;
+  const avatarUserRaw = hero.avatarUserField
+    ? getByPath(record, hero.avatarUserField)
+    : null;
   const accentRaw = hero.accentColorField
     ? getByPath(record, hero.accentColorField)
     : null;
@@ -97,6 +100,11 @@ export function resolveHeroModel(schema, record, fieldMap = null) {
       typeof hero.imageDocsPath === "string" && hero.imageDocsPath.trim()
         ? hero.imageDocsPath.trim()
         : null,
+    // Last-resort fallback when neither imageField nor imageDocsPath yields
+    // a photo: a linked user account's avatar, resolved via the dedicated
+    // /identity/users/:id/avatar/signed-url route (see HeroContainer) since
+    // it isn't a company-scoped file entity fetchSignedUrl can resolve.
+    avatarUserId: isEmpty(avatarUserRaw) ? null : String(avatarUserRaw),
     fallbackIcon:
       typeof hero.fallbackIcon === "string" && hero.fallbackIcon.trim()
         ? hero.fallbackIcon.trim()

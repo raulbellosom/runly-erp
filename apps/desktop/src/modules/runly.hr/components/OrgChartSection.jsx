@@ -2,14 +2,16 @@
 // Props (RunlyDetail "component" section contract): { data, apiBaseUrl, token, companyId }
 // data.supervisor and data.reportees must be the nested relation objects
 // getEmployee() already returns (not just their ids), each carrying its own
-// resolved profileImageFileId (own FileAsset cover, falling back to the
-// linked account's avatar — see hr-service.js's photoFor()).
+// profileImageFileId (own FileAsset cover, resolved via /files/:id/signed-url)
+// and userProfile.id (linked account, resolved via the dedicated
+// /identity/users/:id/avatar/signed-url — a user avatar isn't a
+// company-scoped file entity, so it needs its own route, not fetchSignedUrl).
 // No own card/header chrome — RunlyDetail's section wrapper already
 // supplies one from the blueprint's label/icon (see the same treatment
 // applied to HrEmployeeActivityPanel/HistorySection).
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { cn, fetchSignedUrl } from "@runly/ui";
+import { cn, fetchSignedUrl, fetchUserAvatarSignedUrl } from "@runly/ui";
 import { ChevronRight, User } from "lucide-react";
 
 const STATUS_DOT = {
@@ -108,40 +110,63 @@ function OrgConnector() {
   );
 }
 
+// Own cover photo wins; else fall back to the linked account's avatar.
+// The two need different endpoints (see the imports above), so a request
+// carries which one to use, keyed so multiple nodes sharing a photo only
+// fetch it once.
+function nodePhotoRequest(node) {
+  if (node?.profileImageFileId) {
+    return { key: `own:${node.profileImageFileId}`, kind: "own", id: node.profileImageFileId };
+  }
+  if (node?.userProfile?.id) {
+    return { key: `user:${node.userProfile.id}`, kind: "user", id: node.userProfile.id };
+  }
+  return null;
+}
+
 export default function OrgChartSection({ data, apiBaseUrl, token, companyId }) {
   const navigate = useNavigate();
   const supervisor = data?.supervisor;
   const reportees = data?.reportees ?? [];
 
-  const photoIds = useMemo(
-    () =>
-      [...new Set(
-        [data?.profileImageFileId, supervisor?.profileImageFileId, ...reportees.map((r) => r.profileImageFileId)].filter(
-          Boolean,
-        ),
-      )],
-    [data?.profileImageFileId, supervisor?.profileImageFileId, reportees],
-  );
-  const photoIdsKey = photoIds.join(",");
+  const photoRequests = useMemo(() => {
+    const map = new Map();
+    for (const node of [data, supervisor, ...reportees]) {
+      const req = nodePhotoRequest(node);
+      if (req && !map.has(req.key)) map.set(req.key, req);
+    }
+    return [...map.values()];
+  }, [data, supervisor, reportees]);
+  const photoRequestsKey = photoRequests.map((r) => r.key).join(",");
   const [photoUrls, setPhotoUrls] = useState({});
 
   useEffect(() => {
-    if (photoIds.length === 0) {
+    if (photoRequests.length === 0) {
       setPhotoUrls({});
       return undefined;
     }
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
-        photoIds.map(async (id) => [id, await fetchSignedUrl(apiBaseUrl, token, id, companyId)]),
+        photoRequests.map(async (req) => [
+          req.key,
+          req.kind === "own"
+            ? await fetchSignedUrl(apiBaseUrl, token, req.id, companyId)
+            : await fetchUserAvatarSignedUrl(apiBaseUrl, token, req.id, companyId),
+        ]),
       );
       if (!cancelled) setPhotoUrls(Object.fromEntries(entries));
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- photoIdsKey is the stable dep; photoIds itself is a new array every render
-  }, [apiBaseUrl, token, companyId, photoIdsKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- photoRequestsKey is the stable dep; photoRequests itself is a new array every render
+  }, [apiBaseUrl, token, companyId, photoRequestsKey]);
+
+  const photoUrlFor = (node) => {
+    const req = nodePhotoRequest(node);
+    return req ? (photoUrls[req.key] ?? null) : null;
+  };
 
   return (
     <div className="space-y-0.5">
@@ -154,7 +179,7 @@ export default function OrgChartSection({ data, apiBaseUrl, token, companyId }) 
             firstName={supervisor.firstName}
             lastName={supervisor.lastName}
             status={supervisor.status}
-            photoUrl={supervisor.profileImageFileId ? photoUrls[supervisor.profileImageFileId] : null}
+            photoUrl={photoUrlFor(supervisor)}
             onClick={() => navigate(`/app/m/runly.hr/hr/employees/${supervisor.id}`)}
           />
           <OrgConnector />
@@ -174,7 +199,7 @@ export default function OrgChartSection({ data, apiBaseUrl, token, companyId }) 
         lastName={data?.lastName}
         jobTitle={data?.jobTitle}
         status={data?.status}
-        photoUrl={data?.profileImageFileId ? photoUrls[data.profileImageFileId] : null}
+        photoUrl={photoUrlFor(data)}
         isSelf
       />
 
@@ -191,7 +216,7 @@ export default function OrgChartSection({ data, apiBaseUrl, token, companyId }) 
                 firstName={r.firstName}
                 lastName={r.lastName}
                 status={r.status}
-                photoUrl={r.profileImageFileId ? photoUrls[r.profileImageFileId] : null}
+                photoUrl={photoUrlFor(r)}
                 onClick={() => navigate(`/app/m/runly.hr/hr/employees/${r.id}`)}
               />
             ))}

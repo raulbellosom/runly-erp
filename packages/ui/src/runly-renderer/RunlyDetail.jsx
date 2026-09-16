@@ -41,6 +41,7 @@ import {
 import {
   HeroContainer,
   fetchSignedUrl,
+  fetchUserAvatarSignedUrl,
   initialsFromName,
 } from "./runly-detail-hero.jsx";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
@@ -550,27 +551,39 @@ function RelationCardSection({ section, data, apiBaseUrl, token, companyId = nul
   const relationCard = section.relationCard;
   const [avatarUrl, setAvatarUrl] = useState(null);
 
-  const rawAvatarId = relationCard?.avatarField
+  const relatedId = relationCard?.idField ? getByPath(data, relationCard.idField) : null;
+  const hasRelatedId = Boolean(normalizeTextValue(relatedId));
+
+  // avatarKind: 'user' resolves via the dedicated user-avatar route instead
+  // of the generic files one — a user account's avatar isn't a
+  // company-scoped file entity fetchSignedUrl can resolve (see
+  // fetchUserAvatarSignedUrl's comment). It uses relatedId directly since
+  // that route takes a user id, not a file id.
+  const isUserAvatar = relationCard?.avatarKind === "user";
+  const rawAvatarId = !isUserAvatar && relationCard?.avatarField
     ? getByPath(data, relationCard.avatarField)
     : null;
   const avatarAssetId = normalizeTextValue(rawAvatarId) || null;
 
   useEffect(() => {
     let cancelled = false;
-    if (!avatarAssetId) {
+    const id = isUserAvatar ? (hasRelatedId ? relatedId : null) : avatarAssetId;
+    if (!id) {
       setAvatarUrl(null);
       return () => {
         cancelled = true;
       };
     }
     (async () => {
-      const url = await fetchSignedUrl(apiBaseUrl, token, avatarAssetId, companyId);
+      const url = isUserAvatar
+        ? await fetchUserAvatarSignedUrl(apiBaseUrl, token, id, companyId)
+        : await fetchSignedUrl(apiBaseUrl, token, id, companyId);
       if (!cancelled) setAvatarUrl(url);
     })();
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, token, avatarAssetId, companyId]);
+  }, [apiBaseUrl, token, companyId, isUserAvatar, avatarAssetId, hasRelatedId, relatedId]);
 
   if (!relationCard?.idField) {
     return (
@@ -580,8 +593,6 @@ function RelationCardSection({ section, data, apiBaseUrl, token, companyId = nul
     );
   }
 
-  const relatedId = getByPath(data, relationCard.idField);
-  const hasRelatedId = Boolean(normalizeTextValue(relatedId));
   const rawTitle = relationCard.titleField
     ? getByPath(data, relationCard.titleField)
     : null;
@@ -623,7 +634,7 @@ function RelationCardSection({ section, data, apiBaseUrl, token, companyId = nul
     .filter(Boolean);
 
   const Icon = resolveIcon(relationCard.icon) ?? Link2;
-  const showAvatar = Boolean(relationCard.avatarField) && hasRelatedId;
+  const showAvatar = (isUserAvatar || Boolean(relationCard.avatarField)) && hasRelatedId;
 
   const media = showAvatar ? (
     <Avatar className="mt-0.5 h-9 w-9 rounded-lg">

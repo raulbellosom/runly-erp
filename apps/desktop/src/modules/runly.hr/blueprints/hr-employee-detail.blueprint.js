@@ -25,12 +25,14 @@ export const HR_EMPLOYEE_DETAIL = {
       subtitleFields: ['jobTitle', 'department'],
       statusField: 'status',
       statusMap: STATUS_LABEL_MAP,
-      // getEmployee() resolves this to the employee's own cover photo (from
-      // Archivos), falling back to the linked user account's avatar. Kept
-      // ahead of imageDocsPath, whose own /files lookup never sees that
-      // fallback and only covers a photo uploaded directly to this record.
+      // Priority: own cover photo (imageField) -> first image tagged to this
+      // record (imageDocsPath) -> linked user account's avatar
+      // (avatarUserField, via /identity/users/:id/avatar/signed-url — a
+      // user avatar isn't a company-scoped file entity, so it can't be
+      // resolved the same way as the first two).
       imageField: 'profileImageFileId',
       imageDocsPath: '/files?moduleKey=runly.hr&entityType=HrEmployee&sourceEntityId=:id',
+      avatarUserField: 'userProfile.id',
       fallbackIcon: 'User',
       metaChips: [
         { field: 'employeeCode', label: 'Código', icon: 'Hash' },
@@ -95,7 +97,11 @@ export const HR_EMPLOYEE_DETAIL = {
           idField: 'userProfile.id',
           titleField: 'userProfile.displayName',
           subtitleFields: ['userProfile.email'],
-          avatarField: 'userProfile.avatarFileId',
+          // A user avatar isn't a company-scoped file entity, so it's
+          // resolved via /identity/users/:id/avatar/signed-url (using
+          // idField's value) instead of the generic /files/:id/signed-url
+          // avatarField would otherwise be sent to.
+          avatarKind: 'user',
           fallbackTitle: 'Sin cuenta de usuario vinculada.',
           hrefTemplate: '/app/m/runly.identity/identity/users/:id',
           icon: 'UserCheck',
