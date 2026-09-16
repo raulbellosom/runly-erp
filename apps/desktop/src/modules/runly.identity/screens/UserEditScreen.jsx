@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { RunlyForm, PageHeader, LoadingState, ErrorState, Button } from "@runly/ui";
 import { Eye } from "lucide-react";
@@ -12,7 +13,15 @@ import { componentRegistry } from "../../../lib/moduleComponentRegistry.js";
 const API_BASE = getApiUrl();
 
 export default function UserEditScreen() {
-  const { id: userId } = useParams();
+  // See UserDetailScreen.jsx for why "id" isn't a real react-router param
+  // here — ModuleOutlet resolves this route via a flat key lookup, not a
+  // nested <Route path=":id">, so the id has to be parsed out of the "*"
+  // wildcard instead.
+  const { "*": wildcard } = useParams();
+  const userId = useMemo(() => {
+    const segs = String(wildcard ?? "").replace(/^\/+/, "").split("/").filter(Boolean);
+    return segs[2] ?? null;
+  }, [wildcard]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, userProfile } = useAuth();

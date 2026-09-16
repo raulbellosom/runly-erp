@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   RunlyDetail,
@@ -40,7 +40,18 @@ function isProtectedAdminUser(user) {
 }
 
 export default function UserDetailScreen() {
-  const { id: userId } = useParams();
+  // ModuleOutlet resolves "runly.identity:/identity/users/:id" to this file
+  // via a flat key lookup (see apps/desktop/src/app/module-screen-resolver.js)
+  // rather than a nested <Route path=":id">, so react-router never populates
+  // a named "id" param — only the catch-all "*" wildcard is available. Every
+  // other directly-registered detail screen in this app (AccountScreen.jsx,
+  // ReportDetailScreen.jsx, InventoryItemDetail.jsx, ...) parses the id out
+  // of that wildcard the same way.
+  const { "*": wildcard } = useParams();
+  const userId = useMemo(() => {
+    const segs = String(wildcard ?? "").replace(/^\/+/, "").split("/").filter(Boolean);
+    return segs[2] ?? null;
+  }, [wildcard]);
   const { session, userProfile, refreshProfile } = useAuth();
   const token = session?.access_token;
   const navigate = useNavigate();

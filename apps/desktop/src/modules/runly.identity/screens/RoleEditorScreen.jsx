@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -28,7 +28,15 @@ import { componentRegistry } from "../../../lib/moduleComponentRegistry.js";
 const API_BASE = getApiUrl();
 
 export default function RoleEditorScreen() {
-  const { id: roleId } = useParams();
+  // See UserDetailScreen.jsx for why "id" isn't a real react-router param
+  // here — ModuleOutlet resolves this route via a flat key lookup, not a
+  // nested <Route path=":id">, so the id has to be parsed out of the "*"
+  // wildcard instead.
+  const { "*": wildcard } = useParams();
+  const roleId = useMemo(() => {
+    const segs = String(wildcard ?? "").replace(/^\/+/, "").split("/").filter(Boolean);
+    return segs[2] ?? null;
+  }, [wildcard]);
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const navigate = useNavigate();
