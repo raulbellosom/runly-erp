@@ -25,6 +25,11 @@ shipped:
 4. The crop modal ("Recortar imagen") frequently opens to a blank viewfinder
    that never finishes loading, for effectively every image, not just ones
    viewed in a prior session.
+5. The `/` slash-command menu renders with no opaque/glass background —
+   underlying content (e.g. an image) shows through it, unlike every other
+   floating menu in the app.
+6. Images visibly pop in and shift the surrounding content around as they
+   load, especially noticeable when several images are on screen at once.
 
 Root causes:
 
@@ -65,6 +70,29 @@ Root causes:
   the `load` event has frequently already fired (or the image is already
   `.complete`) before React attaches the `onLoad` listener — `nat` never
   gets set, the viewfinder never sizes itself, and the modal stays blank.
+- **5 (transparent slash menu):** `SlashCommandMenu.jsx:32,39` hand-rolls its
+  own container background (`border border-border bg-popover shadow-lg`)
+  instead of reusing the project's `.glass-strong` utility class
+  (`apps/desktop/src/styles.css:253-258`) that every other floating menu
+  uses — e.g. `@runly/ui`'s `PopoverContent`
+  (`packages/ui/src/components/Popover.jsx:27`, `'z-50 rounded-xl
+  glass-strong shadow-lg outline-none'`). `.glass-strong` bundles the
+  `backdrop-filter: blur()` that a translucent-by-design surface needs to
+  read as "frosted glass" rather than "broken/see-through" — without it, the
+  plain `bg-popover` token (itself translucent by design in this app's glass
+  system) shows whatever is underneath.
+- **6 (image pop-in/shift):** `ImageAnnotationOverlay.jsx`'s `frameStyle`
+  (`ImageAnnotationOverlay.jsx:394-398` as of the tables/images/mobile-controls
+  work) only knows the image's aspect ratio once either the stored
+  `aspectRatio` attribute is set (currently only written by the corner-resize
+  handles, not at insert time) or the full-resolution `<img>` fires `onLoad`
+  and populates `natural`. Until one of those happens, the frame falls back to
+  a 1:1 (or crop-derived) placeholder ratio, then snaps to the real ratio the
+  moment the full image finishes downloading — visibly shifting everything
+  below it. `noteImageUpload.js` already computes the natural dimensions
+  before upload (`getImageNaturalSize`, used today only to pick the initial
+  width scale) but never persists them as `aspectRatio`, so even brand-new
+  images pay this cost.
 
 ## Goals
 
@@ -80,6 +108,12 @@ Root causes:
 4. The crop modal reliably shows the image and sizes its viewfinder
    correctly on the first open, whether the image was just uploaded or is
    already cached.
+5. The `/` slash-command menu renders with the same opaque glass background
+   as every other floating menu in the app.
+6. Images never visibly shift surrounding content as they load — new images
+   reserve their exact space immediately, and a blurred low-quality preview
+   fills the frame for any image (new or pre-existing) while the full
+   resolution version is still loading.
 
 ## Non-goals
 
@@ -93,12 +127,23 @@ Root causes:
   shipped in the tables/images/mobile-controls work — this spec only touches
   the edit-mode toolbar, focus/keyboard handling, click-below-content, and
   the crop modal's load timing.
-- No change to desktop (fine-pointer) behavior for any of these four fixes
-  beyond what naturally falls out of the toolbar/keyboard/crop fixes (which
-  are pointer-type-agnostic — a mouse click on an image control was never
-  going to move the caret into the document either, but the explicit
-  `preventDefault()` makes that guarantee instead of relying on incidental
-  browser behavior).
+- No change to desktop (fine-pointer) behavior for any of the toolbar,
+  keyboard, crop, or blur-up fixes above, beyond what naturally falls out of
+  them (which are pointer-type-agnostic — a mouse click on an image control
+  was never going to move the caret into the document either, but the
+  explicit `preventDefault()` makes that guarantee instead of relying on
+  incidental browser behavior).
+- No exhaustive audit of every other place in the app that might have the
+  same "translucent token without `.glass-strong`/backdrop-blur" bug as the
+  slash-command menu — only that one instance is fixed here. A broader sweep
+  is a separate follow-up if wanted.
+- No new backend/storage infrastructure for the low-quality image preview —
+  it reuses the existing Supabase image-transform endpoint
+  (`apps/desktop/src/lib/imageVariants.js`) with a new, smaller size preset,
+  not a separately generated/stored thumbnail asset.
+- No true blurhash/dominant-color placeholder algorithm — the "low quality"
+  preview is simply a much smaller transformed version of the same image,
+  blurred via CSS.
 
 ## Design
 
@@ -209,23 +254,91 @@ Wired via a `ref` callback (or a `useEffect` keyed on `[open, src]` that
 reads a ref) rather than replacing the existing `onLoad` handler, so both
 the already-loaded and the freshly-loading cases are covered.
 
+### 5 — Slash-command menu: use the project's glass system
+
+`SlashCommandMenu.jsx`'s two container `<div>`s (the populated-results list
+at line 39 and the "Sin resultados" empty state at line 32) replace
+`border border-border bg-popover shadow-lg` with `glass-strong` — matching
+`@runly/ui`'s `PopoverContent` exactly (`rounded-xl glass-strong shadow-lg`).
+`glass-strong` already includes the border and shadow, so those utility
+classes are dropped as redundant; `rounded-lg` becomes `rounded-xl` to match
+the same convention. No other structural change — this is a class-list swap,
+not a rewrite of the component.
+
+### 6 — Blur-up image loading, no layout shift
+
+Two independent pieces:
+
+**a) Persist `aspectRatio` at insert time.** `noteImageUpload.js`'s
+`uploadAndInsertNoteImage` already computes `naturalSize` via
+`getImageNaturalSize(file)` before calling `editor.chain().insertContent(...)`
+(`noteImageUpload.js:67-75`). That same call adds
+`aspectRatio: naturalSize.naturalWidth / naturalSize.naturalHeight` (only
+when both are truthy) to the inserted node's `attrs`, alongside `width`. This
+means every newly-inserted image carries its correct aspect ratio from its
+very first render — `ImageAnnotationOverlay.jsx`'s `frameStyle` (Design 2 of
+the tables/images/mobile-controls spec) already prefers
+`node.attrs.aspectRatio` over the natural-size fallback, so no changes are
+needed there beyond this one new attribute being populated earlier.
+
+**b) Blurred low-quality placeholder for everyone else** (images inserted
+before this attribute existed, and the brief window before any image's full
+resolution arrives):
+
+- `apps/desktop/src/lib/imageVariants.js` gets a new preset, e.g.
+  `lqip: { width: 24, quality: 30 }` (no forced height, same
+  aspect-preserving shape as the existing `content` preset, just far
+  smaller/lower-quality) — no backend change, this only adds another
+  `IMAGE_VARIANT_PRESETS` entry consumed by the existing
+  `withImageVariant(url, variant)` URL-rewriter.
+- `ImageAnnotationOverlay.jsx` renders two stacked `<img>` elements inside
+  the existing frame `<div>` (`ImageAnnotationOverlay.jsx:544` area) instead
+  of one:
+  1. A `lqip`-variant `<img>`, `aria-hidden`, styled with a CSS blur filter
+     and a slight `scale(1.1)` (to hide the blurred edge halo), positioned to
+     fill the frame. Loads almost immediately (a few hundred bytes).
+  2. The existing full-resolution `<img>` on top, starting at `opacity: 0`
+     and transitioning to `opacity: 1` once its `onLoad` fires (CSS
+     `transition-opacity`), so the sharp image visibly crossfades in over the
+     blurred one rather than popping in abruptly.
+- The `lqip` image's `onLoad` ALSO calls `setNatural(...)` (the same setter
+  the full image's `onLoad` already calls) — since it loads first and shares
+  the same aspect ratio, this lets `effNat`/`frameStyle` correct themselves
+  within a frame or two even for legacy images that have no stored
+  `aspectRatio` attribute at all, instead of waiting for the full-resolution
+  image.
+
+This applies everywhere `ImageAnnotationOverlay` renders (it's the sole
+NodeView for the image node type), so both the editable note view and the
+read-only/public note view get the fix from one implementation point.
+
 ## Components / files
 
 Changed:
 
 - `apps/desktop/src/modules/runly.notes/components/ImageAnnotationOverlay.jsx`
-  (Design 1, 2)
+  (Design 1, 2, 6b)
 - `apps/desktop/src/modules/runly.notes/components/NoteEditor.jsx` (Design 3)
 - `apps/desktop/src/modules/runly.notes/components/ImageCropModal.jsx`
   (Design 4)
+- `apps/desktop/src/modules/runly.notes/components/SlashCommandMenu.jsx`
+  (Design 5)
+- `apps/desktop/src/modules/runly.notes/lib/noteImageUpload.js` (Design 6a)
+- `apps/desktop/src/lib/imageVariants.js` (Design 6b — new `lqip` preset)
 
 No new files, no new `@runly/ui` components, no backend/API/Prisma changes.
 
 ## Data / compatibility
 
-- No new node attributes, no schema changes, no migration.
-- All four fixes are purely presentational/interaction changes — no stored
-  note content changes shape or meaning.
+- `aspectRatio` is an existing node attribute (added in the
+  tables/images/mobile-controls work) — Design 6a just populates it at one
+  more call site (insert time, not only corner-resize time). No schema
+  change, no migration.
+- The `lqip` variant preset is a pure URL-parameter addition to an existing,
+  already-public image-transform endpoint — no new stored data.
+- All six fixes are presentational/interaction changes — no stored note
+  content changes shape or meaning beyond the pre-existing `aspectRatio`
+  attribute now sometimes being populated earlier.
 
 ## Testing
 
@@ -238,6 +351,8 @@ logic only; DOM/TipTap/touch/keyboard interaction is verified manually.
 - `checkAlreadyLoaded`-equivalent pure predicate: given
   `{ complete, naturalWidth, naturalHeight }`, returns the `nat` value it
   should produce (or `null` if not yet loaded).
+- `withImageVariant(url, 'lqip')` — extend the existing variant tests to
+  cover the new preset the same way `content`/`banner`/etc. are covered.
 
 Manual QA (per `docs/ai-context/ui-screen-audit-checklist.md`), 390px and
 1440px, both themes:
@@ -258,10 +373,23 @@ Manual QA (per `docs/ai-context/ui-screen-audit-checklist.md`), 390px and
   previously-more-likely-to-repro case) to confirm both paths work.
 - Both themes (light/dark): compact toolbar and "⋯" menu contrast readable
   in both.
+- Open the `/` slash-command menu over an image: menu background is fully
+  opaque/frosted (matches the look of the "Tabla" options popover), no
+  content bleeds through. Check both the populated list and the "Sin
+  resultados" empty state.
+- Upload a new image on a slow/throttled connection (devtools network
+  throttling): a blurred low-quality version appears almost immediately and
+  crossfades to the sharp version once it loads, with no layout shift either
+  time. Reload the note and confirm the same image (now "old") still shows
+  the blur-up behavior and settles to the right size quickly.
+- Scroll through a note with several images stacked vertically on a
+  throttled connection: confirm surrounding text/blocks don't visibly jump
+  as each image loads.
 
 ## Implementation plan
 
-Single plan — all four fixes are frontend-only, touch the same small cluster
-of files (`ImageAnnotationOverlay.jsx`, `NoteEditor.jsx`,
-`ImageCropModal.jsx`), and total well under the 10-task threshold that would
+Single plan — all six fixes are frontend-only, touch a small, related
+cluster of files (`ImageAnnotationOverlay.jsx`, `NoteEditor.jsx`,
+`ImageCropModal.jsx`, `SlashCommandMenu.jsx`, `noteImageUpload.js`,
+`imageVariants.js`), and total well under the 10-task threshold that would
 call for an A/B split.
