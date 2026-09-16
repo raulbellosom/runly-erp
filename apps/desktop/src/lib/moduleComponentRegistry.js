@@ -25,6 +25,10 @@ import AssignedEquipmentSection from "../modules/runly.hr/components/AssignedEqu
 
 import { AddressFieldsSection } from "@runly/ui";
 
+import MembershipsSection from "../modules/runly.identity/components/MembershipsSection.jsx";
+import PermissionGrantsSection from "../modules/runly.identity/components/PermissionGrantsSection.jsx";
+import UserActivitySection from "../modules/runly.identity/components/UserActivitySection.jsx";
+
 const _isDev = Boolean(import.meta.env?.DEV);
 
 function warnDev(message) {
@@ -87,6 +91,18 @@ componentRegistry.register(
 componentRegistry.register(
   "runly.identity:AddressFieldsSection",
   AddressFieldsSection,
+);
+componentRegistry.register(
+  "runly.identity:MembershipsSection",
+  MembershipsSection,
+);
+componentRegistry.register(
+  "runly.identity:PermissionGrantsSection",
+  PermissionGrantsSection,
+);
+componentRegistry.register(
+  "runly.identity:UserActivitySection",
+  UserActivitySection,
 );
 
 // Dynamic bundle registration is done at runtime by ModuleBundleLoader

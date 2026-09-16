@@ -48,10 +48,10 @@ const SCREEN_MAP = {
     () => import("../modules/runly.identity/screens/UserCreateScreen.jsx"),
   ),
   "runly.identity:/identity/users/:id": lazy(
-    () => import("../modules/runly.identity/screens/UserEditorScreen.jsx"),
+    () => import("../modules/runly.identity/screens/UserDetailScreen.jsx"),
   ),
   "runly.identity:/identity/users/:id/edit": lazy(
-    () => import("../modules/runly.identity/screens/UserEditorScreen.jsx"),
+    () => import("../modules/runly.identity/screens/UserEditScreen.jsx"),
   ),
   "runly.identity:/identity/roles": lazy(
     () => import("../modules/runly.identity/screens/RolesScreen.jsx"),
