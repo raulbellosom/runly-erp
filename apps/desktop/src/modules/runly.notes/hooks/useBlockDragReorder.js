@@ -14,14 +14,26 @@ const CLONE_LIFT_STYLE = {
   transition: 'none',
 }
 
-// Press-and-hold-anywhere drag reorder for an image node view. Touch
+// Press-and-hold-anywhere drag reorder for a top-level block. Touch
 // requires a LONG_PRESS_MS hold before arming (so an ordinary scroll
-// gesture starting on the image is never hijacked); mouse arms as soon as
+// gesture starting on the block is never hijacked); mouse arms as soon as
 // it moves past DRAG_THRESHOLD_PX. Once armed, a floating clone of the
-// image's frame follows the pointer and every sibling block between the
-// original and candidate position slides out of the way in real time. See
-// docs/superpowers/specs/2026-09-16-notes-image-drag-reorder-design.md.
-export function useImageDragReorder({ editor, getPos, boxRef, frameRef, editable, isEditing }) {
+// block follows the pointer and every sibling between the original and
+// candidate position slides out of the way in real time. Used by both
+// image reordering (docs/superpowers/specs/2026-09-16-notes-image-drag-reorder-design.md)
+// and table reordering (docs/superpowers/specs/2026-09-16-notes-table-drag-reorder-design.md).
+//
+// `getBoxEl`/`getFrameEl` are functions (not refs) returning the current DOM
+// element — an image caller can supply `() => boxRef.current`; a table
+// caller has no ref of its own and instead resolves the element by
+// ProseMirror position (e.g. `() => editor.view.nodeDOM(getPos())`).
+// `getBoxEl` is the element whose opacity is dimmed during the drag (its
+// own layout slot stays reserved so the reflow math stays correct);
+// `getFrameEl` is what's measured/cloned for the floating drag preview —
+// for a table these are the same element; for an image `boxEl` also
+// carries non-content chrome (control buttons) that shouldn't be part of
+// the visual clone, so `frameEl` is narrower.
+export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, editable, isEditing }) {
   const pressRef = useRef(null) // { pointerId, startX, startY, pointerType, timerId }
   const dragRef = useRef(null) // { pointerId, originalPos, originalIndex, blockRects, draggedHeightPx, cloneEl, grabDX, grabDY, candidatePos }
   const wasDragRef = useRef(false) // set true right after a real drag commits; consumed once by the caller's click handler
@@ -34,20 +46,24 @@ export function useImageDragReorder({ editor, getPos, boxRef, frameRef, editable
       if (dom?.style) dom.style.transform = ''
     }
     d.cloneEl?.remove()
-    if (boxRef.current) boxRef.current.style.opacity = ''
+    const boxEl = getBoxEl()
+    if (boxEl) boxEl.style.opacity = ''
     dragRef.current = null
   }
 
   function startDrag(e) {
-    if (typeof getPos !== 'function' || !boxRef.current || !frameRef.current) return
+    if (typeof getPos !== 'function') return
+    const boxEl = getBoxEl()
+    const frameEl = getFrameEl()
+    if (!boxEl || !frameEl) return
     const view = editor.view
     const originalPos = getPos()
     const blockRects = computeBlockRects(view)
     const originalIndex = blockRects.findIndex((b) => b.offset === originalPos)
     if (originalIndex === -1) return
-    const rect = frameRef.current.getBoundingClientRect()
+    const rect = frameEl.getBoundingClientRect()
 
-    const clone = frameRef.current.cloneNode(true)
+    const clone = frameEl.cloneNode(true)
     Object.assign(clone.style, CLONE_LIFT_STYLE, {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
@@ -55,7 +71,7 @@ export function useImageDragReorder({ editor, getPos, boxRef, frameRef, editable
       height: `${rect.height}px`,
     })
     document.body.appendChild(clone)
-    boxRef.current.style.opacity = '0'
+    boxEl.style.opacity = '0'
 
     dragRef.current = {
       pointerId: e.pointerId,

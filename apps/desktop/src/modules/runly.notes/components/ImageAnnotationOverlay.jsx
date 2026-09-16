@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { withImageVariant } from '../../../lib/imageVariants.js'
-import { useImageDragReorder } from '../hooks/useImageDragReorder.js'
+import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
 import {
   cropToViewBox, elementFracToImageSpace, effectiveNaturalSize,
   normalizeRotation, rotateAnnotations,
@@ -75,7 +75,11 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
     onPointerUp: onDragPointerUp,
     onPointerCancel: onDragPointerCancel,
     wasDragRef,
-  } = useImageDragReorder({ editor, getPos, boxRef, frameRef, editable, isEditing })
+  } = useBlockDragReorder({
+    editor, getPos, editable, isEditing,
+    getBoxEl: () => boxRef.current,
+    getFrameEl: () => frameRef.current,
+  })
 
   // Deselect when clicking outside the image (Word/PPT-style click-away).
   useEffect(() => {
