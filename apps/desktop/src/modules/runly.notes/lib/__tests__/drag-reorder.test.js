@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX, findTableAtSelection,
-  groupIntoRows, pickDropIndex,
+  groupIntoRows, pickDropIndex, computeIndicatorRect,
 } from '../dragReorder.js'
 
 // 6 blocks at indices 0-5, offsets deliberately uneven (not equal to index)
@@ -127,4 +127,27 @@ test('pickDropIndex: pointer below every row inserts at the very end', () => {
     { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
   ]
   assert.equal(pickDropIndex(rects, 150, 500), 1)
+})
+
+test('computeIndicatorRect: positions at the candidate block\'s own top-left when dropping before it', () => {
+  const rects = [
+    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
+    { offset: 10, top: 20, bottom: 40, left: 150, width: 150 },
+  ]
+  const rect = computeIndicatorRect(rects, 1, 80, 60)
+  assert.deepEqual(rect, { top: 20, left: 150, width: 80, height: 60 })
+})
+
+test('computeIndicatorRect: positions below the last block when dropping past the end', () => {
+  const rects = [
+    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
+    { offset: 10, top: 20, bottom: 40, left: 0, width: 300 },
+  ]
+  const rect = computeIndicatorRect(rects, 2, 80, 60)
+  assert.deepEqual(rect, { top: 40, left: 0, width: 80, height: 60 })
+})
+
+test('computeIndicatorRect: an empty document positions at the origin', () => {
+  const rect = computeIndicatorRect([], 0, 80, 60)
+  assert.deepEqual(rect, { top: 0, left: 0, width: 80, height: 60 })
 })

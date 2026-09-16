@@ -147,6 +147,28 @@ export function computeShiftMap({ blockRects, originalIndex, candidateIndex, dra
   return map
 }
 
+/**
+ * Pure: given block rects (document order), the candidate drop array index
+ * (from pickDropIndex), and the dragged block's own width/height in px,
+ * returns the exact `{ top, left, width, height }` rect a visible drop-zone
+ * indicator should occupy. Positioned at the candidate block's own
+ * top-left (row-aware — lands beside a specific floated sibling, not just
+ * "the row"), or below the last block when dropping past the end.
+ */
+export function computeIndicatorRect(blockRects, candidateIndex, widthPx, heightPx) {
+  if (candidateIndex < blockRects.length) {
+    const r = blockRects[candidateIndex]
+    return { top: r.top, left: r.left, width: widthPx, height: heightPx }
+  }
+  const last = blockRects[blockRects.length - 1]
+  return {
+    top: last ? last.bottom : 0,
+    left: last ? last.left : 0,
+    width: widthPx,
+    height: heightPx,
+  }
+}
+
 // ── table drag reorder ─────────────────────────────────────────────────────
 
 /**

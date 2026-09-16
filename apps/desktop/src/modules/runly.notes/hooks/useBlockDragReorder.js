@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import {
   findDropPosition, moveNode, computeBlockRects, computeShiftMap,
-  exceedsDragThreshold, LONG_PRESS_MS,
+  exceedsDragThreshold, LONG_PRESS_MS, computeIndicatorRect,
 } from '../lib/dragReorder.js'
 
 const CLONE_LIFT_STYLE = {
@@ -12,6 +12,16 @@ const CLONE_LIFT_STYLE = {
   transform: 'scale(1.03)',
   boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
   transition: 'none',
+}
+
+const INDICATOR_STYLE = {
+  position: 'fixed',
+  pointerEvents: 'none',
+  zIndex: 9998,
+  border: '2px dashed #f59e0b',
+  borderRadius: '8px',
+  backgroundColor: 'rgba(245, 158, 11, 0.08)',
+  transition: 'top 120ms ease, left 120ms ease',
 }
 
 // Press-and-hold-anywhere drag reorder for a top-level block. Touch
@@ -46,6 +56,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       if (dom?.style) dom.style.transform = ''
     }
     d.cloneEl?.remove()
+    d.indicatorEl?.remove()
     const boxEl = getBoxEl()
     if (boxEl) boxEl.style.opacity = ''
     dragRef.current = null
@@ -71,6 +82,16 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       height: `${rect.height}px`,
     })
     document.body.appendChild(clone)
+
+    const indicator = document.createElement('div')
+    Object.assign(indicator.style, INDICATOR_STYLE, {
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    })
+    document.body.appendChild(indicator)
+
     boxEl.style.opacity = '0'
 
     dragRef.current = {
@@ -78,8 +99,10 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       originalPos,
       originalIndex,
       blockRects,
+      draggedWidthPx: rect.width,
       draggedHeightPx: rect.height,
       cloneEl: clone,
+      indicatorEl: indicator,
       grabDX: e.clientX - rect.left,
       grabDY: e.clientY - rect.top,
       candidatePos: originalPos,
@@ -126,6 +149,11 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       active.candidatePos = candidatePos
       active.cloneEl.style.left = `${e.clientX - active.grabDX}px`
       active.cloneEl.style.top = `${e.clientY - active.grabDY}px`
+      const indicatorRect = computeIndicatorRect(active.blockRects, candidateIndex, active.draggedWidthPx, active.draggedHeightPx)
+      active.indicatorEl.style.left = `${indicatorRect.left}px`
+      active.indicatorEl.style.top = `${indicatorRect.top}px`
+      active.indicatorEl.style.width = `${indicatorRect.width}px`
+      active.indicatorEl.style.height = `${indicatorRect.height}px`
       return
     }
 
