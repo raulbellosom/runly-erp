@@ -340,6 +340,31 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/identity/users${toQueryString(query)}`, {
           headers: withAuthHeaders(token),
         }),
+      getUser: (id, token) =>
+        request(`/identity/users/${encodeURIComponent(id)}`, {
+          headers: withAuthHeaders(token),
+        }),
+      updateMembership: (userId, membershipId, data, token) =>
+        request(
+          `/identity/users/${encodeURIComponent(userId)}/memberships/${encodeURIComponent(membershipId)}`,
+          {
+            method: "PATCH",
+            headers: withAuthHeaders(token),
+            body: JSON.stringify(data),
+          },
+        ),
+      createMembership: (userId, data, token) =>
+        request(`/identity/users/${encodeURIComponent(userId)}/memberships`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(data),
+        }),
+      listCompanyOptions: (token) =>
+        request("/identity/companies-options", { headers: withAuthHeaders(token) }),
+      listRoleMembers: (roleId, token) =>
+        request(`/identity/roles/${encodeURIComponent(roleId)}/members`, {
+          headers: withAuthHeaders(token),
+        }),
       updateUser: (id, data, token) =>
         request(`/identity/users/${encodeURIComponent(id)}`, {
           method: "PATCH",
