@@ -59,6 +59,8 @@ app.post(
         }
       }
 
+      const { actorName } = getActivityContext(c);
+
       if (
         body.moduleKey === "runly.identity" &&
         body.entityType === "UserProfile" &&
@@ -84,9 +86,21 @@ app.post(
             },
           });
         }
+        // Also publish to the Activity table (not just AuditLog above) so the
+        // upload actually shows up in the user's own "Actividad" panel
+        // (UserActivitySection.jsx queries Activity by entityType/entityId,
+        // not AuditLog — the generic "files.assets.upload" publish below is
+        // keyed to entityType: "FileAsset" and wouldn't appear there).
+        await publishActivityFromContext(prisma, c, {
+          type: "identity.user.file.attach",
+          severity: "success",
+          entityType: "UserProfile",
+          entityId: String(body.entityId),
+          summary:
+            `${actorName} subió "${asset.originalName ?? asset.id}"`.trim(),
+        });
       }
 
-      const { actorName } = getActivityContext(c);
       await publishActivityFromContext(prisma, c, {
         type: "files.assets.upload",
         severity: "success",
