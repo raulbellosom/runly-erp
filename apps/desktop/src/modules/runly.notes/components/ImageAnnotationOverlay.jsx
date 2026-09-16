@@ -1,12 +1,12 @@
 import { NodeViewWrapper } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  GripVertical, Pencil, Crop as CropIcon, Check,
+  Pencil, Crop as CropIcon, Check,
   PenLine, ArrowUpRight, Square, Type, MoreHorizontal,
 } from 'lucide-react'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
-import { findDropPosition, moveNode } from '../lib/dragReorder.js'
 import { withImageVariant } from '../../../lib/imageVariants.js'
+import { useImageDragReorder } from '../hooks/useImageDragReorder.js'
 import {
   cropToViewBox, elementFracToImageSpace, effectiveNaturalSize,
   normalizeRotation, rotateAnnotations,
@@ -38,8 +38,8 @@ function parseCrop(raw) {
 export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos }) {
   const svgRef = useRef(null)
   const boxRef = useRef(null) // the sized img+svg container — resize math + click-outside
+  const frameRef = useRef(null) // the image frame only (no control chrome) — measured/cloned for drag reorder
   const rotWrapRef = useRef(null) // sized/positioned per crop; useRotatedFillSize measures this
-  const dragRef = useRef(null) // { pointerId, dropPos } — image reorder
   const drawRef = useRef(null) // { pointerId } — annotation drawing
   const resizeRef = useRef(null) // { pointerId, startX, startY, startWidthPx, startHeightPx, containerWidthPx }
 
@@ -49,7 +49,6 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const [lineWidth, setLineWidth] = useState(3)
   const [draft, setDraft] = useState(null)
   const [textInput, setTextInput] = useState(null) // { screenX, screenY, svgX, svgY }
-  const [dropIndicator, setDropIndicator] = useState(null) // { top, left, width }
   const [cropOpen, setCropOpen] = useState(false)
   const [natural, setNatural] = useState(null) // { w, h }
   const [selected, setSelected] = useState(false) // click-to-select for resize (Word/PPT style)
@@ -70,6 +69,13 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const effectiveCrop = crop ?? { x: 0, y: 0, w: 1, h: 1 }
   const effNat = effectiveNaturalSize(natural, rotation)
   const fillSize = useRotatedFillSize(rotWrapRef, rotation)
+  const {
+    onPointerDown: onDragPointerDown,
+    onPointerMove: onDragPointerMove,
+    onPointerUp: onDragPointerUp,
+    onPointerCancel: onDragPointerCancel,
+    wasDragRef,
+  } = useImageDragReorder({ editor, getPos, boxRef, frameRef, editable, isEditing })
 
   // Deselect when clicking outside the image (Word/PPT-style click-away).
   useEffect(() => {
@@ -81,50 +87,12 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
     return () => document.removeEventListener('pointerdown', onDocPointerDown, true)
   }, [selected])
 
-  // ── image reorder drag handle (mouse + touch via Pointer Events) ─────────
-  function getIndicatorRect(view, pos) {
-    const { doc } = view.state
-    const dom = pos < doc.content.size ? view.nodeDOM(pos) : null
-    if (dom?.getBoundingClientRect) {
-      const rect = dom.getBoundingClientRect()
-      return { top: rect.top, left: rect.left, width: rect.width }
-    }
-    let lastDom = null
-    doc.forEach((_n, offset) => {
-      lastDom = view.nodeDOM(offset) ?? lastDom
-    })
-    if (lastDom?.getBoundingClientRect) {
-      const rect = lastDom.getBoundingClientRect()
-      return { top: rect.bottom, left: rect.left, width: rect.width }
-    }
-    const containerRect = view.dom.getBoundingClientRect()
-    return { top: containerRect.top, left: containerRect.left, width: containerRect.width }
-  }
-
-  function onHandlePointerDown(e) {
-    if (!editable || typeof getPos !== 'function') return
-    e.preventDefault()
-    e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { pointerId: e.pointerId, dropPos: null }
-  }
-  function onHandlePointerMove(e) {
-    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return
-    const view = editor.view
-    const dropPos = findDropPosition(view, e.clientY)
-    dragRef.current.dropPos = dropPos
-    setDropIndicator(getIndicatorRect(view, dropPos))
-  }
-  function onHandlePointerUp(e) {
-    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return
-    const { dropPos } = dragRef.current
-    dragRef.current = null
-    setDropIndicator(null)
-    if (dropPos !== null) moveNode(editor, getPos(), dropPos)
-  }
-
   // ── click-to-resize (Word/PowerPoint-style corner handle) ────────────────
   function onImageClick() {
+    if (wasDragRef.current) {
+      wasDragRef.current = false
+      return
+    }
     if (!editable || mode !== 'view') return
     setSelected(true)
   }
@@ -448,6 +416,10 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
       <div
         ref={boxRef}
         onClick={onImageClick}
+        onPointerDown={onDragPointerDown}
+        onPointerMove={onDragPointerMove}
+        onPointerUp={onDragPointerUp}
+        onPointerCancel={onDragPointerCancel}
         className={[
           'relative',
           selected && mode === 'view' ? 'ring-2 ring-amber-500 ring-offset-1 rounded-b' : '',
@@ -579,7 +551,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
           </div>
         )}
 
-        <div className="relative rounded-b overflow-hidden" style={frameStyle}>
+        <div ref={frameRef} className="relative rounded-b overflow-hidden" style={frameStyle}>
           <div ref={rotWrapRef} style={rotWrapStyle}>
             {/* Tiny blurred placeholder — loads almost instantly (a few
                 hundred bytes) and shares the full image's aspect ratio, so
@@ -647,29 +619,20 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
         {editable && mode === 'view' && (
           <div
             // Top-right: keeps the primary "Editar imagen" affordance in view
-            // above the fold on a tall image, and clear of the bottom-right
-            // resize handle.
+            // above the fold on a tall image, clear of the corner resize
+            // handles. No separate move handle any more — press-and-hold
+            // anywhere on the image body (via boxRef's own pointer handlers
+            // above) starts a reorder drag instead.
             className={`absolute top-2 right-2 flex items-center gap-1.5 opacity-100 transition-opacity ${
               selected ? 'sm:opacity-100' : 'sm:opacity-0 sm:group-hover/img:opacity-100'
             }`}
           >
             <button
-              onPointerDown={(e) => e.preventDefault()}
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
               onClick={() => setMode('edit')}
               className="flex items-center gap-1.5 text-xs font-medium bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg px-2.5 py-1.5 shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" /> Editar imagen
-            </button>
-            <button
-              title="Arrastrar para mover la imagen"
-              className="flex items-center justify-center w-8 h-8 rounded-lg bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] shadow-sm text-[hsl(var(--muted-foreground))] cursor-grab active:cursor-grabbing"
-              style={{ touchAction: 'none' }}
-              onPointerDown={onHandlePointerDown}
-              onPointerMove={onHandlePointerMove}
-              onPointerUp={onHandlePointerUp}
-              onPointerCancel={onHandlePointerUp}
-            >
-              <GripVertical className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -706,13 +669,6 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
           </>
         )}
       </div>
-
-      {dropIndicator && (
-        <div
-          className="fixed h-0.5 bg-amber-500 rounded-full z-50 pointer-events-none"
-          style={{ top: dropIndicator.top, left: dropIndicator.left, width: dropIndicator.width }}
-        />
-      )}
 
       {cropOpen && (
         <ImageCropModal
