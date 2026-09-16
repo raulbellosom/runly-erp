@@ -2,7 +2,7 @@ import { NodeViewWrapper } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import {
   GripVertical, Pencil, Crop as CropIcon, Check,
-  PenLine, ArrowUpRight, Square, Type, ChevronDown,
+  PenLine, ArrowUpRight, Square, Type, MoreHorizontal,
 } from 'lucide-react'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { findDropPosition, moveNode } from '../lib/dragReorder.js'
@@ -453,41 +453,27 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
         style={wrapperStyle}
       >
         {isEditing && (
-          // Same width as the image below it (both are children of the
-          // resizable box) so the whole editing card — toolbar + drawing
-          // area — reads as one unit delimited exactly to the image, not a
-          // full-width bar floating over a narrower thumbnail. It WRAPS onto
-          // 2-3 rows on a narrow / portrait image so every control stays
-          // visible — an earlier `overflow-x-auto` bar hid Recortar/Listo
-          // off-screen with no scroll affordance.
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-1 py-1.5 px-2 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded-t text-xs">
-            <button
-              title="Arrastrar para mover la imagen"
-              className="flex items-center justify-center w-9 h-9 rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)] hover:text-[hsl(var(--foreground))] cursor-grab active:cursor-grabbing shrink-0"
-              style={{ touchAction: 'none' }}
-              onPointerDown={onHandlePointerDown}
-              onPointerMove={onHandlePointerMove}
-              onPointerUp={onHandlePointerUp}
-              onPointerCancel={onHandlePointerUp}
-            >
-              <GripVertical className="w-4 h-4" />
-            </button>
-            <div className="h-5 w-px bg-[hsl(var(--border))] shrink-0" />
-
+          // Single row that never wraps — a wrapping multi-row toolbar used
+          // to push the image itself down on narrow screens. Every button
+          // also preventDefaults its pointerdown so tapping it can't shift
+          // ProseMirror's selection into the document and pop the mobile
+          // keyboard (see docs/superpowers/specs/2026-09-16-notes-mobile-image-editing-fixes-design.md).
+          <div className="flex items-center flex-nowrap gap-1 py-1.5 px-2 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded-t text-xs overflow-hidden">
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   title="Herramienta"
-                  className="flex items-center gap-0.5 px-2 h-9 rounded font-medium shrink-0 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]"
+                  onPointerDown={(e) => e.preventDefault()}
+                  className="flex items-center justify-center w-9 h-9 rounded shrink-0 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]"
                 >
                   <ActiveToolIcon className="w-4 h-4" />
-                  <ChevronDown className="w-3 h-3 opacity-60" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-1 w-36" side="bottom" align="start">
                 {TOOLS.map((t) => (
                   <button
                     key={t.id}
+                    onPointerDown={(e) => e.preventDefault()}
                     onClick={() => setTool(t.id)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium ${
                       tool === t.id
@@ -503,12 +489,15 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
 
             <Popover>
               <PopoverTrigger asChild>
-                <button title="Color" className="flex items-center gap-0.5 px-1.5 h-9 rounded shrink-0 hover:bg-[hsl(var(--muted-foreground)/0.1)]">
+                <button
+                  title="Color"
+                  onPointerDown={(e) => e.preventDefault()}
+                  className="flex items-center justify-center w-9 h-9 rounded shrink-0 hover:bg-[hsl(var(--muted-foreground)/0.1)]"
+                >
                   <span
                     className="w-5 h-5 rounded-full border-2 border-[hsl(var(--border))]"
                     style={{ backgroundColor: color === '#ffffff' ? '#f3f4f6' : color }}
                   />
-                  <ChevronDown className="w-3 h-3 opacity-60" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-2 w-auto" side="bottom" align="start">
@@ -516,6 +505,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
                   {COLORS.map((c) => (
                     <button
                       key={c}
+                      onPointerDown={(e) => e.preventDefault()}
                       onClick={() => setColor(c)}
                       className={`w-7 h-7 rounded-full border-2 ${color === c ? 'border-amber-500 scale-110' : 'border-transparent'}`}
                       style={{ backgroundColor: c === '#ffffff' ? '#f3f4f6' : c }}
@@ -525,35 +515,60 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
               </PopoverContent>
             </Popover>
 
-            <div className="h-5 w-px bg-[hsl(var(--border))] shrink-0" />
-            <Select value={String(lineWidth)} onValueChange={(v) => setLineWidth(Number(v))}>
-              <SelectTrigger className="h-9 w-auto min-w-16 px-2 py-0 text-xs shrink-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4, 6, 8].map((w) => (
-                  <SelectItem key={w} value={String(w)}>
-                    {w}px
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="h-5 w-px bg-[hsl(var(--border))] shrink-0" />
             <button
+              title="Recortar"
+              onPointerDown={(e) => e.preventDefault()}
               onClick={() => setCropOpen(true)}
-              className="flex items-center gap-1 px-2.5 h-9 rounded font-medium text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)] shrink-0"
+              className="flex items-center justify-center w-9 h-9 rounded shrink-0 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]"
             >
-              <CropIcon className="w-3.5 h-3.5" /> Recortar
+              <CropIcon className="w-3.5 h-3.5" />
             </button>
-            {annotations.length > 0 && (
-              <button
-                onClick={() => updateAttributes({ annotations: '[]' })}
-                className="text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-2.5 h-9 rounded shrink-0"
-              >
-                Limpiar
-              </button>
-            )}
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  title="Mas opciones"
+                  onPointerDown={(e) => e.preventDefault()}
+                  className="flex items-center justify-center w-9 h-9 rounded shrink-0 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="p-1 w-44" side="bottom" align="start">
+                <div className="px-2 py-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+                  Grosor
+                </div>
+                <div className="px-2 pb-1.5">
+                  <Select value={String(lineWidth)} onValueChange={(v) => setLineWidth(Number(v))}>
+                    <SelectTrigger className="h-9 w-full px-2 py-0 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 6, 8].map((w) => (
+                        <SelectItem key={w} value={String(w)}>
+                          {w}px
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {annotations.length > 0 && (
+                  <>
+                    <div className="my-1 border-t border-[hsl(var(--border))]" />
+                    <button
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => updateAttributes({ annotations: '[]' })}
+                      className="w-full text-left text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-2.5 py-1.5 rounded"
+                    >
+                      Limpiar
+                    </button>
+                  </>
+                )}
+              </PopoverContent>
+            </Popover>
+
             <button
+              onPointerDown={(e) => e.preventDefault()}
               onClick={exitEditMode}
               className="ml-auto flex items-center gap-1 px-3 h-9 rounded font-semibold bg-amber-500 hover:bg-amber-600 text-white shrink-0"
             >
@@ -617,6 +632,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
             }`}
           >
             <button
+              onPointerDown={(e) => e.preventDefault()}
               onClick={() => setMode('edit')}
               className="flex items-center gap-1.5 text-xs font-medium bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg px-2.5 py-1.5 shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
             >
