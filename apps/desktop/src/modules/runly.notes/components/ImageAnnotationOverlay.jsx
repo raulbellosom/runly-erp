@@ -8,6 +8,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Popover,
 import { withImageVariant } from '../../../lib/imageVariants.js'
 import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
 import { useImageAnnotationDrawing } from '../hooks/useImageAnnotationDrawing.jsx'
+import { isInsideTableCell } from '../lib/tableContext.js'
 import {
   cropToViewBox, effectiveNaturalSize,
   normalizeRotation, rotateAnnotations,
@@ -15,6 +16,7 @@ import {
 import { clampImageWidthPct, computeCornerResize } from '../lib/imageSize.js'
 import { useRotatedFillSize } from '../hooks/useRotatedFillSize.js'
 import { ImageCropModal } from './ImageCropModal.jsx'
+import { ImageEditModal } from './ImageEditModal.jsx'
 
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#1a1a1a', '#ffffff']
 const TOOLS = [
@@ -51,12 +53,14 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const [liveWidthPct, setLiveWidthPct] = useState(null) // resize drag preview
   const [liveAspectRatio, setLiveAspectRatio] = useState(null) // resize drag preview
   const [fullLoaded, setFullLoaded] = useState(false) // full-resolution <img> onLoad fired
+  const [editModalOpen, setEditModalOpen] = useState(false) // table-cell images edit via modal instead of inline mode
 
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
   const rotation = normalizeRotation(node.attrs.rotation)
   const editable = editor?.isEditable !== false
   const isEditing = editable && mode === 'edit'
+  const inTableCell = typeof getPos === 'function' && isInsideTableCell(editor.state, getPos())
   // null = full width, for images inserted before this attribute existed.
   const widthPct = node.attrs.width == null ? 100 : clampImageWidthPct(node.attrs.width)
   // Identity crop when unset — cropToViewBox/elementFracToImageSpace treat
@@ -423,13 +427,25 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
               selected ? 'sm:opacity-100' : 'sm:opacity-0 sm:group-hover/img:opacity-100'
             }`}
           >
-            <button
-              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
-              onClick={() => setMode('edit')}
-              className="flex items-center gap-1.5 text-xs font-medium bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg px-2.5 py-1.5 shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
-            >
-              <Pencil className="w-3.5 h-3.5" /> Editar imagen
-            </button>
+            {inTableCell ? (
+              <button
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                onClick={() => setEditModalOpen(true)}
+                aria-label="Editar imagen"
+                title="Editar imagen"
+                className="flex items-center justify-center w-8 h-8 bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                onClick={() => setMode('edit')}
+                className="flex items-center gap-1.5 text-xs font-medium bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg px-2.5 py-1.5 shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Editar imagen
+              </button>
+            )}
           </div>
         )}
 
@@ -488,6 +504,19 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
             })
             setCropOpen(false)
           }}
+        />
+      )}
+
+      {editModalOpen && (
+        <ImageEditModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          src={src}
+          alt={node.attrs.alt}
+          annotations={annotations}
+          crop={crop}
+          rotation={rotation}
+          updateAttributes={updateAttributes}
         />
       )}
     </NodeViewWrapper>
