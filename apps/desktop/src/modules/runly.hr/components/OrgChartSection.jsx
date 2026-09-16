@@ -1,12 +1,15 @@
 // Registry key: runly.hr:OrgChartSection
-// Props (RunlyDetail "component" section contract): { data }
+// Props (RunlyDetail "component" section contract): { data, apiBaseUrl, token, companyId }
 // data.supervisor and data.reportees must be the nested relation objects
-// getEmployee() already returns (not just their ids).
+// getEmployee() already returns (not just their ids), each carrying its own
+// resolved profileImageFileId (own FileAsset cover, falling back to the
+// linked account's avatar — see hr-service.js's photoFor()).
 // No own card/header chrome — RunlyDetail's section wrapper already
 // supplies one from the blueprint's label/icon (see the same treatment
 // applied to HrEmployeeActivityPanel/HistorySection).
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@runly/ui";
+import { cn, fetchSignedUrl } from "@runly/ui";
 import { ChevronRight, User } from "lucide-react";
 
 const STATUS_DOT = {
@@ -34,7 +37,7 @@ function orgAvatarColor(name = "") {
   return ORG_AVATAR_COLORS[hash % ORG_AVATAR_COLORS.length];
 }
 
-function OrgNode({ firstName = "", lastName = "", jobTitle, status, isSelf, onClick }) {
+function OrgNode({ firstName = "", lastName = "", jobTitle, status, isSelf, onClick, photoUrl }) {
   const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
   const name = `${firstName} ${lastName}`.trim();
   const dot = STATUS_DOT[status];
@@ -57,11 +60,15 @@ function OrgNode({ firstName = "", lastName = "", jobTitle, status, isSelf, onCl
     >
       <div
         className={cn(
-          "h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-          avatarCls,
+          "h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden",
+          !photoUrl && avatarCls,
         )}
       >
-        {initials || <User className="h-4 w-4" />}
+        {photoUrl ? (
+          <img src={photoUrl} alt={name} className="h-full w-full object-cover" />
+        ) : (
+          initials || <User className="h-4 w-4" />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -101,10 +108,40 @@ function OrgConnector() {
   );
 }
 
-export default function OrgChartSection({ data }) {
+export default function OrgChartSection({ data, apiBaseUrl, token, companyId }) {
   const navigate = useNavigate();
   const supervisor = data?.supervisor;
   const reportees = data?.reportees ?? [];
+
+  const photoIds = useMemo(
+    () =>
+      [...new Set(
+        [data?.profileImageFileId, supervisor?.profileImageFileId, ...reportees.map((r) => r.profileImageFileId)].filter(
+          Boolean,
+        ),
+      )],
+    [data?.profileImageFileId, supervisor?.profileImageFileId, reportees],
+  );
+  const photoIdsKey = photoIds.join(",");
+  const [photoUrls, setPhotoUrls] = useState({});
+
+  useEffect(() => {
+    if (photoIds.length === 0) {
+      setPhotoUrls({});
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        photoIds.map(async (id) => [id, await fetchSignedUrl(apiBaseUrl, token, id, companyId)]),
+      );
+      if (!cancelled) setPhotoUrls(Object.fromEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- photoIdsKey is the stable dep; photoIds itself is a new array every render
+  }, [apiBaseUrl, token, companyId, photoIdsKey]);
 
   return (
     <div className="space-y-0.5">
@@ -117,6 +154,7 @@ export default function OrgChartSection({ data }) {
             firstName={supervisor.firstName}
             lastName={supervisor.lastName}
             status={supervisor.status}
+            photoUrl={supervisor.profileImageFileId ? photoUrls[supervisor.profileImageFileId] : null}
             onClick={() => navigate(`/app/m/runly.hr/hr/employees/${supervisor.id}`)}
           />
           <OrgConnector />
@@ -136,6 +174,7 @@ export default function OrgChartSection({ data }) {
         lastName={data?.lastName}
         jobTitle={data?.jobTitle}
         status={data?.status}
+        photoUrl={data?.profileImageFileId ? photoUrls[data.profileImageFileId] : null}
         isSelf
       />
 
@@ -152,6 +191,7 @@ export default function OrgChartSection({ data }) {
                 firstName={r.firstName}
                 lastName={r.lastName}
                 status={r.status}
+                photoUrl={r.profileImageFileId ? photoUrls[r.profileImageFileId] : null}
                 onClick={() => navigate(`/app/m/runly.hr/hr/employees/${r.id}`)}
               />
             ))}

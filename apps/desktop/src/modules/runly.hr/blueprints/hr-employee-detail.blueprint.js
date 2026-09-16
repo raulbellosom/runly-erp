@@ -36,6 +36,7 @@ export const HR_EMPLOYEE_DETAIL = {
       { label: 'Antigüedad', field: 'tenureLabel', icon: 'Clock' },
       { label: 'Fecha de ingreso', field: 'hireDate', type: 'date', icon: 'Calendar' },
       { label: 'Fecha de baja', field: 'terminationDate', type: 'date', icon: 'Calendar' },
+      { label: 'Ubicación de trabajo', field: 'workLocation', icon: 'MapPin' },
     ],
     sections: [
       {
@@ -72,6 +73,14 @@ export const HR_EMPLOYEE_DETAIL = {
         fields: [{ field: 'notesMarkdown', label: 'Notas', type: 'markdown', icon: 'FileText' }],
       },
       {
+        id: 'org-chart',
+        type: 'component',
+        label: 'Organigrama',
+        icon: 'Users',
+        column: 'main',
+        component: 'runly.hr:OrgChartSection',
+      },
+      {
         id: 'linked-user',
         type: 'relation-card',
         label: 'Cuenta de usuario vinculada',
@@ -86,14 +95,6 @@ export const HR_EMPLOYEE_DETAIL = {
           hrefTemplate: '/app/m/runly.identity/identity/users/:id',
           icon: 'UserCheck',
         },
-      },
-      {
-        id: 'org-chart',
-        type: 'component',
-        label: 'Organigrama',
-        icon: 'Users',
-        column: 'aside',
-        component: 'runly.hr:OrgChartSection',
       },
       {
         id: 'attachments',

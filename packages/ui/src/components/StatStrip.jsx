@@ -8,21 +8,35 @@ function StatIcon({ name, className }) {
   return <Icon className={className} aria-hidden="true" />;
 }
 
+// sm:/lg: column counts keyed by actual item count (capped at 6) so a strip
+// with e.g. 3-4 items fills its row instead of leaving a mostly-empty one
+// sized for the 6-item case.
+const SM_COLS_BY_COUNT = { 1: "sm:grid-cols-1", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-2", 5: "sm:grid-cols-3", 6: "sm:grid-cols-3" };
+const LG_COLS_BY_COUNT = { 1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5", 6: "lg:grid-cols-6" };
+
+function responsiveColsClass(count) {
+  const n = Math.max(1, Math.min(count, 6));
+  return `${n === 1 ? "grid-cols-1" : "grid-cols-2"} ${SM_COLS_BY_COUNT[n]} ${LG_COLS_BY_COUNT[n]}`;
+}
+
 // Responsive key-figures strip.
 //   items: [{ key, label, value (ReactNode), icon (lucide name), href }]
-// Mobile: horizontal snap-scroll carousel. sm+: 3-up grid. lg+: 6-up grid.
+// Mobile: horizontal snap-scroll carousel. sm+/lg+ column count matches the
+// item count (up to 6-up) so the strip fills its row.
 //   bare: when true, renders as flat divided columns with no per-tile Card,
 //         for callers (HeroContainer) that place this beneath a `bare`
 //         DetailHero inside one shared outer card.
 export function StatStrip({ items, className, bare = false }) {
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   if (list.length === 0) return null;
+  const colsClass = responsiveColsClass(list.length);
 
   if (bare) {
     return (
       <div
         className={cn(
-          "grid grid-cols-2 divide-x divide-y divide-[hsl(var(--border))] border-t border-[hsl(var(--border))] sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-6",
+          "grid divide-x divide-y divide-[hsl(var(--border))] border-t border-[hsl(var(--border))] sm:divide-y-0",
+          colsClass,
           className,
         )}
       >
@@ -60,7 +74,8 @@ export function StatStrip({ items, className, bare = false }) {
     <div
       className={cn(
         "flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        "sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-6",
+        "sm:grid sm:overflow-visible",
+        colsClass,
         className,
       )}
     >

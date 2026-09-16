@@ -6,3 +6,4 @@ export { RunlyCardView } from "./RunlyCardView.jsx";
 export { BulkActionBar } from "./BulkActionBar.jsx";
 export { shouldUsePageMode, normalizeToFilterBarFilters, normalizeSpanishLabel } from "./renderer-adapters.js";
 export { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
+export { fetchSignedUrl } from "./runly-detail-hero.jsx";

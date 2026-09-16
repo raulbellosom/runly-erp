@@ -277,6 +277,7 @@ export {
   normalizeSpanishLabel,
   shouldUsePageMode,
   CostsSummaryPanel,
+  fetchSignedUrl,
 } from "./runly-renderer/index.js";
 
 export { UserSearchModal } from "./components/UserSearchModal.jsx";

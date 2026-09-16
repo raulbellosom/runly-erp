@@ -228,25 +228,11 @@ export function createHrService({ prisma, activityBridge }) {
   // The employee's "photo" is now the FileAsset marked isCover among their
   // generic moduleKey/entityType/metadata.sourceEntityId-tagged files (see
   // the FileAsset.isCover/sortOrder migration this feature added) — there is
-  // no more dedicated profileImageFileId column. These two helpers keep
-  // every OTHER consumer that used to read that column directly (chat
-  // @mention avatars via getEmployee(), the org chart, the employee list
-  // export) working, exposed under the same `profileImageFileId` field name
-  // so those call sites don't need their own changes.
-  async function resolveCoverFileId(employeeId, companyId) {
-    const file = await prisma.fileAsset.findFirst({
-      where: {
-        entityId: companyId,
-        moduleKey: { in: ["runly.hr", "atlas.hr"] },
-        entityType: "HrEmployee",
-        metadata: { path: ["sourceEntityId"], equals: employeeId },
-        isCover: true,
-      },
-      select: { id: true },
-    });
-    return file?.id ?? null;
-  }
-
+  // no more dedicated profileImageFileId column. This helper keeps every
+  // OTHER consumer that used to read that column directly (chat @mention
+  // avatars via getEmployee(), the org chart, the employee list export)
+  // working, exposed under the same `profileImageFileId` field name so
+  // those call sites don't need their own changes.
   async function resolveCoverFileIdsBatch(employeeIds, companyId) {
     const map = new Map();
     if (!employeeIds.length) return map;
@@ -517,10 +503,23 @@ export function createHrService({ prisma, activityBridge }) {
       const row = await prisma.hrEmployee.findFirst({
         where: { id, companyId },
         include: {
-          supervisor: { select: { id: true, firstName: true, lastName: true } },
+          supervisor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              userProfile: { select: { avatarFileId: true } },
+            },
+          },
           reportees: {
             where: { enabled: true },
-            select: { id: true, firstName: true, lastName: true, status: true },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              status: true,
+              userProfile: { select: { avatarFileId: true } },
+            },
             orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
           },
           departmentRef: { select: { id: true, name: true } },
@@ -538,11 +537,26 @@ export function createHrService({ prisma, activityBridge }) {
       if (!row) {
         throw new HrServiceError("Colaborador no encontrado.", 404);
       }
-      const profileImageFileId = await resolveCoverFileId(row.id, companyId);
+      // Own FileAsset cover wins; fall back to the linked account's avatar
+      // (same fallback listEmployees already applies) — for the employee
+      // itself and for the supervisor/reportees shown in the org chart.
+      const coverFileIds = await resolveCoverFileIdsBatch(
+        [row.id, row.supervisor?.id, ...row.reportees.map((r) => r.id)].filter(Boolean),
+        companyId,
+      );
+      const photoFor = (employee) =>
+        coverFileIds.get(employee.id) ?? employee.userProfile?.avatarFileId ?? null;
       return {
         ...row,
         tenureLabel: computeTenureLabel(row.hireDate),
-        profileImageFileId,
+        profileImageFileId: photoFor(row),
+        supervisor: row.supervisor
+          ? { ...row.supervisor, profileImageFileId: photoFor(row.supervisor) }
+          : null,
+        reportees: row.reportees.map((r) => ({
+          ...r,
+          profileImageFileId: photoFor(r),
+        })),
       };
     },
 
@@ -979,7 +993,8 @@ export function createHrService({ prisma, activityBridge }) {
         status: employee.status,
         department: employee.departmentRef?.name ?? null,
         jobTitle: employee.jobTitleRef?.name ?? null,
-        profileImageFileId: coverFileIds.get(employee.id) ?? null,
+        profileImageFileId:
+          coverFileIds.get(employee.id) ?? employee.userProfile?.avatarFileId ?? null,
         children: (childrenByParent.get(employee.id) ?? []).map(buildNode),
       });
 
