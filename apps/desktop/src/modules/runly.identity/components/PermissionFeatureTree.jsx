@@ -531,6 +531,7 @@ export default function PermissionFeatureTree({
         return (
           <Card
             key={moduleItem.key}
+            variant="bordered"
             className={[
               "p-0 overflow-hidden",
               moduleFull ? "ring-1 ring-emerald-500/40" : "",
@@ -539,17 +540,22 @@ export default function PermissionFeatureTree({
             {/* Collapsible module header — split into a button + sibling switch to avoid button-in-button.
                 Deliberately NOT green-tinted when moduleFull: the card's emerald ring plus the "Todos"
                 badge already signal "fully assigned" — stacking a translucent green header background
-                on top of those made the header text hard to read (green-on-green) in dark mode. */}
-            <div className="w-full px-4 py-3 border-b border-[hsl(var(--border))] flex items-center gap-3 transition-colors glass-subtle hover:bg-[hsl(var(--muted))]/30">
+                on top of those made the header text hard to read (green-on-green) in dark mode.
+                Uses a plain tint here (not the .glass-subtle backdrop-filter class) — this tree already
+                sits inside a blurred RunlyDetail section, and this card is now a plain border (no blur
+                of its own, see the "bordered" variant above), so a nested blur on top of that too was
+                unnecessary and contributed to occasional GPU-compositing flicker on this much stacked
+                translucency. */}
+            <div className="w-full px-4 py-3 border-b border-[hsl(var(--border))] flex items-center gap-3 transition-colors bg-[hsl(var(--muted))]/40 hover:bg-[hsl(var(--muted))]/55">
               <button
                 type="button"
                 onClick={() => toggleModule(moduleItem.key)}
                 className="flex items-center gap-3 flex-1 text-left min-w-0"
               >
                 {isOpen ? (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[hsl(var(--foreground))]/70" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[hsl(var(--foreground))]/70" />
                 )}
 
                 <div className="min-w-0 flex-1">
@@ -602,8 +608,10 @@ export default function PermissionFeatureTree({
                       key={`${moduleItem.key}.${featureItem.key}`}
                       className="border-b border-[hsl(var(--border))] last:border-b-0"
                     >
-                      {/* Feature header */}
-                      <div className="px-4 py-2.5 bg-[hsl(var(--muted))]/20 border-b border-[hsl(var(--border))]/60 flex items-center justify-between gap-3">
+                      {/* Feature header — no background tint of its own: one more nested "box"
+                          didn't add clarity here, just visual noise. The bottom border plus the
+                          bold uppercase label already separate it from the permission rows below. */}
+                      <div className="px-4 py-2.5 border-b border-[hsl(var(--border))]/60 flex items-center justify-between gap-3">
                         <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] dark:text-slate-300 uppercase tracking-wide">
                           {featureItem.label}
                         </p>

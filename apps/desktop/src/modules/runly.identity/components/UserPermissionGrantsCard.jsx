@@ -6,10 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   EmptyState,
   ErrorState,
   Skeleton,
@@ -95,20 +91,19 @@ export default function UserPermissionGrantsCard({ userId, token, canManage }) {
   const isLoading = permissionsQuery.isLoading || grantsQuery.isLoading;
   const isError = permissionsQuery.isError || grantsQuery.isError;
 
+  // No outer Card here on purpose: this component only ever renders inside a
+  // RunlyDetail "Permisos" section, which already provides the glass-shell
+  // box + title. Wrapping it in a second Card stacked four backdrop-filter
+  // blur layers on top of each other (section > this card > each module card
+  // > header row), which is both visually redundant and a real cause of
+  // intermittent GPU-compositing flicker on this much translucency at once.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-[hsl(var(--primary))]" />
-          Permisos adicionales
-        </CardTitle>
-        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-          Permisos extra para esta persona, ademas de los que ya da su rol. Aqui
-          no se pueden quitar los permisos del rol.
-        </p>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-4">
-        {isLoading ? (
+    <div className="space-y-4">
+      <p className="text-xs text-[hsl(var(--muted-foreground))] dark:text-slate-400">
+        Permisos extra para esta persona, ademas de los que ya da su rol. Aqui
+        no se pueden quitar los permisos del rol.
+      </p>
+      {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-14 w-full rounded-xl" />
@@ -130,7 +125,7 @@ export default function UserPermissionGrantsCard({ userId, token, canManage }) {
           />
         ) : (
           <>
-            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] dark:text-slate-400">
               <Badge variant="secondary" className="tabular-nums">
                 {pendingKeys?.size ?? savedKeys.size} concedidos
               </Badge>
@@ -151,11 +146,9 @@ export default function UserPermissionGrantsCard({ userId, token, canManage }) {
             />
           </>
         )}
-      </CardContent>
 
       {isDirty && canManage && (
         <UnsavedChangesBar
-          className="px-6"
           message="Cambios sin guardar en permisos"
           saving={saveMutation.isPending}
           saveLabel="Guardar permisos"
@@ -163,6 +156,6 @@ export default function UserPermissionGrantsCard({ userId, token, canManage }) {
           onSave={() => saveMutation.mutate([...(pendingKeys ?? [])])}
         />
       )}
-    </Card>
+    </div>
   );
 }
