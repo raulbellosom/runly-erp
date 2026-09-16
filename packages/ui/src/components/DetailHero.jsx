@@ -18,6 +18,8 @@ function GlyphIcon({ name, className, fallback = "FileText" }) {
 //   accentHex   string | null   (tints the fallback panel)
 //   chips       [{ key, label, value, icon, type, colorHex }]
 //   actions     ReactNode | null
+//   onImageClick function | null — when set and there's an imageUrl, the
+//               photo becomes a button (e.g. to open it in a viewer)
 //   bare        bool — when true, renders just the inner content with no Card
 //               wrapper, for callers (HeroContainer) that place this inside
 //               their own outer card alongside a StatStrip (also `bare`), so
@@ -32,6 +34,7 @@ export function DetailHero({
   accentHex,
   chips,
   actions,
+  onImageClick,
   bare = false,
 }) {
   const chipList = Array.isArray(chips) ? chips : [];
@@ -42,11 +45,26 @@ export function DetailHero({
             {imageLoading ? (
               <Skeleton className="h-full w-full" />
             ) : imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={title ? `Imagen de ${title}` : "Imagen"}
-                className="h-full w-full object-cover"
-              />
+              onImageClick ? (
+                <button
+                  type="button"
+                  onClick={onImageClick}
+                  className="block h-full w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-inset"
+                  aria-label="Ver imagen"
+                >
+                  <img
+                    src={imageUrl}
+                    alt={title ? `Imagen de ${title}` : "Imagen"}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ) : (
+                <img
+                  src={imageUrl}
+                  alt={title ? `Imagen de ${title}` : "Imagen"}
+                  className="h-full w-full object-cover"
+                />
+              )
             ) : (
               <div
                 className="flex h-full w-full items-center justify-center bg-[hsl(var(--muted))]"

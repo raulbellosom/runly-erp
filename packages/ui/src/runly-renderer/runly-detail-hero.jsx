@@ -6,6 +6,7 @@ import { Badge } from "../components/Badge.jsx";
 import { Card } from "../components/Card.jsx";
 import { DetailHero } from "../components/DetailHero.jsx";
 import { StatStrip } from "../components/StatStrip.jsx";
+import { AdvancedFileViewer } from "../components/AdvancedFileViewer.jsx";
 import { replacePathTokens } from "./detail-presentation.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 
@@ -133,6 +134,11 @@ export function HeroContainer({
   const [imageLoading, setImageLoading] = useState(
     Boolean(heroModel.imageAssetId || heroModel.imageDocsPath),
   );
+  // Only set for an "own" resolvable FileAsset (imageField/imageDocsPath) —
+  // an avatar-fallback photo has no file record to open in a viewer, just
+  // a preview image, so it stays null and the photo isn't clickable.
+  const [ownAssetId, setOwnAssetId] = useState(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,12 +163,14 @@ export function HeroContainer({
           );
           if (!cancelled) {
             setImageUrl(avatarUrl);
+            setOwnAssetId(null);
             setImageLoading(false);
           }
           return;
         }
         if (!cancelled) {
           setImageUrl(null);
+          setOwnAssetId(null);
           setImageLoading(false);
         }
         return;
@@ -170,6 +178,7 @@ export function HeroContainer({
       const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId);
       if (!cancelled) {
         setImageUrl(url);
+        setOwnAssetId(assetId);
         setImageLoading(false);
       }
     }
@@ -220,8 +229,19 @@ export function HeroContainer({
         accentHex={heroModel.accentHex}
         chips={heroModel.chips}
         actions={actions}
+        onImageClick={ownAssetId ? () => setViewerOpen(true) : null}
       />
       {kpiRenderItems.length > 0 ? <StatStrip bare items={kpiRenderItems} /> : null}
+      {ownAssetId ? (
+        <AdvancedFileViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          files={[{ id: ownAssetId, fileAssetId: ownAssetId, originalName: heroModel.title || "Imagen", mimeType: "image/*" }]}
+          activeIndex={0}
+          onIndexChange={() => {}}
+          onResolveSignedUrl={() => fetchSignedUrl(apiBaseUrl, token, ownAssetId, companyId)}
+        />
+      ) : null}
     </Card>
   );
 }
