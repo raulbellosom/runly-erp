@@ -1,9 +1,22 @@
 # Notes Editor — Automatic Side-by-Side Content Flow
 
-- Status: Approved (design)
-- Date: 2026-09-16
+- Status: Approved (design) — Revision 2
+- Date: 2026-09-16 (Revision 2: 2026-09-17)
 - Module: `runly.notes` (frontend only)
 - Author: Raul Belloso Medina
+
+## Revision 2 — fixes after live testing
+
+Revision 1 shipped, was tried live, and was reverted the same day: the drop
+target during drag was hard to see, dropping near a floated pair sometimes
+landed lower than expected, and images could silently queue into 3+ columns,
+making the row cramped and hard to type in. The user confirmed the
+Word-style automatic-flow *direction* is still right — these are bugs to fix,
+not a reason to abandon the approach. Revision 2 re-ships Designs 1-4 below
+unchanged, plus three additions: Design 5 (cap side-by-side to at most 2
+images per row), Design 6 (a visible drop-zone indicator during drag, not
+just the subtle sibling-slide), and Design 7 (row-height-aware reflow so the
+visual shift and the final rest position agree).
 
 ## Problem
 
@@ -137,16 +150,71 @@ items within a row independently. This keeps the reflow math tractable
 while still being visually correct for the common cases (dragging into/out
 of a single floated pair, or past a row entirely).
 
+### 5 — Cap side-by-side to at most 2 images per row
+
+`ImageAnnotationOverlay.jsx` only floats an image when its width is in
+`[34, 100)` percent — `displayWidthPct >= 34 && displayWidthPct < 100`
+(previously any `displayWidthPct < 100` floated). Below 34% the image stays
+a normal full-width block, same as 100%.
+
+This threshold is chosen deliberately: three floated images can only ever
+fit on the same row if each is under ⅓ (33.33%) of the row's width — by
+requiring at least 34% to float at all, `3 × 34% = 102% > 100%`, so a third
+floated image mathematically cannot fit and always wraps to its own new
+row. Two images at 34%+ each fit comfortably (`68%` minimum combined,
+`198%` maximum — the resize handles already clamp to `MAX_IMAGE_WIDTH_PCT`
+so an individual image can't itself exceed 100%). This directly fixes the
+reported "ends up 3 columns wide and hard to use" problem without needing
+any JS-side column counting — it falls out of float layout's own packing
+behavior once the threshold makes 3-wide arithmetically impossible.
+
+An image resized below 34% (a small icon-like accent) is not intended to
+pair with adjacent content for reading purposes and stays block-stacked,
+matching its pre-side-by-side-work behavior exactly.
+
+### 6 — A visible, authoritative drop-zone indicator during drag
+
+Revision 1's only feedback for "where will this land" was the sibling-slide
+animation (`docs/superpowers/specs/2026-09-16-notes-image-drag-reorder-design.md`,
+Design 3) — subtle, and, once floated rows are involved, only an
+approximation (it treats the dragged block's own height as the shift
+amount for every affected sibling, which isn't exactly right when the
+affected range crosses a shared row). Users found it hard to trust.
+
+Fix: `hooks/useBlockDragReorder.js` gains a second floating overlay — a
+dashed, tinted rectangle — sized and positioned directly from the exact
+same values used to compute the real drop position, so it is always
+accurate regardless of how precisely the secondary slide animation
+approximates the physical reflow:
+
+- Size: the dragged block's own on-screen width/height at drag start
+  (measured once, same source as the existing floating clone).
+- Position: at the candidate block's own `{ top, left }` when dropping
+  before an existing block (row-aware — for two floated images, this is
+  that specific image's own left edge, not just "the row's left edge");
+  at `{ top: lastBlock.bottom, left: lastBlock.left }` when dropping past
+  the end of the document.
+- Created alongside the floating clone at drag start, repositioned on every
+  `pointermove` (same imperative DOM-mutation approach as the clone, for
+  60fps smoothness — no React re-render per frame), removed on drop/cancel.
+
+The sibling-slide animation stays as supplementary motion feedback
+(unchanged, same documented approximation as Revision 1) — the dashed box
+is now the thing users are meant to trust for "where exactly will it land."
+
 ## Components / files
 
 Changed:
 
 - `apps/desktop/src/modules/runly.notes/components/ImageAnnotationOverlay.jsx`
-  (Design 1)
+  (Design 1, 5)
 - `apps/desktop/src/styles.css` (Design 2 — `.tiptap::after` clearfix)
 - `apps/desktop/src/modules/runly.notes/lib/dragReorder.js` (Design 4 — only
   relevant once the image drag-reorder spec has shipped; extends its
   `findDropPosition`/`computeShiftMap`)
+- `apps/desktop/src/modules/runly.notes/hooks/useBlockDragReorder.js`
+  (Design 6 — the shared drag hook now used by both images and tables;
+  gains the drop-zone indicator for both)
 
 No new files, no `@runly/ui` changes, no backend/API/Prisma changes, no new
 node attributes.
@@ -187,6 +255,12 @@ Manual QA (per `docs/ai-context/ui-screen-audit-checklist.md`), 390px and
 - Both themes: no visual regressions in spacing/margins around images that
   are still full-width (100%) — those should render byte-for-byte as before
   this change.
+- Resize three images to 34%+ each and place them consecutively: only 2
+  render side by side, the third wraps to its own new row. Resize one to
+  33% or below: it never floats, even next to another narrow image.
+- While dragging an image (mouse and touch), a dashed drop-zone box is
+  clearly visible and tracks the pointer accurately, including landing at
+  the correct side of a floated sibling.
 
 ## Implementation plan
 
