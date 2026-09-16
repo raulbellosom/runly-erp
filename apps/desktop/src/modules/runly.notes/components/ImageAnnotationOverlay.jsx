@@ -164,16 +164,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const displayWidthPct = liveWidthPct ?? widthPct
   // Outer box: controls the resizable width, carries the selection ring and
   // the pill/handle controls — never clipped, so they're never cut off.
-  const wrapperStyle = { userSelect: 'none' }
-  // Float only when width is in [34, 100) — three floated images can only
-  // ever fit on a row if each is under 1/3 (33.33%) of it, so requiring at
-  // least 34% to float makes 3-wide arithmetically impossible: 3*34=102>100.
-  // Below 34%, the image stays a normal full-width block (a small
-  // icon-like image isn't meant to pair with adjacent content for reading).
-  const canFloat = displayWidthPct >= 34 && displayWidthPct < 100
-  const wrapperClass = canFloat
-    ? 'group/img relative my-2 float-left'
-    : 'group/img relative my-2 block w-full'
+  const wrapperStyle = { userSelect: 'none', width: `${displayWidthPct}%` }
   // Frame: clips to the crop window (overflow-hidden always — harmless when
   // effectiveCrop is the identity {0,0,1,1}, no crop set), so a cropped
   // image can't hide controls that sit just outside its edges. Sized via
@@ -212,7 +203,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
     : { position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0 }
 
   return (
-    <NodeViewWrapper className={wrapperClass} style={{ width: `${displayWidthPct}%` }}>
+    <NodeViewWrapper className="group/img relative my-2 block w-full">
       <div
         ref={boxRef}
         onClick={onImageClick}

@@ -3,68 +3,23 @@
 // dragging (e.g. moving an image within a note) is implemented manually
 // with pointer events instead, which work uniformly for mouse and touch.
 
-// Finds the top-level block boundary closest to the pointer and returns the
+// Finds the top-level block boundary closest to clientY and returns the
 // document position to insert before. Falls back to the end of the doc.
-// Row-aware: when two blocks share a row (floated side by side), clientX
-// breaks the tie instead of always picking the first one in document order —
-// see pickDropIndex.
-export function findDropPosition(view, clientX, clientY) {
+export function findDropPosition(view, clientY) {
   const { doc } = view.state
-  const blockRects = computeBlockRects(view)
-  if (blockRects.length === 0) return doc.content.size
-  const index = pickDropIndex(blockRects, clientX, clientY)
-  return index >= blockRects.length ? doc.content.size : blockRects[index].offset
-}
-
-/**
- * Pure: groups block rects (in document order) into visual "rows" — runs of
- * consecutive blocks whose rects vertically overlap (e.g. two floated
- * images sharing a line). A block that doesn't overlap its neighbor starts
- * a new row on its own, which is what keeps ordinary single-column content
- * behaving exactly as it did before floats existed.
- */
-export function groupIntoRows(blockRects) {
-  const rows = []
-  for (const rect of blockRects) {
-    const lastRow = rows[rows.length - 1]
-    const overlapsLastRow = lastRow?.some((r) => rect.top < r.bottom && r.top < rect.bottom)
-    if (overlapsLastRow) lastRow.push(rect)
-    else rows.push([rect])
-  }
-  return rows
-}
-
-/**
- * Pure: given block rects (in document order, each needs top/bottom/
- * left/width) and a pointer position, returns the array INDEX (into the
- * flattened, document-order list — not a ProseMirror offset) to insert
- * before. Returns blockRects.length to mean "insert at the very end".
- *
- * Single-block rows use the original top/bottom-half rule (preserves
- * existing single-column behavior exactly). Multi-block rows (floated
- * siblings sharing a line) pick a position among them by comparing
- * clientX to each block's own horizontal midpoint, left to right.
- */
-export function pickDropIndex(blockRects, clientX, clientY) {
-  const rows = groupIntoRows(blockRects)
-  let flatIndex = 0
-  for (const row of rows) {
-    const rowBottom = Math.max(...row.map((r) => r.bottom))
-    if (clientY < rowBottom) {
-      if (row.length === 1) {
-        const r = row[0]
-        return clientY < r.top + (r.bottom - r.top) / 2 ? flatIndex : flatIndex + 1
-      }
-      const sorted = [...row].sort((a, b) => a.left - b.left)
-      for (let i = 0; i < sorted.length; i++) {
-        const r = sorted[i]
-        if (clientX < r.left + r.width / 2) return flatIndex + i
-      }
-      return flatIndex + row.length
+  let pos = doc.content.size
+  let found = false
+  doc.forEach((node, offset) => {
+    if (found) return
+    const dom = view.nodeDOM(offset)
+    if (!dom?.getBoundingClientRect) return
+    const rect = dom.getBoundingClientRect()
+    if (clientY < rect.top + rect.height / 2) {
+      pos = offset
+      found = true
     }
-    flatIndex += row.length
-  }
-  return blockRects.length
+  })
+  return pos
 }
 
 // Moves the node currently at fromPos to targetPos (a position computed
@@ -147,11 +102,10 @@ export function computeShiftMap({ blockRects, originalIndex, candidateIndex, dra
 
 /**
  * Pure: given block rects (document order), the candidate drop array index
- * (from pickDropIndex), and the dragged block's own width/height in px,
- * returns the exact `{ top, left, width, height }` rect a visible drop-zone
- * indicator should occupy. Positioned at the candidate block's own
- * top-left (row-aware — lands beside a specific floated sibling, not just
- * "the row"), or below the last block when dropping past the end.
+ * (from findDropPosition's array-index resolution), and the dragged block's
+ * own width/height in px, returns the exact `{ top, left, width, height }`
+ * rect a visible drop-zone indicator should occupy — at the candidate
+ * block's own top-left, or below the last block when dropping past the end.
  */
 export function computeIndicatorRect(blockRects, candidateIndex, widthPx, heightPx) {
   if (candidateIndex < blockRects.length) {

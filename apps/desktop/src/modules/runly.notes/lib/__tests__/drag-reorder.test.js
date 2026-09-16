@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX, findTableAtSelection,
-  groupIntoRows, pickDropIndex, computeIndicatorRect,
+  computeIndicatorRect,
 } from '../dragReorder.js'
 
 // 6 blocks at indices 0-5, offsets deliberately uneven (not equal to index)
@@ -79,66 +79,6 @@ test('findTableAtSelection: returns null when the selection is not inside a tabl
   const paragraphNode = { type: { name: 'paragraph' } }
   const $from = fakePos([docNode, paragraphNode])
   assert.equal(findTableAtSelection({ selection: { $from } }), null)
-})
-
-test('groupIntoRows: blocks that do not vertically overlap each stay in their own row', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
-    { offset: 10, top: 20, bottom: 40, left: 0, width: 300 },
-  ]
-  const rows = groupIntoRows(rects)
-  assert.equal(rows.length, 2)
-  assert.equal(rows[0].length, 1)
-  assert.equal(rows[1].length, 1)
-})
-
-test('groupIntoRows: two blocks with overlapping vertical ranges (floated side by side) group into one row', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 100, left: 0, width: 150 },
-    { offset: 10, top: 0, bottom: 100, left: 150, width: 150 },
-  ]
-  const rows = groupIntoRows(rects)
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].length, 2)
-})
-
-test('pickDropIndex: single-column stacking still uses the top/bottom-half rule per block', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
-    { offset: 10, top: 20, bottom: 40, left: 0, width: 300 },
-  ]
-  assert.equal(pickDropIndex(rects, 150, 22), 1)
-  assert.equal(pickDropIndex(rects, 150, 38), 2)
-  assert.equal(pickDropIndex(rects, 150, 2), 0)
-})
-
-test('pickDropIndex: two floated blocks side by side use clientX to decide between/around them', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 100, left: 0, width: 150 },
-    { offset: 10, top: 0, bottom: 100, left: 150, width: 150 },
-  ]
-  assert.equal(pickDropIndex(rects, 50, 50), 0)
-  assert.equal(pickDropIndex(rects, 200, 50), 1)
-  assert.equal(pickDropIndex(rects, 280, 50), 2)
-})
-
-test('pickDropIndex: pointer below every row inserts at the very end', () => {
-  const rects = [
-    { offset: 0, top: 0, bottom: 20, left: 0, width: 300 },
-  ]
-  assert.equal(pickDropIndex(rects, 150, 500), 1)
-})
-
-test('pickDropIndex: pointer well below a floated pair inserts at the end, not beside either of them (regression)', () => {
-  // Two floated images side by side (a single row), then a large gap below
-  // them with nothing else in the document. Dropping far below the row
-  // must land at the end (its own new line) — not get attributed to "beside
-  // the left/right image" just because it's technically the last row.
-  const rects = [
-    { offset: 0, top: 100, bottom: 300, left: 0, width: 150 },
-    { offset: 10, top: 100, bottom: 300, left: 150, width: 150 },
-  ]
-  assert.equal(pickDropIndex(rects, 75, 600), 2)
 })
 
 test('computeIndicatorRect: positions at the candidate block\'s own top-left when dropping before it', () => {

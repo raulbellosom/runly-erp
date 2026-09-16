@@ -168,7 +168,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     if (active && active.pointerId === e.pointerId) {
       e.preventDefault()
       const view = editor.view
-      const candidatePos = findDropPosition(view, e.clientX, e.clientY)
+      const candidatePos = findDropPosition(view, e.clientY)
       const rawCandidateIndex = active.blockRects.findIndex((b) => b.offset === candidatePos)
       const candidateIndex = rawCandidateIndex === -1 ? active.blockRects.length : rawCandidateIndex
       const shiftMap = computeShiftMap({
