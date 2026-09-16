@@ -1436,11 +1436,16 @@ export function RunlyForm({
       )}
 
       <div className={hasAsideColumn ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]" : "space-y-3"}>
-        <div className="space-y-3">
+        {/* Below xl there's no side-by-side column, so the aside content
+            (completion ring, quick actions) would otherwise fall after every
+            field, at the very bottom of a long form. order-first puts it
+            right below the header instead; xl:order-none restores normal
+            (right-column) source order once the two columns sit side by side. */}
+        <div className="space-y-3 order-last xl:order-none">
           {mainSections.map((section) => renderSection(section))}
         </div>
         {hasAsideColumn ? (
-          <div className="space-y-3 xl:sticky xl:top-4 xl:self-start">
+          <div className="space-y-3 order-first xl:order-none xl:sticky xl:top-4 xl:self-start">
             {showCompletion ? (
               <FormCompletionRing
                 percent={completionPercent}
