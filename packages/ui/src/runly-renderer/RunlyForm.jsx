@@ -29,38 +29,27 @@ import { FormPreviewPanel } from "../components/FormPreviewPanel.jsx";
 import { ReportPartsEditor } from "./ReportPartsEditor.jsx";
 import { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
 import { DynamicFieldsSection, buildCustomFieldsPayload } from "./DynamicFieldsSection.jsx";
-import {
-  normalizeSpanishLabel,
-  normalizeRelationDescriptor,
-} from "./renderer-adapters.js";
+import { normalizeSpanishLabel, normalizeRelationDescriptor } from "./renderer-adapters.js";
 import { cn } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { normalizeField, normalizeSections } from "./runly-form-schema.js";
 import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
+import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
   PRESET_COLORS,
   CAR_COLORS,
   resolveColorName,
   joinUrl,
-  resolveRelationLabel,
   normalizeOptions,
   buildInitialValues,
   castValueByType,
   resolveRecordId,
-  extractBlueprintRows,
-  extractFieldsFromBlueprint,
-  extractCreatedRecord,
-  buildInlineCreatePrefill,
   toMoney,
   normalizeReportParts,
   computePartsCost,
 } from "./runly-form-utils.js";
 
-// Module-level cache for relation field options. Persists across modal open/close cycles.
-const _relationOptionsCache = new Map();
-
-const MAIN_SECTION_TYPES = new Set(["fields", "parts", "attachments", "custom-fields"]);
-const _RELATION_CACHE_TTL = 5 * 60 * 1000;
+const MAIN_SECTION_TYPES = new Set(["fields", "parts", "attachments", "custom-fields", "component"]);
 
 function matchesFieldRule(rule, formValues) {
   if (!rule || typeof rule !== "object") return true;
@@ -143,6 +132,7 @@ export function RunlyForm({
   onCompletionChange,
   asideActions = null,
   onAttachmentsChange,
+  componentRegistry = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -190,25 +180,6 @@ export function RunlyForm({
   const [resolvedRecordId, setResolvedRecordId] = useState(() =>
     resolveRecordId(initialData),
   );
-  const [relationState, setRelationState] = useState({});
-  const [relationInlineErrors, setRelationInlineErrors] = useState({});
-  const [inlineCreateState, setInlineCreateState] = useState({
-    open: false,
-    fieldName: null,
-    descriptor: null,
-    blueprint: null,
-    prefillData: {},
-    searchText: "",
-  });
-  const [quickCreatingField, setQuickCreatingField] = useState(null);
-  const [nestedBlueprintRows, setNestedBlueprintRows] = useState(null);
-  // Stable fields array for the nested inline-create form. Recomputed only when the
-  // blueprint changes, not on every outer render.
-  const nestedBlueprintFields = useMemo(
-    () => extractFieldsFromBlueprint(inlineCreateState.blueprint),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [inlineCreateState.blueprint],
-  );
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const next = {};
     for (const section of sections) {
@@ -218,7 +189,6 @@ export function RunlyForm({
     return next;
   });
   const attachmentsControllersRef = useRef(new Map());
-  const relationDebounceRef = useRef({});
   const formValuesRef = useRef(formValues);
   const fieldMapRef = useRef(fieldMap);
   const initialDataRef = useRef(initialData);
@@ -233,135 +203,37 @@ export function RunlyForm({
     formValuesRef.current = formValues;
   }, [formValues]);
 
-  const loadRelationOptions = useCallback(
-    async (fieldName, descriptor, search) => {
-      const url = new URL(joinUrl(apiBaseUrl, descriptor.apiPath));
-      url.searchParams.set(descriptor.pageParam, "1");
-      url.searchParams.set(
-        descriptor.pageSizeParam,
-        String(descriptor.pageSize),
-      );
-      if (search) url.searchParams.set(descriptor.searchParam, search);
-      const cacheKey = url.toString();
-
-      // Serve from module-level cache if fresh and it's not a search query
-      if (!search) {
-        const cached = _relationOptionsCache.get(cacheKey);
-        if (cached && Date.now() - cached.ts < _RELATION_CACHE_TTL) {
-          setRelationState((prev) => ({
-            ...prev,
-            [fieldName]: {
-              options: cached.options,
-              loading: false,
-              error: null,
-            },
-          }));
-          return true;
-        }
-      }
-
-      setRelationState((prev) => ({
-        ...prev,
-        [fieldName]: {
-          options: prev[fieldName]?.options ?? [],
-          loading: true,
-          error: null,
-        },
-      }));
-      try {
-        const res = await fetch(cacheKey, {
-          headers: buildApiHeaders(token, companyId),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const rows = Array.isArray(json.data)
-          ? json.data
-          : Array.isArray(json)
-            ? json
-            : [];
-        const options = rows
-          .map((row) => {
-            const df = descriptor.displayFields;
-            let meta = null;
-            if (df) {
-              const rawMeta = {
-                badge: df.badge ? String(row[df.badge] ?? "").trim() : null,
-                title: df.title ? String(row[df.title] ?? "").trim() : null,
-                subtitle: df.subtitle
-                  ? Array.isArray(df.subtitle)
-                    ? df.subtitle
-                        .map((f) => row[f])
-                        .filter(Boolean)
-                        .join(" • ")
-                    : String(row[df.subtitle] ?? "").trim()
-                  : null,
-              };
-              meta =
-                rawMeta.badge || rawMeta.title || rawMeta.subtitle
-                  ? rawMeta
-                  : null;
-            }
-            return {
-              value: String(row[descriptor.valueField] ?? ""),
-              label: resolveRelationLabel(row, descriptor),
-              disabled: descriptor.disabledField
-                ? row[descriptor.disabledField] === false
-                : false,
-              meta,
-            };
-          })
-          .filter((o) => o.value);
-        if (!search) {
-          _relationOptionsCache.set(cacheKey, { options, ts: Date.now() });
-        }
-        setRelationState((prev) => {
-          const currentOptions = prev[fieldName]?.options ?? [];
-          const selectedValue = formValuesRef.current?.[fieldName];
-          const normalizedSelectedValue =
-            selectedValue === undefined ||
-            selectedValue === null ||
-            selectedValue === ""
-              ? null
-              : String(selectedValue);
-          const hasSelectedInFetched =
-            normalizedSelectedValue != null &&
-            options.some(
-              (item) => String(item?.value ?? "") === normalizedSelectedValue,
-            );
-          const selectedFallback =
-            normalizedSelectedValue != null && !hasSelectedInFetched
-              ? currentOptions.find(
-                  (item) =>
-                    String(item?.value ?? "") === normalizedSelectedValue,
-                )
-              : null;
-          const mergedOptions = selectedFallback
-            ? [selectedFallback, ...options]
-            : options;
-          return {
-            ...prev,
-            [fieldName]: {
-              options: mergedOptions,
-              loading: false,
-              error: null,
-            },
-          };
-        });
-        return true;
-      } catch {
-        setRelationState((prev) => ({
-          ...prev,
-          [fieldName]: {
-            options: prev[fieldName]?.options ?? [],
-            loading: false,
-            error: true,
-          },
-        }));
-        return false;
-      }
-    },
-    [apiBaseUrl, token, companyId],
-  );
+  const {
+    relationState,
+    relationInlineErrors,
+    setRelationInlineErrors,
+    quickCreatingField,
+    inlineCreateState,
+    nestedBlueprintFields,
+    nestedBlueprintRows,
+    loadRelationOptions,
+    handleRelationSearch,
+    openInlineCreate,
+    closeInlineCreate,
+    handleInlineCreateSuccess,
+    handleQuickCreate,
+    clearRelationInlineError,
+  } = useRunlyFormRelations({
+    apiBaseUrl,
+    token,
+    companyId,
+    fieldMap,
+    initialData,
+    resetInitialDataToken,
+    formValuesRef,
+    setFormValues,
+    setFieldErrors,
+    blueprint,
+    blueprints,
+    resolveBlueprintByKey,
+    allowInlineCreate,
+    inlineCreateDepth,
+  });
 
   // Reset form state when the form structure or initial data actually changes.
   // Uses string tokens (not object refs) so reference-equal but structurally identical
@@ -402,74 +274,6 @@ export function RunlyForm({
       total_cost: totalCost,
     }));
   }, [formValues.labor_cost, reportParts]);
-
-  useEffect(() => {
-    for (const [, field] of fieldMap.entries()) {
-      if (field.type !== "relation") continue;
-      const descriptor = normalizeRelationDescriptor(field);
-      if (descriptor?.source === "remote" && descriptor.preload) {
-        loadRelationOptions(field.name, descriptor, "");
-      }
-    }
-  }, [fieldMap, loadRelationOptions]);
-
-  // When editing an existing record, seed each relation field with an initial
-  // option built from the initialData fields that match the descriptor's
-  // labelField(s). This prevents "Registro no disponible" when the current
-  // value isn't in the first page of remote results.
-  useEffect(() => {
-    if (!initialData || typeof initialData !== "object") return;
-    for (const [fieldName, field] of fieldMap.entries()) {
-      if (field.type !== "relation") continue;
-      const descriptor = normalizeRelationDescriptor(field);
-      if (!descriptor) continue;
-      const value = initialData[fieldName];
-      if (value == null || value === "") continue;
-
-      const labelFields = Array.isArray(descriptor.labelField)
-        ? descriptor.labelField
-        : typeof descriptor.labelField === "string"
-          ? [descriptor.labelField]
-          : [];
-
-      const labelParts = labelFields
-        .map((f) =>
-          initialData[f] != null ? String(initialData[f]).trim() : "",
-        )
-        .filter(Boolean);
-
-      if (labelParts.length === 0) continue;
-
-      const seedOption = {
-        value: String(value),
-        label: labelParts.join(descriptor.labelSeparator ?? " "),
-        disabled: false,
-        meta: null,
-      };
-
-      setRelationState((prev) => {
-        const current = prev[fieldName] ?? {
-          options: [],
-          loading: false,
-          error: null,
-        };
-        if (current.options.some((o) => o.value === seedOption.value))
-          return prev;
-        return {
-          ...prev,
-          [fieldName]: {
-            ...current,
-            options: [
-              seedOption,
-              ...current.options.filter((o) => o.value !== seedOption.value),
-            ],
-          },
-        };
-      });
-    }
-    // Re-seed whenever the initial data token changes (i.e. a different record is opened).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetInitialDataToken, fieldMap]);
 
   if (!apiPath) {
     return (
@@ -530,7 +334,7 @@ export function RunlyForm({
   const handleChange = (name, value) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-    setRelationInlineErrors((prev) => ({ ...prev, [name]: "" }));
+    clearRelationInlineError(name);
   };
 
   const handlePartsChange = useCallback((nextParts) => {
@@ -545,287 +349,6 @@ export function RunlyForm({
     }));
   }, []);
 
-  const handleRelationSearch = (fieldName, descriptor, search) => {
-    if (descriptor.source !== "remote") return;
-    clearTimeout(relationDebounceRef.current[fieldName]);
-    if (!search) {
-      loadRelationOptions(fieldName, descriptor, "");
-      return;
-    }
-    relationDebounceRef.current[fieldName] = setTimeout(() => {
-      loadRelationOptions(fieldName, descriptor, search);
-    }, 300);
-  };
-
-  const closeInlineCreate = useCallback(() => {
-    setInlineCreateState({
-      open: false,
-      fieldName: null,
-      descriptor: null,
-      blueprint: null,
-      prefillData: {},
-      searchText: "",
-    });
-  }, []);
-
-  const resolveInlineCreateBlueprint = useCallback(
-    async (viewKey) => {
-      if (typeof resolveBlueprintByKey === "function") {
-        const resolved = await resolveBlueprintByKey(viewKey);
-        if (resolved) return resolved;
-      }
-
-      const localRows = Array.isArray(blueprints)
-        ? blueprints
-        : nestedBlueprintRows;
-      if (Array.isArray(localRows) && localRows.length > 0) {
-        const found = localRows.find(
-          (row) => String(row?.key ?? "").trim() === viewKey,
-        );
-        if (found) return found;
-      }
-
-      const response = await fetch(joinUrl(apiBaseUrl, "/blueprints"), {
-        method: "GET",
-        headers: buildApiHeaders(token, companyId),
-      });
-      if (!response.ok)
-        throw new Error("No se pudieron cargar las vistas relacionadas.");
-      const payload = await response.json();
-      const rows = extractBlueprintRows(payload);
-      setNestedBlueprintRows(rows);
-      const moduleKey = String(blueprint?.moduleKey ?? "").trim();
-      const found = rows.find((row) => {
-        if (String(row?.key ?? "").trim() !== viewKey) return false;
-        if (!moduleKey) return true;
-        return String(row?.moduleKey ?? "").trim() === moduleKey;
-      });
-      return found ?? null;
-    },
-    [
-      apiBaseUrl,
-      blueprint?.moduleKey,
-      blueprints,
-      nestedBlueprintRows,
-      resolveBlueprintByKey,
-      token,
-      companyId,
-    ],
-  );
-
-  const openInlineCreate = useCallback(
-    async (fieldName, descriptor, searchText) => {
-      if (!allowInlineCreate || inlineCreateDepth > 1) return;
-      if (!descriptor?.create?.enabled) return;
-
-      const viewKey = String(descriptor.create.viewKey ?? "").trim();
-      if (!viewKey) return;
-
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
-
-      setRelationInlineErrors((prev) => ({ ...prev, [fieldName]: "" }));
-
-      try {
-        const nestedBlueprint = await resolveInlineCreateBlueprint(viewKey);
-        if (!nestedBlueprint) {
-          throw new Error("No se encontró la vista de creación relacionada.");
-        }
-        const nestedApiPath = descriptor.create.apiPath;
-        const blueprintForCreate =
-          nestedApiPath &&
-          nestedBlueprint?.schema &&
-          nestedBlueprint.schema.apiPath !== nestedApiPath
-            ? {
-                ...nestedBlueprint,
-                schema: {
-                  ...nestedBlueprint.schema,
-                  apiPath: nestedApiPath,
-                },
-              }
-            : nestedBlueprint;
-        const prefillData = buildInlineCreatePrefill({
-          nestedBlueprint: blueprintForCreate,
-          searchText,
-          descriptor,
-        });
-        setInlineCreateState({
-          open: true,
-          fieldName,
-          descriptor,
-          blueprint: blueprintForCreate,
-          prefillData,
-          searchText: String(searchText ?? ""),
-        });
-      } catch (err) {
-        setRelationInlineErrors((prev) => ({
-          ...prev,
-          [fieldName]:
-            err instanceof Error && err.message
-              ? err.message
-              : "No se pudo abrir el formulario relacionado.",
-        }));
-      }
-    },
-    [allowInlineCreate, inlineCreateDepth, resolveInlineCreateBlueprint],
-  );
-
-  // Shared by the modal-create success handler and quick-create: selects the
-  // newly created record, refreshes the option list, and surfaces any
-  // partial-failure state. Kept independent of inlineCreateState so quick
-  // create (which never opens the modal) can call it directly.
-  const applyCreatedRelationResult = useCallback(
-    async (fieldName, descriptor, result) => {
-      if (!fieldName || !descriptor) return;
-
-      const createdRecord = extractCreatedRecord(result);
-      const createdIdRaw =
-        createdRecord && descriptor.valueField in createdRecord
-          ? createdRecord[descriptor.valueField]
-          : null;
-      const createdId =
-        createdIdRaw === undefined ||
-        createdIdRaw === null ||
-        createdIdRaw === ""
-          ? null
-          : String(createdIdRaw);
-
-      if (createdRecord && createdId) {
-        const option = {
-          value: createdId,
-          label: resolveRelationLabel(createdRecord, descriptor),
-          disabled: false,
-        };
-        setRelationState((prev) => {
-          const current = prev[fieldName]?.options ?? [];
-          const next = current.filter(
-            (item) => String(item.value) !== createdId,
-          );
-          return {
-            ...prev,
-            [fieldName]: {
-              ...prev[fieldName],
-              options: [option, ...next],
-              loading: false,
-              error: null,
-            },
-          };
-        });
-      }
-
-      if (descriptor.create?.selectCreated !== false && createdId) {
-        handleChange(fieldName, createdId);
-      }
-
-      let refreshOk = true;
-      if (descriptor.create?.refreshOptions !== false) {
-        refreshOk = await loadRelationOptions(fieldName, descriptor, "");
-        if (createdRecord && createdId) {
-          const createdOption = {
-            value: createdId,
-            label: resolveRelationLabel(createdRecord, descriptor),
-            disabled: false,
-          };
-          setRelationState((prev) => {
-            const current = prev[fieldName]?.options ?? [];
-            const exists = current.some(
-              (item) => String(item?.value ?? "") === createdId,
-            );
-            if (exists) return prev;
-            return {
-              ...prev,
-              [fieldName]: {
-                ...prev[fieldName],
-                options: [createdOption, ...current],
-                loading: false,
-                error: null,
-              },
-            };
-          });
-        }
-      }
-
-      if (!createdId) {
-        setRelationInlineErrors((prev) => ({
-          ...prev,
-          [fieldName]:
-            "Se creó el registro, pero no se pudo obtener su identificador.",
-        }));
-      } else if (!refreshOk) {
-        setRelationInlineErrors((prev) => ({
-          ...prev,
-          [fieldName]:
-            "Se creó el registro, pero no se pudieron actualizar las opciones.",
-        }));
-      } else {
-        setRelationInlineErrors((prev) => ({ ...prev, [fieldName]: "" }));
-      }
-    },
-    [loadRelationOptions],
-  );
-
-  const handleInlineCreateSuccess = useCallback(
-    async (result) => {
-      await applyCreatedRelationResult(
-        inlineCreateState.fieldName,
-        inlineCreateState.descriptor,
-        result,
-      );
-      closeInlineCreate();
-    },
-    [
-      applyCreatedRelationResult,
-      closeInlineCreate,
-      inlineCreateState.descriptor,
-      inlineCreateState.fieldName,
-    ],
-  );
-
-  const handleQuickCreate = useCallback(
-    async (fieldName, descriptor, searchText) => {
-      if (descriptor?.create?.mode !== "quick") return;
-      const trimmed = String(searchText ?? "").trim();
-      if (!trimmed) return;
-
-      setQuickCreatingField(fieldName);
-      setRelationInlineErrors((prev) => ({ ...prev, [fieldName]: "" }));
-      try {
-        const response = await fetch(
-          joinUrl(apiBaseUrl, descriptor.create.apiPath),
-          {
-            method: "POST",
-            headers: buildApiHeaders(token, companyId, {
-              "Content-Type": "application/json",
-            }),
-            body: JSON.stringify({ [descriptor.create.nameField]: trimmed }),
-          },
-        );
-        const text = await response.text();
-        let payload = null;
-        try {
-          payload = text ? JSON.parse(text) : null;
-        } catch {
-          payload = null;
-        }
-        if (!response.ok) {
-          throw new Error(payload?.error || "No se pudo crear el registro.");
-        }
-        await applyCreatedRelationResult(fieldName, descriptor, payload);
-      } catch (err) {
-        setRelationInlineErrors((prev) => ({
-          ...prev,
-          [fieldName]:
-            err instanceof Error && err.message
-              ? err.message
-              : "No se pudo crear el registro.",
-        }));
-      } finally {
-        setQuickCreatingField(null);
-      }
-    },
-    [apiBaseUrl, applyCreatedRelationResult, companyId, token],
-  );
 
   const validate = () => {
     const nextErrors = {};
@@ -1342,6 +865,43 @@ export function RunlyForm({
             onDefinitionsChange={(defs) =>
               setCustomFieldDefs((prev) => ({ ...prev, [section.id]: defs }))
             }
+          />
+        );
+      }
+
+      if (section.type === "component") {
+        const Comp = componentRegistry?.resolve?.(section.component) ?? null;
+        if (!Comp) {
+          return (
+            <div className="rounded-xl border border-dashed border-[hsl(var(--border))] px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]">
+              Componente "{section.component}" no está registrado.
+            </div>
+          );
+        }
+        const sectionValue = {};
+        for (const fieldName of section.fields ?? []) {
+          sectionValue[fieldName] = formValues[fieldName];
+        }
+        const sectionErrors = {};
+        for (const fieldName of section.fields ?? []) {
+          if (fieldErrors[fieldName]) sectionErrors[fieldName] = fieldErrors[fieldName];
+        }
+        return (
+          <Comp
+            value={sectionValue}
+            errors={sectionErrors}
+            onChange={(patch) => {
+              setFormValues((prev) => ({ ...prev, ...patch }));
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                for (const key of Object.keys(patch)) next[key] = "";
+                return next;
+              });
+            }}
+            apiBaseUrl={apiBaseUrl}
+            token={token}
+            companyId={companyId}
+            disabled={submitting}
           />
         );
       }
