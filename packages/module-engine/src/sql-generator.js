@@ -161,6 +161,11 @@ export function generateCreateTableSql(modelDef) {
     const idxName = `${tableName}_${idx.fields.join('_')}_idx`
     lines.push(`CREATE ${unique} IF NOT EXISTS "${idxName}" ON ${table} (${cols});`)
   }
+  // Private service-owned models must never be exposed through PostgREST.
+  if (modelDef.serverOnly === true) {
+    lines.push(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`)
+    lines.push(`REVOKE ALL ON TABLE ${table} FROM PUBLIC, anon, authenticated;`)
+  }
   return lines.join('\n')
 }
 
@@ -172,8 +177,10 @@ export function assertSafeMigrationSql(sql) {
   if (typeof sql !== 'string') {
     throw new ModuleEngineError('assertSafeMigrationSql: sql must be a string', 'AME_INVALID_SQL')
   }
-  if (/\bALTER\s+TABLE\b/i.test(sql)) {
-    if (!SAFE_ADDITIVE_ALTER_TABLE_RE.test(sql) || UNSAFE_ALTER_TABLE_PARTS_RE.test(sql)) {
+  // Enabling RLS is additive security, and is emitted for serverOnly models.
+  const ddl = sql.replace(/\bALTER\s+TABLE\s+(?:"[a-zA-Z_][a-zA-Z0-9_]*"|[a-zA-Z_][a-zA-Z0-9_]*)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY\s*;/gi, '')
+  if (/\bALTER\s+TABLE\b/i.test(ddl)) {
+    if (!SAFE_ADDITIVE_ALTER_TABLE_RE.test(ddl) || UNSAFE_ALTER_TABLE_PARTS_RE.test(ddl)) {
       throw new ModuleEngineError(
         'assertSafeMigrationSql: ALTER TABLE is allowed only for additive ADD COLUMN IF NOT EXISTS statements. ' +
         'For other DDL (SET DEFAULT, ADD CONSTRAINT, RENAME, etc.) add unsafe: true to the migration entry in module.manifest.js.',
