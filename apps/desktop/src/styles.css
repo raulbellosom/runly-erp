@@ -600,6 +600,10 @@ body,
     hsl(var(--note-paper-line)) calc(0.9375rem * 1.72 - 1px),
     hsl(var(--note-paper-line)) calc(0.9375rem * 1.72)
   );
+  /* Shifts the pattern so a line lands under real body text instead of
+     wherever it happens to fall from .note-sheet's top — see the
+     measurement effect in NoteEditor.jsx that sets this custom property. */
+  background-position: 0 calc(-1 * var(--note-paper-phase, 0px));
 }
 [data-paper-style="grid"] .note-sheet {
   background-image:
@@ -617,6 +621,7 @@ body,
       hsl(var(--note-paper-line)) calc(0.9375rem * 1.72 - 1px),
       hsl(var(--note-paper-line)) calc(0.9375rem * 1.72)
     );
+  background-position: 0 calc(-1 * var(--note-paper-phase, 0px));
 }
 @media (max-width: 639px) {
   [data-paper-style="lined"] .note-sheet {
@@ -651,11 +656,15 @@ body,
    works even on a blank ("En blanco") page. Positioned at 1.25rem, clearly
    BEFORE the 2rem (px-8) left padding shared by the icon row, title, and
    body text, so all writing starts to the right of the line, never on top
-   of or before it. */
+   of or before it. `top` starts at --note-content-top (the measured
+   distance to where body content actually begins, same measurement effect
+   as the paper-pattern phase above) instead of 0, so the line doesn't
+   bleed up into the sticky toolbar's translucent (90%-opacity) background —
+   at 0 it would start behind the toolbar and be faintly visible through it. */
 [data-paper-margin="true"] .note-sheet::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: var(--note-content-top, 0px);
   bottom: 0;
   left: 1.25rem;
   width: 1px;

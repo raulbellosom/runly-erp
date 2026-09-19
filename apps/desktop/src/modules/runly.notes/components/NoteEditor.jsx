@@ -15,6 +15,7 @@ import { buildExtensions } from '../lib/editor-extensions.js'
 import { usePresence } from '../hooks/usePresence.js'
 import { shouldFocusDocumentEnd } from '../lib/clickBelowContent.js'
 import { isCaretHiddenByKeyboard, computeCaretScrollDelta } from '../lib/keyboardInset.js'
+import { computeLineUnitPx, computePaperPhase } from '../lib/paperAlignment.js'
 import { NoteToolbar } from './NoteToolbar.jsx'
 import { TableFloatingMenu } from './TableFloatingMenu.jsx'
 import { NoteCoverBanner } from './NoteCoverBanner.jsx'
@@ -170,6 +171,45 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
 
   const rawKeyboardInset = useKeyboardInset()
   const keyboardInset = readOnly ? 0 : rawKeyboardInset
+
+  // Aligns the ruled/grid paper-style pattern (painted on .note-sheet, whose
+  // top sits behind the sticky toolbar + icon/title row) with where the
+  // BODY content actually starts. That distance isn't a fixed number — the
+  // toolbar's own height changes between mobile and desktop button sizes —
+  // so a hardcoded CSS offset can't reliably make the lines land under real
+  // text. Measuring it directly and exposing it as CSS custom properties
+  // (consumed by the paper-style rules in styles.css) is the only way this
+  // stays correct across breakpoints and content changes (cover banner
+  // present/absent, etc).
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    function measure() {
+      const sheetEl = container.querySelector('.note-sheet')
+      const tiptapEl = container.querySelector('.tiptap')
+      const firstBodyEl = tiptapEl?.children?.[1]
+      if (!sheetEl || !firstBodyEl) return
+      const sheetRect = sheetEl.getBoundingClientRect()
+      const bodyRect = firstBodyEl.getBoundingClientRect()
+      const distanceFromSheetTop = bodyRect.top - sheetRect.top
+      const rootFontSizePx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      const isMobile = window.matchMedia('(max-width: 639px)').matches
+      const lineUnitPx = computeLineUnitPx(rootFontSizePx, isMobile)
+      const phase = computePaperPhase(distanceFromSheetTop, lineUnitPx)
+      sheetEl.style.setProperty('--note-content-top', `${distanceFromSheetTop}px`)
+      sheetEl.style.setProperty('--note-paper-phase', `${phase}px`)
+    }
+
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(container)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [note.id, note.cover_url, note.paper_style, note.paper_margin])
 
   const handleSelectionUpdate = useCallback(
     ({ editor }) => {
