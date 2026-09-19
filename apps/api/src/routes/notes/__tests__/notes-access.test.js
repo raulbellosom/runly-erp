@@ -106,6 +106,34 @@ describe("notes-service — updateNote paper_style", () => {
   });
 });
 
+describe("notes-service — updateNote paper effect toggles", () => {
+  it("includes paper_margin/paper_texture/paper_shadow in the CASE update and returns them", async () => {
+    let capturedSql = "";
+    const prisma = {
+      $queryRaw: (strings) => {
+        const text = sql(strings).toLowerCase();
+        capturedSql = text;
+        if (text.includes("from notes n left join note_shares")) {
+          return Promise.resolve([{ id: NOTE, owner_user_id: OWNER, share_permission: null }]);
+        }
+        if (text.includes("update notes")) {
+          return Promise.resolve([{ id: NOTE, paper_margin: true, paper_texture: true, paper_shadow: true }]);
+        }
+        return Promise.resolve([]);
+      },
+      $executeRaw: () => Promise.resolve([]),
+    };
+    const svc = createNotesService({ prisma });
+    const note = await svc.updateNote(NOTE, OWNER, { paperMargin: true, paperTexture: true, paperShadow: true });
+    assert.equal(note.paper_margin, true);
+    assert.equal(note.paper_texture, true);
+    assert.equal(note.paper_shadow, true);
+    assert.match(capturedSql, /paper_margin/);
+    assert.match(capturedSql, /paper_texture/);
+    assert.match(capturedSql, /paper_shadow/);
+  });
+});
+
 describe("notes-service — updateNote contentText", () => {
   it("includes content_text in the CASE update when contentText is sent, and returns it", async () => {
     let capturedSql = "";

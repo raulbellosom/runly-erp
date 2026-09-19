@@ -252,6 +252,9 @@ export function createNotesService({ prisma, broadcaster = null }) {
         a.background_color,
         a.background_image_url,
         a.paper_style,
+        a.paper_margin,
+        a.paper_texture,
+        a.paper_shadow,
         a.is_pinned,
         a.is_archived,
         a.is_trashed,
@@ -316,6 +319,21 @@ export function createNotesService({ prisma, broadcaster = null }) {
                                  WHEN ${data.paperStyle !== undefined ? "t" : "f"}::boolean = TRUE
                                  THEN ${data.paperStyle ?? 'none'}::text
                                  ELSE paper_style
+                               END,
+        paper_margin         = CASE
+                                 WHEN ${data.paperMargin !== undefined ? "t" : "f"}::boolean = TRUE
+                                 THEN ${data.paperMargin ?? false}::boolean
+                                 ELSE paper_margin
+                               END,
+        paper_texture        = CASE
+                                 WHEN ${data.paperTexture !== undefined ? "t" : "f"}::boolean = TRUE
+                                 THEN ${data.paperTexture ?? false}::boolean
+                                 ELSE paper_texture
+                               END,
+        paper_shadow         = CASE
+                                 WHEN ${data.paperShadow !== undefined ? "t" : "f"}::boolean = TRUE
+                                 THEN ${data.paperShadow ?? false}::boolean
+                                 ELSE paper_shadow
                                END,
         cover_url            = CASE
                                  WHEN ${data.coverUrl !== undefined ? "t" : "f"}::boolean = TRUE
