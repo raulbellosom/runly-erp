@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Pencil, Trash2, SmilePlus } from 'lucide-react'
 import { Button } from './Button.jsx'
 import { Card } from './Card.jsx'
 import { Avatar, AvatarImage, AvatarFallback } from './Avatar.jsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from './Tooltip.jsx'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
+import { Popover, PopoverTrigger, PopoverContent } from './Popover.jsx'
 import MentionTextarea, { renderMentionText } from './MentionTextarea.jsx'
 
 function formatTime(str) {
@@ -35,60 +36,51 @@ function groupReactions(reactions = [], currentUserId = null) {
   return [...map.values()]
 }
 
-// ── Emoji reaction picker (inline grid — no external dependency) ───────────────
+// ── Emoji reaction picker ───────────────────────────────────────────────────
+// Uses the shared Radix Popover (portals to <body>) instead of a hand-rolled
+// `position: absolute` div — CommentThread is commonly rendered inside a
+// Sheet's `overflow-y-auto` panel, which clipped/mispositioned a locally
+// absolute-positioned popup. See runly.chat's MessageReactionPicker for the
+// same pattern.
 
 const REACTIONS = ['👍', '👎', '❤️', '🎉', '😄', '😮', '😢', '🔥', '👀', '✅', '🚀', '💯']
 
 function EmojiPicker({ onSelect }) {
   const [open, setOpen] = useState(false)
-  const buttonRef = useRef(null)
-  const pickerRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleOutside(e) {
-      if (!buttonRef.current?.contains(e.target) && !pickerRef.current?.contains(e.target)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    document.addEventListener('touchstart', handleOutside, { passive: true })
-    return () => {
-      document.removeEventListener('mousedown', handleOutside)
-      document.removeEventListener('touchstart', handleOutside)
-    }
-  }, [open])
 
   return (
-    <div className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] px-1.5 py-0.5 text-xs text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
-      >
-        <SmilePlus className="h-3 w-3" />
-      </button>
-      {open && (
-        <div
-          ref={pickerRef}
-          className="absolute bottom-7 left-0 z-50 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--popover))] p-2 shadow-lg"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] px-1.5 py-0.5 text-xs text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
         >
-          <div className="grid grid-cols-6 gap-1">
-            {REACTIONS.map(emoji => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => { onSelect(emoji); setOpen(false) }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-[hsl(var(--muted))] transition-colors"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+          <SmilePlus className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={8}
+        collisionPadding={8}
+        className="w-auto p-2 pointer-events-auto"
+        style={{ zIndex: 10001 }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="grid grid-cols-6 gap-1">
+          {REACTIONS.map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => { onSelect(emoji); setOpen(false) }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-[hsl(var(--muted))] transition-colors"
+            >
+              {emoji}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -121,16 +113,18 @@ function CommentRow({ comment, currentUserId, members, onUpdate, onDelete, onTog
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs font-semibold">{displayName(comment.author)}</span>
-          {comment._pending ? (
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">Enviando...</span>
-          ) : (
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">{formatTime(comment.createdAt)}</span>
-          )}
-          {!comment._pending && comment.editedAt && (
-            <span className="text-xs text-[hsl(var(--muted-foreground))] italic">(editado)</span>
-          )}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-semibold leading-tight">{displayName(comment.author)}</span>
+          <div className="flex items-center gap-1.5">
+            {comment._pending ? (
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">Enviando...</span>
+            ) : (
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">{formatTime(comment.createdAt)}</span>
+            )}
+            {!comment._pending && comment.editedAt && (
+              <span className="text-xs text-[hsl(var(--muted-foreground))] italic">(editado)</span>
+            )}
+          </div>
         </div>
 
         {editing ? (
