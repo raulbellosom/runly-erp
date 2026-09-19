@@ -32,8 +32,19 @@ export const DrawingBlock = Node.create({
 
   addCommands() {
     return {
-      insertDrawingBlock: () => ({ commands }) =>
-        commands.insertContent({ type: 'drawingBlock', attrs: {} }),
+      insertDrawingBlock: () => ({ commands }) => {
+        // A TipTap command isn't a React component, so it can't use the
+        // useIsDark hook — but it also doesn't need to: this is the same
+        // plain DOM check that hook uses internally for its own initial
+        // state. Read live at insertion time so a new drawing always starts
+        // legible against the app's CURRENT theme.
+        const isDark =
+          typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+        return commands.insertContent({
+          type: 'drawingBlock',
+          attrs: { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' },
+        })
+      },
     }
   },
 })
