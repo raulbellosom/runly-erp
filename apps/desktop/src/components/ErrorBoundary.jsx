@@ -15,7 +15,7 @@ import { ApiErrorScreen } from "./ApiErrorScreen";
 export class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, componentStack: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -25,6 +25,7 @@ export class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // eslint-disable-next-line no-console
     console.error("[ErrorBoundary]", error, info?.componentStack);
+    this.setState({ componentStack: info?.componentStack ?? null });
     // Stale-client recovery: a lazy chunk URL died because the server restarted
     // or a new deploy replaced hashed assets. Reload once to fetch fresh modules.
     const message = String(error?.message ?? error ?? "");
@@ -42,7 +43,7 @@ export class ErrorBoundary extends Component {
   }
 
   handleRetry = () => {
-    this.setState({ error: null });
+    this.setState({ error: null, componentStack: null });
   };
 
   render() {
@@ -50,6 +51,7 @@ export class ErrorBoundary extends Component {
       return (
         <ApiErrorScreen
           error={this.state.error}
+          componentStack={this.state.componentStack}
           onRetry={this.handleRetry}
           fullScreen={this.props.fullScreen ?? true}
           context={this.props.context}

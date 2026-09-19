@@ -13,6 +13,8 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  Copy,
+  Check,
 } from "lucide-react";
 import { classifyError } from "../lib/classifyError.js";
 
@@ -240,20 +242,43 @@ function AnimatedErrorIcon({ Icon, color, glowColor, pulse, reduced }) {
  * @param {Function} props.onRetry        Callback for the "Reintentar" action.
  * @param {boolean}  props.fullScreen     If true (default), fills the full viewport.
  * @param {string}   props.context        Optional context label shown in details.
+ * @param {string}   props.componentStack Optional React component stack (from componentDidCatch).
  */
-export function ApiErrorScreen({ error, onRetry, fullScreen = true, context }) {
+export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, componentStack }) {
   const reduced = useReducedMotion();
   const [showDetails, setShowDetails] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const { type, code } = classifyError(error);
   const cfg = ERROR_CONFIG[type] ?? ERROR_CONFIG.unknown;
   const Icon = cfg.icon;
 
-  const techDetails = error?.message
+  const summary = error?.message
     ? code
       ? `HTTP ${code} — ${error.message}`
       : error.message
     : "Sin detalles disponibles";
+  // Everything a real diagnosis needs — not just the one-line message the
+  // badge/summary already shows. error.stack already includes name+message,
+  // so this is the JS stack (where it threw) plus the React tree (what was
+  // rendering when it threw), the two things DevTools' console gives you
+  // that this screen didn't before.
+  const fullDetails = [
+    context ? `Contexto: ${context}` : null,
+    error?.stack || summary,
+    componentStack ? `Component stack:${componentStack}` : null,
+  ].filter(Boolean).join("\n\n");
+
+  async function copyDetails() {
+    try {
+      await navigator.clipboard.writeText(fullDetails);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard API unavailable (permissions, insecure context) — the
+      // details are still fully visible and selectable in the box below.
+    }
+  }
 
   const wrapperClass = fullScreen
     ? "fixed inset-0 z-[300] flex flex-col items-center justify-center overflow-hidden"
@@ -406,19 +431,27 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context }) {
                 className="overflow-hidden"
               >
                 <div
-                  className="mt-3 rounded-xl p-3 font-mono text-[11px] leading-relaxed"
+                  className="relative mt-3 rounded-xl p-3"
                   style={{
                     background: "hsl(var(--muted))",
-                    color: "hsl(var(--muted-foreground))",
                     border: "1px solid hsl(var(--border))",
                   }}
                 >
-                  {context && (
-                    <div className="mb-1.5 opacity-60">
-                      <span className="font-semibold">Contexto:</span> {context}
-                    </div>
-                  )}
-                  <div className="break-all">{techDetails}</div>
+                  <button
+                    onClick={copyDetails}
+                    className="absolute right-2 top-2 flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium transition-colors duration-150 hover:bg-[hsl(var(--background))]"
+                    style={{ color: "hsl(var(--muted-foreground))" }}
+                    aria-label="Copiar detalles del error"
+                  >
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                    {copied ? "Copiado" : "Copiar"}
+                  </button>
+                  <pre
+                    className="max-h-64 overflow-auto whitespace-pre-wrap break-all pr-14 font-mono text-[11px] leading-relaxed"
+                    style={{ color: "hsl(var(--muted-foreground))" }}
+                  >
+                    {fullDetails}
+                  </pre>
                 </div>
               </motion.div>
             )}
