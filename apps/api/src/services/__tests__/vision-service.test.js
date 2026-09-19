@@ -121,7 +121,7 @@ describe("vision-service", () => {
     );
   });
 
-  it("defaults to the current qwen vision model and sends reasoning_format hidden", async () => {
+  it("defaults to the current qwen vision model and sends reasoning_format hidden plus a low reasoning effort", async () => {
     const fetchMock = mock.fn(async () =>
       groqBody('{"merchant":null,"total":null,"currency":"MXN","date":null,"taxAmount":null,"lines":[],"confidence":null}'),
     );
@@ -129,8 +129,20 @@ describe("vision-service", () => {
     await svc.extractReceipt({ imageBase64: IMG, mimeType: "image/jpeg" });
     const [, opts] = fetchMock.mock.calls[0].arguments;
     const body = JSON.parse(opts.body);
-    assert.equal(body.model, "qwen/qwen3.6-27b");
+    assert.equal(body.model, "qwen/qwen3.8-27b");
     assert.equal(body.reasoning_format, "hidden");
+    assert.equal(body.reasoning_effort, "low");
+  });
+
+  it("always sends an explicit max_completion_tokens so Groq doesn't assume the model's full ceiling", async () => {
+    const fetchMock = mock.fn(async () =>
+      groqBody('{"merchant":null,"total":null,"currency":"MXN","date":null,"taxAmount":null,"lines":[],"confidence":null}'),
+    );
+    const svc = createVisionService({ env: { GROQ_API_KEY: "k" }, fetchImpl: fetchMock });
+    await svc.extractReceipt({ imageBase64: IMG, mimeType: "image/jpeg" });
+    const [, opts] = fetchMock.mock.calls[0].arguments;
+    const body = JSON.parse(opts.body);
+    assert.equal(body.max_completion_tokens, 900);
   });
 
   it("does not send reasoning_format for a non-reasoning model override", async () => {
@@ -145,6 +157,7 @@ describe("vision-service", () => {
     const [, opts] = fetchMock.mock.calls[0].arguments;
     const body = JSON.parse(opts.body);
     assert.equal(body.reasoning_format, undefined);
+    assert.equal(body.reasoning_effort, undefined);
   });
 
   it("surfaces the full model_not_found body so the UI can show the real cause", async () => {
