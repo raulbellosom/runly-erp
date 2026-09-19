@@ -152,6 +152,9 @@ importers:
       nodemailer:
         specifier: ^8.0.10
         version: 8.0.10
+      pdfjs-dist:
+        specifier: 5.4.296
+        version: 5.4.296
       pdfkit:
         specifier: ^0.18.0
         version: 0.18.0

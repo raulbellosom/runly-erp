@@ -26,6 +26,7 @@
     "lucide-react": "latest",
     "node-cache": "^5.1.2",
     "nodemailer": "^8.0.10",
+    "pdfjs-dist": "5.4.296",
     "pdfkit": "^0.18.0",
     "react": "latest",
     "react-dom": "latest",

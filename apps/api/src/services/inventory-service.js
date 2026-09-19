@@ -2,6 +2,7 @@
 import { parseMentionIds } from '../lib/mention-utils.js'
 import { createActivityService } from './activity-service.js';
 import { createActivityBridge } from './activity-bridge.js';
+import { buildInventoryWhere } from './inventory-query.js';
 
 export class InventoryServiceError extends Error {
   constructor(message, status = 500) {
@@ -78,6 +79,8 @@ export function createInventoryService({ prisma, activityBridge }) {
     locationId,
     status,
     assignedToId,
+    sortBy,
+    sortDir,
     page = 1,
     limit = 50,
   }) {
@@ -85,23 +88,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     const take = normalizeLimit(limit);
     const skip = (normalizePage(page) - 1) * take;
 
-    const where = { companyId, enabled: true };
-
-    if (search) {
-      const q = String(search).trim();
-      if (q) {
-        where.OR = [
-          { name: { contains: q, mode: 'insensitive' } },
-          { assetTag: { contains: q, mode: 'insensitive' } },
-          { serialNumber: { contains: q, mode: 'insensitive' } },
-        ];
-      }
-    }
-    if (categoryId) where.categoryId = categoryId;
-    if (brandId) where.brandId = brandId;
-    if (locationId) where.locationId = locationId;
-    if (status) where.status = status;
-    if (assignedToId) where.assignedToId = assignedToId;
+    const where = buildInventoryWhere(companyId, { search, categoryId, brandId, locationId, status, assignedToId });
 
     const [data, total] = await Promise.all([
       prisma.invItem.findMany({
@@ -112,7 +99,7 @@ export function createInventoryService({ prisma, activityBridge }) {
           location: { select: { id: true, name: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [new Set(['assetTag', 'name', 'status', 'purchaseDate', 'warrantyExpiry', 'updatedAt']).has(sortBy) ? sortBy : 'createdAt']: sortDir === 'asc' ? 'asc' : 'desc' },
         skip,
         take,
       }),
@@ -303,7 +290,7 @@ export function createInventoryService({ prisma, activityBridge }) {
             });
           });
         } catch (err) {
-          if (err.code === 'P2002' && err.meta?.target?.includes('asset_tag') && tagAttempt < 5) {
+          if (!data.assetTag && err.code === 'P2002' && err.meta?.target?.includes('asset_tag') && tagAttempt < 5) {
             tagAttempt++;
             const year = new Date().getFullYear();
             const count = await prisma.invItem.count({ where: { companyId } });
@@ -341,7 +328,7 @@ export function createInventoryService({ prisma, activityBridge }) {
           },
         });
       } catch (err) {
-        if (err.code === 'P2002' && err.meta?.target?.includes('asset_tag') && tagAttempt < 5) {
+        if (!data.assetTag && err.code === 'P2002' && err.meta?.target?.includes('asset_tag') && tagAttempt < 5) {
           tagAttempt++;
           const year = new Date().getFullYear();
           const count = await prisma.invItem.count({ where: { companyId } });
@@ -519,7 +506,8 @@ export function createInventoryService({ prisma, activityBridge }) {
     const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true } });
     if (!item) throw new InventoryServiceError('Item not found', 404);
     await assertRefInCompany('hrEmployee', employeeId, companyId, 'El colaborador');
-    if (item.assignedToId || item.status === 'assigned') throw new InventoryServiceError('Item is already assigned', 409);
+    const activeAssignment = await prisma.invAssignment.findFirst({ where: { itemId, returnedAt: null } });
+    if (activeAssignment) throw new InventoryServiceError('Item is already assigned', 409);
 
     const result = await prisma.$transaction(async (tx) => {
       const assignment = await tx.invAssignment.create({
@@ -556,20 +544,17 @@ export function createInventoryService({ prisma, activityBridge }) {
     assertCompany(companyId);
     const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true } });
     if (!item) throw new InventoryServiceError('Item not found', 404);
-    if (!item.assignedToId && item.status !== 'assigned') throw new InventoryServiceError('Item is not currently assigned', 409);
+    const activeAssignment = await prisma.invAssignment.findFirst({
+      where: { itemId, returnedAt: null },
+      orderBy: { assignedAt: 'desc' },
+    });
+    if (!activeAssignment) throw new InventoryServiceError('Item is not currently assigned', 409);
 
     const result = await prisma.$transaction(async (tx) => {
-      const activeAssignment = await tx.invAssignment.findFirst({
-        where: { itemId, returnedAt: null },
-        orderBy: { assignedAt: 'desc' },
+      await tx.invAssignment.update({
+        where: { id: activeAssignment.id },
+        data: { returnedAt: new Date(), ...(notes !== undefined ? { notes } : {}) },
       });
-
-      if (activeAssignment) {
-        await tx.invAssignment.update({
-          where: { id: activeAssignment.id },
-          data: { returnedAt: new Date(), ...(notes !== undefined ? { notes } : {}) },
-        });
-      }
 
       return tx.invItem.update({
         where: { id: itemId },
@@ -1005,9 +990,13 @@ export function createInventoryService({ prisma, activityBridge }) {
     assertCompany(companyId);
     const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true }, select: { id: true } });
     if (!item) throw new InventoryServiceError('Item not found', 404);
-    return prisma.invItemFile.create({
-      data: { itemId, fileAssetId, label: label ?? null },
-      include: { fileAsset: { select: { id: true, originalName: true, mimeType: true, sizeBytes: true } } },
+    return prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`inventory-files:${itemId}`}, 0))::text AS locked`;
+      const include = { fileAsset: { select: { id: true, originalName: true, mimeType: true, sizeBytes: true } } };
+      const previous = await tx.invItemFile.findFirst({ where: { itemId, fileAssetId }, include });
+      if (previous) return previous;
+      if (await tx.invItemFile.count({ where: { itemId } }) >= 20) throw new InventoryServiceError('El equipo admite hasta 20 archivos.', 400);
+      return tx.invItemFile.create({ data: { itemId, fileAssetId, label: label ?? null }, include });
     });
   }
 

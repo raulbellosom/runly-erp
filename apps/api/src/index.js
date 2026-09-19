@@ -5484,6 +5484,7 @@ mountWithAuth(
     inventoryNotifSvc,
     commentsService,
     CommentsServiceError,
+    filesService,
     enrichFilesWithSignedUrls: filesService.enrichFilesWithSignedUrls.bind(filesService),
   }),
 );

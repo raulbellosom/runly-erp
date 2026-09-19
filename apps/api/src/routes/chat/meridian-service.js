@@ -334,7 +334,7 @@ export function createMeridianService({
   // One place for the Groq HTTP call: retry once on 429/5xx or a network error,
   // abort after timeoutMs. Returns the assistant `message` object or throws.
   // Shared by the chat loop (callGroq), the turn classifier, and the web turn.
-  async function callGroqRaw({ model: m, messages, tools, toolChoice, maxTokens = 1000, timeoutMs = GROQ_TIMEOUT_MS }) {
+  async function callGroqRaw({ model: m, messages, tools, toolChoice, maxTokens = 1000, timeoutMs = GROQ_TIMEOUT_MS, respectRateLimit = false }) {
     const body = {
       model: m,
       temperature: 0.2,
@@ -344,8 +344,9 @@ export function createMeridianService({
       messages,
     };
     let lastErr;
+    let retryDelay = 1200;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
+      if (attempt > 0) await new Promise((r) => setTimeout(r, retryDelay));
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       let res;
@@ -357,7 +358,15 @@ export function createMeridianService({
         });
       } catch (err) { lastErr = err; clearTimeout(timer); continue; }
       clearTimeout(timer);
-      if (res.status === 429 || res.status >= 500) { lastErr = new Error(`Groq ${res.status}`); continue; }
+      if (res.status === 429 || res.status >= 500) {
+        lastErr = new Error(`Groq ${res.status}`);
+        if (respectRateLimit && res.status === 429) {
+          lastErr = new ChatServiceError('La IA alcanzó el límite temporal del proveedor. Espera un momento y vuelve a enviar; no se ha creado ningún registro.', 429);
+          const retrySeconds = Number(res.headers.get('retry-after'));
+          if (Number.isFinite(retrySeconds) && retrySeconds > 0) retryDelay = Math.min(30000, Math.max(15000, retrySeconds * 1000 + 5000));
+        }
+        continue;
+      }
       if (!res.ok) { const d = await res.text().catch(() => ""); throw new Error(`Groq ${res.status}: ${d.slice(0, 160)}`); }
       const payload = await res.json();
       return payload?.choices?.[0]?.message ?? null;
@@ -924,7 +933,37 @@ export function createMeridianService({
     return { message: { role: "assistant", content: finalText, createdAt: saved?.createdAt ?? new Date() } };
   }
 
+  // Module surfaces reuse Meridian's transport and limits without constructing
+  // fake chat conversations or granting access to Chat's tool registry.
+  async function answerWithTools({ messages, tools, executeTool, actorProfileId, finishAfterTools }) {
+    if (!isConfigured()) throw new ChatServiceError('La IA no está configurada.', 503);
+    if (!checkRate(actorProfileId)) throw new ChatServiceError('Espera un momento antes de volver a consultar.', 429);
+    const transcript = [...messages];
+    const started = Date.now();
+    let calls = 0;
+    for (let step = 0; step < 5 && Date.now() - started < 60_000; step++) {
+      const reply = await callGroqRaw({ model, messages: transcript, tools, toolChoice: 'auto', maxTokens: 1200, respectRateLimit: true });
+      if (!reply?.tool_calls?.length) {
+        if (!reply?.content?.trim()) throw new ChatServiceError('La IA no pudo responder. Intenta de nuevo.', 502);
+        return { text: reply.content.trim().slice(0, 6000), model, calls };
+      }
+      transcript.push({ role: 'assistant', content: reply.content ?? '', tool_calls: reply.tool_calls });
+      for (const tool of reply.tool_calls) {
+        if (++calls > 8 || Date.now() - started >= 60_000) throw new ChatServiceError('La consulta requiere demasiados pasos. Haz una pregunta más concreta.', 400);
+        let args;
+        try { args = JSON.parse(tool.function?.arguments || '{}'); } catch { args = null; }
+        const result = await executeTool(tool.function?.name, args);
+        transcript.push({ role: 'tool', tool_call_id: tool.id, content: clampToolResult(result) });
+      }
+      const finalText = finishAfterTools?.();
+      if (finalText) return { text: finalText, model, calls };
+    }
+    throw new ChatServiceError('La consulta requiere demasiados pasos. Haz una pregunta más concreta.', 400);
+  }
+
   return {
+    answerWithTools,
+    searchPublicModel: tavilyKey && webEnabled ? tavilySearch : null,
     isConfigured,
     isWebEnabled: () => webEnabled,
     getOrCreateMeridianProfile,

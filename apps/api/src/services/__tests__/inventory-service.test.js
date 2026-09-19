@@ -255,10 +255,13 @@ describe('assignItem', () => {
     )
   })
 
-  it('throws 409 if item status is already assigned', async () => {
+  it('throws 409 if item has an active assignment row', async () => {
     const prisma = buildPrismaMock({
       invItem: {
         findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, status: 'assigned', enabled: true }),
+      },
+      invAssignment: {
+        findFirst: async () => ({ id: 'assign-1', returnedAt: null }),
       },
     })
     const svc = createInventoryService({ prisma })
@@ -271,6 +274,35 @@ describe('assignItem', () => {
         return true
       },
     )
+  })
+
+  // Regression: the denormalized InvItem.status field can drift to 'assigned'
+  // (e.g. a manual edit) without a real InvAssignment row ever being created.
+  // The duplicate check must trust InvAssignment, not the stale status field,
+  // or a genuinely unassigned item gets permanently blocked from assignment.
+  it('does not throw when status is stale "assigned" but no active assignment row exists', async () => {
+    let txCalled = false
+    const prisma = buildPrismaMock({
+      invItem: {
+        findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, status: 'assigned', enabled: true }),
+      },
+      invAssignment: {
+        findFirst: async () => null,
+      },
+      _tx: {
+        invItem: {
+          update: async (args) => ({ id: args.where.id, status: 'assigned', ...args.data }),
+        },
+        invAssignment: {
+          create: async (args) => { txCalled = true; return { id: 'assign-1', ...args.data } },
+        },
+      },
+    })
+    const svc = createInventoryService({ prisma })
+    const result = await svc.assignItem(ITEM_ID, EMPLOYEE_ID, USER_ID, null, COMPANY_ID)
+
+    assert.ok(txCalled, '$transaction was called')
+    assert.ok(result.assignment, 'result has assignment')
   })
 })
 
@@ -285,9 +317,11 @@ describe('returnItem', () => {
       invItem: {
         findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, status: 'assigned', enabled: true }),
       },
+      invAssignment: {
+        findFirst: async () => ({ id: 'assign-1', returnedAt: null }),
+      },
       _tx: {
         invAssignment: {
-          findFirst: async () => ({ id: 'assign-1', returnedAt: null }),
           update: async (args) => { assignmentUpdated = true; return { id: args.where.id, ...args.data } },
         },
         invItem: {

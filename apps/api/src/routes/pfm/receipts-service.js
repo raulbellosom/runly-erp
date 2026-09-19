@@ -1,40 +1,10 @@
 // apps/api/src/routes/pfm/receipts-service.js
-import sharp from "sharp";
+import { prepareVisionImage } from "../../services/vision-image.js";
+export { prepareVisionImage } from "../../services/vision-image.js";
 import { PfmServiceError, isTableNotFoundError } from "./service-helpers.js";
 
 const NOT_INSTALLED = "El modulo de finanzas personales no esta instalado.";
 const MAX_ATTEMPTS = 3;
-
-// Groq's vision endpoint (like most OpenAI-compatible vision APIs) rejects
-// base64 image payloads above a few MB, and phone-camera photos routinely
-// come in well over that once JPEG bytes are base64-inflated (~33%) — that's
-// what "El servicio de vision rechazo la peticion (4xx)" actually is for a
-// normal photo. Re-encoding through sharp also normalizes EXIF rotation (a
-// portrait phone photo is otherwise sent sideways) and any exotic source
-// format (e.g. HEIC) into a plain JPEG the vision model can always read.
-const MAX_VISION_IMAGE_BYTES = 3 * 1024 * 1024;
-const MAX_VISION_DIMENSION = 2000;
-
-export async function prepareVisionImage(buf) {
-  let quality = 85;
-  const render = (q) =>
-    sharp(buf)
-      .rotate()
-      .resize({
-        width: MAX_VISION_DIMENSION,
-        height: MAX_VISION_DIMENSION,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: q })
-      .toBuffer();
-  let out = await render(quality);
-  while (out.length > MAX_VISION_IMAGE_BYTES && quality > 40) {
-    quality -= 15;
-    out = await render(quality);
-  }
-  return out;
-}
 
 export function createReceiptsService({
   prisma,

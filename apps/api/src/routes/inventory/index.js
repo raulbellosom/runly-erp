@@ -5,6 +5,10 @@
 // applied by mountWithAuth(); every route still declares its own
 // requirePermission(...).
 import { Hono } from "hono";
+import { createInventoryIntakeRouter } from './intake-routes.js';
+import { createInventoryAssistantRouter } from './assistant-routes.js';
+import { tenantActiveContext } from '../../lib/active-context.js';
+import { createInventoryReusableCatalog, INVENTORY_BASE_TYPES } from '../../services/inventory-reusable-catalog.js';
 
 export function createInventoryRouter({
   prisma,
@@ -15,8 +19,29 @@ export function createInventoryRouter({
   commentsService,
   CommentsServiceError,
   enrichFilesWithSignedUrls,
+  filesService,
 }) {
   const router = new Hono();
+  router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
+  router.route('/', createInventoryAssistantRouter({ prisma, requirePermission }));
+  const reusableCatalog = createInventoryReusableCatalog({ prisma });
+  const typeLabels = ['Hardware', 'Software', 'Licencia', 'Equipo', 'Mobiliario', 'Vehículo', 'Consumible', 'Otro'];
+  for (const [segment, kind] of [['models', 'model'], ['types', 'type']]) {
+    router.get(`/inventory/${segment}`, requirePermission('inventory.catalog.read'), async c => {
+      try {
+        const search = c.req.query('search') ?? '';
+        const rows = await reusableCatalog.list({ companyId: c.get('companyId'), kind, search });
+        const base = kind === 'type' ? INVENTORY_BASE_TYPES.map((value, i) => ({ id: value, value, name: typeLabels[i] })).filter(row => `${row.value} ${row.name}`.toLowerCase().includes(search.toLowerCase())) : [];
+        return c.json({ data: [...base, ...rows.map(row => ({ ...row, value: row.name }))] });
+      } catch (error) { return c.json({ error: 'No se pudo consultar el catálogo.' }, error.status ?? 500); }
+    });
+    router.post(`/inventory/${segment}`, requirePermission('inventory.catalog.manage'), async c => {
+      try {
+        const row = await reusableCatalog.create({ companyId: c.get('companyId'), kind, input: await c.req.json() });
+        return c.json({ data: { ...row, value: row.name } }, 201);
+      } catch (error) { return c.json({ error: error.status ? error.message : 'No se pudo crear el registro.' }, error.status ?? 500); }
+    });
+  }
 
   const isInvErr = (err) => err instanceof InventoryServiceError;
   const isCommentErr = (err) => err instanceof CommentsServiceError;
@@ -25,8 +50,8 @@ export function createInventoryRouter({
   router.get("/inventory/items", requirePermission("inventory.item.read"), async (c) => {
     try {
       const companyId = c.get("companyId");
-      const { search, categoryId, brandId, locationId, status, assignedToId, page, limit } = c.req.query();
-      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, page: Number(page) || 1, limit: Number(limit) || 50 });
+      const { search, categoryId, brandId, locationId, status, assignedToId, page, limit, pageSize, sortBy, sortDir } = c.req.query();
+      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
       return c.json(result);
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
@@ -173,6 +198,9 @@ export function createInventoryRouter({
       const body = await c.req.json();
       const fileAssetId = body.file_asset_id ?? body.fileAssetId;
       if (!fileAssetId) return c.json({ error: "file_asset_id is required" }, 400);
+      if (filesService) {
+        await filesService.getById({ authUserId: c.get('authUserId'), activeContext: tenantActiveContext(c), id: fileAssetId });
+      }
       const record = await inventoryService.addItemFile(id, fileAssetId, companyId, body.label ?? null);
       return c.json({ data: record }, 201);
     } catch (err) {

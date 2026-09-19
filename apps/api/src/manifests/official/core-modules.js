@@ -1,4 +1,5 @@
 import { createModuleManifest, MODULE_KINDS } from "@runly/core";
+import { inventoryAssistantThread, inventoryReusableCatalog } from './inventory-assistant.model.js';
 import {
   contactsMap,
   hrMap,
@@ -886,7 +887,6 @@ export const runlyCalendarManifest = createModuleManifest({
   pwa: { shortName: "Calendario", startPath: "/calendar" },
   accentColor: "#6D28D9",
   initials: "CA",
-  logoUrl: "/module-logos/runly-calendar-128.svg",
   category: "sistema",
   summary: "Calendarios personales, eventos y recordatorios",
   fullscreenPaths: ["/calendar"],
@@ -947,7 +947,6 @@ export const runlyCatalogManifest = createModuleManifest({
   accentColor: "#EA580C",
   initials: "CT",
   category: "comercial",
-  logoUrl: "/module-logos/runly-catalog-128.svg",
   summary: "Productos, categorias, variantes e inventario unificados.",
   dependencies: [{ key: "runly.core" }],
   lifecycle: {
@@ -1265,6 +1264,7 @@ export const runlyPosManifest = createModuleManifest({
 });
 
 export const inventoryMap = createModuleManifest({
+  models: [inventoryAssistantThread, inventoryReusableCatalog],
   key: 'runly.inventory',
   name: 'Inventario',
   description: 'Gestion de inventario y activos de la empresa',
@@ -1285,6 +1285,13 @@ export const inventoryMap = createModuleManifest({
       icon: 'Boxes',
       layout: 'main',
       permissionKey: 'inventory.item.read',
+    },
+    {
+      label: 'Registro con IA',
+      path: '/inventory/intake',
+      icon: 'Sparkles',
+      layout: 'main',
+      permissionKey: 'inventory.item.create',
     },
     {
       label: 'Asignaciones',
