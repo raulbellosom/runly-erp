@@ -82,6 +82,30 @@ describe("notes-service — read/write require access", () => {
   });
 });
 
+describe("notes-service — updateNote paper_style", () => {
+  it("includes paper_style in the CASE update and returns it", async () => {
+    let capturedSql = "";
+    const prisma = {
+      $queryRaw: (strings) => {
+        const text = sql(strings).toLowerCase();
+        capturedSql = text;
+        if (text.includes("from notes n left join note_shares")) {
+          return Promise.resolve([{ id: NOTE, owner_user_id: OWNER, share_permission: null }]);
+        }
+        if (text.includes("update notes")) {
+          return Promise.resolve([{ id: NOTE, paper_style: "lined" }]);
+        }
+        return Promise.resolve([]);
+      },
+      $executeRaw: () => Promise.resolve([]),
+    };
+    const svc = createNotesService({ prisma });
+    const note = await svc.updateNote(NOTE, OWNER, { paperStyle: "lined" });
+    assert.equal(note.paper_style, "lined");
+    assert.match(capturedSql, /paper_style/);
+  });
+});
+
 describe("shares-service — shareNote target validation", () => {
   const base = [
     ["from notes where id = ? and owner_user_id", [{ id: NOTE }]], // _verifyOwner ok

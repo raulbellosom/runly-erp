@@ -240,6 +240,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
         a.icon,
         a.background_color,
         a.background_image_url,
+        a.paper_style,
         a.is_pinned,
         a.is_archived,
         a.is_trashed,
@@ -299,6 +300,11 @@ export function createNotesService({ prisma, broadcaster = null }) {
                                  WHEN ${data.backgroundImageUrl !== undefined ? "t" : "f"}::boolean = TRUE
                                  THEN ${data.backgroundImageUrl ?? null}::text
                                  ELSE background_image_url
+                               END,
+        paper_style          = CASE
+                                 WHEN ${data.paperStyle !== undefined ? "t" : "f"}::boolean = TRUE
+                                 THEN ${data.paperStyle ?? 'none'}::text
+                                 ELSE paper_style
                                END,
         cover_url            = CASE
                                  WHEN ${data.coverUrl !== undefined ? "t" : "f"}::boolean = TRUE
