@@ -50,6 +50,39 @@ test("normalizeRelationDescriptor normalizes modal inline-create config", () => 
   assert.equal(descriptor.clearable, false);
 });
 
+test("normalizeRelationDescriptor normalizes quick inline-create config", () => {
+  const descriptor = normalizeRelationDescriptor({
+    name: "jobTitleId",
+    required: false,
+    relation: {
+      source: "remote",
+      apiPath: "/hr/job-titles",
+      create: {
+        enabled: true,
+        mode: "quick",
+        label: "Crear puesto",
+      },
+    },
+  });
+  assert.equal(descriptor.create.enabled, true);
+  assert.equal(descriptor.create.mode, "quick");
+  assert.equal(descriptor.create.apiPath, "/hr/job-titles");
+  assert.equal(descriptor.create.nameField, "name");
+  assert.equal(descriptor.create.viewKey, undefined);
+});
+
+test("normalizeRelationDescriptor ignores quick create without an apiPath", () => {
+  const descriptor = normalizeRelationDescriptor({
+    name: "jobTitleId",
+    relation: {
+      source: "static",
+      options: [{ value: "1", label: "Uno" }],
+      create: { enabled: true, mode: "quick" },
+    },
+  });
+  assert.equal(descriptor.create, null);
+});
+
 test("normalizeToFilterBarFilters includes only select filters", () => {
   const filters = normalizeToFilterBarFilters([
     {

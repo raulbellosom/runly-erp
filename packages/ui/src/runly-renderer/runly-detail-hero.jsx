@@ -73,7 +73,7 @@ export async function fetchUserAvatarSignedUrl(apiBaseUrl, token, userId, compan
   }
 }
 
-async function fetchFirstImageAssetId(apiBaseUrl, token, docsPath, recordId, companyId = null) {
+export async function fetchFirstImageAssetId(apiBaseUrl, token, docsPath, recordId, companyId = null) {
   if (!docsPath || !recordId) return null;
   try {
     const path = replacePathTokens(docsPath, { id: recordId });

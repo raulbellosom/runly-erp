@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as LucideIcons from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
@@ -34,6 +34,7 @@ import { cn } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { normalizeField, normalizeSections } from "./runly-form-schema.js";
 import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
+import { fetchFirstImageAssetId, fetchSignedUrl } from "./runly-detail-hero.jsx";
 import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
   CAR_COLORS,
@@ -133,6 +134,8 @@ export function RunlyForm({
   asideActions = null,
   onAttachmentsChange,
   componentRegistry = null,
+  renderTools = null,
+  submitRequest = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -194,10 +197,12 @@ export function RunlyForm({
   const initialDataRef = useRef(initialData);
   const sectionsRef = useRef(sections);
 
-  // Keep refs current on every render so the reset effect always reads latest values
-  fieldMapRef.current = fieldMap;
-  initialDataRef.current = initialData;
-  sectionsRef.current = sections;
+  // Commit the latest values before the reset effect and event handlers run.
+  useLayoutEffect(() => {
+    fieldMapRef.current = fieldMap;
+    initialDataRef.current = initialData;
+    sectionsRef.current = sections;
+  }, [fieldMap, initialData, sections]);
 
   useEffect(() => {
     formValuesRef.current = formValues;
@@ -274,18 +279,6 @@ export function RunlyForm({
       total_cost: totalCost,
     }));
   }, [formValues.labor_cost, reportParts]);
-
-  if (!apiPath) {
-    return (
-      <Alert variant="warning">
-        <AlertTitle>Vista sin configuración</AlertTitle>
-        <AlertDescription>
-          Esta vista no tiene <code>schema.apiPath</code>. No se puede guardar
-          la información.
-        </AlertDescription>
-      </Alert>
-    );
-  }
 
   const recordId = resolvedRecordId;
   const isEditMode = mode === "edit";
@@ -425,6 +418,10 @@ export function RunlyForm({
     }
     setSubmitting(true);
     try {
+      let result;
+      if (submitRequest) {
+        result = await submitRequest({ payload, recordId, mode });
+      } else {
       const endpoint = isEditMode
         ? `${joinUrl(apiBaseUrl, apiPath)}/${encodeURIComponent(String(recordId))}`
         : joinUrl(apiBaseUrl, apiPath);
@@ -444,7 +441,8 @@ export function RunlyForm({
         }
         throw new Error(message);
       }
-      const result = await response.json();
+      result = await response.json();
+      }
       const createdRecord = extractCreatedRecord(result);
       const createdRecordId = resolveRecordId(createdRecord);
       const effectiveRecordId = isEditMode
@@ -971,6 +969,34 @@ export function RunlyForm({
   const hasAsideColumn =
     showCompletion || Boolean(asideActions) || Boolean(previewModel) || asideSections.length > 0;
 
+  const [previewImageUrl, setPreviewImageUrl] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPreviewImage() {
+      if (!previewConfig?.imageDocsPath || !recordId) {
+        if (!cancelled) setPreviewImageUrl(null);
+        return;
+      }
+      const assetId = await fetchFirstImageAssetId(
+        apiBaseUrl,
+        token,
+        previewConfig.imageDocsPath,
+        recordId,
+        companyId,
+      );
+      if (!assetId) {
+        if (!cancelled) setPreviewImageUrl(null);
+        return;
+      }
+      const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId);
+      if (!cancelled) setPreviewImageUrl(url);
+    }
+    loadPreviewImage();
+    return () => {
+      cancelled = true;
+    };
+  }, [previewConfig?.imageDocsPath, recordId, apiBaseUrl, token, companyId]);
+
   // Reported unconditionally (regardless of schema.showCompletion) so a screen
   // that wants to react to completion changes elsewhere (e.g. a page title
   // badge) can do so in addition to the ring RunlyForm renders itself below.
@@ -983,8 +1009,17 @@ export function RunlyForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completionPercent, filledCount, allFieldNames.length]);
 
+  if (!apiPath) {
+    return <Alert variant="warning"><AlertTitle>Vista sin configuración</AlertTitle>
+      <AlertDescription>Esta vista no tiene <code>schema.apiPath</code>. No se puede guardar la información.</AlertDescription></Alert>;
+  }
+
   return (
     <form id={id} className="space-y-6" onSubmit={handleSubmit}>
+      {renderTools?.({ values: formValues, disabled: submitting, patchValues: (patch) => {
+        setFormValues((prev) => ({ ...prev, ...patch }));
+        setFieldErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !(key in patch))));
+      } })}
       {sections.length === 0 && (
         <Alert variant="warning">
           <AlertTitle>Formulario sin secciones</AlertTitle>
@@ -1005,19 +1040,25 @@ export function RunlyForm({
         </div>
         {hasAsideColumn ? (
           <div className="space-y-3 order-first xl:order-none xl:sticky xl:top-4 xl:self-start">
-            {showCompletion ? (
-              <FormCompletionRing
-                percent={completionPercent}
-                filledCount={filledCount}
-                totalCount={allFieldNames.length}
-              />
+            {showCompletion || asideActions ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:flex-col xl:items-stretch">
+                {showCompletion ? (
+                  <FormCompletionRing
+                    percent={completionPercent}
+                    filledCount={filledCount}
+                    totalCount={allFieldNames.length}
+                  />
+                ) : null}
+                {asideActions}
+              </div>
             ) : null}
-            {asideActions}
             {previewModel ? (
               <FormPreviewPanel
                 title={previewModel.title}
                 subtitle={previewModel.subtitle}
                 rows={previewModel.rows}
+                imageUrl={previewImageUrl}
+                fallbackIcon={previewConfig?.fallbackIcon}
               />
             ) : null}
             {asideSections.map((section) => renderSection(section))}

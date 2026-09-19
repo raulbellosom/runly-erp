@@ -33,6 +33,8 @@ export function DataTable({
   emptyAction,
   className,
   manualPagination = false,
+  getRowId,
+  autoResetPageIndex,
   showToolbar = true,
   showPagination = true,
 }) {
@@ -58,6 +60,8 @@ export function DataTable({
 
   const table = useReactTable({
     data: filteredData,
+    getRowId,
+    autoResetPageIndex,
     columns,
     state: { sorting, globalFilter, pagination },
     onSortingChange: setSorting,

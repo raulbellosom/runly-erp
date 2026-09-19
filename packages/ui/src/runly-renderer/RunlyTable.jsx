@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Eye, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
 import { Checkbox } from "../components/Checkbox.jsx";
@@ -307,6 +307,7 @@ export function RunlyTable({
   refreshSignal = 0,
   bulkActions = [],
   onExportExcel = null,
+  onContextChange = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -344,9 +345,9 @@ export function RunlyTable({
     toConfig,
   } = colConfig;
 
-  // Ref kept in sync on every render so async callbacks always read the latest toConfig
+  // Async callbacks read the latest committed configuration.
   const toConfigRef = useRef(toConfig);
-  toConfigRef.current = toConfig;
+  useLayoutEffect(() => { toConfigRef.current = toConfig; }, [toConfig]);
 
   const sortableColumns = useMemo(
     () => visibleColumns.filter((c) => c.sortable),
@@ -475,6 +476,10 @@ export function RunlyTable({
     () => rows.filter((row, i) => selectedIds.has(getRowId(row, i))),
     [rows, selectedIds],
   );
+
+  useEffect(() => {
+    onContextChange?.({ selectedIds: [...selectedIds], search, filters: filterValues, total: pagination.total });
+  }, [onContextChange, selectedIds, search, filterValues, pagination.total]);
 
   useEffect(() => {
     if (!apiPath) return;

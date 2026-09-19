@@ -183,6 +183,30 @@ export function normalizeRelationDescriptor(fieldLike) {
             ? rawCreate.permissionKey.trim()
             : null,
       };
+    } else if (mode === 'quick' && createApiPath) {
+      // Lightweight create: POST { [nameField]: searchText } directly, no
+      // nested form/modal — for simple name-only catalogs (job titles,
+      // departments, categories, brands, locations).
+      create = {
+        enabled: true,
+        label:
+          typeof rawCreate.label === 'string' && rawCreate.label.trim()
+            ? rawCreate.label.trim()
+            : null,
+        mode,
+        apiPath: createApiPath,
+        nameField:
+          typeof rawCreate.nameField === 'string' && rawCreate.nameField.trim()
+            ? rawCreate.nameField.trim()
+            : 'name',
+        selectCreated: rawCreate.selectCreated !== false,
+        refreshOptions: rawCreate.refreshOptions !== false,
+        allowedWhen: allowedWhenNormalized,
+        permissionKey:
+          typeof rawCreate.permissionKey === 'string' && rawCreate.permissionKey.trim()
+            ? rawCreate.permissionKey.trim()
+            : null,
+      };
     }
   }
 

@@ -102,6 +102,8 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
   initialMode = "list",
   recordId = null,
   module = null,
+  blueprints = null,
+  resolveBlueprintByKey = null,
   onNavigate,
   onCreateSuccess,
   onEditSuccess,
@@ -442,6 +444,8 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                 token={token}
                 companyId={companyId}
                 apiBaseUrl={apiBaseUrl}
+                blueprints={blueprints}
+                resolveBlueprintByKey={resolveBlueprintByKey}
                 onSuccess={handleFormSuccess}
                 onCancel={goToList}
               />
@@ -548,6 +552,8 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                     token={token}
                 companyId={companyId}
                     apiBaseUrl={apiBaseUrl}
+                    blueprints={blueprints}
+                    resolveBlueprintByKey={resolveBlueprintByKey}
                     onSuccess={handleFormSuccess}
                     onCancel={goToList}
                   />
@@ -605,6 +611,8 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                       token={token}
                 companyId={companyId}
                       apiBaseUrl={apiBaseUrl}
+                      blueprints={blueprints}
+                      resolveBlueprintByKey={resolveBlueprintByKey}
                       onSuccess={handleFormSuccess}
                       onCancel={goToList}
                     />
@@ -669,6 +677,8 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                           token={token}
                 companyId={companyId}
                           apiBaseUrl={apiBaseUrl}
+                          blueprints={blueprints}
+                          resolveBlueprintByKey={resolveBlueprintByKey}
                           onSuccess={handleFormSuccess}
                           onCancel={goToList}
                         />
