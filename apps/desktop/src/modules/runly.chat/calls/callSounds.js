@@ -13,35 +13,12 @@ export const CALL_SOUND_URLS = Object.freeze({
   notification: `${BASE}sounds/notification.mp3`,
 });
 
-const SILENT_UNLOCK_WAV = "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
-
 let audioContext = null;
 const bufferPromises = new Map();
 const audioElements = new Map();
-const elementUnlockPromises = new Map();
-const unlockedElements = new Set();
 
 function clampVolume(value) {
   return Math.min(1, Math.max(0, value));
-}
-
-// Every real <audio> element here (unlike the WebAudio path) stays attached
-// to the DOM for the whole session — iOS ties autoplay permission to the
-// element instance, so it can't be torn down after use. But the moment one
-// of them is `.play()`ed — even the silent unlock WAV that primes autoplay
-// on the very first tap anywhere in the app — iOS Safari treats it as an
-// active media session and shows a persistent lock-screen "Now Playing"
-// widget (falling back to the document title, since no MediaMetadata is
-// ever set) even though nothing is audibly playing. Telling the OS
-// explicitly that nothing is playing clears/suppresses that widget without
-// touching the autoplay-unlock mechanics themselves.
-function clearMediaSession() {
-  try {
-    if (navigator.mediaSession) {
-      navigator.mediaSession.playbackState = "none";
-      navigator.mediaSession.metadata = null;
-    }
-  } catch {}
 }
 
 function getAudioContext() {
@@ -91,91 +68,23 @@ async function loadBuffer(name, context) {
   return bufferPromises.get(name);
 }
 
-function primeAudioElement(name) {
-  if (unlockedElements.has(name)) return Promise.resolve(true);
-  if (elementUnlockPromises.has(name)) return elementUnlockPromises.get(name);
-
-  const element = ensureAudioElement(name);
-  if (!element) return Promise.resolve(false);
-
-  // Do not use `muted` here. WebKit permits muted autoplay but can pause the
-  // element as soon as it becomes audible. Play real (but silent) PCM inside
-  // the gesture, then restore the target on this same reusable element.
-  element.muted = false;
-  element.volume = 1;
-  element.loop = false;
-  // Setting .src already schedules a load. Calling .load() explicitly and then
-  // .play() on the very next line makes iOS reject the play() promise with an
-  // AbortError ("interrupted by a call to load()"), so the silent unlock never
-  // "counts" and the real ringtone stays blocked. Just set src + play.
-  element.src = SILENT_UNLOCK_WAV;
-  try { element.currentTime = 0; } catch {}
-
-  function restoreTarget() {
-    element.pause();
-    try { element.currentTime = 0; } catch {}
-    element.src = CALL_SOUND_URLS[name];
-    try { element.load?.(); } catch {}
-    clearMediaSession();
-  }
-
-  let playResult;
-  try {
-    playResult = element.play();
-  } catch {
-    restoreTarget();
-    return Promise.resolve(false);
-  }
-
-  const unlockPromise = Promise.resolve(playResult)
-    .then(() => {
-      restoreTarget();
-      unlockedElements.add(name);
-      return true;
-    })
-    .catch(() => {
-      restoreTarget();
-      return false;
-    })
-    .finally(() => elementUnlockPromises.delete(name));
-  elementUnlockPromises.set(name, unlockPromise);
-  return unlockPromise;
-}
-
-function kickAudioContext(context) {
-  try {
-    const buffer = context.createBuffer(1, 1, 22050);
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    source.start(0);
-  } catch {}
-}
-
+// Unlock only Web Audio inside a user gesture. Playing silent HTML audio here
+// claims iOS's Now Playing UI even when the user is only navigating the app.
+// HTML audio remains available for real sounds (including ringtone retries).
 export async function unlockCallSounds() {
-  // Invoke every play() synchronously before the first await so all attempts
-  // remain inside the pointer/touch/key activation that called this function.
-  const elementAttempts = Object.keys(CALL_SOUND_URLS).map(primeAudioElement);
-  const context = getAudioContext();
-  let contextReady = false;
-
-  if (context) {
-    try {
-      if (context.state !== "running" && context.state !== "closed") {
-        kickAudioContext(context);
-        await context.resume();
-      }
-      contextReady = context.state === "running";
-      if (contextReady) {
-        await Promise.allSettled(
-          Object.keys(CALL_SOUND_URLS).map((name) => loadBuffer(name, context)),
-        );
-      }
-    } catch {}
+  try {
+    const context = getAudioContext();
+    if (!context) return false;
+    if (context.state !== "running") await context.resume();
+    if (context.state !== "running") return false;
+    // Fetch/decode without starting a source or delaying gesture completion.
+    void Promise.allSettled(
+      Object.keys(CALL_SOUND_URLS).map((name) => loadBuffer(name, context)),
+    );
+    return true;
+  } catch {
+    return false;
   }
-
-  const elementResults = await Promise.all(elementAttempts);
-  return contextReady || elementResults.some(Boolean);
 }
 
 // The "call ended" cue fires from several independent places almost at once
@@ -209,6 +118,7 @@ export function playCallSound(name, {
   let elementAudio = null;
 
   async function playWithElement() {
+    if (stopped) return true;
     elementAudio = ensureAudioElement(name);
     if (!elementAudio) return false;
     elementAudio.muted = false;
@@ -216,16 +126,15 @@ export function playCallSound(name, {
     elementAudio.volume = clampVolume(volume);
     try { elementAudio.currentTime = 0; } catch {}
     await elementAudio.play();
-    clearMediaSession();
     if (stopped) {
       elementAudio.pause();
       return true;
     }
-    unlockedElements.add(name);
     return true;
   }
 
   async function playWithWebAudio() {
+    if (stopped) return true;
     const context = getAudioContext();
     if (!context) return false;
     if (context.state !== "running" && context.state !== "closed") await context.resume();
@@ -272,6 +181,5 @@ export function playCallSound(name, {
       try { elementAudio.currentTime = 0; } catch {}
       elementAudio.loop = false;
     }
-    clearMediaSession();
   };
 }

@@ -3,7 +3,7 @@ import { getSupabaseClient } from "../../../lib/supabase";
 import { shouldResumeCallOnDevice } from "./callDeviceSession";
 import { leaveCallOnPageHide } from "./callLifecycle";
 
-const CURRENT_CALL_POLL_MS = 4_000;
+const CURRENT_CALL_POLL_MS = 20_000;
 
 export function useCallSynchronization({
   enabled,
