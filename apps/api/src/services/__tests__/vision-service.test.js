@@ -15,6 +15,13 @@ function groqBody(content) {
 }
 
 describe("vision-service", () => {
+  it("preserves an inventory text response when structured extraction fails, without changing receipt validation", async () => {
+    const svc = createVisionService({ env: { GROQ_API_KEY: 'k' }, fetchImpl: async () => groqBody('Equipo DEMO\nS/N O0-I1-B8') });
+    const result = await svc.extractInventory({ imageBase64: IMG });
+    assert.equal(result.parsed.rawText, 'Equipo DEMO\nS/N O0-I1-B8');
+    assert.deepEqual(result.parsed.observations, []); assert.equal(result.parsed.warnings.length, 1);
+    await assert.rejects(svc.extractReceipt({ imageBase64: IMG }), /JSON legible/);
+  });
   it("throws a 503 VisionServiceError when GROQ_API_KEY is not set", async () => {
     const svc = createVisionService({ env: { PFM_VISION_PROVIDER: "groq" } });
     await assert.rejects(
