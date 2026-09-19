@@ -11,7 +11,7 @@ export function PublicNoteCollaborators({ collaborators = [] }) {
   if (!collaborators.length) return null
 
   return (
-    <div className="mt-6 flex flex-col items-center gap-3 text-center">
+    <div className="shrink-0 max-h-32 overflow-y-auto px-4 py-3 flex flex-col items-center gap-3 text-center">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
         <Users size={12} />
         Colaboradores de esta nota

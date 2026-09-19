@@ -1,5 +1,5 @@
 import { NodeViewWrapper } from '@tiptap/react'
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import {
   Pencil, Trash2, Crop as CropIcon, Check,
   PenLine, ArrowUpRight, Square, Type, MoreHorizontal,
@@ -17,6 +17,8 @@ import { clampImageWidthPct, computeCornerResize } from '../lib/imageSize.js'
 import { useRotatedFillSize } from '../hooks/useRotatedFillSize.js'
 import { ImageCropModal } from './ImageCropModal.jsx'
 import { ImageEditModal } from './ImageEditModal.jsx'
+import { NoteImagePreviewButton } from './NoteImagePreviewButton.jsx'
+import { NoteInteractionContext } from './NoteInteractionContext.js'
 
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#1a1a1a', '#ffffff']
 const TOOLS = [
@@ -37,6 +39,7 @@ function parseCrop(raw) {
 }
 
 export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos, deleteNode }) {
+  const { viewing } = useContext(NoteInteractionContext)
   const svgRef = useRef(null)
   const boxRef = useRef(null) // the sized img+svg container — resize math + click-outside
   const frameRef = useRef(null) // the image frame only (no control chrome) — measured/cloned for drag reorder
@@ -59,7 +62,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
   const rotation = normalizeRotation(node.attrs.rotation)
-  const editable = editor?.isEditable !== false
+  const editable = !viewing && editor?.isEditable !== false
   const isEditing = editable && mode === 'edit'
   const inTableCell = typeof getPos === 'function' && isInsideTableCell(editor.state, getPos())
   // null = full width, for images inserted before this attribute existed.
@@ -449,18 +452,17 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
           )}
         </div>
 
-        {editable && mode === 'view' && (
+        {!isEditing && (
           <div
             // Top-right: keeps the primary "Editar imagen" affordance in view
             // above the fold on a tall image, clear of the corner resize
             // handles. No separate move handle any more — press-and-hold
             // anywhere on the image body (via boxRef's own pointer handlers
             // above) starts a reorder drag instead.
-            className={`absolute top-2 right-2 flex items-center gap-1.5 opacity-100 transition-opacity ${
-              selected ? 'sm:opacity-100' : 'sm:opacity-0 sm:group-hover/img:opacity-100'
-            }`}
+            className="absolute top-2 right-2 flex items-center gap-1.5"
           >
-            {inTableCell ? (
+            <NoteImagePreviewButton src={node.attrs.src} alt={node.attrs.alt} />
+            {editable && (inTableCell ? (
               <button
                 onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
                 onClick={() => setEditModalOpen(true)}
@@ -485,8 +487,8 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
                 <Pencil className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Editar imagen</span>
               </button>
-            )}
-            {typeof deleteNode === 'function' && (
+            ))}
+            {editable && typeof deleteNode === 'function' && (
               <button
                 onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
                 onClick={() => setConfirmDeleteOpen(true)}

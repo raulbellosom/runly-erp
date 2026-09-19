@@ -1,5 +1,6 @@
 import { NodeViewWrapper } from '@tiptap/react'
-import { useRef, useState, useEffect } from 'react'
+import { useContext, useRef, useState, useEffect } from 'react'
+import { NoteInteractionContext } from './NoteInteractionContext.js'
 import { X } from 'lucide-react'
 import { ConfirmDialog } from '@runly/ui'
 
@@ -8,6 +9,7 @@ const BACKGROUNDS = ['#ffffff', '#f3f4f6', '#fef9c3', '#dbeafe', '#dcfce7', '#1a
 const SIZES = [2, 4, 8, 14, 20]
 
 export function DrawingCanvas({ node, updateAttributes, editor, deleteNode }) {
+  const { viewing } = useContext(NoteInteractionContext)
   const canvasRef = useRef(null)
   const isDrawing = useRef(false)
   const currentStroke = useRef([])
@@ -100,7 +102,7 @@ export function DrawingCanvas({ node, updateAttributes, editor, deleteNode }) {
     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
   }
 
-  const editable = editor?.isEditable !== false
+  const editable = !viewing && editor?.isEditable !== false
 
   return (
     <NodeViewWrapper className="my-4 select-none">

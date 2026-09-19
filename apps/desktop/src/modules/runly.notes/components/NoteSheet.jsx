@@ -5,6 +5,7 @@ import { DARK_BG_MAP } from '../lib/noteColors.js'
 // (PublicNoteScreen) so a note's content area is always the same width and
 // background treatment regardless of where it's rendered.
 export const NOTE_SHEET_MAX_WIDTH_CLASS = 'max-w-3xl mx-auto'
+export const NOTE_SHEET_WIDTH = 768
 
 export function NoteSheet({ note, isDark = false, zoom = 100, children }) {
   const raw = note?.background_color ?? null
@@ -12,8 +13,11 @@ export function NoteSheet({ note, isDark = false, zoom = 100, children }) {
 
   return (
     <div
-      className={`${NOTE_SHEET_MAX_WIDTH_CLASS} min-h-full bg-card note-sheet`}
+      className="mx-auto bg-card note-sheet"
       style={{
+        width: NOTE_SHEET_WIDTH,
+        minWidth: NOTE_SHEET_WIDTH,
+        minHeight: 1024,
         zoom: `${zoom}%`,
         // Exposed as a custom property (not just the `backgroundColor` style
         // field) so specific descendants — the title row, which needs to sit

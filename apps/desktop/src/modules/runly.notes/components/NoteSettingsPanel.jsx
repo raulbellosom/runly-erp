@@ -338,6 +338,12 @@ export function NoteSettingsPanel({ open, onOpenChange, note, onUpdate, onPublis
           {/* ── Enlace publico ───────────────────────────────── */}
           <div className="pt-1 border-t border-border">
             <Section label="Enlace publico">
+              <CheckboxField
+                id="show-public-collaborators"
+                label="Mostrar colaboradores en la nota pública"
+                checked={note.show_public_collaborators !== false}
+                onChange={e => onUpdate({ showPublicCollaborators: e.target.checked })}
+              />
               {publicUrl ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5">

@@ -303,6 +303,11 @@ export function createSharesService({ prisma, broadcaster, notificationService }
         notes.cover_url,
         notes.background_color,
         notes.background_image_url,
+        notes.paper_style,
+        notes.paper_margin,
+        notes.paper_texture,
+        notes.paper_shadow,
+        notes.show_public_collaborators,
         notes.word_count,
         notes.public_slug,
         notes.created_at,
@@ -318,6 +323,7 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     `
     if (!rows.length) throw new SharesServiceError('Nota no encontrada', 404)
     const note = rows[0]
+    if (note.show_public_collaborators === false) return { ...note, collaborators: [] }
     // Collaborators footer for the public page: owner + everyone the note is
     // shared with. Display name only — email and avatar file ids stay
     // internal, this is rendered to anonymous visitors.

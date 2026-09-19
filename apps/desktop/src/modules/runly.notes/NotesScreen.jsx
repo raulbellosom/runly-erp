@@ -1,13 +1,13 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import {
   Plus, ArrowLeft,
   Settings2, Share2, RotateCcw, Trash2, PenLine,
   FileText, Shapes, ChevronLeft, ChevronRight,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, Eye,
 } from 'lucide-react'
 import {
-  ConfirmDialog,
+  ConfirmDialog, Button,
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@runly/ui'
 import { NoteIcon } from './noteIcons.jsx'
@@ -22,7 +22,7 @@ import { NoteSettingsPanel } from './components/NoteSettingsPanel.jsx'
 import { NoteShareModal } from './components/NoteShareModal.jsx'
 import { NoteTitleEditor } from './components/NoteTitleEditor.jsx'
 import { ZoomControl } from './components/ZoomControl.jsx'
-import { useNoteZoom } from './hooks/useNoteZoom.js'
+import { fitNoteZoom, useNoteZoom } from './hooks/useNoteZoom.js'
 
 // Lazy so the Excalidraw bundle only loads when a canvas note is opened.
 const CanvasEditor = lazy(() =>
@@ -64,6 +64,9 @@ export default function NotesScreen() {
   const isTrashView = activeView === 'trash'
 
   const [selectedNote, setSelectedNote] = useState(null)
+  const [editingNoteId, setEditingNoteId] = useState(null)
+  const editorPanelRef = useRef(null)
+  const viewOnly = editingNoteId !== selectedNote?.id
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen]       = useState(false)
   const [restoreOpen, setRestoreOpen]   = useState(false)
@@ -155,6 +158,7 @@ export default function NotesScreen() {
         onSuccess: (res) => {
           if (res?.note) {
             setSelectedNote(res.note)
+            setEditingNoteId(res.note.id)
             setNoteParam(res.note.id)
             setMobileView('editor')
           }
@@ -172,6 +176,7 @@ export default function NotesScreen() {
       isPinned: 'is_pinned', isArchived: 'is_archived', coverUrl: 'cover_url',
       paperStyle: 'paper_style',
       paperMargin: 'paper_margin', paperTexture: 'paper_texture', paperShadow: 'paper_shadow',
+      showPublicCollaborators: 'show_public_collaborators',
     }
     const localPatch = {}
     for (const [k, v] of Object.entries(patch)) {
@@ -199,6 +204,7 @@ export default function NotesScreen() {
   }
 
   function selectNote(note) {
+    setEditingNoteId(null)
     setSelectedNote(note)
     setNoteParam(note.id)
     setMobileView('editor')
@@ -297,6 +303,7 @@ export default function NotesScreen() {
 
       {/* Panel 2: Editor / Settings */}
       <div
+        ref={editorPanelRef}
         className={[
           'flex-1 min-w-0 flex flex-col overflow-hidden',
           // fixed inset-x-0 top-0 h-dvh (not bare inset-0) — see RunlyApp.jsx's
@@ -336,6 +343,18 @@ export default function NotesScreen() {
 
           {selectedNote && (
             <div className="flex items-center gap-0.5">
+              {!isTrashView && !isCanvasNote && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  aria-label={viewOnly ? 'Editar nota' : 'Ver nota'}
+                  onClick={() => setEditingNoteId(viewOnly ? selectedNote.id : null)}
+                >
+                  {viewOnly ? <PenLine size={14} /> : <Eye size={14} />}
+                  {viewOnly ? 'Editar' : 'Ver'}
+                </Button>
+              )}
               <button
                 onClick={() => setShareOpen(true)}
                 className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
@@ -374,11 +393,11 @@ export default function NotesScreen() {
             <CanvasEditor key={selectedNote.id} note={selectedNote} />
           </Suspense>
         ) : (
-          <NoteEditor note={selectedNote} readOnly={isTrashView} zoom={zoom} />
+          <NoteEditor note={selectedNote} readOnly={isTrashView} viewOnly={viewOnly} zoom={zoom} />
         )}
 
         {!isTrashView && !isCanvasNote && selectedNote && (
-          <ZoomControl zoom={zoom} onZoomChange={setZoom} />
+          <ZoomControl zoom={zoom} onZoomChange={setZoom} onFit={() => setZoom(fitNoteZoom(editorPanelRef.current.clientWidth - 16))} />
         )}
       </div>
 

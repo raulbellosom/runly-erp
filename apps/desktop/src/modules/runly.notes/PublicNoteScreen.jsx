@@ -6,6 +6,10 @@ import { NoteEditor } from './components/NoteEditor.jsx'
 import { NOTE_SHEET_MAX_WIDTH_CLASS } from './components/NoteSheet.jsx'
 import { PublicNoteToolbar } from './components/PublicNoteToolbar.jsx'
 import { PublicNoteCollaborators } from './components/PublicNoteCollaborators.jsx'
+import { PublicNoteDates } from './components/PublicNoteDates.jsx'
+import { copyNoteContent } from './lib/noteClipboard.js'
+import { ZoomControl } from './components/ZoomControl.jsx'
+import { fitNoteZoom, useNoteZoom } from './hooks/useNoteZoom.js'
 import { exportNoteSheetAsJpg, exportNoteSheetAsPdf } from './lib/notePageExport.js'
 import { ErrorState } from '@runly/ui'
 
@@ -14,6 +18,7 @@ const PublicCanvasView = lazy(() => import('./PublicCanvasView.jsx'))
 export default function PublicNoteScreen() {
   const { slug } = useParams()
   const contentRef = useRef(null)
+  const [zoom, setZoom] = useNoteZoom()
 
   // Force light theme for the public view — remove .dark from <html> and restore on unmount
   useEffect(() => {
@@ -37,6 +42,9 @@ export default function PublicNoteScreen() {
     // an already-open or recently-visited public tab silently showing a
     // stale snapshot of the note.
     staleTime: 0,
+    // Keep public metadata and the visibility preference current too; Y.js
+    // updates the body but does not broadcast these note settings.
+    refetchInterval: 30000,
   })
 
   const note = data?.note
@@ -55,7 +63,7 @@ export default function PublicNoteScreen() {
           <div className="min-h-screen grid place-items-center text-sm text-gray-400">Cargando...</div>
         }
       >
-        <PublicCanvasView key={slug} slug={slug} />
+        <PublicCanvasView key={slug} slug={slug} note={note} />
       </Suspense>
     )
   }
@@ -87,12 +95,13 @@ export default function PublicNoteScreen() {
     // html/body are globally overflow:hidden (the authenticated app shell
     // does its own internal scrolling) — this page needs its own bounded,
     // scrollable region or content taller than the viewport is unreachable.
-    <div className="h-dvh overflow-y-auto overscroll-contain bg-gray-100">
-      <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} py-8 sm:py-12 px-4`}>
-        <div className="mb-4 flex justify-end">
+    <div className="relative h-dvh flex flex-col overflow-hidden bg-gray-100">
+      <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} w-full px-4 py-3 shrink-0 space-y-2`}>
+        <div className="flex justify-end">
           <PublicNoteToolbar
             title={note.title}
             publicUrl={publicUrl}
+            onCopyContent={() => copyNoteContent(contentRef.current?.querySelector('.note-sheet'), { coverUrl: note.cover_url })}
             onDownloadPdf={() =>
               exportNoteSheetAsPdf(contentRef.current?.querySelector('.note-sheet'), {
                 title: note.title,
@@ -107,19 +116,15 @@ export default function PublicNoteScreen() {
             }
           />
         </div>
-        <div ref={contentRef} className="rounded-xl shadow-sm overflow-hidden bg-white">
-          {/* scrollable=false: this page already owns scroll (the h-dvh
-              overflow-y-auto root above) — see NoteEditor's scrollable prop.
-              Background color and the max-width sheet column are now rendered
-              by NoteEditor itself (NoteSheet), shared with the authenticated
-              editor — this wrapper only supplies the rounded/shadow chrome.
-              publicSlug (+ readOnly) turns on the live realtime path — see
-              NoteEditor's collabEnabled — instead of only refetching on
-              focus/remount. */}
-          <NoteEditor note={note} readOnly scrollable={false} publicSlug={slug} />
-        </div>
-        <PublicNoteCollaborators collaborators={note.collaborators} />
+        <PublicNoteDates createdAt={note.created_at} updatedAt={note.updated_at} />
       </div>
+      <div ref={contentRef} className="relative flex-1 min-h-0">
+        {/* Both views share one fixed sheet and its scroll/zoom behavior.
+            publicSlug keeps this read-only view connected to live updates. */}
+        <NoteEditor note={note} readOnly zoom={zoom} publicSlug={slug} />
+        <ZoomControl zoom={zoom} onZoomChange={setZoom} onFit={() => setZoom(fitNoteZoom(contentRef.current.clientWidth - 16))} />
+      </div>
+      {note.show_public_collaborators !== false && <PublicNoteCollaborators collaborators={note.collaborators} />}
     </div>
   )
 }

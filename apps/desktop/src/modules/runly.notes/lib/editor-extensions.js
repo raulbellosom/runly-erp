@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
+import { columnResizing, columnResizingPluginKey } from '@tiptap/pm/tables'
 import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
@@ -16,6 +17,25 @@ import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import { SlashCommand } from './extensions/SlashCommand.jsx'
 import { TrailingNode } from './extensions/TrailingNode.js'
 import { bodyPlaceholderText } from './placeholderText.js'
+
+// TipTap only installs column resizing when initially editable. Notes open
+// in view mode, so retain this plugin across mode switches. Its handlers
+// already check view.editable before allowing a resize.
+const NoteTable = Table.extend({
+  addProseMirrorPlugins() {
+    const plugins = this.parent()
+    if (this.options.resizable && !plugins.some(plugin => plugin.key === columnResizingPluginKey.key)) {
+      plugins.unshift(columnResizing({
+        handleWidth: this.options.handleWidth,
+        cellMinWidth: this.options.cellMinWidth,
+        defaultCellMinWidth: this.options.cellMinWidth,
+        View: this.options.View,
+        lastColumnResizable: this.options.lastColumnResizable,
+      }))
+    }
+    return plugins
+  },
+})
 
 // CollaborationCaret's default cursor builder renders an unstyled block <div>
 // with the user's name — with no matching CSS it shows as a full-width solid
@@ -88,7 +108,7 @@ export function buildExtensions({
     Link.configure({ openOnClick: false }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: true }),
+    NoteTable.configure({ resizable: !readOnly }),
     TableRow,
     TableCell,
     TableHeader,

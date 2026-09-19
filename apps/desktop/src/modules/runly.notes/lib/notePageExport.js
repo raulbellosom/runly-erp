@@ -1,3 +1,5 @@
+import { normalizeExportColors } from './exportColorCompatibility.js'
+
 // Client-side export for the public note page's rendered content (the
 // `.note-sheet` DOM node — see NoteSheet.jsx). html2canvas is dynamic-
 // imported so it never ships in the main bundle; this only runs from the
@@ -23,6 +25,22 @@ async function renderNoteSheetToCanvas(el, backgroundColor) {
     backgroundColor: backgroundColor || '#ffffff',
     useCORS: true,
     scale: Math.min(window.devicePixelRatio || 1, 2),
+    // Export the document at its canonical dimensions, independently of
+    // the viewer's mobile zoom and scroll position.
+    onclone: (_document, sheet) => {
+      sheet.style.zoom = '1'
+      sheet.style.margin = '0'
+      normalizeExportColors(_document, sheet)
+      let ancestor = sheet.parentElement
+      while (ancestor && ancestor !== _document.body) {
+        ancestor.style.overflow = 'visible'
+        ancestor.style.height = 'auto'
+        ancestor.style.maxHeight = 'none'
+        ancestor.scrollTop = 0
+        ancestor.scrollLeft = 0
+        ancestor = ancestor.parentElement
+      }
+    },
   })
 }
 

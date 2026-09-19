@@ -1,14 +1,33 @@
 import { useState } from 'react'
-import { Copy, Check, Share2, FileDown, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Copy, Check, Share2, FileDown, Image as ImageIcon, Loader2, ClipboardCopy } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@runly/ui'
 
 // Accessible action row for a public (anonymous, no-auth) note/canvas page:
 // copy link, native share sheet when available, and raster download(s).
 // Shared by PublicNoteScreen and PublicCanvasView so both note types get the
 // same controls instead of only being reachable from inside the app.
-export function PublicNoteToolbar({ title, publicUrl, onDownloadPdf, onDownloadImage, imageLabel = 'JPG' }) {
+export function PublicNoteToolbar({ title, publicUrl, onCopyContent, onDownloadPdf, onDownloadImage, imageLabel = 'JPG' }) {
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(null) // 'pdf' | 'image' | null
+  const [copyingContent, setCopyingContent] = useState(false)
+
+  async function handleCopyContent() {
+    if (copyingContent) return
+    setCopyingContent(true)
+    try {
+      const result = await onCopyContent()
+      toast.success(result.rich
+        ? 'Contenido copiado. Las imágenes se pegarán si la aplicación de destino lo permite.'
+        : 'Texto copiado. Este navegador no permitió copiar el formato y las imágenes.')
+    } catch (error) {
+      toast.error(error?.name === 'NotAllowedError'
+        ? 'No se pudo copiar el contenido. Revisa los permisos del portapapeles.'
+        : error?.message || 'No se pudo copiar el contenido.')
+    } finally {
+      setCopyingContent(false)
+    }
+  }
 
   async function handleCopy() {
     try {
@@ -49,6 +68,12 @@ export function PublicNoteToolbar({ title, publicUrl, onDownloadPdf, onDownloadI
         {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
         {copied ? 'Copiado' : 'Copiar enlace'}
       </button>
+      {onCopyContent && (
+        <Button type="button" variant="outline" size="sm" onClick={handleCopyContent} disabled={copyingContent} className={btnClass}>
+          {copyingContent ? <Loader2 size={13} className="animate-spin" /> : <ClipboardCopy size={13} />}
+          Copiar contenido
+        </Button>
+      )}
       {typeof navigator !== 'undefined' && navigator.share && (
         <button type="button" onClick={handleShare} className={btnClass}>
           <Share2 size={13} />

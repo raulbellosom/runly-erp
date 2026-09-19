@@ -255,6 +255,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
         a.paper_margin,
         a.paper_texture,
         a.paper_shadow,
+        a.show_public_collaborators,
         a.is_pinned,
         a.is_archived,
         a.is_trashed,
@@ -281,6 +282,9 @@ export function createNotesService({ prisma, broadcaster = null }) {
 
   async function updateNote(noteId, userId, data) {
     await assertAccess(noteId, userId, "edit");
+    if (data.showPublicCollaborators !== undefined && typeof data.showPublicCollaborators !== 'boolean') {
+      throw new NotesServiceError('Mostrar colaboradores debe ser verdadero o falso.', 400);
+    }
 
     const rows = await prisma.$queryRaw`
       UPDATE notes
@@ -334,6 +338,11 @@ export function createNotesService({ prisma, broadcaster = null }) {
                                  WHEN ${data.paperShadow !== undefined ? "t" : "f"}::boolean = TRUE
                                  THEN ${data.paperShadow ?? false}::boolean
                                  ELSE paper_shadow
+                               END,
+        show_public_collaborators = CASE
+                                 WHEN ${data.showPublicCollaborators !== undefined}::boolean
+                                 THEN ${data.showPublicCollaborators ?? true}::boolean
+                                 ELSE show_public_collaborators
                                END,
         cover_url            = CASE
                                  WHEN ${data.coverUrl !== undefined ? "t" : "f"}::boolean = TRUE

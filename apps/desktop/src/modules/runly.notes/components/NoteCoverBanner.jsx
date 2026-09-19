@@ -5,6 +5,7 @@ import { ImageSourceSheet, useCoarsePointer } from '@runly/ui'
 import { runly } from '../../../lib/runly'
 import { supabase } from '../../../lib/supabase'
 import { withImageVariant } from '../../../lib/imageVariants.js'
+import { NoteImagePreviewButton } from './NoteImagePreviewButton.jsx'
 
 const MAX_BANNER_BYTES = 20 * 1024 * 1024
 
@@ -110,6 +111,9 @@ export function NoteCoverBanner({ coverUrl, editable, noteId, token, onChange, o
         draggable={false}
         onError={() => setFailedUrl(coverUrl)}
       />
+      <div className="absolute top-2 right-2">
+        <NoteImagePreviewButton src={coverUrl} alt="Portada de la nota" />
+      </div>
       {editable && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover/cover:opacity-100 transition-opacity">
           {isCoarsePointer ? (

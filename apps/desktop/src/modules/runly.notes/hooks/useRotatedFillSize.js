@@ -27,10 +27,14 @@ export function useRotatedFillSize(ref, rotation, naturalWidth, naturalHeight) {
     if (!el) return undefined
 
     function recompute() {
-      const rect = el.getBoundingClientRect()
-      if (rect.width <= 0 || rect.height <= 0) return
+      // Measure layout pixels, before the sheet's zoom. Viewport rectangles
+      // already include zoom and would scale the image a second time.
+      const style = getComputedStyle(el)
+      const width = parseFloat(style.width)
+      const height = parseFloat(style.height)
+      if (!(width > 0) || !(height > 0)) return
       const swapped = rotation === 90 || rotation === 270
-      setSize(swapped ? { width: rect.height, height: rect.width } : { width: rect.width, height: rect.height })
+      setSize(swapped ? { width: height, height: width } : { width, height })
     }
 
     recompute()

@@ -6,6 +6,8 @@ import { SupabaseCanvasSync } from './lib/SupabaseCanvasSync.js'
 import { hydrateImages } from './lib/canvasImages.js'
 import { deriveScene, ensureLayers } from './lib/canvasLayers.js'
 import { PublicNoteToolbar } from './components/PublicNoteToolbar.jsx'
+import { PublicNoteDates } from './components/PublicNoteDates.jsx'
+import { PublicNoteCollaborators } from './components/PublicNoteCollaborators.jsx'
 import { exportCanvasPdf, exportCanvasPng } from './lib/canvasExport.js'
 
 const CanvasStage = lazy(() => import('./components/CanvasStage.jsx'))
@@ -13,7 +15,7 @@ const CanvasStage = lazy(() => import('./components/CanvasStage.jsx'))
 // Live, read-only public canvas. Seeds from GET /public/notes/:slug/canvas then
 // subscribes to the same broadcast channel as the editors in readOnly mode:
 // it applies scene.delta / scene.full and never emits.
-export default function PublicCanvasView({ slug }) {
+export default function PublicCanvasView({ slug, note }) {
   const { data, isLoading, error } = usePublicCanvasScene(slug)
   const apiRef = useRef(null)
   const elementsRef = useRef([])
@@ -111,7 +113,7 @@ export default function PublicCanvasView({ slug }) {
 
   return (
     <div className="h-dvh flex flex-col bg-white">
-      <div className="flex items-center gap-2 px-4 h-12 border-b border-gray-200 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-200 shrink-0">
         <h1 className="text-sm font-semibold text-gray-900 truncate">{scene.title || 'Lienzo'}</h1>
         <span className="text-[11px] text-gray-400 shrink-0">Solo lectura</span>
         <div className="ml-auto">
@@ -137,6 +139,9 @@ export default function PublicCanvasView({ slug }) {
             imageLabel="PNG"
           />
         </div>
+        <div className="w-full">
+          <PublicNoteDates createdAt={note?.created_at} updatedAt={note?.updated_at} />
+        </div>
       </div>
       <div className="flex-1 min-h-0">
         <Suspense
@@ -153,6 +158,7 @@ export default function PublicCanvasView({ slug }) {
           />
         </Suspense>
       </div>
+      {note?.show_public_collaborators !== false && <PublicNoteCollaborators collaborators={note?.collaborators} />}
     </div>
   )
 }

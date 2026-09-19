@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom'
+import { NoteInteractionContext } from './NoteInteractionContext.js'
 import { EditorProvider } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -56,7 +58,7 @@ function colorForUser(seed) {
 // dropped and switching notes would leave stale content on screen — the
 // editor instance would outlive the note it was built for. Keying the surface
 // by note.id and gating on the engine fixes both.
-export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 100, publicSlug = null }) {
+export function NoteEditor({ note, readOnly = false, viewOnly = false, scrollable = true, zoom = 100, publicSlug = null }) {
   const { session, userProfile } = useAuth()
   const token = session?.access_token
 
@@ -114,6 +116,7 @@ export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 1
         key={note.id}
         note={note}
         readOnly={readOnly}
+        viewOnly={viewOnly}
         scrollable={scrollable}
         zoom={zoom}
         token={token}
@@ -135,6 +138,7 @@ export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 1
       key={note.id}
       note={note}
       readOnly={readOnly}
+      viewOnly={viewOnly}
       scrollable={scrollable}
       zoom={zoom}
       token={token}
@@ -164,7 +168,10 @@ function EditorLoading({ scrollable }) {
 // Everything below is a single editor instance for one note. It is mounted with
 // key={note.id} by NoteEditor, so every hook/ref here is scoped to one note and
 // torn down cleanly on switch.
-function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, session, userProfile, engine }) {
+function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, token, session, userProfile, engine }) {
+  const viewing = readOnly || viewOnly
+  const interaction = useMemo(() => ({ viewing }), [viewing])
+  const [toolbarHost, setToolbarHost] = useState(null)
   const queryClient = useQueryClient()
   const containerRef = useRef(null)
   const scrollRef = useRef(null)
@@ -174,7 +181,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
   const isDark = useIsDark()
 
   const rawKeyboardInset = useKeyboardInset()
-  const keyboardInset = readOnly ? 0 : rawKeyboardInset
+  const keyboardInset = viewing ? 0 : rawKeyboardInset
 
   // Aligns the ruled/grid paper-style pattern (painted on .note-sheet, whose
   // top sits behind the sticky toolbar + icon/title row) with where the
@@ -196,10 +203,10 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
       if (!sheetEl || !firstBodyEl) return
       const sheetRect = sheetEl.getBoundingClientRect()
       const bodyRect = firstBodyEl.getBoundingClientRect()
-      const distanceFromSheetTop = bodyRect.top - sheetRect.top
+      const scale = sheetRect.width / sheetEl.offsetWidth
+      const distanceFromSheetTop = (bodyRect.top - sheetRect.top) / scale
       const rootFontSizePx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-      const isMobile = window.matchMedia('(max-width: 639px)').matches
-      const lineUnitPx = computeLineUnitPx(rootFontSizePx, isMobile)
+      const lineUnitPx = computeLineUnitPx(rootFontSizePx)
       const phase = computePaperPhase(distanceFromSheetTop, lineUnitPx)
       sheetEl.style.setProperty('--note-content-top', `${distanceFromSheetTop}px`)
       sheetEl.style.setProperty('--note-paper-phase', `${phase}px`)
@@ -208,23 +215,25 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(container)
+    const tiptap = container.querySelector('.tiptap')
+    if (tiptap) ro.observe(tiptap)
     window.addEventListener('resize', measure)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [note.id, note.cover_url, note.paper_style, note.paper_margin])
+  }, [note.id, note.cover_url, note.paper_style, note.paper_margin, zoom, viewing])
 
   const handleSelectionUpdate = useCallback(
     ({ editor }) => {
-      if (readOnly || keyboardInset <= 0 || !scrollRef.current) return
+      if (viewing || keyboardInset <= 0 || !scrollRef.current) return
       const coords = editor.view.coordsAtPos(editor.state.selection.head)
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight
       if (!isCaretHiddenByKeyboard(coords.bottom, viewportHeight)) return
       const delta = computeCaretScrollDelta(coords.bottom, viewportHeight)
       scrollRef.current.scrollBy({ top: delta, behavior: 'smooth' })
     },
-    [readOnly, keyboardInset],
+    [viewing, keyboardInset],
   )
 
   // ── autosave ───────────────────────────────────────────────────────────
@@ -269,12 +278,17 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
       }
     } finally {
       savingRef.current = false
+      // Switching to view can flush while a previous request is in flight.
+      // Drain any newer snapshot once it finishes, even without another edit.
+      if (pendingRef.current && pendingRef.current !== snap) {
+        queueMicrotask(() => flushRef.current())
+      }
     }
   }, [note?.id, token, readOnly, ydoc, queryClient])
 
   const handleUpdate = useCallback(
-    ({ editor }) => {
-      if (readOnly || !note?.id || !token) return
+    ({ editor, transaction }) => {
+      if (!transaction?.docChanged || viewing || !note?.id || !token) return
       // First paragraph text becomes the note title (Apple Notes pattern).
       // Always send it — an empty string clears a stale "Nueva nota".
       const firstChild = editor.state.doc.firstChild
@@ -286,8 +300,19 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
       clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(flushSave, AUTOSAVE_DELAY)
     },
-    [note?.id, token, readOnly, flushSave],
+    [note?.id, token, viewing, flushSave],
   )
+
+  useEffect(() => {
+    const editor = editorInstanceRef.current
+    if (!editor) return
+    editor.setEditable(!viewing, false)
+    if (viewing) {
+      editor.commands.blur()
+      clearTimeout(saveTimerRef.current)
+      flushSave()
+    }
+  }, [viewing, flushSave])
 
   // Flush once on unmount so switching notes fast never drops the last edits.
   const flushRef = useRef(flushSave)
@@ -321,7 +346,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
   // This converts touchstart on .column-resize-handle into the equivalent mouse events.
   useEffect(() => {
     const container = containerRef.current
-    if (!container || readOnly) return
+    if (!container || viewing) return
 
     let active = false
 
@@ -364,7 +389,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
     }
-  }, [readOnly])
+  }, [viewing])
 
   const presenceUsers = usePresence(provider, session?.user?.id)
 
@@ -445,11 +470,22 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
     flushSave()
   }
 
+  const cover = (
+    <NoteCoverBanner
+      coverUrl={note.cover_url}
+      editable={!viewing}
+      noteId={note.id}
+      token={token}
+      onChange={coverUrl => updateNoteMeta({ coverUrl })}
+      onRemove={() => updateNoteMeta({ coverUrl: null })}
+    />
+  )
+
   const editorProvider = (
     <EditorProvider
       extensions={extensions}
       content={engine ? '' : (note.content || '')}
-      editable={!readOnly}
+      editable={!viewing}
       onCreate={(props) => {
         editorInstanceRef.current = props.editor
         seedIfNeeded(props)
@@ -463,22 +499,12 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
       }}
       slotBefore={
         <>
-          <NoteCoverBanner
-            coverUrl={note.cover_url}
-            editable={!readOnly}
-            noteId={note.id}
-            token={token}
-            onChange={coverUrl => updateNoteMeta({ coverUrl })}
-            onRemove={() => updateNoteMeta({ coverUrl: null })}
-          />
-          {!readOnly && (
-            // Wrapper does the pinning inside the new scroll container;
-            // NoteToolbar's own `sticky top-0` had no scrolling ancestor.
-            <div className="sticky top-0 z-20">
-              <NoteToolbar noteId={note.id} token={token} />
-            </div>
+          {note.cover_url ? cover : !viewing && toolbarHost ? createPortal(cover, toolbarHost) : null}
+          {!viewing && toolbarHost && createPortal(
+            <NoteToolbar noteId={note.id} token={token} />,
+            toolbarHost,
           )}
-          {(!readOnly || note.icon) && (
+          {(
             // Overlaps the title's own line (the editor's first paragraph —
             // see handleUpdate) via a negative margin-bottom, computed from
             // the title's font-size/line-height and .tiptap's own top
@@ -493,9 +519,9 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
             // the note's internal title line matches the editable editor
             // instead of showing bare text with no icon next to it.
             <div className="relative z-10 px-8 pt-4 flex items-center justify-between gap-2 -mb-10">
-              {readOnly ? (
+              {viewing ? (
                 <div className="w-10 h-10 flex items-center justify-center">
-                  <NoteIcon name={note.icon} size={22} className="text-amber-500" />
+                  <NoteIcon name={note.icon || 'NotebookPen'} size={22} className="text-amber-500" />
                 </div>
               ) : (
                 <Popover>
@@ -505,7 +531,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
                       title="Seleccionar icono"
                     >
                       {note.icon
-                        ? <NoteIcon name={note.icon} size={22} className="text-amber-500" />
+                        ? <NoteIcon name={note.icon || 'NotebookPen'} size={22} className="text-amber-500" />
                         : <NotebookPen className="w-5 h-5 text-muted-foreground/50" />
                       }
                     </button>
@@ -518,13 +544,13 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
                   </PopoverContent>
                 </Popover>
               )}
-              {!readOnly && <PresenceStack users={presenceUsers} />}
+              {!viewing && <PresenceStack users={presenceUsers} />}
             </div>
           )}
         </>
       }
     >
-      {!readOnly && <TableFloatingMenu />}
+      {!viewing && <TableFloatingMenu />}
     </EditorProvider>
   )
 
@@ -537,28 +563,31 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
   return (
     <div
       ref={containerRef}
-      className="flex flex-col h-full overflow-hidden"
+      className={scrollable ? "flex flex-col h-full min-h-0 overflow-hidden" : "flex flex-col"}
       data-paper-style={note.paper_style ?? 'none'}
       data-paper-margin={note.paper_margin ? 'true' : 'false'}
       data-paper-texture={note.paper_texture ? 'true' : 'false'}
       data-paper-shadow={note.paper_shadow ? 'true' : 'false'}
     >
-      {scrollable ? (
-        <div
-          ref={scrollRef}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
-          style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
-          onClick={readOnly ? undefined : handleContainerClick}
-        >
+      <div ref={setToolbarHost} className="shrink-0" />
+      <NoteInteractionContext.Provider value={interaction}>
+        {scrollable ? (
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-auto overscroll-contain pb-20"
+            style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+            onClick={viewing ? undefined : handleContainerClick}
+          >
+            <NoteSheet note={note} isDark={isDark} zoom={zoom}>
+              {editorProvider}
+            </NoteSheet>
+          </div>
+        ) : (
           <NoteSheet note={note} isDark={isDark} zoom={zoom}>
             {editorProvider}
           </NoteSheet>
-        </div>
-      ) : (
-        <NoteSheet note={note} isDark={isDark} zoom={zoom}>
-          {editorProvider}
-        </NoteSheet>
-      )}
+        )}
+      </NoteInteractionContext.Provider>
     </div>
   )
 }
