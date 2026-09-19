@@ -200,11 +200,15 @@ export default function NotesScreen() {
     <div className="flex h-full min-h-0 overflow-hidden">
 
       {/* Panel 1: Note list */}
-      <div className={[
-        'shrink-0 border-r border-border flex flex-col bg-background',
-        effectiveListCollapsed ? 'w-full lg:w-12' : 'w-full lg:w-72',
-        mobileView === 'list' ? 'flex' : 'hidden lg:flex',
-      ].join(' ')}>
+      <div
+        {...(isZenMode ? { inert: '' } : {})}
+        aria-hidden={isZenMode || undefined}
+        className={[
+          'shrink-0 border-r border-border flex flex-col bg-background',
+          effectiveListCollapsed ? 'w-full lg:w-12' : 'w-full lg:w-72',
+          mobileView === 'list' ? 'flex' : 'hidden lg:flex',
+        ].join(' ')}
+      >
 
         <div className={`flex items-center gap-2 h-11 border-b border-border shrink-0 ${effectiveListCollapsed ? 'justify-center px-1' : 'px-3'}`}>
           {!effectiveListCollapsed && (
