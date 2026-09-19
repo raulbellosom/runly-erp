@@ -138,7 +138,7 @@ function LeadPickerDialog({ token, selectedId, onSelect }) {
 
           <div className="px-5 pt-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 autoFocus
                 className="pl-9"

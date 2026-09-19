@@ -11,7 +11,7 @@ export function SearchInput({
 }) {
   return (
     <div className={cn("relative flex items-center", className)}>
-      <Search className="pointer-events-none absolute left-3 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+      <Search className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
       <input
         type="text"
         value={value}
