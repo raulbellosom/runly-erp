@@ -13,6 +13,7 @@ import { useRuntimeModules } from "./useRuntimeModules";
 import { getLayoutMode, matchesFullscreenPath } from "../lib/runtimeModules";
 import { ModuleBundleLoader } from '../shell/ModuleBundleLoader.jsx'
 import { getApiUrl } from "../lib/runtimeConfig.js";
+import { RUNLY_EDITION_NAME } from "../lib/appConfig.js";
 import { useAuth } from "../auth/AuthProvider";
 import { usePwaManifest } from "../hooks/usePwaManifest.js";
 import { usePwaInstall } from "../hooks/usePwaInstall.js";
@@ -246,6 +247,7 @@ export function RunlyApp() {
                 onMobileClose={() => setMobileOpen(false)}
                 canInstall={canInstall}
                 onInstall={install}
+                editionName={RUNLY_EDITION_NAME}
               />
             ))}
 
@@ -260,7 +262,7 @@ export function RunlyApp() {
               <Outlet />
             </main>
             {!(getLegacyModuleKey(activeModule?.key ?? moduleKeyFromPath) === "runly.chat" && isFullscreen) && (
-              <BrandFooter className="hidden lg:flex" />
+              <BrandFooter className="hidden lg:flex" editionName={RUNLY_EDITION_NAME} />
             )}
           </div>
         </div>
@@ -307,6 +309,7 @@ export function RunlyApp() {
               onMobileClose={() => setSidebarOverlayOpen(false)}
               canInstall={canInstall}
               onInstall={install}
+              editionName={RUNLY_EDITION_NAME}
             />
           </aside>
         </>

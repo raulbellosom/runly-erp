@@ -31,6 +31,7 @@ export function ModuleSidebar({
   onInstall,
   contained = false,
   sidebarSlot = null,
+  editionName = "Jaguar",
 }) {
   if (!module) return null;
 
@@ -381,7 +382,7 @@ export function ModuleSidebar({
         {/* Brand — mobile only; desktop uses BrandFooter */}
         <div className="lg:hidden px-3 pt-3 pb-2 flex flex-col gap-1">
           <p className="text-[10px] text-[hsl(var(--muted-foreground))] leading-none">
-            Runly ERP Meridian{" "}
+            Runly ERP {editionName}{" "}
             <span className="font-medium">v0.1</span>
           </p>
           <a
