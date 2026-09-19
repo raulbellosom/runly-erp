@@ -68,6 +68,16 @@ export default function NotesScreen() {
   const [noteToAction, setNoteToAction] = useState(null)
   const [mobileView, setMobileView]     = useState('list')
   const [listCollapsed, setListCollapsed] = useState(getListCollapsed)
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const onChange = () => setIsDesktop(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  const effectiveListCollapsed = listCollapsed && isDesktop
 
   // Restore selected note from URL on mount / page reload
   const { data: urlNoteData } = useNote(urlNoteId)
@@ -180,17 +190,17 @@ export default function NotesScreen() {
       {/* Panel 1: Note list */}
       <div className={[
         'shrink-0 border-r border-border flex flex-col bg-background',
-        listCollapsed ? 'w-full lg:w-12' : 'w-full lg:w-72',
+        effectiveListCollapsed ? 'w-full lg:w-12' : 'w-full lg:w-72',
         mobileView === 'list' ? 'flex' : 'hidden lg:flex',
       ].join(' ')}>
 
-        <div className="flex items-center gap-2 px-3 h-11 border-b border-border shrink-0">
-          {!listCollapsed && (
+        <div className={`flex items-center gap-2 h-11 border-b border-border shrink-0 ${effectiveListCollapsed ? 'justify-center px-1' : 'px-3'}`}>
+          {!effectiveListCollapsed && (
             <span className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               {folderId ? 'Carpeta' : VIEW_LABELS[activeView]}
             </span>
           )}
-          {!listCollapsed && !isTrashView && (
+          {!effectiveListCollapsed && !isTrashView && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -218,13 +228,13 @@ export default function NotesScreen() {
               persistListCollapsed(next)
             }}
             className="hidden lg:flex p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            title={listCollapsed ? 'Expandir lista' : 'Colapsar lista'}
+            title={effectiveListCollapsed ? 'Expandir lista' : 'Colapsar lista'}
           >
-            {listCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+            {effectiveListCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           </button>
         </div>
 
-        {!listCollapsed && (
+        {!effectiveListCollapsed && (
           <>
             <NotesList
               notes={notes}
