@@ -64,7 +64,7 @@ export default function NotesScreen() {
   const isTrashView = activeView === 'trash'
 
   const [selectedNote, setSelectedNote] = useState(null)
-  const [rightPanel, setRightPanel]     = useState('editor')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen]       = useState(false)
   const [restoreOpen, setRestoreOpen]   = useState(false)
   const [deleteOpen, setDeleteOpen]     = useState(false)
@@ -172,6 +172,7 @@ export default function NotesScreen() {
       backgroundColor: 'background_color', folderId: 'folder_id',
       isPinned: 'is_pinned', isArchived: 'is_archived', coverUrl: 'cover_url',
       paperStyle: 'paper_style',
+      paperMargin: 'paper_margin', paperTexture: 'paper_texture', paperShadow: 'paper_shadow',
     }
     const localPatch = {}
     for (const [k, v] of Object.entries(patch)) {
@@ -352,15 +353,15 @@ export default function NotesScreen() {
                 {isZenMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
               </button>
               <button
-                onClick={() => setRightPanel(p => p === 'editor' ? 'settings' : 'editor')}
+                onClick={() => setSettingsOpen(true)}
                 className={`flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  rightPanel === 'settings'
+                  settingsOpen
                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 <Settings2 size={13} />
-                <span className="hidden sm:inline">{rightPanel === 'settings' ? 'Editor' : 'Ajustes'}</span>
+                <span className="hidden sm:inline">Ajustes</span>
               </button>
             </div>
           )}
@@ -368,14 +369,6 @@ export default function NotesScreen() {
 
         {!selectedNote ? (
           <EmptyEditor onCreateNote={!isTrashView ? () => handleCreateNote('document') : undefined} isTrash={isTrashView} />
-        ) : rightPanel === 'settings' ? (
-          <NoteSettingsPanel
-            note={selectedNote}
-            onUpdate={handleUpdateNote}
-            onPublish={() => publishNote.mutate(selectedNote.id, { onSuccess: r => r?.note && setSelectedNote(r.note) })}
-            onUnpublish={() => unpublishNote.mutate(selectedNote.id, { onSuccess: r => r?.note && setSelectedNote(r.note) })}
-            onTrash={() => handleTrash(selectedNote)}
-          />
         ) : (!isTrashView && selectedNote.note_type === 'canvas') ? (
           <Suspense fallback={
             <div className="h-full grid place-items-center text-sm text-muted-foreground">Cargando lienzo...</div>
@@ -386,13 +379,25 @@ export default function NotesScreen() {
           <NoteEditor note={selectedNote} readOnly={isTrashView} zoom={zoom} />
         )}
 
-        {rightPanel === 'editor' && !isTrashView && !isCanvasNote && selectedNote && (
+        {!isTrashView && !isCanvasNote && selectedNote && (
           <ZoomControl zoom={zoom} onZoomChange={setZoom} />
         )}
       </div>
 
       {selectedNote && (
         <NoteShareModal note={selectedNote} open={shareOpen} onOpenChange={setShareOpen} />
+      )}
+
+      {selectedNote && (
+        <NoteSettingsPanel
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          note={selectedNote}
+          onUpdate={handleUpdateNote}
+          onPublish={() => publishNote.mutate(selectedNote.id, { onSuccess: r => r?.note && setSelectedNote(r.note) })}
+          onUnpublish={() => unpublishNote.mutate(selectedNote.id, { onSuccess: r => r?.note && setSelectedNote(r.note) })}
+          onTrash={() => { setSettingsOpen(false); handleTrash(selectedNote) }}
+        />
       )}
 
       <ConfirmDialog

@@ -476,6 +476,9 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
       ref={containerRef}
       className="flex flex-col h-full overflow-hidden"
       data-paper-style={note.paper_style ?? 'none'}
+      data-paper-margin={note.paper_margin ? 'true' : 'false'}
+      data-paper-texture={note.paper_texture ? 'true' : 'false'}
+      data-paper-shadow={note.paper_shadow ? 'true' : 'false'}
     >
       {scrollable ? (
         <div
