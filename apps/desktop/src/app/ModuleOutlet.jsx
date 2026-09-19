@@ -16,6 +16,8 @@ const PfmAssistantSidebar = lazy(() =>
   })),
 );
 
+const InventoryAssistantHost = lazy(() => import("../modules/runly.inventory/components/InventoryAssistant.jsx").then(m => ({ default: m.InventoryAssistantHost })));
+
 const SCREEN_MAP = {
   "runly.core:/modules": lazy(
     () => import("../modules/runly.core/screens/ModuleCatalog.jsx"),
@@ -360,6 +362,9 @@ const SCREEN_MAP = {
   "runly.inventory:/inventory/new": lazy(
     () => import("../modules/runly.inventory/screens/InventoryItemForm.jsx"),
   ),
+  "runly.inventory:/inventory/intake": lazy(
+    () => import("../modules/runly.inventory/screens/InventoryIntakeScreen.jsx"),
+  ),
   "runly.inventory:/inventory/:id": lazy(
     () => import("../modules/runly.inventory/screens/InventoryItemDetail.jsx"),
   ),
@@ -614,5 +619,8 @@ export function ModuleOutlet() {
     );
   }
 
+  if (moduleKey === "runly.inventory") {
+    return <Suspense fallback={<LoadingFallback />}><InventoryAssistantHost>{screenNode}</InventoryAssistantHost></Suspense>;
+  }
   return screenNode;
 }
