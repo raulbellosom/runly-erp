@@ -1814,6 +1814,7 @@ export function RelationSelectField({
   createActionMode = "always",
   createFromSearch = false,
   createDisabled = false,
+  isCreating = false,
   onCreate,
   placeholder = "Seleccionar...",
   className,
@@ -2102,15 +2103,18 @@ export function RelationSelectField({
                       type="button"
                       role="option"
                       onClick={handleCreate}
-                      disabled={createDisabled}
+                      disabled={createDisabled || isCreating}
                       className={cn(
                         "w-full text-left px-3 py-2 text-sm transition-colors duration-100 flex items-center gap-2",
                         "text-primary hover:bg-primary/5",
-                        createDisabled && "opacity-50 cursor-not-allowed",
+                        (createDisabled || isCreating) &&
+                          "opacity-50 cursor-not-allowed",
                       )}
                     >
                       <Plus size={14} className="shrink-0" />
-                      <span className="font-medium">{createLabel}</span>
+                      <span className="font-medium">
+                        {isCreating ? "Creando..." : createLabel}
+                      </span>
                     </button>
                   </>
                 )}
