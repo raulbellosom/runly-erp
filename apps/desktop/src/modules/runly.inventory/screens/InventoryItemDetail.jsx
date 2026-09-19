@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { RunlyDetail, LoadingState, ErrorState, ConfirmDialog, DetailActionBar } from '@runly/ui'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { RunlyDetail, LoadingState, ErrorState, ConfirmDialog, DetailActionBar, Button } from '@runly/ui'
+import { ArrowLeft, Trash2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -9,6 +9,7 @@ import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryItems.js'
 import { INVENTORY_ITEM_DETAIL } from '../blueprints/inventory-item-detail.blueprint.js'
 import { componentRegistry } from '../../../lib/moduleComponentRegistry.js'
+import { useInventoryAssistant } from '../lib/assistant-context.js'
 
 const API_BASE = getApiUrl()
 
@@ -17,6 +18,7 @@ export default function InventoryItemDetail() {
   const id = useMemo(() => (wildcard ?? '').split('/')[1] ?? null, [wildcard])
   const navigate = useNavigate()
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const assistant = useInventoryAssistant()
 
   const { session } = useAuth()
   const token = session?.access_token
@@ -51,6 +53,7 @@ export default function InventoryItemDetail() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 min-h-dvh">
+      <Button variant="outline" onClick={() => assistant?.openAssistant({ mode: 'item', ids: [id], filters: {} })}><Sparkles className="mr-2 h-4 w-4" />Consultar este equipo con IA</Button>
       <RunlyDetail
         blueprint={INVENTORY_ITEM_DETAIL}
         data={item}

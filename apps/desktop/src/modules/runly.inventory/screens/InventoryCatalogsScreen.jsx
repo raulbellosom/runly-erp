@@ -22,6 +22,7 @@ import {
 } from '@runly/ui'
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
+import { InventoryReusableCatalog } from '../components/InventoryReusableCatalog.jsx'
 import {
   useInventoryCategories,
   useCreateInventoryCategory,
@@ -534,7 +535,7 @@ function CustomFieldsTab() {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-const VALID_TABS = new Set(['categories', 'brands', 'locations', 'custom-fields'])
+const VALID_TABS = new Set(['categories', 'brands', 'locations', 'custom-fields', 'models', 'types'])
 
 export default function InventoryCatalogsScreen() {
   const [searchParams] = useSearchParams()
@@ -548,13 +549,15 @@ export default function InventoryCatalogsScreen() {
       <PageHeader
         eyebrow="Runly Inventario"
         title="Catalogos"
-        description="Administra categorias, marcas, ubicaciones y campos personalizados. Arrastra para reordenar."
+        description="Administra categorías, marcas, modelos, tipos, ubicaciones y campos personalizados."
       />
 
       <Tabs defaultValue={initialTab}>
-        <TabsList>
+        <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="categories">Categorias</TabsTrigger>
           <TabsTrigger value="brands">Marcas</TabsTrigger>
+          <TabsTrigger value="models">Modelos</TabsTrigger>
+          <TabsTrigger value="types">Tipos</TabsTrigger>
           <TabsTrigger value="locations">Ubicaciones</TabsTrigger>
           <TabsTrigger value="custom-fields">Campos personalizados</TabsTrigger>
         </TabsList>
@@ -565,6 +568,8 @@ export default function InventoryCatalogsScreen() {
         <TabsContent value="brands" className="mt-4">
           <BrandsTab />
         </TabsContent>
+        <TabsContent value="models" className="mt-4"><InventoryReusableCatalog kind="models" /></TabsContent>
+        <TabsContent value="types" className="mt-4"><InventoryReusableCatalog kind="types" /></TabsContent>
         <TabsContent value="locations" className="mt-4">
           <LocationsTab />
         </TabsContent>

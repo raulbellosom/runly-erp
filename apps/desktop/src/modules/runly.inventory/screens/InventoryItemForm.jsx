@@ -7,11 +7,12 @@ import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryItems.js'
-import { INVENTORY_ITEM_FORM } from '../blueprints/inventory-item-form.blueprint.js'
+import { useInventoryFormBlueprint } from '../hooks/useInventoryFormBlueprint.js'
 
 const API_BASE = getApiUrl()
 
 export default function InventoryItemForm() {
+  const blueprint = useInventoryFormBlueprint()
   const { '*': wildcard } = useParams()
   const id = useMemo(() => {
     const parts = (wildcard ?? '').split('/')
@@ -51,7 +52,7 @@ export default function InventoryItemForm() {
       />
       <div className="mt-6">
         <RunlyForm
-          blueprint={INVENTORY_ITEM_FORM}
+          blueprint={blueprint}
           initialData={isEdit ? editItem : {}}
           mode={isEdit ? 'edit' : 'create'}
           token={token}
@@ -59,11 +60,11 @@ export default function InventoryItemForm() {
           apiBaseUrl={API_BASE}
           asideActions={
             isEdit && editItem?.id ? (
-              <div className="glass-shell flex flex-col gap-2 rounded-2xl p-3">
+              <div className="glass-shell flex flex-col gap-2 rounded-2xl p-3 sm:flex-row sm:items-stretch xl:flex-col">
                 <Button
                   type="button"
                   variant="glass"
-                  className="w-full justify-start"
+                  className="justify-start sm:justify-center xl:justify-start"
                   onClick={() => navigate(`/app/m/runly.inventory/inventory/${id}`)}
                 >
                   <Eye className="h-4 w-4" />
@@ -72,7 +73,7 @@ export default function InventoryItemForm() {
                 <Button
                   type="button"
                   variant="destructive"
-                  className="w-full justify-start"
+                  className="justify-start sm:justify-center xl:justify-start"
                   onClick={() => setDeleteOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" />

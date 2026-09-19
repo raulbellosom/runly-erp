@@ -231,6 +231,8 @@ export { ContactPicker } from "./components/ContactPicker.jsx";
 export { FileCard } from "./components/FileCard.jsx";
 export { DistDropZone } from "./components/DistDropZone.jsx";
 export { FileUploader } from "./components/FileUploader.jsx";
+export { AIUploadDropzone } from "./components/AIUploadDropzone.jsx";
+export { AIFlowSteps } from "./components/AIFlowSteps.jsx";
 export { FileViewer } from "./components/FileViewer.jsx";
 export { AdvancedFileViewer } from "./components/AdvancedFileViewer.jsx";
 export { FileVisual } from "./components/FileVisual.jsx";
@@ -255,6 +257,7 @@ export {
 } from "./components/ViewModeSwitch.jsx";
 export { MobileFiltersSheet } from "./components/MobileFiltersSheet.jsx";
 export { ImageSourceSheet } from "./components/ImageSourceSheet.jsx";
+export { ChatAttachMenu } from "./components/ChatAttachMenu.jsx";
 export { ListLayout } from "./components/ListLayout.jsx";
 export { useAttachmentsController, resolveAttachmentFileType } from "./hooks/useAttachmentsController.js";
 export { useIsMobile } from "./hooks/useIsMobile.js";

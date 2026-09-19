@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import { RunlyTable, Button, ConfirmDialog, PageHeader } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -10,6 +10,7 @@ import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { runly } from '../../../lib/runly.js'
 import { useInventoryCategories, useInventoryBrands, useInventoryLocations } from '../hooks/useInventoryCatalogs.js'
 import { ITEM_STATUSES } from '../lib/inventory-constants.js'
+import { useInventoryAssistant } from '../lib/assistant-context.js'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map(s => ({ value: s.value, label: s.label }))
 
@@ -22,6 +23,15 @@ export default function InventoryScreen() {
 
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [refreshSignal, setRefreshSignal] = useState(0)
+  const assistant = useInventoryAssistant()
+  const setPageContext = assistant?.setPageContext
+  const [assistantContext, setAssistantContext] = useState({ mode: 'all', ids: [], filters: {} })
+  const updateAssistantContext = useCallback(({ selectedIds, search, filters }) => {
+    const activeFilters = Object.fromEntries(Object.entries({ ...filters, search }).filter(([, value]) => value !== '' && value != null))
+    const next = selectedIds.length ? { mode: 'selected', ids: selectedIds, filters: {} } : Object.keys(activeFilters).length ? { mode: 'filtered', ids: [], filters: activeFilters } : { mode: 'all', ids: [], filters: {} }
+    setAssistantContext(current => JSON.stringify(current) === JSON.stringify(next) ? current : next)
+    setPageContext?.(next)
+  }, [setPageContext])
 
   const { data: categoriesData } = useInventoryCategories()
   const { data: brandsData } = useInventoryBrands()
@@ -99,14 +109,20 @@ export default function InventoryScreen() {
         title="Inventario"
         description="Gestiona y rastrea todos los activos de la empresa"
         actions={
+          <>
+          <Button variant="ghost" onClick={() => assistant?.openAssistant(assistantContext)}><Sparkles className="mr-2 h-4 w-4" />Consultar con IA</Button>
+          <Button variant="outline" onClick={() => navigate('/app/m/runly.inventory/inventory/intake')}><Sparkles className="mr-2 h-4 w-4" />Registro con IA</Button>
           <Button onClick={() => navigate('/app/m/runly.inventory/inventory/new')}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo item
           </Button>
+          </>
         }
       />
 
       <RunlyTable
+        key={activeCompanyId}
+        onContextChange={updateAssistantContext}
         blueprint={blueprint}
         token={token}
         companyId={activeCompanyId}
@@ -123,6 +139,7 @@ export default function InventoryScreen() {
         onDelete={row => setConfirmDelete(row)}
         refreshSignal={refreshSignal}
       />
+
 
       <ConfirmDialog
         open={Boolean(confirmDelete)}
