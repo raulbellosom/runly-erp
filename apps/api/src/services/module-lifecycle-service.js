@@ -1376,6 +1376,13 @@ export function createModuleLifecycleService({ prisma }) {
         await upsertManifestPermissions(tx, mod.id, manifest.key, manifest.permissions ?? [], isInstalled)
         await upsertManifestBlueprints(tx, mod.id, manifest.blueprints ?? [])
       })
+      // Built-in manifests can declare Runly ORM models inline. Filesystem
+      // modules continue through their existing discovery/install flow.
+      const inlineModels = (Array.isArray(manifest.models) ? manifest.models : []).filter(model => model && typeof model === 'object')
+      if (inlineModels.length && isOfficialCoreModuleKey(manifest.key)) {
+        await metadataSvc.syncModuleMetadata({ manifest, models: inlineModels, views: manifest.views ?? [] })
+        await applyModuleOrmMigrations({ moduleKey: manifest.key, actorId })
+      }
     }
 
     await writeAuditLog(prisma, {
