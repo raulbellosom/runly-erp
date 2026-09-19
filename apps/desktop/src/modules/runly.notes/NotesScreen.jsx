@@ -4,6 +4,7 @@ import {
   Plus, ArrowLeft,
   Settings2, Share2, RotateCcw, Trash2, PenLine,
   FileText, Shapes, ChevronLeft, ChevronRight,
+  Maximize2, Minimize2,
 } from 'lucide-react'
 import {
   ConfirmDialog,
@@ -78,6 +79,17 @@ export default function NotesScreen() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
   const effectiveListCollapsed = listCollapsed && isDesktop
+
+  const [isZenMode, setIsZenMode] = useState(false)
+
+  useEffect(() => {
+    if (!isZenMode) return
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setIsZenMode(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isZenMode])
 
   // Restore selected note from URL on mount / page reload
   const { data: urlNoteData } = useNote(urlNoteId)
@@ -271,10 +283,10 @@ export default function NotesScreen() {
       <div
         className={[
           'flex-1 min-w-0 flex flex-col overflow-hidden',
-          isCanvasNote ? '' : 'bg-muted/30',
-          mobileView === 'editor' ? 'flex' : 'hidden lg:flex',
+          isZenMode ? 'fixed inset-0 z-50 bg-background' : (isCanvasNote ? '' : 'bg-muted/30'),
+          (mobileView === 'editor' || isZenMode) ? 'flex' : 'hidden lg:flex',
         ].join(' ')}
-        style={isCanvasNote ? (() => {
+        style={(!isZenMode && isCanvasNote) ? (() => {
           const raw = selectedNote?.background_color
           if (!raw) return {}
           const color = isDark ? (DARK_BG_MAP[raw] ?? raw) : raw
@@ -308,6 +320,13 @@ export default function NotesScreen() {
               >
                 <Share2 size={13} />
                 <span className="hidden sm:inline">Compartir</span>
+              </button>
+              <button
+                onClick={() => setIsZenMode(z => !z)}
+                className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+                title={isZenMode ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              >
+                {isZenMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
               </button>
               <button
                 onClick={() => setRightPanel(p => p === 'editor' ? 'settings' : 'editor')}
