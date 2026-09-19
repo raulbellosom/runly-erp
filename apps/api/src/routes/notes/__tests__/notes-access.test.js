@@ -275,8 +275,13 @@ describe("notes-service — listNotes search matches tags and folder name", () =
     };
     const svc = createNotesService({ prisma });
     await svc.listNotes({ userId: OWNER, q: "urgente" });
-    assert.match(capturedSql, /note_tag_assignments/);
-    assert.match(capturedSql, /note_tags/);
-    assert.match(capturedSql, /note_folders/);
+    // Anchor on the search clause's own aliases/predicates, not the bare
+    // table names — listNotes already LEFT JOINs note_tag_assignments/
+    // note_tags elsewhere (unrelated tag-enrichment for the response shape),
+    // so asserting on the bare table names alone would pass even if the new
+    // tag-search EXISTS block were deleted entirely.
+    assert.match(capturedSql, /nta_q\.note_id/);
+    assert.match(capturedSql, /nt_q\.name ilike/);
+    assert.match(capturedSql, /nf_q\.name ilike/);
   });
 });
