@@ -85,7 +85,7 @@ export default function NotesScreen() {
   useEffect(() => {
     if (!isZenMode) return
     function onKeyDown(e) {
-      if (e.key === 'Escape') setIsZenMode(false)
+      if (e.key === 'Escape' && !e.defaultPrevented) setIsZenMode(false)
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
@@ -283,7 +283,12 @@ export default function NotesScreen() {
       <div
         className={[
           'flex-1 min-w-0 flex flex-col overflow-hidden',
-          isZenMode ? 'fixed inset-0 z-50 bg-background' : (isCanvasNote ? '' : 'bg-muted/30'),
+          // fixed inset-x-0 top-0 h-dvh (not bare inset-0) — see RunlyApp.jsx's
+          // app-shell-root comment: plain inset-0 sizes against the
+          // non-shrinking mobile layout viewport and breaks the h-full/
+          // flex-1 min-h-0 chain NoteEditor's scroll/keyboard-avoidance logic
+          // depends on.
+          isZenMode ? 'fixed inset-x-0 top-0 h-dvh z-50 bg-background' : (isCanvasNote ? '' : 'bg-muted/30'),
           (mobileView === 'editor' || isZenMode) ? 'flex' : 'hidden lg:flex',
         ].join(' ')}
         style={(!isZenMode && isCanvasNote) ? (() => {
