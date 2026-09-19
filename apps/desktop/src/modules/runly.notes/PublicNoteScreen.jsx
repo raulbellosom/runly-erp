@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { runly } from '../../lib/runly'
 import { NoteEditor } from './components/NoteEditor.jsx'
+import { NOTE_SHEET_MAX_WIDTH_CLASS } from './components/NoteSheet.jsx'
 import { NoteIcon } from './noteIcons.jsx'
 import { ErrorState } from '@runly/ui'
 
@@ -75,7 +76,7 @@ export default function PublicNoteScreen() {
     // does its own internal scrolling) — this page needs its own bounded,
     // scrollable region or content taller than the viewport is unreachable.
     <div className="h-dvh overflow-y-auto overscroll-contain bg-gray-100">
-      <div className="max-w-3xl mx-auto py-12 px-4">
+      <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} py-12 px-4`}>
         <div className="flex items-center gap-3 mb-6">
           {note.icon && <NoteIcon name={note.icon} size={28} className="text-amber-500 shrink-0" />}
           <h1 className="text-2xl font-bold text-gray-900">{note.title || 'Nota'}</h1>

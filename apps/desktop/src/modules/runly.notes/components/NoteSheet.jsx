@@ -12,7 +12,7 @@ export function NoteSheet({ note, isDark = false, children }) {
 
   return (
     <div
-      className={`${NOTE_SHEET_MAX_WIDTH_CLASS} min-h-full`}
+      className={`${NOTE_SHEET_MAX_WIDTH_CLASS} min-h-full bg-card`}
       style={backgroundColor ? { backgroundColor } : undefined}
     >
       {children}

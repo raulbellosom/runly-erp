@@ -151,6 +151,8 @@ export default function NotesScreen() {
     setMobileView('editor')
   }
 
+  const isCanvasNote = selectedNote?.note_type === 'canvas'
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
 
@@ -221,10 +223,10 @@ export default function NotesScreen() {
       <div
         className={[
           'flex-1 min-w-0 flex flex-col overflow-hidden',
-          selectedNote?.note_type === 'canvas' ? '' : 'bg-muted/30',
+          isCanvasNote ? '' : 'bg-muted/30',
           mobileView === 'editor' ? 'flex' : 'hidden lg:flex',
         ].join(' ')}
-        style={selectedNote?.note_type === 'canvas' ? (() => {
+        style={isCanvasNote ? (() => {
           const raw = selectedNote?.background_color
           if (!raw) return {}
           const color = isDark ? (DARK_BG_MAP[raw] ?? raw) : raw
