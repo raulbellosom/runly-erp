@@ -180,9 +180,14 @@ export default function SmtpSettingsScreen() {
             />
 
             <div className="flex items-center gap-2">
-              <Switch id="smtp-tls" checked={form.tls} onCheckedChange={(v) => setForm((f) => ({ ...f, tls: v }))} />
-              <Label htmlFor="smtp-tls">Usar TLS / SSL</Label>
+              <Switch id="smtp-tls" checked={Number(form.port) === 465 || form.tls} disabled={Number(form.port) === 465} onCheckedChange={(v) => setForm((f) => ({ ...f, tls: v }))} />
+              <Label htmlFor="smtp-tls">{[25, 587].includes(Number(form.port)) ? 'Exigir STARTTLS' : 'Usar TLS directo (SSL)'}</Label>
             </div>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              {[25, 587].includes(Number(form.port))
+                ? 'La conexion se cifra mediante STARTTLS. Activa esta opcion para exigirlo; desactivada, se usa si el servidor lo ofrece.'
+                : 'El puerto 465 siempre usa TLS directo. Para STARTTLS usa el puerto 587, segun las indicaciones de tu proveedor.'}
+            </p>
 
             <div className="flex gap-2 pt-2 border-t border-[hsl(var(--border))]">
               <Button type="submit" disabled={saveMutation.isPending} className="flex-1">

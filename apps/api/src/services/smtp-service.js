@@ -86,7 +86,10 @@ export function createSmtpService({ prisma }) {
     const transporter = nodemailer.createTransport({
       host:   config.host,
       port:   config.port,
-      secure: config.tls,
+      // Ports 587/25 upgrade via STARTTLS; 465 starts with TLS immediately.
+      // Keep the legacy implicit-TLS choice for custom ports.
+      secure: config.port === 465 || (config.tls && ![25, 587].includes(config.port)),
+      requireTLS: config.tls,
       auth:   { user: config.user, pass: config.pass },
     })
 
@@ -167,7 +170,9 @@ export function createWebsiteSmtpService({ prisma }) {
     const transporter = nodemailer.createTransport({
       host:   config.host,
       port:   config.port,
-      secure: config.tls,
+      // Match platform SMTP, including existing saved TLS settings on port 587.
+      secure: config.port === 465 || (config.tls && ![25, 587].includes(config.port)),
+      requireTLS: config.tls,
       auth:   { user: config.user, pass: config.pass },
     })
 
