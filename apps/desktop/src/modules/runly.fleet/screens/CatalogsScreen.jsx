@@ -108,6 +108,12 @@ const CATALOG_BLUEPRINTS = {
   },
 }
 
+// Exported so VehiclesScreen.jsx can reuse this exact schema as the inline
+// "Crear modelo de vehiculo" modal target (see relation.create.viewKey on
+// vehicle_model_id) instead of duplicating it or relying on a server-side
+// /blueprints registration that doesn't exist for Fleet's catalog screens.
+export const FLEET_VEHICLE_MODEL_FORM_BLUEPRINT = CATALOG_BLUEPRINTS['vehicle-models'].form
+
 export default function CatalogsScreen() {
   const { '*': wildcard } = useParams()
   const navigate = useNavigate()

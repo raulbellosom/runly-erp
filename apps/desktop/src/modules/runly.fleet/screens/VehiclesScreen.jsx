@@ -6,6 +6,7 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { componentRegistry } from "../../../lib/moduleComponentRegistry";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { FLEET_VEHICLE_MODEL_FORM_BLUEPRINT } from "./CatalogsScreen.jsx";
 
 const API_BASE = getApiUrl();
 const BASE_PATH = "/app/m/runly.fleet/vehicles";
@@ -132,7 +133,7 @@ const VEHICLE_FORM = {
                 mode: "modal",
                 title: "Crear modelo de vehiculo",
                 apiPath: "/fleet/catalogs/vehicle-models",
-                viewKey: "fleet.catalog.vehicle_models.form",
+                viewKey: FLEET_VEHICLE_MODEL_FORM_BLUEPRINT.key,
                 selectCreated: true,
                 refreshOptions: true,
                 permissionKey: "fleet.catalogs.create",
@@ -625,6 +626,7 @@ export default function VehiclesScreen() {
         recordId={recordId}
         onNavigate={handleNavigate}
         componentRegistry={componentRegistry}
+        blueprints={[FLEET_VEHICLE_MODEL_FORM_BLUEPRINT]}
         suppressToolbarCreate
       />
     </div>
