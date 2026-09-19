@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Sheet,
@@ -17,6 +17,9 @@ import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
 } from "@runly/ui";
 import { Skeleton } from "@runly/ui";
 import { Trash2, Plus, X, Activity, Lock, SmilePlus } from "lucide-react";
@@ -70,56 +73,45 @@ function groupReactions(reactions = [], currentUserId = null) {
 
 const REACTIONS = ['👍', '👎', '❤️', '🎉', '😄', '😮', '😢', '🔥', '👀', '✅', '🚀', '💯']
 
+// Radix Popover (portals to <body>) instead of a hand-rolled `position:
+// absolute` div — this panel renders inside a Sheet's overflow-y-auto region,
+// which clipped/mispositioned a locally absolute-positioned popup.
 function EmojiPicker({ onSelect }) {
   const [open, setOpen] = useState(false);
-  const buttonRef = useRef(null);
-  const pickerRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleOutside(e) {
-      if (!buttonRef.current?.contains(e.target) && !pickerRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    document.addEventListener("touchstart", handleOutside, { passive: true });
-    return () => {
-      document.removeEventListener("mousedown", handleOutside);
-      document.removeEventListener("touchstart", handleOutside);
-    };
-  }, [open]);
 
   return (
-    <div className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted active:bg-muted transition-colors"
-      >
-        <SmilePlus className="h-3 w-3" />
-      </button>
-      {open && (
-        <div
-          ref={pickerRef}
-          className="absolute bottom-7 left-0 z-50 rounded-xl border border-border bg-popover p-2 shadow-lg"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted active:bg-muted transition-colors"
         >
-          <div className="grid grid-cols-6 gap-1">
-            {REACTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => { onSelect(emoji); setOpen(false); }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-muted transition-colors"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+          <SmilePlus className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={8}
+        collisionPadding={8}
+        className="w-auto p-2 pointer-events-auto"
+        style={{ zIndex: 10001 }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="grid grid-cols-6 gap-1">
+          {REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => { onSelect(emoji); setOpen(false); }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-muted transition-colors"
+            >
+              {emoji}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -891,22 +883,24 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
                             size="sm"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-medium">
+                            <div className="flex flex-col gap-0.5 mb-0.5">
+                              <span className="text-xs font-medium leading-tight">
                                 {authorName}
                               </span>
-                              {comment._pending ? (
-                                <span className="text-[10px] text-muted-foreground">Enviando...</span>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {formatDate(comment.createdAt)}
-                                </span>
-                              )}
-                              {!comment._pending && comment.editedAt && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  (editado)
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                {comment._pending ? (
+                                  <span className="text-[10px] text-muted-foreground">Enviando...</span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {formatDate(comment.createdAt)}
+                                  </span>
+                                )}
+                                {!comment._pending && comment.editedAt && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    (editado)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             {isEditing ? (
                               <div className="space-y-1.5">
