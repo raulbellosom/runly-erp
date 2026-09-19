@@ -51,6 +51,23 @@ test('recognition preserves identifiers and issues evidence scoped to the actor/
   body.proofs[0] += 'x';
   await assert.rejects(service.validate({ ...context, input: body }), /no pertenece/);
 });
+test('recognition derives a serial from rawText when the model does not tag one, marked uncertain', async () => {
+  const { service } = fixture({ vision: { extractInventory: async () => ({
+    parsed: { rawText: 'HP EliteBook 845 G7\nProduct TN0E3LT#ABM\nSN# 5CG1320TKP\nWarranty 1Y/GOY', observations: [] },
+    model: 'test',
+  }) } });
+  const { images } = await service.recognize({ ...context, files: [photo()] });
+  assert.deepEqual(images[0].observations, [{ field: 'serialNumber', value: '5CG1320TKP', status: 'uncertain' }]);
+});
+test('recognition does not override a serial the model already tagged', async () => {
+  const { service } = fixture({ vision: { extractInventory: async () => ({
+    parsed: { rawText: 'SN# 5CG1320TKP', observations: [{ field: 'serialNumber', value: 'MODEL-VALUE', status: 'observed' }] },
+    model: 'test',
+  }) } });
+  const { images } = await service.recognize({ ...context, files: [photo()] });
+  assert.equal(images[0].observations.length, 1);
+  assert.equal(images[0].observations[0].value, 'MODEL-VALUE');
+});
 test('recognition refuses missing identity, oversized batches and unsupported image types', async () => {
   const { service } = fixture();
   await assert.rejects(service.recognize({ files: [photo()] }), /autorizado/);
@@ -75,9 +92,11 @@ test('recognition retains the transcription and valid fields when another field 
   ] } }) } });
   const { images: [image] } = await service.recognize({ ...context, files: [photo()] });
   assert.equal(image.error, undefined); assert.ok(image.proof);
-  assert.match(image.rawText, /S\/N O0-I1/); assert.equal(image.observations.length, 2);
+  assert.match(image.rawText, /S\/N O0-I1/); assert.equal(image.observations.length, 3);
   assert.deepEqual(image.observations.filter(o => o.field === 'model').map(o => o.value), ['Laptop DEMO']);
   assert.equal(image.observations.find(o => o.value === 'HSN-DEMO').field, 'description');
+  // The model didn't tag a serial itself, but the rawText fallback found one from the "S/N" label.
+  assert.deepEqual(image.observations.find(o => o.field === 'serialNumber'), { field: 'serialNumber', value: 'O0-I1', status: 'uncertain' });
   assert.equal(image.warnings.length, 1);
 });
 

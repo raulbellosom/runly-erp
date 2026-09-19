@@ -261,6 +261,7 @@ export function createVisionService({ env = process.env, fetchImpl } = {}) {
           "status solo observed, uncertain o unreadable. value es string o null.",
           "itemType solo hardware, software, license, equipment, furniture, vehicle, consumable, other.",
           "Transcribe exactamente identificadores, sin corregir, inventar, completar ni cambiar mayúsculas, ceros, guiones o símbolos.",
+          "serialNumber es el dato más importante de esta lectura, más que partNumber o productCode: búscalo activamente incluso si la etiqueta está desordenada. Reconoce CUALQUIERA de estas variantes de la etiqueta que lo precede: SN, S/N, S/NO, Serial, Serial No, Serial Number, Serial #, N/S, Serie, No. de serie, Núm. de serie, Número de serie.",
           "Distingue S/N de P/N, modelo y códigos de producto. Un código de barras no necesariamente es una serie.",
           "model es exclusivamente el modelo comercial del EQUIPO principal. RMN, Regulatory Model, HSN y modelos de radios/componentes internos no son su modelo comercial NI su número de parte: consérvalos en rawText y description, nunca en model ni partNumber. Si solo aparece la etiqueta regulatoria, no propongas model ni name.",
           "ProdID/Product ID corresponde a productCode; no lo confundas con S/N. Usa la marca comercial con escritura consistente. Para equipos electrónicos físicos, itemType es hardware.",

@@ -5,6 +5,23 @@ import { createInventoryService, InventoryServiceError } from './inventory-servi
 import { intakeSchema, observationSchema } from '../routes/inventory/intake-validators.js';
 import { createInventoryReusableCatalog } from './inventory-reusable-catalog.js';
 
+// The vision model doesn't reliably tag serialNumber under a tight token
+// budget (see vision-service.js's DEFAULT_MAX_TOKENS), but rawText transcription
+// stays reliable — so also try to pull a serial out of it ourselves whenever
+// the model didn't already flag one. Matches the label, not the value, so it
+// only fires next to something that actually reads as a serial-number tag;
+// the result is always 'uncertain' (a suggestion to confirm, never auto-applied).
+const SERIAL_LABEL_RE = /(?:^|[\s,.;:|(])(?:s\s*\/\s*n\.?o?|sn|n\/s|ser(?:ial)?(?:\s*(?:no\.?|number|num\.?|#))?|n[uú]m(?:ero|\.)?\s*de\s*serie|no\.?\s*de\s*serie)\b\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9-]{4,})/i;
+
+function deriveSerialFromRawText(rawText) {
+  if (!rawText) return null;
+  for (const line of rawText.split(/\r?\n/)) {
+    const match = SERIAL_LABEL_RE.exec(line);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 export function createInventoryIntakeService({ prisma, env = process.env, vision = createVisionService({ env }), prepareImage = prepareVisionImage }) {
   const buckets = new Map();
   const active = new Set();
@@ -71,6 +88,10 @@ export function createInventoryIntakeService({ prisma, env = process.env, vision
             });
             const warnings = Array.isArray(source.warnings) ? source.warnings.filter(w => typeof w === 'string').slice(0, 10).map(w => w.slice(0, 500)) : [];
             if (observations.length !== candidates.length) warnings.push('Algunos campos no se pudieron interpretar. Revisa el texto extraído y completa esos datos manualmente.');
+            if (!observations.some(o => o.field === 'serialNumber' && o.value)) {
+              const derivedSerial = deriveSerialFromRawText(rawText);
+              if (derivedSerial) observations.push({ field: 'serialNumber', value: derivedSerial, status: 'uncertain' });
+            }
             if (!observations.length && !rawText) throw new Error('empty-recognition');
             return { index, imageId, name: file.name, rawText, observations, warnings, model: result.model,
               proof: encodeProof({ ...context, imageId, observations, model: result.model, expiresAt: Date.now() + 24 * 60 * 60_000 }) };
