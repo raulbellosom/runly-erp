@@ -217,6 +217,17 @@ export function createNotesService({ prisma, broadcaster = null }) {
         -- 'spanish' config must match notes_fts_idx so the GIN index is used.
         OR to_tsvector('spanish', COALESCE(a.title, '') || ' ' || COALESCE(a.content_text, ''))
            @@ plainto_tsquery('spanish', ${q ?? null}::text)
+        OR EXISTS (
+          SELECT 1 FROM note_tag_assignments nta_q
+          JOIN note_tags nt_q ON nt_q.id = nta_q.tag_id
+          WHERE nta_q.note_id = a.id
+            AND nt_q.name ILIKE '%' || ${q ?? null}::text || '%'
+        )
+        OR EXISTS (
+          SELECT 1 FROM note_folders nf_q
+          WHERE nf_q.id = a.folder_id
+            AND nf_q.name ILIKE '%' || ${q ?? null}::text || '%'
+        )
       )
       AND (
         ${shared ?? null}::boolean IS NULL

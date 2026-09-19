@@ -262,3 +262,21 @@ describe('shared note notifications', () => {
     await assert.rejects(svc.shareNote(NOTE, OWNER, { targetUserId: OTHER, permission: 'edit' }), { status: 403 });
   });
 });
+
+describe("notes-service — listNotes search matches tags and folder name", () => {
+  it("the q filter's SQL also checks tag names and the note's folder name", async () => {
+    let capturedSql = "";
+    const prisma = {
+      $queryRaw: (strings) => {
+        capturedSql = sql(strings).toLowerCase();
+        return Promise.resolve([]);
+      },
+      $executeRaw: () => Promise.resolve([]),
+    };
+    const svc = createNotesService({ prisma });
+    await svc.listNotes({ userId: OWNER, q: "urgente" });
+    assert.match(capturedSql, /note_tag_assignments/);
+    assert.match(capturedSql, /note_tags/);
+    assert.match(capturedSql, /note_folders/);
+  });
+});
