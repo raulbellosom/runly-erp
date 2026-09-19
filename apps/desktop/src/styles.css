@@ -490,6 +490,13 @@ body,
   margin-bottom: 0.625rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid hsl(var(--border));
+  /* Opaque, same reason as .note-title-row above: this box (content +
+     padding, where the border-bottom line is drawn) must hide the ruled
+     pattern behind it so that colored border-bottom below is the ONLY
+     line visible here — otherwise a pattern line peeking through nearby
+     reads as a confusing second, slightly-offset line right under the
+     title. */
+  background-color: var(--note-sheet-bg, hsl(var(--card)));
   /* Extra room so the title's text doesn't render under the note-icon
      button, which overlaps onto this line from the row above (see the
      `-mb-10` on that row in NoteEditor.jsx). text-indent (not padding-left)
@@ -630,13 +637,16 @@ body,
 }
 
 /* Red margin line (school-notebook style) — independent of paper_style,
-   works even on a blank ("En blanco") page. */
+   works even on a blank ("En blanco") page. Positioned at 1.25rem, clearly
+   BEFORE the 2rem (px-8) left padding shared by the icon row, title, and
+   body text, so all writing starts to the right of the line, never on top
+   of or before it. */
 [data-paper-margin="true"] .note-sheet::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 3.5rem;
+  left: 1.25rem;
   width: 1px;
   background: hsl(var(--note-paper-margin) / 0.6);
   pointer-events: none;

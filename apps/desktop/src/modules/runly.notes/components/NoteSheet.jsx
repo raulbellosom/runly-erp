@@ -13,7 +13,18 @@ export function NoteSheet({ note, isDark = false, zoom = 100, children }) {
   return (
     <div
       className={`${NOTE_SHEET_MAX_WIDTH_CLASS} min-h-full bg-card note-sheet`}
-      style={{ zoom: `${zoom}%`, ...(backgroundColor ? { backgroundColor } : {}) }}
+      style={{
+        zoom: `${zoom}%`,
+        // Exposed as a custom property (not just the `backgroundColor` style
+        // field) so specific descendants — the title row, which needs to sit
+        // OPAQUE on top of the ruled/grid pattern instead of showing it
+        // through — can reference the sheet's actual resolved background via
+        // var(), which threads through intervening unstyled wrapper elements
+        // the way a plain inherited `background-color` would not (that
+        // property isn't inherited by default).
+        '--note-sheet-bg': backgroundColor ?? 'hsl(var(--card))',
+        ...(backgroundColor ? { backgroundColor } : {}),
+      }}
     >
       {children}
     </div>
