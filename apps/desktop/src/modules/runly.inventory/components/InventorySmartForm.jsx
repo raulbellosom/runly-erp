@@ -8,7 +8,7 @@ import { RunlyForm, Button, AIUploadDropzone, AIFlowSteps, Input, Textarea, Chec
 import { InventoryCaptureTable } from './InventoryCaptureTable.jsx'
 import { INVENTORY_ITEM_FORM } from '../blueprints/inventory-item-form.blueprint.js'
 import { useInventoryFormBlueprint } from '../hooks/useInventoryFormBlueprint.js'
-import { useInventoryBrands, useInventoryCategories } from '../hooks/useInventoryCatalogs.js'
+import { useInventoryBrands, useInventoryCategories, useCreateInventoryBrand, useCreateInventoryCategory } from '../hooks/useInventoryCatalogs.js'
 import { collectSuggestions, confirmationKey, identifiersFor, intakeRequest } from '../lib/intake.js'
 
 const LABELS = { name: 'Nombre', itemType: 'Tipo', brandName: 'Marca', categoryName: 'Categoría', model: 'Modelo', partNumber: 'Número de parte', serialNumber: 'Número de serie', productCode: 'Código de producto', description: 'Descripción visible' }
@@ -64,6 +64,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
   const [retrying, setRetrying] = useState(false)
   const [photoStatus, setPhotoStatus] = useState({})
   const [leaveSaved, setLeaveSaved] = useState(false)
+  const [pendingCatalogCreate, setPendingCatalogCreate] = useState(null)
   const sequence = useRef(0)
   const urls = useRef(new Set())
   const abort = useRef(null)
@@ -72,6 +73,8 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
   const requestSnapshot = useRef(null)
   const { data: brands } = useInventoryBrands()
   const { data: categories } = useInventoryCategories()
+  const createBrand = useCreateInventoryBrand()
+  const createCategory = useCreateInventoryCategory()
   const updatePhotoStatus = useCallback((id, pending) => setPhotoStatus(current => current[id] === pending ? current : { ...current, [id]: pending }), [])
   const photosPending = Boolean(saved && saved.some((item, index) => units[index].photoIds.length && photoStatus[item.id] !== false))
   const flowActiveIndex = saved ? 3 : (!analyzing && photos.some(p => p.result)) ? 2 : photos.length ? 1 : 0
@@ -242,7 +245,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
         const options = field === 'brandName' ? brands?.data : categories?.data
         const match = options?.find(o => o.name.toLocaleLowerCase() === suggestion.value.toLocaleLowerCase())
         if (match) patchValues({ [field === 'brandName' ? 'brandId' : 'categoryId']: match.id })
-        else toast.info('Busca o crea este valor en el catálogo del formulario.')
+        else setPendingCatalogCreate({ field, value: suggestion.value, patchValues })
       } else if (field === 'description' || field === 'productCode') {
         patchValues({ notes: [values.notes, `${LABELS[field]}: ${suggestion.value}`].filter(Boolean).join('\n') })
       } else patchValues({ [field]: suggestion.value })
@@ -326,5 +329,17 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
     <fieldset disabled={pendingSave || analyzing} className="contents"><RunlyForm blueprint={blueprint} initialData={{ status: 'available' }} mode="create" token={token} companyId={companyId} apiBaseUrl={apiBaseUrl} renderTools={renderCapture} submitRequest={submit} onCancel={() => setDiscard(true)} /></fieldset>
     <ImageViewer key={viewer?.url ?? 'closed'} allowZoom open={Boolean(viewer)} src={viewer?.url} fileName={viewer?.file.name} onClose={() => setViewer(null)} />
     <ConfirmDialog open={discard} onOpenChange={setDiscard} title="Descartar captura" description="Se perderán las fotos y series que aún no guardaste." confirmLabel="Descartar" onConfirm={onCancel} />
+    <ConfirmDialog open={Boolean(pendingCatalogCreate)} onOpenChange={value => !value && setPendingCatalogCreate(null)}
+      title={`Crear ${pendingCatalogCreate?.field === 'brandName' ? 'marca' : 'categoría'} nueva`}
+      description={`La IA detectó «${pendingCatalogCreate?.value}» en la fotografía, pero no existe en tu catálogo. ¿Deseas crearla y usarla en este equipo?`}
+      confirmLabel="Crear y usar"
+      onConfirm={async () => {
+        const { field, value, patchValues: patch } = pendingCatalogCreate
+        try {
+          const created = field === 'brandName' ? await createBrand.mutateAsync({ name: value }) : await createCategory.mutateAsync({ name: value })
+          patch({ [field === 'brandName' ? 'brandId' : 'categoryId']: created.data.id })
+        } catch (err) { toast.error(err.message) }
+        finally { setPendingCatalogCreate(null) }
+      }} />
   </>
 }
