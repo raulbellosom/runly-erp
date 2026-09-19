@@ -79,6 +79,12 @@ html {
   --border: 214 13% 89%;
   --input: 214 13% 89%;
   --ring: 195 98% 56%;
+
+  /* Realistic notebook paper effects (runly.notes "Estilo de hoja" +
+     "Efectos de papel") — deliberately distinct from --border, warm/paper
+     toned rather than neutral UI gray. */
+  --note-paper-line: 213 55% 78%;
+  --note-paper-margin: 350 70% 78%;
   --surface-1: 0 0% 100%;
   --surface-2: 210 18% 97%;
   --surface-3: 210 16% 95%;
@@ -163,6 +169,10 @@ html {
   --border: 222 47% 15%;
   --input: 222 47% 15%;
   --ring: 195 98% 56%;
+
+  --note-paper-line: 213 35% 38%;
+  --note-paper-margin: 350 45% 45%;
+
   --surface-1: 222 47% 8%;
   --surface-2: 222 47% 6%;
   --surface-3: 222 47% 10%;
@@ -551,13 +561,16 @@ body,
    real body-text line-height. Cover banner/toolbar sit in the same tree but
    already paint their own opaque/blurred background, so this doesn't leak
    through them. */
+.note-sheet {
+  position: relative;
+}
 [data-paper-style="lined"] .note-sheet {
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
     transparent calc(0.9375rem * 1.72 - 1px),
-    hsl(var(--border)) calc(0.9375rem * 1.72 - 1px),
-    hsl(var(--border)) calc(0.9375rem * 1.72)
+    hsl(var(--note-paper-line)) calc(0.9375rem * 1.72 - 1px),
+    hsl(var(--note-paper-line)) calc(0.9375rem * 1.72)
   );
 }
 [data-paper-style="grid"] .note-sheet {
@@ -566,15 +579,15 @@ body,
       to bottom,
       transparent 0,
       transparent calc(0.9375rem * 1.72 - 1px),
-      hsl(var(--border)) calc(0.9375rem * 1.72 - 1px),
-      hsl(var(--border)) calc(0.9375rem * 1.72)
+      hsl(var(--note-paper-line)) calc(0.9375rem * 1.72 - 1px),
+      hsl(var(--note-paper-line)) calc(0.9375rem * 1.72)
     ),
     repeating-linear-gradient(
       to right,
       transparent 0,
       transparent calc(0.9375rem * 1.72 - 1px),
-      hsl(var(--border)) calc(0.9375rem * 1.72 - 1px),
-      hsl(var(--border)) calc(0.9375rem * 1.72)
+      hsl(var(--note-paper-line)) calc(0.9375rem * 1.72 - 1px),
+      hsl(var(--note-paper-line)) calc(0.9375rem * 1.72)
     );
 }
 @media (max-width: 639px) {
@@ -583,8 +596,8 @@ body,
       to bottom,
       transparent 0,
       transparent calc(0.875rem * 1.72 - 1px),
-      hsl(var(--border)) calc(0.875rem * 1.72 - 1px),
-      hsl(var(--border)) calc(0.875rem * 1.72)
+      hsl(var(--note-paper-line)) calc(0.875rem * 1.72 - 1px),
+      hsl(var(--note-paper-line)) calc(0.875rem * 1.72)
     );
   }
   [data-paper-style="grid"] .note-sheet {
@@ -593,17 +606,47 @@ body,
         to bottom,
         transparent 0,
         transparent calc(0.875rem * 1.72 - 1px),
-        hsl(var(--border)) calc(0.875rem * 1.72 - 1px),
-        hsl(var(--border)) calc(0.875rem * 1.72)
+        hsl(var(--note-paper-line)) calc(0.875rem * 1.72 - 1px),
+        hsl(var(--note-paper-line)) calc(0.875rem * 1.72)
       ),
       repeating-linear-gradient(
         to right,
         transparent 0,
         transparent calc(0.875rem * 1.72 - 1px),
-        hsl(var(--border)) calc(0.875rem * 1.72 - 1px),
-        hsl(var(--border)) calc(0.875rem * 1.72)
+        hsl(var(--note-paper-line)) calc(0.875rem * 1.72 - 1px),
+        hsl(var(--note-paper-line)) calc(0.875rem * 1.72)
       );
   }
+}
+
+/* Red margin line (school-notebook style) — independent of paper_style,
+   works even on a blank ("En blanco") page. */
+[data-paper-margin="true"] .note-sheet::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3.5rem;
+  width: 1px;
+  background: hsl(var(--note-paper-margin) / 0.6);
+  pointer-events: none;
+}
+
+/* Subtle paper grain — inline SVG feTurbulence noise, no external asset.
+   Kept at very low opacity so it never fights with text contrast. */
+[data-paper-texture="true"] .note-sheet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  opacity: 0.035;
+  pointer-events: none;
+}
+
+/* Sheet depth — a page sitting on the desk, not a flat panel. */
+[data-paper-shadow="true"] .note-sheet {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* Paragraph */
