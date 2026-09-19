@@ -480,6 +480,10 @@ body,
   margin-bottom: 0.625rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid hsl(var(--border));
+  /* Extra room so the title's text doesn't render under the note-icon
+     button, which overlaps onto this line from the row above (see the
+     `-mb-10` on that row in NoteEditor.jsx). */
+  padding-left: 2.75rem;
 }
 
 /* Headings */

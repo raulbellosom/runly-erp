@@ -426,10 +426,14 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
             </div>
           )}
           {!readOnly && (
-            // Sits directly above the title (the editor's first line — see
-            // handleUpdate) so icon + title read as one unit, matching
-            // Notion's page-icon convention.
-            <div className="px-8 pt-4 flex items-center justify-between gap-2">
+            // Overlaps the title's own line (the editor's first paragraph —
+            // see handleUpdate) via a negative margin-bottom, computed from
+            // the title's font-size/line-height and .tiptap's own top
+            // padding — see the matching CSS comment in styles.css for the
+            // math. `relative z-10` makes this row paint above the title
+            // text in the overlap zone instead of the reverse (later DOM
+            // order would otherwise win).
+            <div className="relative z-10 px-8 pt-4 flex items-center justify-between gap-2 -mb-10">
               <Popover>
                 <PopoverTrigger asChild>
                   <button
