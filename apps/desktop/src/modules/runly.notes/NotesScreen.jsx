@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import {
   Plus, ArrowLeft,
   Settings2, Share2, RotateCcw, Trash2, PenLine,
-  FileText, Shapes
+  FileText, Shapes, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
   ConfirmDialog,
@@ -33,6 +33,25 @@ function viewFromPath(pathname) {
   return 'all'
 }
 
+const NOTES_LIST_COLLAPSED_KEY = 'atlas:v1:notes-list-collapsed'
+
+function getListCollapsed() {
+  try {
+    return localStorage.getItem(NOTES_LIST_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistListCollapsed(val) {
+  try {
+    localStorage.setItem(NOTES_LIST_COLLAPSED_KEY, val ? '1' : '0')
+  } catch {
+    // localStorage unavailable (private mode, etc.) — collapse still works
+    // for the session, it just won't persist across reloads.
+  }
+}
+
 export default function NotesScreen() {
   const { pathname } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -48,6 +67,7 @@ export default function NotesScreen() {
   const [deleteOpen, setDeleteOpen]     = useState(false)
   const [noteToAction, setNoteToAction] = useState(null)
   const [mobileView, setMobileView]     = useState('list')
+  const [listCollapsed, setListCollapsed] = useState(getListCollapsed)
 
   // Restore selected note from URL on mount / page reload
   const { data: urlNoteData } = useNote(urlNoteId)
@@ -160,15 +180,17 @@ export default function NotesScreen() {
       {/* Panel 1: Note list */}
       <div className={[
         'shrink-0 border-r border-border flex flex-col bg-background',
-        'w-full lg:w-72',
+        listCollapsed ? 'w-full lg:w-12' : 'w-full lg:w-72',
         mobileView === 'list' ? 'flex' : 'hidden lg:flex',
       ].join(' ')}>
 
         <div className="flex items-center gap-2 px-3 h-11 border-b border-border shrink-0">
-          <span className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            {folderId ? 'Carpeta' : VIEW_LABELS[activeView]}
-          </span>
-          {!isTrashView && (
+          {!listCollapsed && (
+            <span className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {folderId ? 'Carpeta' : VIEW_LABELS[activeView]}
+            </span>
+          )}
+          {!listCollapsed && !isTrashView && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -189,34 +211,49 @@ export default function NotesScreen() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <button
+            onClick={() => {
+              const next = !listCollapsed
+              setListCollapsed(next)
+              persistListCollapsed(next)
+            }}
+            className="hidden lg:flex p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title={listCollapsed ? 'Expandir lista' : 'Colapsar lista'}
+          >
+            {listCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          </button>
         </div>
 
-        <NotesList
-          notes={notes}
-          selectedNoteId={selectedNote?.id}
-          onSelect={selectNote}
-          onTrash={!isTrashView ? handleTrash : undefined}
-          isLoading={isLoading}
-          showTrash={isTrashView}
-        />
+        {!listCollapsed && (
+          <>
+            <NotesList
+              notes={notes}
+              selectedNoteId={selectedNote?.id}
+              onSelect={selectNote}
+              onTrash={!isTrashView ? handleTrash : undefined}
+              isLoading={isLoading}
+              showTrash={isTrashView}
+            />
 
-        {isTrashView && selectedNote && (
-          <div className="px-3 py-2 border-t border-border flex gap-2 shrink-0">
-            <button
-              onClick={() => { setNoteToAction(selectedNote); setRestoreOpen(true) }}
-              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 border border-border rounded-lg hover:bg-muted text-foreground transition-colors"
-            >
-              <RotateCcw size={13} />
-              Restaurar
-            </button>
-            <button
-              onClick={() => { setNoteToAction(selectedNote); setDeleteOpen(true) }}
-              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-            >
-              <Trash2 size={13} />
-              Eliminar
-            </button>
-          </div>
+            {isTrashView && selectedNote && (
+              <div className="px-3 py-2 border-t border-border flex gap-2 shrink-0">
+                <button
+                  onClick={() => { setNoteToAction(selectedNote); setRestoreOpen(true) }}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 border border-border rounded-lg hover:bg-muted text-foreground transition-colors"
+                >
+                  <RotateCcw size={13} />
+                  Restaurar
+                </button>
+                <button
+                  onClick={() => { setNoteToAction(selectedNote); setDeleteOpen(true) }}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Eliminar
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
