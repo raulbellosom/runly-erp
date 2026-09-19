@@ -55,7 +55,7 @@ function colorForUser(seed) {
 // dropped and switching notes would leave stale content on screen — the
 // editor instance would outlive the note it was built for. Keying the surface
 // by note.id and gating on the engine fixes both.
-export function NoteEditor({ note, readOnly = false, scrollable = true }) {
+export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 100 }) {
   const { session, userProfile } = useAuth()
   const token = session?.access_token
 
@@ -110,6 +110,7 @@ export function NoteEditor({ note, readOnly = false, scrollable = true }) {
         note={note}
         readOnly={readOnly}
         scrollable={scrollable}
+        zoom={zoom}
         token={token}
         session={session}
         userProfile={userProfile}
@@ -130,6 +131,7 @@ export function NoteEditor({ note, readOnly = false, scrollable = true }) {
       note={note}
       readOnly={readOnly}
       scrollable={scrollable}
+      zoom={zoom}
       token={token}
       session={session}
       userProfile={userProfile}
@@ -157,7 +159,7 @@ function EditorLoading({ scrollable }) {
 // Everything below is a single editor instance for one note. It is mounted with
 // key={note.id} by NoteEditor, so every hook/ref here is scoped to one note and
 // torn down cleanly on switch.
-function NoteEditorSurface({ note, readOnly, scrollable, token, session, userProfile, engine }) {
+function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, session, userProfile, engine }) {
   const queryClient = useQueryClient()
   const containerRef = useRef(null)
   const scrollRef = useRef(null)
@@ -482,12 +484,12 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
           style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
           onClick={readOnly ? undefined : handleContainerClick}
         >
-          <NoteSheet note={note} isDark={isDark}>
+          <NoteSheet note={note} isDark={isDark} zoom={zoom}>
             {editorProvider}
           </NoteSheet>
         </div>
       ) : (
-        <NoteSheet note={note} isDark={isDark}>
+        <NoteSheet note={note} isDark={isDark} zoom={zoom}>
           {editorProvider}
         </NoteSheet>
       )}

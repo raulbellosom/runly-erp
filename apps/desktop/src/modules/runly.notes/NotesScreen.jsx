@@ -21,6 +21,8 @@ import { NoteEditor } from './components/NoteEditor.jsx'
 import { NoteSettingsPanel } from './components/NoteSettingsPanel.jsx'
 import { NoteShareModal } from './components/NoteShareModal.jsx'
 import { NoteTitleEditor } from './components/NoteTitleEditor.jsx'
+import { ZoomControl } from './components/ZoomControl.jsx'
+import { useNoteZoom } from './hooks/useNoteZoom.js'
 
 // Lazy so the Excalidraw bundle only loads when a canvas note is opened.
 const CanvasEditor = lazy(() =>
@@ -81,6 +83,7 @@ export default function NotesScreen() {
   const effectiveListCollapsed = listCollapsed && isDesktop
 
   const [isZenMode, setIsZenMode] = useState(false)
+  const [zoom, setZoom] = useNoteZoom()
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -304,6 +307,7 @@ export default function NotesScreen() {
           // depends on.
           isZenMode ? 'fixed inset-x-0 top-0 h-dvh z-50 bg-background' : (isCanvasNote ? '' : 'bg-muted/30'),
           (mobileView === 'editor' || isZenMode) ? 'flex' : 'hidden lg:flex',
+          !isZenMode ? 'relative' : '',
         ].join(' ')}
         style={(!isZenMode && isCanvasNote) ? (() => {
           const raw = selectedNote?.background_color
@@ -379,7 +383,11 @@ export default function NotesScreen() {
             <CanvasEditor key={selectedNote.id} note={selectedNote} />
           </Suspense>
         ) : (
-          <NoteEditor note={selectedNote} readOnly={isTrashView} />
+          <NoteEditor note={selectedNote} readOnly={isTrashView} zoom={zoom} />
+        )}
+
+        {rightPanel === 'editor' && !isTrashView && !isCanvasNote && selectedNote && (
+          <ZoomControl zoom={zoom} onZoomChange={setZoom} />
         )}
       </div>
 

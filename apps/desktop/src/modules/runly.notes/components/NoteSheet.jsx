@@ -6,14 +6,14 @@ import { DARK_BG_MAP } from '../lib/noteColors.js'
 // background treatment regardless of where it's rendered.
 export const NOTE_SHEET_MAX_WIDTH_CLASS = 'max-w-3xl mx-auto'
 
-export function NoteSheet({ note, isDark = false, children }) {
+export function NoteSheet({ note, isDark = false, zoom = 100, children }) {
   const raw = note?.background_color ?? null
   const backgroundColor = raw ? (isDark ? (DARK_BG_MAP[raw] ?? raw) : raw) : undefined
 
   return (
     <div
       className={`${NOTE_SHEET_MAX_WIDTH_CLASS} min-h-full bg-card note-sheet`}
-      style={backgroundColor ? { backgroundColor } : undefined}
+      style={{ zoom: `${zoom}%`, ...(backgroundColor ? { backgroundColor } : {}) }}
     >
       {children}
     </div>
