@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 
 const DEFAULT_FIELDS = {
@@ -285,9 +285,11 @@ export function useAttachmentsController({
   const pendingItemsRef = useRef(pendingItems);
   useEffect(() => { pendingItemsRef.current = pendingItems; }, [pendingItems]);
   const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useLayoutEffect(() => {
+    onErrorRef.current = onError;
+    onChangeRef.current = onChange;
+  }, [onError, onChange]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -411,6 +413,10 @@ export function useAttachmentsController({
       );
 
       try {
+        // An association can fail after upload. Reuse the already uploaded asset
+        // on retry, instead of leaving a new orphan on every attempt.
+        let fileAssetId = pending.fileAssetId;
+        if (!fileAssetId) {
         const formData = new FormData();
         formData.append("file", pending.file);
         formData.append("moduleKey", config.upload.moduleKey);
@@ -429,9 +435,10 @@ export function useAttachmentsController({
           throw new Error(extractErrorMessage(uploadPayload, "No se pudo subir el documento."));
         }
 
-        const fileAssetId = resolveUploadedFileAssetId(uploadPayload);
+        fileAssetId = resolveUploadedFileAssetId(uploadPayload);
         if (!fileAssetId) {
           throw new Error("No se pudo asociar el documento.");
+        }
         }
 
         setPendingItems((prev) =>
@@ -916,11 +923,11 @@ export function useAttachmentsController({
 
   useEffect(() => {
     return () => {
-      for (const item of pendingItems) {
+      for (const item of pendingItemsRef.current) {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
       }
     };
-  }, [pendingItems]);
+  }, []);
 
   useEffect(() => {
     return () => {

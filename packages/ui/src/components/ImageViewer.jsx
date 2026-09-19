@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Download, X } from "lucide-react";
+import { Download, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Button } from './Button.jsx';
 
-export function ImageViewer({ src, alt = "Imagen", fileName, open, onClose }) {
+export function ImageViewer({ src, alt = "Imagen", fileName, open, onClose, allowZoom = false }) {
+  const [zoom, setZoom] = useState(1);
   useEffect(() => {
     function handleKey(e) {
       if (e.key === "Escape") onClose();
@@ -40,8 +42,14 @@ export function ImageViewer({ src, alt = "Imagen", fileName, open, onClose }) {
             "duration-200 pointer-events-none",
           ].join(" ")}
         >
+          <DialogPrimitive.Title className="sr-only">{fileName ?? alt}</DialogPrimitive.Title>
           {/* Action bar — top right */}
-          <div className="absolute top-0 right-0 flex items-center gap-0.5 pointer-events-auto">
+          <div className="absolute top-0 right-0 z-10 flex items-center gap-0.5 pointer-events-auto">
+            {allowZoom && <>
+              <Button type="button" size="icon" variant="secondary" aria-label="Reducir imagen" disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - 0.5))}><ZoomOut className="h-4 w-4" /></Button>
+              <Button type="button" variant="secondary" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</Button>
+              <Button type="button" size="icon" variant="secondary" aria-label="Ampliar imagen" disabled={zoom >= 4} onClick={() => setZoom(value => Math.min(4, value + 0.5))}><ZoomIn className="h-4 w-4" /></Button>
+            </>}
             <button
               onClick={handleDownload}
               aria-label="Descargar imagen"
@@ -61,11 +69,12 @@ export function ImageViewer({ src, alt = "Imagen", fileName, open, onClose }) {
           </div>
 
           {/* Image — fills available space */}
-          <div className="flex-1 min-h-0 flex items-center justify-center pointer-events-auto">
+          <div className={zoom > 1 ? "flex-1 min-h-0 overflow-auto pointer-events-auto pt-10" : "flex-1 min-h-0 flex items-center justify-center pointer-events-auto"}>
             <img
               src={src}
               alt={alt}
-              className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl"
+              className={zoom > 1 ? "max-w-none rounded-2xl shadow-2xl" : "max-h-full max-w-full object-contain rounded-2xl shadow-2xl"}
+              style={zoom > 1 ? { width: `${zoom * 100}%` } : undefined}
               draggable={false}
             />
           </div>
