@@ -6,6 +6,7 @@ import { NotebookPen } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useIsDark } from '../hooks/useIsDark.js'
+import { useKeyboardInset } from '../hooks/useKeyboardInset.js'
 import { NoteSheet } from './NoteSheet.jsx'
 import { runly } from '../../../lib/runly'
 import { supabase } from '../../../lib/supabase'
@@ -13,6 +14,7 @@ import { SupabaseYjsProvider, bytesToBase64 } from '../lib/SupabaseYjsProvider.j
 import { buildExtensions } from '../lib/editor-extensions.js'
 import { usePresence } from '../hooks/usePresence.js'
 import { shouldFocusDocumentEnd } from '../lib/clickBelowContent.js'
+import { isCaretHiddenByKeyboard, computeCaretScrollDelta } from '../lib/keyboardInset.js'
 import { NoteToolbar } from './NoteToolbar.jsx'
 import { TableFloatingMenu } from './TableFloatingMenu.jsx'
 import { NoteCoverBanner } from './NoteCoverBanner.jsx'
@@ -158,10 +160,26 @@ function EditorLoading({ scrollable }) {
 function NoteEditorSurface({ note, readOnly, scrollable, token, session, userProfile, engine }) {
   const queryClient = useQueryClient()
   const containerRef = useRef(null)
+  const scrollRef = useRef(null)
   const editorInstanceRef = useRef(null)
   const ydoc = engine?.ydoc ?? null
   const provider = engine?.provider ?? null
   const isDark = useIsDark()
+
+  const rawKeyboardInset = useKeyboardInset()
+  const keyboardInset = readOnly ? 0 : rawKeyboardInset
+
+  const handleSelectionUpdate = useCallback(
+    ({ editor }) => {
+      if (readOnly || keyboardInset <= 0 || !scrollRef.current) return
+      const coords = editor.view.coordsAtPos(editor.state.selection.head)
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+      if (!isCaretHiddenByKeyboard(coords.bottom, viewportHeight)) return
+      const delta = computeCaretScrollDelta(coords.bottom, viewportHeight)
+      scrollRef.current.scrollBy({ top: delta, behavior: 'smooth' })
+    },
+    [readOnly, keyboardInset],
+  )
 
   // ── autosave ───────────────────────────────────────────────────────────
   // pendingRef holds the latest not-yet-persisted snapshot; the debounce only
@@ -383,6 +401,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
         seedIfNeeded(props)
       }}
       onUpdate={handleUpdate}
+      onSelectionUpdate={handleSelectionUpdate}
       editorProps={{
         attributes: {
           class: 'focus:outline-none px-8 pt-1 pb-6 min-h-full',
@@ -453,7 +472,9 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
     >
       {scrollable ? (
         <div
+          ref={scrollRef}
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
           onClick={readOnly ? undefined : handleContainerClick}
         >
           <NoteSheet note={note} isDark={isDark}>
