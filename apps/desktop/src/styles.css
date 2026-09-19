@@ -487,22 +487,33 @@ body,
   line-height: 1.25 !important;
   letter-spacing: -0.02em;
   color: hsl(var(--foreground));
-  margin-bottom: 0.625rem;
-  padding-bottom: 0.5rem;
   border-bottom: 1px solid hsl(var(--border));
-  /* Opaque, same reason as .note-title-row above: this box (content +
-     padding, where the border-bottom line is drawn) must hide the ruled
-     pattern behind it so that colored border-bottom below is the ONLY
-     line visible here — otherwise a pattern line peeking through nearby
-     reads as a confusing second, slightly-offset line right under the
-     title. */
+  /* Opaque box that hides the ruled/grid pattern behind it, so the
+     border-bottom below is the ONLY line visible in the title area — a
+     pattern line peeking through nearby otherwise reads as a confusing,
+     slightly-offset second line right under the title (or a "cut" line if
+     the opaque box doesn't reach every edge). To make sure there are truly
+     no gaps for the pattern to show through:
+     - margin-left/right cancel .tiptap's own px-8 side padding, extending
+       this box's background full-bleed to .note-sheet's edges (matching
+       padding-left/right below re-adds the same 2rem so the TEXT position
+       is unchanged — only the painted background area gets wider).
+     - the old separate margin-bottom is folded into padding-bottom instead,
+       since background-color paints the padding-box but never the margin
+       box — any spacing left as a margin would be an uncovered gap. */
+  margin-left: -2rem;
+  margin-right: -2rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 1.125rem;
   background-color: var(--note-sheet-bg, hsl(var(--card)));
   /* Extra room so the title's text doesn't render under the note-icon
      button, which overlaps onto this line from the row above (see the
-     `-mb-10` on that row in NoteEditor.jsx). text-indent (not padding-left)
-     on purpose — it only shifts the FIRST line, where the icon actually
-     sits; a wrapped title's continuation lines render at full width below,
-     like normal text, instead of staying needlessly indented. */
+     `-mb-10` on that row in NoteEditor.jsx). text-indent (not more
+     padding-left) on purpose — it only shifts the FIRST line, where the
+     icon actually sits; a wrapped title's continuation lines render at the
+     normal 2rem position below, like body text, instead of staying
+     needlessly indented. */
   text-indent: 2.75rem;
 }
 
