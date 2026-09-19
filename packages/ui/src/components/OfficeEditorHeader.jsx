@@ -22,7 +22,8 @@ export function OfficeEditorHeader({ fileName, mode, ready, dirty, saving, saved
       <div className="office-editor-header-main">
         <Button variant="ghost" className="office-editor-back" onClick={onBack} disabled={saving} aria-label="Volver a Runly ERP" title="Volver a Runly ERP">
           <ArrowLeft aria-hidden="true" />
-          <img className="office-editor-logo" src="/brand/runly-logo-isotype.png" width="24" height="24" alt="" />
+          <img className="office-editor-logo dark:hidden" src="/runly/runly-isotipo-light.png" width="24" height="24" alt="" />
+          <img className="office-editor-logo hidden dark:block" src="/runly/runly-isotipo-dark.png" width="24" height="24" alt="" />
           <span className="office-editor-back-label">Runly ERP</span>
         </Button>
         <div className="office-editor-document">

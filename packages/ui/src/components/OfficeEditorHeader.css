@@ -2,8 +2,10 @@
   --office-accent: #185abd;
   flex-shrink: 0;
   color: hsl(var(--foreground));
-  background: hsl(var(--background));
-  border-bottom: 2px solid var(--office-accent);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 2px solid color-mix(in srgb, var(--office-accent) 70%, transparent);
+  box-shadow: var(--glass-shadow);
   padding-top: env(safe-area-inset-top);
 }
 .office-editor-header[data-format="xlsx"] { --office-accent: #107c41; }
