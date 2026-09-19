@@ -6,6 +6,7 @@ import { runly } from '../../../lib/runly'
 import { useNoteFolders, useCreateNoteFolder } from '../hooks/useNoteFolders.js'
 import { useNoteTags, useCreateNoteTag, useSetNoteTags } from '../hooks/useNoteTags.js'
 import { NOTE_BACKGROUND_COLORS } from '../lib/noteColors.js'
+import { NOTE_PAPER_STYLES, paperStylePreviewBackground } from '../lib/paperStyles.js'
 import { NoteIcon } from '../noteIcons.jsx'
 import { NoteIconPickerContent } from './NoteIconPicker.jsx'
 import {
@@ -240,6 +241,30 @@ export function NoteSettingsPanel({ note, onUpdate, onPublish, onUnpublish, onTr
                   transform: isActive ? 'scale(1.2)' : 'scale(1)',
                 }}
               />
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Estilo de hoja ───────────────────────────────── */}
+      <div>
+        <SectionLabel>Estilo de hoja</SectionLabel>
+        <div className="flex gap-2">
+          {NOTE_PAPER_STYLES.map(style => {
+            const isActive = (note?.paper_style ?? 'none') === style.value
+            return (
+              <button
+                key={style.value}
+                type="button"
+                onClick={() => onUpdate({ paperStyle: style.value })}
+                title={style.label}
+                className={`flex-1 h-14 rounded-lg border-2 bg-background transition-all ${
+                  isActive ? 'border-amber-500' : 'border-border hover:border-muted-foreground/40'
+                }`}
+                style={paperStylePreviewBackground(style.value)}
+              >
+                <span className="sr-only">{style.label}</span>
+              </button>
             )
           })}
         </div>

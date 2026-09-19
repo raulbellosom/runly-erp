@@ -118,6 +118,7 @@ export default function NotesScreen() {
       title: 'title', content: 'content', icon: 'icon',
       backgroundColor: 'background_color', folderId: 'folder_id',
       isPinned: 'is_pinned', isArchived: 'is_archived', coverUrl: 'cover_url',
+      paperStyle: 'paper_style',
     }
     const localPatch = {}
     for (const [k, v] of Object.entries(patch)) {

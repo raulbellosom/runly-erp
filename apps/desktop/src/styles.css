@@ -506,6 +506,61 @@ body,
   color: hsl(var(--foreground));
 }
 
+/* On phones, the same rem sizes read visually larger relative to the
+   viewport than on desktop (less content fits per screen for the same
+   text). Scale everything down a notch so a phone shows roughly the same
+   amount of content per screen as desktop, instead of just enlarged text. */
+@media (max-width: 639px) {
+  .tiptap {
+    font-size: 0.875rem;
+  }
+  .tiptap > p:first-child {
+    font-size: 1.375rem !important;
+  }
+  .tiptap h1 {
+    font-size: 1.3125rem !important;
+  }
+  .tiptap h2 {
+    font-size: 1.125rem !important;
+  }
+  .tiptap h3 {
+    font-size: 1rem !important;
+  }
+}
+
+/* Paper-style backgrounds (per-note "Estilo de hoja" setting). Scoped to the
+   actual text area only (not the cover banner/toolbar above it) via the
+   [data-paper-style] attribute NoteEditor sets on its outer wrapper. Line
+   spacing is in `em`, relative to .tiptap's own font-size, so it tracks the
+   line-height: 1.72 set above at any font-size — including the mobile
+   breakpoint, which only changes font-size, not the line-height ratio. */
+[data-paper-style="lined"] .tiptap {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(1.72em - 1px),
+    hsl(var(--border)) calc(1.72em - 1px),
+    hsl(var(--border)) 1.72em
+  );
+}
+[data-paper-style="grid"] .tiptap {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(1.72em - 1px),
+      hsl(var(--border)) calc(1.72em - 1px),
+      hsl(var(--border)) 1.72em
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(1.72em - 1px),
+      hsl(var(--border)) calc(1.72em - 1px),
+      hsl(var(--border)) 1.72em
+    );
+}
+
 /* Paragraph */
 .tiptap p { margin: 0.3rem 0; }
 
