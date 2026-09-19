@@ -499,6 +499,16 @@ body,
   text-indent: 2.75rem;
 }
 
+/* When a ruled/grid paper style is active, the title's own separator line
+   uses the same warm paper-line color as the rest of the page, so the
+   title visually reads as sitting on one of the notebook's rules instead
+   of a mismatched neutral UI divider. Left as the neutral --border color
+   on "En blanco" (no paper style), where there's no ruled pattern to match. */
+[data-paper-style="lined"] .tiptap > p:first-child,
+[data-paper-style="grid"] .tiptap > p:first-child {
+  border-bottom-color: hsl(var(--note-paper-line));
+}
+
 /* Headings */
 .tiptap h1 {
   font-size: 1.5rem !important;
