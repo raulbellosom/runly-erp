@@ -425,10 +425,17 @@ export default function WebsiteSettingsScreen() {
 
                     <SwitchField
                       id="ws-smtp-tls"
-                      label="Usar TLS / SSL"
-                      checked={smtpForm.tls}
+                      label={[25, 587].includes(Number(smtpForm.port)) ? 'Exigir STARTTLS' : 'Usar TLS directo (SSL)'}
+                      checked={Number(smtpForm.port) === 465 || smtpForm.tls}
+                      disabled={Number(smtpForm.port) === 465}
                       onChange={(checked) => setSmtpForm((f) => ({ ...f, tls: checked }))}
                     />
+
+                    <p className="text-sm text-muted-foreground">
+                      {[25, 587].includes(Number(smtpForm.port))
+                        ? 'La conexion se cifra mediante STARTTLS. Activa esta opcion para exigirlo; desactivada, se usa si el servidor lo ofrece.'
+                        : 'El puerto 465 siempre usa TLS directo. Para STARTTLS usa el puerto 587, segun las indicaciones de tu proveedor.'}
+                    </p>
 
                     <div className="flex gap-2 pt-2 border-t border-border">
                       <Button type="submit" disabled={smtpSaveMutation.isPending} className="flex-1">
