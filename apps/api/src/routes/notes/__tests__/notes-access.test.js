@@ -254,11 +254,17 @@ describe("shares-service — listShareableUsers", () => {
 });
 
 describe("shares-service — getPublicNote projection", () => {
-  it("selects only render-safe columns, never internal identifiers", async () => {
-    let capturedSql = "";
+  it("selects only render-safe columns, never internal identifiers, and attaches a public-safe collaborators list", async () => {
+    let noteSql = "";
     const prisma = {
+      // getPublicNote issues two queries: the note projection, then a
+      // UNION ALL (owner + shares) for the public collaborators footer.
       $queryRaw: (strings) => {
-        capturedSql = sql(strings).toLowerCase();
+        const text = sql(strings).toLowerCase();
+        if (text.includes("union all")) {
+          return Promise.resolve([{ display_name: "Ana", is_owner: true, permission: null }]);
+        }
+        noteSql = text;
         return Promise.resolve([{ id: NOTE, title: "Public", content: {}, author_name: "Ana" }]);
       },
       $executeRaw: () => Promise.resolve([]),
@@ -266,8 +272,9 @@ describe("shares-service — getPublicNote projection", () => {
     const svc = createSharesService({ prisma, broadcaster: null });
     const note = await svc.getPublicNote("abc123");
     assert.equal(note.title, "Public");
-    // Isolate the SELECT list (columns before the FROM clause).
-    const selectList = capturedSql.slice(capturedSql.indexOf("select"), capturedSql.indexOf(" from "));
+    assert.deepEqual(note.collaborators, [{ display_name: "Ana", is_owner: true, permission: null }]);
+    // Isolate the SELECT list (columns before the FROM clause) of the note projection query.
+    const selectList = noteSql.slice(noteSql.indexOf("select"), noteSql.indexOf(" from "));
     assert.ok(!selectList.includes("owner_user_id"), "must not select owner_user_id");
     assert.ok(!selectList.includes("company_id"), "must not select company_id");
     assert.ok(!selectList.includes("folder_id"), "must not select folder_id");
@@ -330,7 +337,7 @@ describe('shared note notifications', () => {
     assert.equal(published[0].companyId, 'shared-company');
     assert.deepEqual(published[0].input.recipients.userIds, [OTHER]);
     assert.deepEqual(published[0].input.channels, ['in_app', 'email', 'web_push']);
-    assert.equal(published[0].input.link, `/app/m/atlas.notes?note=${NOTE}`);
+    assert.equal(published[0].input.link, `/app/m/runly.notes?note=${NOTE}`);
   });
   it('never publishes for a rejected share', async () => {
     const prisma = fakePrisma([['from notes where id', [{ id: NOTE }]]]);

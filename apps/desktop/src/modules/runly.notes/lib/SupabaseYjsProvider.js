@@ -33,7 +33,12 @@ export function extractServerYState(res) {
 }
 
 export class SupabaseYjsProvider {
-  constructor(ydoc, { noteId, supabase, runly, token, onSynced, onStatus }) {
+  // publicSlug + readOnly: the public note page (no session/token, anon
+  // Supabase client) uses this to join the same `note:ydoc:<id>` topic as the
+  // authenticated editor, receive-only. See note_ydoc_receive's anon branch
+  // (migration 20260919120000_notes_ydoc_public_realtime) — sending stays
+  // authenticated-only, so a readOnly provider never attempts to broadcast.
+  constructor(ydoc, { noteId, supabase, runly, token, publicSlug, readOnly = false, onSynced, onStatus }) {
     this.ydoc = ydoc
     this.noteId = noteId
     this.synced = false
@@ -47,6 +52,8 @@ export class SupabaseYjsProvider {
     this.hadServerState = false
     this.awareness = new awarenessProtocol.Awareness(ydoc)
     this._supabase = supabase
+    this._readOnly = readOnly
+    this._publicSlug = publicSlug
     this._channel = null
     this._updateHandler = null
     this._awarenessHandler = null
@@ -69,7 +76,9 @@ export class SupabaseYjsProvider {
   async _init(runly, token) {
     // 1. Load persisted server state
     try {
-      const res = await runly.notes.getYDoc(this.noteId, token)
+      const res = this._publicSlug
+        ? await runly.notes.getPublicYDoc(this._publicSlug)
+        : await runly.notes.getYDoc(this.noteId, token)
       const serverState = extractServerYState(res)
       if (serverState) {
         Y.applyUpdate(this.ydoc, base64ToBytes(serverState), 'server-load')
@@ -144,8 +153,12 @@ export class SupabaseYjsProvider {
           // Catch every peer up with our full doc + awareness state. Y.js
           // updates are commutative/idempotent, so a full-state broadcast on
           // (re)connect is how late joiners and post-dropout clients converge.
-          this._broadcastFullState()
-          this._broadcastAwareness([...this.awareness.getStates().keys()])
+          // A readOnly (public) provider never sends — note_ydoc_send stays
+          // authenticated-only, so this would just be rejected by RLS anyway.
+          if (!this._readOnly) {
+            this._broadcastFullState()
+            this._broadcastAwareness([...this.awareness.getStates().keys()])
+          }
         } else if (
           status === 'CHANNEL_ERROR' ||
           status === 'TIMED_OUT' ||
@@ -158,21 +171,25 @@ export class SupabaseYjsProvider {
         }
       })
 
-    // 4. Broadcast local doc updates to peers
-    this._updateHandler = (update, origin) => {
-      if (origin === 'server-load' || origin === 'broadcast') return
-      this._send('ydoc.update', bytesToBase64(update))
-    }
-    this.ydoc.on('update', this._updateHandler)
+    // 4. Broadcast local doc updates to peers. Skipped entirely in readOnly
+    // mode (public view) — it never has local edits to broadcast, and
+    // note_ydoc_send would reject an anon sender anyway.
+    if (!this._readOnly) {
+      this._updateHandler = (update, origin) => {
+        if (origin === 'server-load' || origin === 'broadcast') return
+        this._send('ydoc.update', bytesToBase64(update))
+      }
+      this.ydoc.on('update', this._updateHandler)
 
-    // 5. Broadcast awareness (cursor) changes to peers. Skip changes that came
-    //    in FROM a peer — applyAwarenessUpdate re-fires 'update' with
-    //    origin 'broadcast' and echoing those would loop.
-    this._awarenessHandler = ({ added, updated, removed }, origin) => {
-      if (origin === 'broadcast') return
-      this._broadcastAwareness([...added, ...updated, ...removed])
+      // 5. Broadcast awareness (cursor) changes to peers. Skip changes that came
+      //    in FROM a peer — applyAwarenessUpdate re-fires 'update' with
+      //    origin 'broadcast' and echoing those would loop.
+      this._awarenessHandler = ({ added, updated, removed }, origin) => {
+        if (origin === 'broadcast') return
+        this._broadcastAwareness([...added, ...updated, ...removed])
+      }
+      this.awareness.on('update', this._awarenessHandler)
     }
-    this.awareness.on('update', this._awarenessHandler)
   }
 
   _send(event, encoded) {

@@ -99,6 +99,7 @@ import { createCallsRouter } from "./routes/calls/index.js";
 import { createNotesRouter } from "./routes/notes/index.js";
 import { createSharesService as createNotesSharesService } from "./routes/notes/shares-service.js";
 import { createCanvasService as createNotesCanvasService } from "./routes/notes/canvas-service.js";
+import { createYDocService as createNotesYDocService } from "./routes/notes/ydoc-service.js";
 import {
   publishActivityFromContext,
   getActivityContext,
@@ -1058,6 +1059,7 @@ app.get("/brand/:filename", async (c) => {
 // Public notes — no auth. Registered early so it's never wrapped by auth middleware.
 const _publicNotesShares = createNotesSharesService({ prisma, broadcaster });
 const _publicNotesCanvas = createNotesCanvasService({ prisma });
+const _publicNotesYDoc = createNotesYDocService({ prisma });
 app.get("/public/notes/:slug", async (c) => {
   try {
     const slug = c.req.param("slug");
@@ -1075,6 +1077,20 @@ app.get("/public/notes/:slug/canvas", async (c) => {
     const slug = c.req.param("slug");
     const scene = await _publicNotesCanvas.getPublicScene(slug);
     return c.json({ scene });
+  } catch (e) {
+    return c.json({ error: e.message }, e.status ?? 500);
+  }
+});
+
+// Public Y.js document state — no auth. Lets the public note page join the
+// same `note:ydoc:<id>` realtime broadcast topic (anon, receive-only — see
+// migration 20260919120000_notes_ydoc_public_realtime) and render edits live
+// instead of only refreshing on tab focus.
+app.get("/public/notes/:slug/ydoc", async (c) => {
+  try {
+    const slug = c.req.param("slug");
+    const data = await _publicNotesYDoc.getPublicState(slug);
+    return c.json({ data });
   } catch (e) {
     return c.json({ error: e.message }, e.status ?? 500);
   }

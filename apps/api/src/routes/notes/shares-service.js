@@ -317,7 +317,23 @@ export function createSharesService({ prisma, broadcaster, notificationService }
         AND notes.is_trashed = false
     `
     if (!rows.length) throw new SharesServiceError('Nota no encontrada', 404)
-    return rows[0]
+    const note = rows[0]
+    // Collaborators footer for the public page: owner + everyone the note is
+    // shared with. Display name only — email and avatar file ids stay
+    // internal, this is rendered to anonymous visitors.
+    const collaborators = await prisma.$queryRaw`
+      SELECT up.display_name, true AS is_owner, NULL::text AS permission
+      FROM notes n
+      JOIN user_profile up ON up.id = n.owner_user_id
+      WHERE n.id = ${note.id}
+      UNION ALL
+      SELECT up.display_name, false AS is_owner, ns.permission
+      FROM note_shares ns
+      JOIN user_profile up ON up.id = ns.shared_with_user_id
+      WHERE ns.note_id = ${note.id}
+      ORDER BY is_owner DESC, display_name ASC
+    `
+    return { ...note, collaborators }
   }
 
   return { listShares, listShareableUsers, shareNote, updateShare, revokeShare, publishNote, unpublishNote, getPublicNote }

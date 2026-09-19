@@ -1,16 +1,19 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, useRef, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { runly } from '../../lib/runly'
 import { NoteEditor } from './components/NoteEditor.jsx'
 import { NOTE_SHEET_MAX_WIDTH_CLASS } from './components/NoteSheet.jsx'
-import { NoteIcon } from './noteIcons.jsx'
+import { PublicNoteToolbar } from './components/PublicNoteToolbar.jsx'
+import { PublicNoteCollaborators } from './components/PublicNoteCollaborators.jsx'
+import { exportNoteSheetAsJpg, exportNoteSheetAsPdf } from './lib/notePageExport.js'
 import { ErrorState } from '@runly/ui'
 
 const PublicCanvasView = lazy(() => import('./PublicCanvasView.jsx'))
 
 export default function PublicNoteScreen() {
   const { slug } = useParams()
+  const contentRef = useRef(null)
 
   // Force light theme for the public view — remove .dark from <html> and restore on unmount
   useEffect(() => {
@@ -37,6 +40,13 @@ export default function PublicNoteScreen() {
   })
 
   const note = data?.note
+
+  // Browser tab title — there's no separate on-page heading anymore (see the
+  // icon+title row rendered inside NoteEditor itself, right above the first
+  // paragraph, matching the authenticated editor instead of duplicating it).
+  useEffect(() => {
+    document.title = note?.title ? `${note.title} · Runly` : 'Runly'
+  }, [note?.title])
 
   if (note?.note_type === 'canvas') {
     return (
@@ -71,24 +81,44 @@ export default function PublicNoteScreen() {
     )
   }
 
+  const publicUrl = typeof window !== 'undefined' ? window.location.href : ''
+
   return (
     // html/body are globally overflow:hidden (the authenticated app shell
     // does its own internal scrolling) — this page needs its own bounded,
     // scrollable region or content taller than the viewport is unreachable.
     <div className="h-dvh overflow-y-auto overscroll-contain bg-gray-100">
-      <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} py-12 px-4`}>
-        <div className="flex items-center gap-3 mb-6">
-          {note.icon && <NoteIcon name={note.icon} size={28} className="text-amber-500 shrink-0" />}
-          <h1 className="text-2xl font-bold text-gray-900">{note.title || 'Nota'}</h1>
+      <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} py-8 sm:py-12 px-4`}>
+        <div className="mb-4 flex justify-end">
+          <PublicNoteToolbar
+            title={note.title}
+            publicUrl={publicUrl}
+            onDownloadPdf={() =>
+              exportNoteSheetAsPdf(contentRef.current?.querySelector('.note-sheet'), {
+                title: note.title,
+                backgroundColor: note.background_color,
+              })
+            }
+            onDownloadImage={() =>
+              exportNoteSheetAsJpg(contentRef.current?.querySelector('.note-sheet'), {
+                title: note.title,
+                backgroundColor: note.background_color,
+              })
+            }
+          />
         </div>
-        <div className="rounded-xl shadow-sm overflow-hidden bg-white">
+        <div ref={contentRef} className="rounded-xl shadow-sm overflow-hidden bg-white">
           {/* scrollable=false: this page already owns scroll (the h-dvh
               overflow-y-auto root above) — see NoteEditor's scrollable prop.
               Background color and the max-width sheet column are now rendered
               by NoteEditor itself (NoteSheet), shared with the authenticated
-              editor — this wrapper only supplies the rounded/shadow chrome. */}
-          <NoteEditor note={note} readOnly scrollable={false} />
+              editor — this wrapper only supplies the rounded/shadow chrome.
+              publicSlug (+ readOnly) turns on the live realtime path — see
+              NoteEditor's collabEnabled — instead of only refetching on
+              focus/remount. */}
+          <NoteEditor note={note} readOnly scrollable={false} publicSlug={slug} />
         </div>
+        <PublicNoteCollaborators collaborators={note.collaborators} />
       </div>
     </div>
   )

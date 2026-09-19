@@ -5,6 +5,8 @@ import { usePublicCanvasScene } from './hooks/useCanvasScene.js'
 import { SupabaseCanvasSync } from './lib/SupabaseCanvasSync.js'
 import { hydrateImages } from './lib/canvasImages.js'
 import { deriveScene, ensureLayers } from './lib/canvasLayers.js'
+import { PublicNoteToolbar } from './components/PublicNoteToolbar.jsx'
+import { exportCanvasPdf, exportCanvasPng } from './lib/canvasExport.js'
 
 const CanvasStage = lazy(() => import('./components/CanvasStage.jsx'))
 
@@ -105,11 +107,36 @@ export default function PublicCanvasView({ slug }) {
     )
   }
 
+  const publicUrl = typeof window !== 'undefined' ? window.location.href : ''
+
   return (
     <div className="h-dvh flex flex-col bg-white">
       <div className="flex items-center gap-2 px-4 h-12 border-b border-gray-200 shrink-0">
         <h1 className="text-sm font-semibold text-gray-900 truncate">{scene.title || 'Lienzo'}</h1>
-        <span className="text-[11px] text-gray-400">Solo lectura</span>
+        <span className="text-[11px] text-gray-400 shrink-0">Solo lectura</span>
+        <div className="ml-auto">
+          <PublicNoteToolbar
+            title={scene.title}
+            publicUrl={publicUrl}
+            onDownloadPdf={() =>
+              exportCanvasPdf({
+                elements: deriveScene(elementsRef.current, layersRef.current),
+                appState: {},
+                files: apiRef.current?.getFiles?.() ?? {},
+                title: scene.title,
+              })
+            }
+            onDownloadImage={() =>
+              exportCanvasPng({
+                elements: deriveScene(elementsRef.current, layersRef.current),
+                appState: {},
+                files: apiRef.current?.getFiles?.() ?? {},
+                title: scene.title,
+              })
+            }
+            imageLabel="PNG"
+          />
+        </div>
       </div>
       <div className="flex-1 min-h-0">
         <Suspense

@@ -156,7 +156,6 @@ export default function NotesScreen() {
           if (res?.note) {
             setSelectedNote(res.note)
             setNoteParam(res.note.id)
-            setRightPanel('editor')
             setMobileView('editor')
           }
         },
@@ -202,7 +201,6 @@ export default function NotesScreen() {
   function selectNote(note) {
     setSelectedNote(note)
     setNoteParam(note.id)
-    setRightPanel('editor')
     setMobileView('editor')
   }
 

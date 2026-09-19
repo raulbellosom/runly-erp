@@ -145,7 +145,7 @@ importers:
         version: 2.18.0
       lucide-react:
         specifier: latest
-        version: 1.46.0(react@19.3.0)
+        version: 1.47.0(react@19.3.0)
       node-cache:
         specifier: ^5.1.2
         version: 5.1.2
@@ -232,10 +232,10 @@ importers:
         version: 2.105.1
       '@tanstack/react-query':
         specifier: latest
-        version: 5.103.0(react@19.3.0)
+        version: 5.103.1(react@19.3.0)
       '@tanstack/react-query-persist-client':
         specifier: ^5.101.0
-        version: 5.101.0(@tanstack/react-query@5.103.0(react@19.3.0))(react@19.3.0)
+        version: 5.101.0(@tanstack/react-query@5.103.1(react@19.3.0))(react@19.3.0)
       '@tauri-apps/api':
         specifier: latest
         version: 2.11.1
@@ -326,6 +326,9 @@ importers:
       hls.js:
         specifier: ^1.7.3
         version: 1.7.3
+      html2canvas:
+        specifier: ^1.4.1
+        version: 1.4.1
       jspdf:
         specifier: 4.2.1
         version: 4.2.1
@@ -337,7 +340,7 @@ importers:
         version: 2.21.0(@types/dom-mediacapture-record@1.0.22)
       lucide-react:
         specifier: latest
-        version: 1.46.0(react@19.3.0)
+        version: 1.47.0(react@19.3.0)
       motion:
         specifier: ^12.38.0
         version: 12.38.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -554,7 +557,7 @@ importers:
         version: 4.3.0
       lucide-react:
         specifier: latest
-        version: 1.46.0(react@19.2.5)
+        version: 1.47.0(react@19.2.5)
       react-hook-form:
         specifier: ^7.75.0
         version: 7.75.0(react@19.2.5)
@@ -2858,8 +2861,8 @@ packages:
   '@tanstack/query-core@5.101.0':
     resolution: {integrity: sha512-cQetA74EB+seWySv1TTKr828TnP0u39m6LykwDXIo84SNortpDkp30TMEjkqtYCNP9c40uT/iwl6MLiufEt0Ow==}
 
-  '@tanstack/query-core@5.103.0':
-    resolution: {integrity: sha512-PfafnHQHEu7mZDsSalxSW/EBxPgF77k3atIJeQbqbb1Z7DmK2mH6YLJyqrvbbDk5M6Ua/egs7LLEs04a8robxA==}
+  '@tanstack/query-core@5.103.1':
+    resolution: {integrity: sha512-rms8HqTGp6zA00dM+cUQ2eBcgzNJefuu5CAMB37i/6MiGT1zulPOytCFu2a0qjLqVR2n1jENPj9woqFQNuCzWA==}
 
   '@tanstack/query-persist-client-core@5.101.0':
     resolution: {integrity: sha512-LH99WepGVLwlLfuOcQcPK7f3Xg/Gf+xlMMIj9xWu/8oQ3egnDzjr+a4HvEmi6PGob5SmGXvmDKZaH5+In9dzjw==}
@@ -2875,8 +2878,8 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
-  '@tanstack/react-query@5.103.0':
-    resolution: {integrity: sha512-Kn/cvTrNwFYpS/q1MYghMsVTSinmAKV1U2AnM3/x07PiczvC+nMoySqNpQK1jgDzVCOIHk5LlF2FhTlJKQmPAQ==}
+  '@tanstack/react-query@5.103.1':
+    resolution: {integrity: sha512-rmAPPApNEK17VXRJhtE1rja53n23VV5w30C0saCgJhhX+EpdUnVqMGV/s5nnzV43X75KTHKzuoiuxSzGTBIkag==}
     peerDependencies:
       react: ^18 || ^19
 
@@ -4793,8 +4796,8 @@ packages:
     resolution: {integrity: sha512-DqC6n3QQ77zdFpCMASA1a3Jlb64Hv2N2DciFGkO/4L9+q/IpIAuRlKOvCXabtRW6cQf8usbmM6BE/TOPysCdIA==}
     engines: {bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0'}
 
-  lucide-react@1.46.0:
-    resolution: {integrity: sha512-Bv+FZXgZPrxc/NCl1e7JJVQFLdiCxYgxNVhqoV7X0p6I8ADJo8DxBnK1auH0fZz4AmqOJ3jgneL4f1i8LJQRAA==}
+  lucide-react@1.47.0:
+    resolution: {integrity: sha512-o8C23aXpNQypRY73W7fW02EyvWJinEMXgKeGjFoKym0zj3Q73hD97A1IQps1g8C14HTGsOpZL0Am+xjfgFZAbg==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -8837,7 +8840,7 @@ snapshots:
 
   '@tanstack/query-core@5.101.0': {}
 
-  '@tanstack/query-core@5.103.0': {}
+  '@tanstack/query-core@5.103.1': {}
 
   '@tanstack/query-persist-client-core@5.101.0':
     dependencies:
@@ -8849,10 +8852,10 @@ snapshots:
       '@tanstack/react-query': 5.101.0(react@19.2.7)
       react: 19.2.7
 
-  '@tanstack/react-query-persist-client@5.101.0(@tanstack/react-query@5.103.0(react@19.3.0))(react@19.3.0)':
+  '@tanstack/react-query-persist-client@5.101.0(@tanstack/react-query@5.103.1(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@tanstack/query-persist-client-core': 5.101.0
-      '@tanstack/react-query': 5.103.0(react@19.3.0)
+      '@tanstack/react-query': 5.103.1(react@19.3.0)
       react: 19.3.0
 
   '@tanstack/react-query@5.101.0(react@19.2.7)':
@@ -8860,9 +8863,9 @@ snapshots:
       '@tanstack/query-core': 5.101.0
       react: 19.2.7
 
-  '@tanstack/react-query@5.103.0(react@19.3.0)':
+  '@tanstack/react-query@5.103.1(react@19.3.0)':
     dependencies:
-      '@tanstack/query-core': 5.103.0
+      '@tanstack/query-core': 5.103.1
       react: 19.3.0
 
   '@tanstack/react-table@8.21.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
@@ -9485,8 +9488,7 @@ snapshots:
 
   base64-arraybuffer-es6@0.7.0: {}
 
-  base64-arraybuffer@1.0.2:
-    optional: true
+  base64-arraybuffer@1.0.2: {}
 
   base64-js@0.0.8: {}
 
@@ -9757,7 +9759,6 @@ snapshots:
   css-line-break@2.1.0:
     dependencies:
       utrie: 1.0.2
-    optional: true
 
   csstype@3.2.3: {}
 
@@ -10387,7 +10388,6 @@ snapshots:
     dependencies:
       css-line-break: 2.1.0
       text-segmentation: 1.0.3
-    optional: true
 
   http-status-codes@2.3.0: {}
 
@@ -10769,11 +10769,11 @@ snapshots:
 
   lru.min@1.1.4: {}
 
-  lucide-react@1.46.0(react@19.2.5):
+  lucide-react@1.47.0(react@19.2.5):
     dependencies:
       react: 19.2.5
 
-  lucide-react@1.46.0(react@19.3.0):
+  lucide-react@1.47.0(react@19.3.0):
     dependencies:
       react: 19.3.0
 
@@ -12182,7 +12182,6 @@ snapshots:
   text-segmentation@1.0.3:
     dependencies:
       utrie: 1.0.2
-    optional: true
 
   tiny-inflate@1.0.3: {}
 
@@ -12365,7 +12364,6 @@ snapshots:
   utrie@1.0.2:
     dependencies:
       base64-arraybuffer: 1.0.2
-    optional: true
 
   uuid@14.0.2: {}
 

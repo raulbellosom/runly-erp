@@ -56,14 +56,16 @@ function colorForUser(seed) {
 // dropped and switching notes would leave stale content on screen — the
 // editor instance would outlive the note it was built for. Keying the surface
 // by note.id and gating on the engine fixes both.
-export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 100 }) {
+export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 100, publicSlug = null }) {
   const { session, userProfile } = useAuth()
   const token = session?.access_token
 
-  // Collaboration only runs for an authenticated, editable note. The public
-  // share view (PublicNoteScreen) has no session/token and the trash view is
-  // read-only — both render a plain editor straight from note.content.
-  const collabEnabled = !readOnly && Boolean(token) && Boolean(note?.id)
+  // Collaboration runs for an authenticated, editable note (token) OR the
+  // public share view in its live variant (publicSlug, no session — see
+  // PublicNoteScreen). The trash view is read-only with no publicSlug, so it
+  // stays a plain editor straight from note.content.
+  const collabEnabled =
+    Boolean(note?.id) && ((!readOnly && Boolean(token)) || (readOnly && Boolean(publicSlug)))
 
   // The engine is React state (not a ref) so the surface re-mounts when it
   // becomes ready / changes note.
@@ -82,6 +84,8 @@ export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 1
       supabase,
       runly,
       token,
+      publicSlug: readOnly ? publicSlug : null,
+      readOnly,
       onSynced: () => {
         if (disposed) return
         setEngine(e =>
@@ -99,7 +103,7 @@ export function NoteEditor({ note, readOnly = false, scrollable = true, zoom = 1
       ydoc.destroy()
       setEngine(null)
     }
-  }, [collabEnabled, note?.id, token])
+  }, [collabEnabled, note?.id, token, readOnly, publicSlug])
 
   if (!note) return null
 
@@ -407,13 +411,20 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
   function seedIfNeeded({ editor }) {
     if (!engine || !ydoc) return
     // Only the OWNER migrates the legacy HTML into the shared Y.Doc. If every
-    // client seeded, each would insert its own copy of the same paragraphs —
-    // the doc ends up holding the content N times (this is the "self-
-    // duplication" and the owner/guest divergence). Guests wait for the
+    // editable client seeded, each would insert its own copy of the same
+    // paragraphs — the doc ends up holding the content N times (this is the
+    // "self-duplication" and the owner/guest divergence). Guests wait for the
     // owner's persisted Y.js state instead.
+    //
+    // A readOnly client (the public view, before the owner's first save under
+    // collab left any Y.js state to load) is exempt from that rule: it never
+    // persists (flushSave/handleUpdate both bail on readOnly) and never
+    // broadcasts local ydoc updates (SupabaseYjsProvider's readOnly mode),
+    // so seeding here only affects what this one visitor sees locally —
+    // nothing to duplicate.
     const isOwner =
       Boolean(note?.owner_user_id) && note.owner_user_id === session?.user?.id
-    if (!isOwner) return
+    if (!isOwner && !readOnly) return
     // Decide from the shared Y.Doc, which is ALREADY hydrated from the server
     // state at this point — NOT from editor.isEmpty. y-prosemirror has not
     // populated the ProseMirror view yet inside onCreate, so editor.isEmpty is
@@ -467,7 +478,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
               <NoteToolbar noteId={note.id} token={token} />
             </div>
           )}
-          {!readOnly && (
+          {(!readOnly || note.icon) && (
             // Overlaps the title's own line (the editor's first paragraph —
             // see handleUpdate) via a negative margin-bottom, computed from
             // the title's font-size/line-height and .tiptap's own top
@@ -475,27 +486,39 @@ function NoteEditorSurface({ note, readOnly, scrollable, zoom = 100, token, sess
             // math. `relative z-10` makes this row paint above the title
             // text in the overlap zone instead of the reverse (later DOM
             // order would otherwise win).
+            //
+            // readOnly (public view): no icon picker to open and no presence
+            // (public viewers never broadcast awareness — see
+            // SupabaseYjsProvider's readOnly mode) — just the plain icon, so
+            // the note's internal title line matches the editable editor
+            // instead of showing bare text with no icon next to it.
             <div className="relative z-10 px-8 pt-4 flex items-center justify-between gap-2 -mb-10">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors"
-                    title="Seleccionar icono"
-                  >
-                    {note.icon
-                      ? <NoteIcon name={note.icon} size={22} className="text-amber-500" />
-                      : <NotebookPen className="w-5 h-5 text-muted-foreground/50" />
-                    }
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-84 p-3" side="bottom" align="start">
-                  <NoteIconPickerContent
-                    value={note.icon}
-                    onChange={icon => updateNoteMeta({ icon })}
-                  />
-                </PopoverContent>
-              </Popover>
-              <PresenceStack users={presenceUsers} />
+              {readOnly ? (
+                <div className="w-10 h-10 flex items-center justify-center">
+                  <NoteIcon name={note.icon} size={22} className="text-amber-500" />
+                </div>
+              ) : (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors"
+                      title="Seleccionar icono"
+                    >
+                      {note.icon
+                        ? <NoteIcon name={note.icon} size={22} className="text-amber-500" />
+                        : <NotebookPen className="w-5 h-5 text-muted-foreground/50" />
+                      }
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-84 p-3" side="bottom" align="start">
+                    <NoteIconPickerContent
+                      value={note.icon}
+                      onChange={icon => updateNoteMeta({ icon })}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              {!readOnly && <PresenceStack users={presenceUsers} />}
             </div>
           )}
         </>

@@ -2488,6 +2488,10 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/public/notes/${encodeURIComponent(slug)}`, {
           method: "GET",
         }),
+      getPublicYDoc: (slug) =>
+        request(`/public/notes/${encodeURIComponent(slug)}/ydoc`, {
+          method: "GET",
+        }),
     },
     setOfflineTransport(transport) {
       _offlineTransport = transport;
