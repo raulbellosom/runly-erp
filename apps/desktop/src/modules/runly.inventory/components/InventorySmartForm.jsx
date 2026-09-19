@@ -128,7 +128,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
     setUnits(current => current.map(unit => ({ ...unit, photoIds: unit.photoIds.filter(id => id !== photo.id), confirmation: null })))
   }
   async function addPhotos(files, values, patchValues) {
-    if (files.length > 10 || photos.length + files.length > (batch ? 50 : 20)) throw new Error('Máximo 10 fotos por tanda, 20 por equipo y 50 por lote.')
+    if (files.length > 3 || photos.length + files.length > (batch ? 50 : 20)) throw new Error('Máximo 3 fotos por tanda, 20 por equipo y 50 por lote.')
     if (files.some(f => f.size > 10 * 1024 * 1024 || !/^image\/(jpeg|png|webp|heic|heif)$/.test(f.type))) throw new Error('Usa JPEG, PNG, WebP o HEIC de hasta 10 MB.')
     const incoming = files.map(file => {
       const url = URL.createObjectURL(file); urls.current.add(url)
@@ -139,7 +139,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
     await analyze(values, patchValues, [...photos, ...incoming], incoming)
   }
   async function analyze(values, patchValues, allPhotos = photos, selectedPhotos = null) {
-    const pending = (selectedPhotos ?? allPhotos.filter(p => !p.result || p.result.error)).slice(0, 10)
+    const pending = (selectedPhotos ?? allPhotos.filter(p => !p.result || p.result.error)).slice(0, 3)
     if (!pending.length || analyzing) return
     setError(''); setAnalysisSummary(''); setAnalyzing(true)
     setPhotos(current => current.map(photo => pending.some(p => p.id === photo.id) ? { ...photo, reading: true } : photo))
@@ -264,7 +264,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
         <p className="text-xs font-medium text-muted-foreground">Paso 2 · Sube fotos para que la IA las lea</p>
         <AIUploadDropzone multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" disabled={busy} busy={analyzing}
           title="Suelta las fotos aquí para que la IA las lea" busyLabel="Leyendo las fotografías…"
-          hint="La lectura comienza al soltar o elegir las fotos. Hasta 10 por tanda · 10 MB por foto." actionLabel="Elegir fotografías"
+          hint="La lectura comienza al soltar o elegir las fotos. Hasta 3 por tanda · 10 MB por foto." actionLabel="Elegir fotografías"
           onFiles={files => addPhotos(files, values, patchValues).catch(err => setError(err.message))} />
         {coarse && <Button type="button" variant="outline" disabled={busy} onClick={() => setCamera(true)}><Camera className="mr-2 h-4 w-4" />Tomar fotografía</Button>}
         {photos.length > 0 && <div className="flex flex-wrap gap-3">{photos.map((photo, index) => {
@@ -286,7 +286,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
             </div>
           </div>
         })}</div>}
-        <Button type="button" disabled={busy || !photos.some(p => !p.result || p.result.error)} onClick={() => analyze(values, patchValues)}><Sparkles className="mr-2 h-4 w-4" />{analyzing ? 'Analizando fotografías…' : 'Analizar hasta 10 fotos con IA'}</Button>
+        <Button type="button" disabled={busy || !photos.some(p => !p.result || p.result.error)} onClick={() => analyze(values, patchValues)}><Sparkles className="mr-2 h-4 w-4" />{analyzing ? 'Analizando fotografías…' : 'Analizar hasta 3 fotos con IA'}</Button>
       </div>
       {error && <ErrorState title="No se pudo analizar" description={error} />}
       {analyzing && <p role="status" className="text-sm text-muted-foreground">Leyendo las etiquetas y buscando datos para el formulario…</p>}

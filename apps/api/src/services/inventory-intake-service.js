@@ -35,11 +35,11 @@ export function createInventoryIntakeService({ prisma, env = process.env, vision
   async function recognize({ files, ...context }) {
     assertContext(context);
     if (!secret || !env.GROQ_API_KEY) throw new InventoryServiceError('La IA no está configurada. Puedes capturar las series manualmente.', 503);
-    if (!files.length || files.length > 10) throw new InventoryServiceError('Selecciona de 1 a 10 fotografías por tanda.', 400);
+    if (!files.length || files.length > 3) throw new InventoryServiceError('Selecciona de 1 a 3 fotografías por tanda.', 400);
     if (files.some(f => !/^image\/(jpeg|png|webp|heic|heif)$/.test(f.type) || f.size > 10 * 1024 * 1024 || !f.size)) {
       throw new InventoryServiceError('Usa fotografías JPEG, PNG, WebP o HEIC de hasta 10 MB.', 400);
     }
-    if (files.reduce((sum, f) => sum + f.size, 0) > 40 * 1024 * 1024) throw new InventoryServiceError('La tanda supera 40 MB. Selecciona menos fotografías.', 413);
+    if (files.reduce((sum, f) => sum + f.size, 0) > 30 * 1024 * 1024) throw new InventoryServiceError('La tanda supera 30 MB. Selecciona menos fotografías.', 413);
     const key = `${context.companyId}:${context.actorId}`;
     for (const [id, bucket] of buckets) if (bucket.until < Date.now()) buckets.delete(id);
     const bucket = buckets.get(key) ?? { count: 0, until: Date.now() + 60_000 };

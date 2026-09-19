@@ -54,7 +54,7 @@ test('recognition preserves identifiers and issues evidence scoped to the actor/
 test('recognition refuses missing identity, oversized batches and unsupported image types', async () => {
   const { service } = fixture();
   await assert.rejects(service.recognize({ files: [photo()] }), /autorizado/);
-  await assert.rejects(service.recognize({ ...context, files: Array.from({ length: 11 }, () => photo()) }), /10/);
+  await assert.rejects(service.recognize({ ...context, files: Array.from({ length: 4 }, () => photo()) }), /3/);
   await assert.rejects(service.recognize({ ...context, files: [new File(['svg'], 'x.svg', { type: 'image/svg+xml' })] }), /fotografías/);
 });
 test('one failed photo does not discard successful observations from the batch', async () => {
