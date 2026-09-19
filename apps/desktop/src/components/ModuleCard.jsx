@@ -309,7 +309,7 @@ export function ModuleCardGrid({
         <p className="text-sm font-semibold text-[hsl(var(--foreground))] leading-tight truncate">
           {module.name}
         </p>
-        <p className="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2 leading-snug">
+        <p className="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2 leading-snug min-h-[2.1rem]">
           {module.summary || module.description}
         </p>
       </div>
