@@ -234,6 +234,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
       const firstChild = editor.state.doc.firstChild
       pendingRef.current = {
         content: editor.getHTML(),
+        contentText: editor.getText(),
         title: firstChild?.textContent?.trim() ?? '',
       }
       clearTimeout(saveTimerRef.current)
