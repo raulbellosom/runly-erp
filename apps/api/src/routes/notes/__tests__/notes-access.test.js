@@ -106,6 +106,54 @@ describe("notes-service — updateNote paper_style", () => {
   });
 });
 
+describe("notes-service — updateNote contentText", () => {
+  it("includes content_text in the CASE update when contentText is sent, and returns it", async () => {
+    let capturedSql = "";
+    const prisma = {
+      $queryRaw: (strings) => {
+        const text = sql(strings).toLowerCase();
+        capturedSql = text;
+        if (text.includes("from notes n left join note_shares")) {
+          return Promise.resolve([{ id: NOTE, owner_user_id: OWNER, share_permission: null }]);
+        }
+        if (text.includes("update notes")) {
+          return Promise.resolve([{ id: NOTE, content_text: "hello world" }]);
+        }
+        return Promise.resolve([]);
+      },
+      $executeRaw: () => Promise.resolve([]),
+    };
+    const svc = createNotesService({ prisma });
+    const note = await svc.updateNote(NOTE, OWNER, { contentText: "hello world" });
+    assert.equal(note.content_text, "hello world");
+    assert.match(capturedSql, /content_text/);
+  });
+
+  it("leaves content_text untouched when contentText is not sent", async () => {
+    let capturedSql = "";
+    const prisma = {
+      $queryRaw: (strings) => {
+        const text = sql(strings).toLowerCase();
+        capturedSql = text;
+        if (text.includes("from notes n left join note_shares")) {
+          return Promise.resolve([{ id: NOTE, owner_user_id: OWNER, share_permission: null }]);
+        }
+        if (text.includes("update notes")) {
+          return Promise.resolve([{ id: NOTE, title: "x" }]);
+        }
+        return Promise.resolve([]);
+      },
+      $executeRaw: () => Promise.resolve([]),
+    };
+    const svc = createNotesService({ prisma });
+    await svc.updateNote(NOTE, OWNER, { title: "x" });
+    // The CASE branch for content_text must still be present in the emitted
+    // SQL (it's unconditional — WHEN false THEN ... ELSE content_text), just
+    // resolving to the ELSE/no-op branch when contentText isn't in the patch.
+    assert.match(capturedSql, /content_text\s*=\s*case/);
+  });
+});
+
 describe("shares-service — shareNote target validation", () => {
   const base = [
     ["from notes where id = ? and owner_user_id", [{ id: NOTE }]], // _verifyOwner ok
