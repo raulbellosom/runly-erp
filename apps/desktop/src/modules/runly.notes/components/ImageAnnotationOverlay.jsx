@@ -1,10 +1,10 @@
 import { NodeViewWrapper } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  Pencil, Crop as CropIcon, Check,
+  Pencil, Trash2, Crop as CropIcon, Check,
   PenLine, ArrowUpRight, Square, Type, MoreHorizontal,
 } from 'lucide-react'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Popover, PopoverTrigger, PopoverContent, ConfirmDialog } from '@runly/ui'
 import { withImageVariant } from '../../../lib/imageVariants.js'
 import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
 import { useImageAnnotationDrawing } from '../hooks/useImageAnnotationDrawing.jsx'
@@ -36,7 +36,7 @@ function parseCrop(raw) {
   }
 }
 
-export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos }) {
+export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos, deleteNode }) {
   const svgRef = useRef(null)
   const boxRef = useRef(null) // the sized img+svg container — resize math + click-outside
   const frameRef = useRef(null) // the image frame only (no control chrome) — measured/cloned for drag reorder
@@ -54,6 +54,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const [liveAspectRatio, setLiveAspectRatio] = useState(null) // resize drag preview
   const [fullLoaded, setFullLoaded] = useState(false) // full-resolution <img> onLoad fired
   const [editModalOpen, setEditModalOpen] = useState(false) // table-cell images edit via modal instead of inline mode
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
@@ -95,6 +96,28 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
     document.addEventListener('pointerdown', onDocPointerDown, true)
     return () => document.removeEventListener('pointerdown', onDocPointerDown, true)
   }, [selected])
+
+  // A tap/click anywhere in this node view's own DOM (the image itself, its
+  // pill/handle controls) must never let ProseMirror run its default
+  // mousedown handling — that's what creates a NodeSelection AND focuses the
+  // surrounding contentEditable, which mobile browsers always answer by
+  // opening the on-screen keyboard even though nothing here is meant to be
+  // typed into (and once open, dismissing it leaves the image "selected"
+  // with no clean way back — the reported loop). ProseMirror's own view.dom
+  // mousedown listener bails out whenever event.defaultPrevented is already
+  // true (prosemirror-view's eventBelongsToView checks this before its own
+  // handlers run), so preventing default here — a descendant, which fires
+  // first during the bubble phase — is enough. Real form controls (buttons,
+  // the Texto annotation's <input>) are left alone so their native
+  // focus/caret behavior keeps working; `click` still fires normally either
+  // way since only `mousedown`'s default is touched, not `pointerdown`.
+  function onBoxMouseDown(e) {
+    const target = e.target
+    const isFormControl =
+      target instanceof HTMLElement &&
+      (['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable)
+    if (!isFormControl) e.preventDefault()
+  }
 
   // ── click-to-resize (Word/PowerPoint-style corner handle) ────────────────
   function onImageClick() {
@@ -164,7 +187,19 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
   const displayWidthPct = liveWidthPct ?? widthPct
   // Outer box: controls the resizable width, carries the selection ring and
   // the pill/handle controls — never clipped, so they're never cut off.
-  const wrapperStyle = { userSelect: 'none', width: `${displayWidthPct}%` }
+  // WebkitTouchCallout suppresses iOS Safari's own native long-press menu
+  // on the <img> ("Save Image"/"Copy"/etc, inherited by descendants) while
+  // editable — without it, that native menu races the press-and-hold drag
+  // timer below (useBlockDragReorder, LONG_PRESS_MS) and usually wins,
+  // which is what made long-press-to-reorder feel like it "let go" instead
+  // of arming a drag. Read-only/public views keep the native menu (a
+  // reasonable way to save a shared image), since nothing there needs the
+  // press-and-hold gesture.
+  const wrapperStyle = {
+    userSelect: 'none',
+    width: `${displayWidthPct}%`,
+    ...(editable ? { WebkitTouchCallout: 'none' } : null),
+  }
   // Frame: clips to the crop window (overflow-hidden always — harmless when
   // effectiveCrop is the identity {0,0,1,1}, no crop set), so a cropped
   // image can't hide controls that sit just outside its edges. Sized via
@@ -207,10 +242,17 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
       <div
         ref={boxRef}
         onClick={onImageClick}
+        onMouseDown={onBoxMouseDown}
         onPointerDown={onDragPointerDown}
         onPointerMove={onDragPointerMove}
         onPointerUp={onDragPointerUp}
         onPointerCancel={onDragPointerCancel}
+        // Android/Chrome's long-press-on-image context menu ("Download
+        // image", "Open image in new tab"...) is a real, preventable
+        // contextmenu event — the WebkitTouchCallout style above only
+        // covers iOS Safari's equivalent. Both compete with and otherwise
+        // usually win over the press-and-hold reorder gesture below.
+        onContextMenu={editable ? (e) => e.preventDefault() : undefined}
         className={[
           'relative',
           selected && mode === 'view' ? 'ring-2 ring-amber-500 ring-offset-1 rounded-b' : '',
@@ -432,9 +474,27 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
               <button
                 onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
                 onClick={() => setMode('edit')}
-                className="flex items-center gap-1.5 text-xs font-medium bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg px-2.5 py-1.5 shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
+                aria-label="Editar imagen"
+                title="Editar imagen"
+                // Icon-only on narrow/touch screens — the text label only
+                // widens the tap target without adding clarity there; the
+                // pencil alone already matches every other icon-only control
+                // in this toolbar (Recortar, Herramienta, Color...).
+                className="flex items-center justify-center gap-1.5 text-xs font-medium bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg w-8 h-8 sm:w-auto sm:px-2.5 sm:py-1.5 shadow-sm hover:bg-[hsl(var(--muted))] transition-colors"
               >
-                <Pencil className="w-3.5 h-3.5" /> Editar imagen
+                <Pencil className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Editar imagen</span>
+              </button>
+            )}
+            {typeof deleteNode === 'function' && (
+              <button
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                onClick={() => setConfirmDeleteOpen(true)}
+                aria-label="Eliminar imagen"
+                title="Eliminar imagen"
+                className="flex items-center justify-center w-8 h-8 bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] rounded-lg shadow-sm hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -510,6 +570,15 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos 
           updateAttributes={updateAttributes}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Eliminar imagen"
+        description="Se eliminara esta imagen y sus anotaciones de la nota. Esta accion se puede deshacer con Ctrl+Z."
+        confirmLabel="Eliminar"
+        onConfirm={() => { setConfirmDeleteOpen(false); deleteNode?.() }}
+      />
     </NodeViewWrapper>
   )
 }

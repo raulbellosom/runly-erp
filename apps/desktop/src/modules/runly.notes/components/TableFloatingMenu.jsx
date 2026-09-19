@@ -77,10 +77,21 @@ export function TableFloatingMenu() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
+          // A mobile browser's own long-press context menu otherwise races
+          // (and usually wins over) the press-and-hold drag timer in
+          // useBlockDragReorder — see the matching fix + comment on
+          // ImageAnnotationOverlay.jsx's boxRef.
+          onContextMenu={(e) => e.preventDefault()}
           aria-label="Opciones de tabla"
           title="Opciones de tabla"
           className="fixed z-20 flex items-center justify-center w-12 h-12 rounded-full bg-amber-500 text-white shadow-lg active:scale-95 transition-transform"
-          style={{ left: '1rem', bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', touchAction: 'none' }}
+          style={{
+            left: '1rem',
+            bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+            touchAction: 'none',
+            WebkitTouchCallout: 'none',
+            userSelect: 'none',
+          }}
         >
           <Table2 className="w-5 h-5" />
         </button>
@@ -90,10 +101,17 @@ export function TableFloatingMenu() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
+          onContextMenu={(e) => e.preventDefault()}
           aria-label="Arrastrar para mover la tabla"
           title="Arrastra para mover la tabla"
           className="fixed z-20 flex items-center justify-center w-6 h-6 rounded bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] shadow-sm text-[hsl(var(--muted-foreground))] cursor-grab active:cursor-grabbing"
-          style={{ top: `${handleRect.top - 10}px`, left: `${handleRect.left - 28}px`, touchAction: 'none' }}
+          style={{
+            top: `${handleRect.top - 10}px`,
+            left: `${handleRect.left - 28}px`,
+            touchAction: 'none',
+            WebkitTouchCallout: 'none',
+            userSelect: 'none',
+          }}
         >
           <GripVertical className="w-3.5 h-3.5" />
         </button>
