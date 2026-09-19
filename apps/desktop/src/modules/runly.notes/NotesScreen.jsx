@@ -145,7 +145,7 @@ export default function NotesScreen() {
     createNote.mutate(
       {
         title: noteType === 'canvas' ? 'Nuevo lienzo' : 'Nueva nota',
-        content: '',
+        content: noteType === 'canvas' ? '' : '<p></p><p></p>',
         noteType,
       },
       {
