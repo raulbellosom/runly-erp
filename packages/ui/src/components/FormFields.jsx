@@ -626,7 +626,7 @@ export const DateField = forwardRef(function DateField(
       >
         {displayValue || placeholder}
       </span>
-      <CalendarDays size={14} className="text-muted-foreground/70 shrink-0" />
+      <CalendarDays size={14} className="text-muted-foreground shrink-0" />
     </button>
   );
 
@@ -752,7 +752,7 @@ export const DateTimeField = forwardRef(function DateTimeField(
       >
         {displayValue || placeholder}
       </span>
-      <CalendarDays size={14} className="text-muted-foreground/70 shrink-0" />
+      <CalendarDays size={14} className="text-muted-foreground shrink-0" />
     </button>
   );
 
@@ -1731,7 +1731,7 @@ export function ComboboxField({
               )}>
                 <Search
                   size={13}
-                  className="text-muted-foreground/50 shrink-0"
+                  className="text-muted-foreground shrink-0"
                 />
                 <input
                   ref={searchRef}
@@ -1988,7 +1988,7 @@ export function RelationSelectField({
               )}>
                 <Search
                   size={13}
-                  className="text-muted-foreground/50 shrink-0"
+                  className="text-muted-foreground shrink-0"
                 />
                 <input
                   ref={searchRef}
@@ -2503,7 +2503,7 @@ export function CarColorPickerField({
               )}>
                 <Search
                   size={13}
-                  className="text-muted-foreground/50 shrink-0"
+                  className="text-muted-foreground shrink-0"
                 />
                 <input
                   ref={searchRef}

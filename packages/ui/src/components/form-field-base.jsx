@@ -27,7 +27,7 @@ export function fieldCls(error, extra) {
 export function InputIcon({ icon: Icon }) {
   if (!Icon) return null;
   return (
-    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/70 pointer-events-none z-10">
+    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10">
       <Icon size={14} strokeWidth={1.75} />
     </span>
   );
