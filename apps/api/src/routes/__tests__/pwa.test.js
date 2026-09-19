@@ -1,15 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import { Hono } from 'hono'
 import sharp from 'sharp'
 import { createPwaRouter } from '../pwa.js'
 
-const calendarLogoUrl = new URL(
-  '../../../../desktop/public/module-logos/runly-calendar-128.svg',
-  import.meta.url,
+const CALENDAR_LOGO_SVG = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#7C3AED"/></svg>',
 )
+
+function createLogoLoader(buffer) {
+  return async () => ({
+    buffer,
+    hash: createHash('sha256').update(buffer).digest('hex'),
+  })
+}
 
 const modules = new Map([
   [
@@ -164,12 +169,11 @@ test('serves generated PNG icons at the requested size', async () => {
 })
 
 test('renders configured module logos instead of the Lucide fallback', async () => {
-  const response = await createApp().request(
-    'https://atlas.example.com/pwa/icon/atlas.calendar/192.png',
-  )
+  const response = await createApp({
+    loadLogo: createLogoLoader(CALENDAR_LOGO_SVG),
+  }).request('https://atlas.example.com/pwa/icon/atlas.calendar/192.png')
   const buffer = Buffer.from(await response.arrayBuffer())
-  const calendarLogoBuffer = await readFile(calendarLogoUrl)
-  const expected = await sharp(calendarLogoBuffer)
+  const expected = await sharp(CALENDAR_LOGO_SVG)
     .resize(192, 192)
     .png()
     .toBuffer()
@@ -179,14 +183,6 @@ test('renders configured module logos instead of the Lucide fallback', async () 
 })
 
 test('changes the manifest icon version when logo contents change', async () => {
-  function createLogoLoader(contents) {
-    const buffer = Buffer.from(contents)
-    return async () => ({
-      buffer,
-      hash: createHash('sha256').update(buffer).digest('hex'),
-    })
-  }
-
   const firstManifest = await (
     await createApp({
       loadLogo: createLogoLoader('<svg xmlns="http://www.w3.org/2000/svg"/>'),
