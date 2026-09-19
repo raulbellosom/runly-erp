@@ -1,24 +1,17 @@
-import { useState } from 'react'
 import { NoteCard } from './NoteCard.jsx'
 import { EmptyState, SearchInput } from '@runly/ui'
 
-export function NotesList({ notes = [], selectedNoteId, onSelect, onTrash, isLoading, showTrash = false }) {
-  const [search, setSearch] = useState('')
-
-  const filtered = search.trim()
-    ? notes.filter(n =>
-        n.title?.toLowerCase().includes(search.toLowerCase()) ||
-        n.content?.replace(/<[^>]*>/g, '').toLowerCase().includes(search.toLowerCase())
-      )
-    : notes
-
+export function NotesList({
+  notes = [], selectedNoteId, onSelect, onTrash, isLoading, showTrash = false,
+  search = '', onSearchChange,
+}) {
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="px-3 py-2.5 border-b border-border">
         <SearchInput
           value={search}
-          onChange={e => setSearch(e.target.value)}
-          onClear={() => setSearch('')}
+          onChange={e => onSearchChange(e.target.value)}
+          onClear={() => onSearchChange('')}
           placeholder="Buscar notas..."
         />
       </div>
@@ -29,7 +22,7 @@ export function NotesList({ notes = [], selectedNoteId, onSelect, onTrash, isLoa
             <div className="w-5 h-5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
             <span className="text-xs text-muted-foreground">Cargando notas...</span>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : notes.length === 0 ? (
           <div className="px-4 py-8">
             <EmptyState
               title={search ? 'Sin resultados' : showTrash ? 'Papelera vacia' : 'Sin notas'}
@@ -43,7 +36,7 @@ export function NotesList({ notes = [], selectedNoteId, onSelect, onTrash, isLoa
             />
           </div>
         ) : (
-          filtered.map(note => (
+          notes.map(note => (
             <NoteCard
               key={note.id}
               note={note}

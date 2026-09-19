@@ -82,6 +82,14 @@ export default function NotesScreen() {
 
   const [isZenMode, setIsZenMode] = useState(false)
 
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search.trim()), 250)
+    return () => clearTimeout(handle)
+  }, [search])
+
   useEffect(() => {
     if (!isZenMode) return
     function onKeyDown(e) {
@@ -111,7 +119,7 @@ export default function NotesScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveNoteData])
 
-  const { data, isLoading } = useNotes(buildQueryParams(activeView, folderId))
+  const { data, isLoading } = useNotes(buildQueryParams(activeView, folderId, debouncedSearch))
   const notes = data?.notes ?? []
 
   const isDark = useIsDark()
@@ -259,6 +267,8 @@ export default function NotesScreen() {
               onTrash={!isTrashView ? handleTrash : undefined}
               isLoading={isLoading}
               showTrash={isTrashView}
+              search={search}
+              onSearchChange={setSearch}
             />
 
             {isTrashView && selectedNote && (
@@ -444,10 +454,12 @@ const VIEW_LABELS = {
   trash:  'Papelera',
 }
 
-function buildQueryParams(view, folderId) {
-  if (view === 'trash')  return { trashed: true }
-  if (view === 'recent') return { pageSize: 20 }
-  if (view === 'shared') return { shared: true }
-  if (folderId)          return { folderId }
-  return {}
+function buildQueryParams(view, folderId, q) {
+  const base =
+    view === 'trash'  ? { trashed: true } :
+    view === 'recent' ? { pageSize: 20 } :
+    view === 'shared' ? { shared: true } :
+    folderId          ? { folderId } :
+    {}
+  return q ? { ...base, q } : base
 }
