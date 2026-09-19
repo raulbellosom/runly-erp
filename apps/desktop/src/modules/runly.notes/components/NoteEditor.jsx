@@ -5,6 +5,8 @@ import * as Y from 'yjs'
 import { NotebookPen } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
+import { useIsDark } from '../hooks/useIsDark.js'
+import { NoteSheet } from './NoteSheet.jsx'
 import { runly } from '../../../lib/runly'
 import { supabase } from '../../../lib/supabase'
 import { SupabaseYjsProvider, bytesToBase64 } from '../lib/SupabaseYjsProvider.js'
@@ -159,6 +161,7 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
   const editorInstanceRef = useRef(null)
   const ydoc = engine?.ydoc ?? null
   const provider = engine?.provider ?? null
+  const isDark = useIsDark()
 
   // ── autosave ───────────────────────────────────────────────────────────
   // pendingRef holds the latest not-yet-persisted snapshot; the debounce only
@@ -449,10 +452,14 @@ function NoteEditorSurface({ note, readOnly, scrollable, token, session, userPro
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
           onClick={readOnly ? undefined : handleContainerClick}
         >
-          {editorProvider}
+          <NoteSheet note={note} isDark={isDark}>
+            {editorProvider}
+          </NoteSheet>
         </div>
       ) : (
-        editorProvider
+        <NoteSheet note={note} isDark={isDark}>
+          {editorProvider}
+        </NoteSheet>
       )}
     </div>
   )

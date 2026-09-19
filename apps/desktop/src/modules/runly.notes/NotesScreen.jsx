@@ -220,15 +220,16 @@ export default function NotesScreen() {
       {/* Panel 2: Editor / Settings */}
       <div
         className={[
-          'flex-1 min-w-0 flex flex-col overflow-hidden bg-background',
+          'flex-1 min-w-0 flex flex-col overflow-hidden',
+          selectedNote?.note_type === 'canvas' ? '' : 'bg-muted/30',
           mobileView === 'editor' ? 'flex' : 'hidden lg:flex',
         ].join(' ')}
-        style={(() => {
+        style={selectedNote?.note_type === 'canvas' ? (() => {
           const raw = selectedNote?.background_color
           if (!raw) return {}
           const color = isDark ? (DARK_BG_MAP[raw] ?? raw) : raw
           return { backgroundColor: color }
-        })()}
+        })() : undefined}
       >
         <div className="flex items-center gap-2 px-3 h-11 border-b border-border shrink-0 bg-background/95 backdrop-blur-sm">
           <button

@@ -80,12 +80,12 @@ export default function PublicNoteScreen() {
           {note.icon && <NoteIcon name={note.icon} size={28} className="text-amber-500 shrink-0" />}
           <h1 className="text-2xl font-bold text-gray-900">{note.title || 'Nota'}</h1>
         </div>
-        <div
-          className="rounded-xl shadow-sm overflow-hidden"
-          style={{ backgroundColor: note.background_color ?? '#ffffff' }}
-        >
+        <div className="rounded-xl shadow-sm overflow-hidden bg-white">
           {/* scrollable=false: this page already owns scroll (the h-dvh
-              overflow-y-auto root above) — see NoteEditor's scrollable prop. */}
+              overflow-y-auto root above) — see NoteEditor's scrollable prop.
+              Background color and the max-width sheet column are now rendered
+              by NoteEditor itself (NoteSheet), shared with the authenticated
+              editor — this wrapper only supplies the rounded/shadow chrome. */}
           <NoteEditor note={note} readOnly scrollable={false} />
         </div>
       </div>
