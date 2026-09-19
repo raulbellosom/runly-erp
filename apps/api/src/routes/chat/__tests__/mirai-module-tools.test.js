@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMeridianService } from '../meridian-service.js';
+import { createMiraiService } from '../mirai-service.js';
 
-test('module tool execution reuses Meridian transport without invoking Chat tools or persistence', async () => {
+test('module tool execution reuses MirAI transport without invoking Chat tools or persistence', async () => {
   const requests = [], executed = [];
-  const service = createMeridianService({ prisma: {}, env: { GROQ_API_KEY: 'test-key' },
+  const service = createMiraiService({ prisma: {}, env: { GROQ_API_KEY: 'test-key' },
     fetchImpl: async (_, options) => {
       requests.push(JSON.parse(options.body));
       const message = requests.length === 1
@@ -24,7 +24,7 @@ test('module tool execution reuses Meridian transport without invoking Chat tool
 });
 test('module execution stops an excessive tool batch before executing the ninth call', async () => {
   let executed = 0;
-  const service = createMeridianService({ prisma: {}, env: { GROQ_API_KEY: 'test-key' }, fetchImpl: async () => ({ ok: true, status: 200,
+  const service = createMiraiService({ prisma: {}, env: { GROQ_API_KEY: 'test-key' }, fetchImpl: async () => ({ ok: true, status: 200,
     json: async () => ({ choices: [{ message: { tool_calls: Array.from({ length: 9 }, (_, i) => ({ id: String(i), function: { name: 'inventory_summary', arguments: '{}' } })) } }] }),
   }) });
   await assert.rejects(service.answerWithTools({ actorProfileId: 'actor', messages: [], tools: [], executeTool: async () => { executed++; return {}; } }), e => e.status === 400);
@@ -33,7 +33,7 @@ test('module execution stops an excessive tool batch before executing the ninth 
 
 test('a prepared module proposal can finish without another provider call', async () => {
   let requests = 0, prepared = false;
-  const service = createMeridianService({ prisma: {}, env: { GROQ_API_KEY: 'test-key' }, fetchImpl: async () => {
+  const service = createMiraiService({ prisma: {}, env: { GROQ_API_KEY: 'test-key' }, fetchImpl: async () => {
     requests++;
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { tool_calls: [{ id: 'prepare', function: { name: 'inventory_prepare_create', arguments: '{}' } }] } }] }) };
   } });

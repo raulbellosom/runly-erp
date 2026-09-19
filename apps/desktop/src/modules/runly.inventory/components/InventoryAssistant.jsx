@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Checkbox, ErrorState, ConfirmDialog, Badge, Sheet, SheetContent, SheetHeader, SheetTitle, MarkdownViewer, useCoarsePointer } from '@runly/ui'
+import { AssistantWordmark, Button, Checkbox, ErrorState, ConfirmDialog, Badge, Sheet, SheetContent, SheetHeader, SheetTitle, MarkdownViewer, useCoarsePointer } from '@runly/ui'
 import { Sparkles, Plus, X, Trash2, MessageSquare, FileText, Boxes, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -48,20 +48,20 @@ function AssistantWorkspace({ children, token, companyId, userId }) {
   const header = onClose => <div className="flex items-center justify-between gap-2 border-b p-3">
     <span className="flex items-center gap-2">
       <BotAvatar />
-      <span className="leading-tight"><span className="block text-sm font-semibold">Meridian</span><span className="block text-xs text-muted-foreground">Asistente de inventario</span></span>
+      <span className="leading-tight"><AssistantWordmark className="block text-sm font-semibold" /><span className="block text-xs text-muted-foreground">Asistente de inventario</span></span>
     </span>
     {onClose && <Button size="icon" variant="ghost" aria-label="Cerrar chat" onClick={onClose}><X className="h-4 w-4" /></Button>}
   </div>
-  const renderPanel = content => coarse ? <Sheet open={open} onOpenChange={setOpen}><SheetContent side="right" className="flex h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-lg"><SheetHeader className="border-b p-4"><SheetTitle className="flex items-center gap-2"><BotAvatar /><span className="leading-tight"><span className="block">Meridian</span><span className="block text-xs font-normal text-muted-foreground">Asistente de inventario</span></span></SheetTitle></SheetHeader>{content}</SheetContent></Sheet>
+  const renderPanel = content => coarse ? <Sheet open={open} onOpenChange={setOpen}><SheetContent side="right" className="flex h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-lg"><SheetHeader className="border-b p-4"><SheetTitle className="flex items-center gap-2"><BotAvatar /><span className="leading-tight"><AssistantWordmark className="block" /><span className="block text-xs font-normal text-muted-foreground">Asistente de inventario</span></span></SheetTitle></SheetHeader>{content}</SheetContent></Sheet>
     : <aside aria-label="Chat de inventario" className={`${open ? 'flex' : 'hidden'} h-full min-h-0 w-[390px] shrink-0 flex-col border-l bg-background`}>
       {header(() => setOpen(false))}{content}
     </aside>
   return <InventoryAssistantContext.Provider value={value}><div className="flex h-full min-h-0 overflow-hidden">
     <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
-    {!open && <Button variant="outline" className="group fixed right-0 top-1/2 z-40 -translate-y-1/2 justify-start gap-0 overflow-hidden rounded-l-full rounded-r-none border-r-0 bg-background/90 px-3 text-muted-foreground shadow-md backdrop-blur transition-all duration-200 hover:gap-2 hover:bg-(--brand-primary) hover:px-4 hover:text-(--brand-primary-foreground) hover:shadow-lg"
+    {!open && <Button variant="outline" className="group fixed right-0 top-1/2 z-40 -translate-y-1/2 justify-start gap-0 overflow-hidden rounded-l-full rounded-r-none border-r-0 bg-background/90 px-3 text-muted-foreground shadow-md backdrop-blur transition-all duration-200 hover:gap-2 hover:bg-muted hover:px-4 hover:text-foreground hover:shadow-lg"
       aria-label="Abrir chat de inventario" onClick={() => { if (!openedBefore) { openAssistant(currentContext); setOpenedBefore(true) } else setOpen(true) }}>
       <Sparkles className="h-4 w-4 shrink-0" />
-      <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover:max-w-24 group-hover:opacity-100">Meridian</span>
+      <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover:max-w-24 group-hover:opacity-100"><AssistantWordmark /></span>
     </Button>}
     <InventoryChat token={token} companyId={companyId} userId={userId} open={open} launch={launch} currentContext={currentContext} onBusy={setBusy} renderPanel={renderPanel} />
   </div></InventoryAssistantContext.Provider>
@@ -172,7 +172,7 @@ function ChatMessages({ messages, busy, loading, error, onDecide, onPickPrompt }
     {(busy || loading) && <div className="flex items-center gap-2 px-1" role="status">
       {!loading && <BotAvatar />}
       <div className="flex gap-0.5">{[0, 1, 2].map(i => <span key={i} className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 0.15}s` }} />)}</div>
-      <span className="text-xs italic text-muted-foreground">{busy ? 'Meridian está analizando y consultando' : 'Cargando conversación'}</span>
+      <span className="text-xs italic text-muted-foreground">{busy ? 'MirAI está analizando y consultando' : 'Cargando conversación'}</span>
     </div>}
     {error && <ErrorState title="No se pudo completar la consulta" description={error} />}
     <div ref={end} />

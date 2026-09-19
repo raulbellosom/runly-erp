@@ -1,14 +1,14 @@
-// apps/desktop/src/modules/runly.chat/components/MeridianPanel.jsx
+// apps/desktop/src/modules/runly.chat/components/MirAIPanel.jsx
 import { useEffect, useRef, useState } from "react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
-  Button, EmptyState, Skeleton, ConfirmDialog, Textarea,
+  Button, EmptyState, Skeleton, ConfirmDialog, Textarea, AssistantWordmark,
 } from "@runly/ui";
 import { Sparkles, Send, Trash2 } from "lucide-react";
 import { useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
-import { useMeridianStatus } from "../hooks/useMeridian";
-import { useMeridianPanelThread, useSendMeridianPanel, useClearMeridianPanel } from "../hooks/useMeridianPanel";
-import { MERIDIAN_NAME } from "../lib/meridian";
+import { useMiraiStatus } from "../hooks/useMirAI";
+import { useMiraiPanelThread, useSendMiraiPanel, useClearMiraiPanel } from "../hooks/useMirAIPanel";
+import { MIRAI_NAME } from "../lib/mirai";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import "../chat-theme.css";
 
@@ -44,14 +44,14 @@ function Bubble({ role, content }) {
   );
 }
 
-export function MeridianPanel({ open, onOpenChange, conversationId, focusMessage }) {
+export function MirAIPanel({ open, onOpenChange, conversationId, focusMessage }) {
   const { prefs } = useChatPreferences();
-  const { data: status } = useMeridianStatus();
+  const { data: status } = useMiraiStatus();
   const available = status?.available !== false;
 
-  const { data, isLoading } = useMeridianPanelThread(conversationId, { enabled: open });
-  const send = useSendMeridianPanel(conversationId);
-  const clear = useClearMeridianPanel(conversationId);
+  const { data, isLoading } = useMiraiPanelThread(conversationId, { enabled: open });
+  const send = useSendMiraiPanel(conversationId);
+  const clear = useClearMiraiPanel(conversationId);
 
   const [draft, setDraft] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
@@ -97,7 +97,7 @@ export function MeridianPanel({ open, onOpenChange, conversationId, focusMessage
         <SheetHeader>
           <SheetTitle className="chat-font-display flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[hsl(var(--primary))]" />
-            {MERIDIAN_NAME}
+            <AssistantWordmark />
             <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">· solo tú ves esto</span>
           </SheetTitle>
         </SheetHeader>
@@ -144,7 +144,7 @@ export function MeridianPanel({ open, onOpenChange, conversationId, focusMessage
                   />
                 ))}
               </div>
-              <span className="text-xs italic text-[hsl(var(--muted-foreground))]">{MERIDIAN_NAME} está pensando</span>
+              <span className="text-xs italic text-[hsl(var(--muted-foreground))]">{MIRAI_NAME} está pensando</span>
             </div>
           )}
 
@@ -167,7 +167,7 @@ export function MeridianPanel({ open, onOpenChange, conversationId, focusMessage
               }}
               rows={2}
               disabled={!available || send.isPending}
-              placeholder={available ? `Escribe a ${MERIDIAN_NAME}...` : `${MERIDIAN_NAME} no está configurado`}
+              placeholder={available ? `Escribe a ${MIRAI_NAME}...` : `${MIRAI_NAME} no está configurado`}
               className="min-h-[44px] flex-1 resize-none"
             />
             <Button size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() || send.isPending || !available} onClick={submit}>
@@ -180,8 +180,8 @@ export function MeridianPanel({ open, onOpenChange, conversationId, focusMessage
         <ConfirmDialog
           open={confirmClear}
           onOpenChange={setConfirmClear}
-          title="Limpiar la conversación con MeridIAn"
-          description="Se borrará todo lo que has hablado con MeridIAn sobre este chat. Esta acción no se puede deshacer."
+          title="Limpiar la conversación con MirAI"
+          description="Se borrará todo lo que has hablado con MirAI sobre este chat. Esta acción no se puede deshacer."
           confirmLabel="Limpiar"
           variant="destructive"
           onConfirm={() => { clear.mutate(); setConfirmClear(false); }}

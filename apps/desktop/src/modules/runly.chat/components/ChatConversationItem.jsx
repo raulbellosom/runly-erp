@@ -1,5 +1,5 @@
 import { AtSign, Pin, Sparkles } from "lucide-react";
-import { renderMentionText } from "@runly/ui";
+import { AssistantWordmark, renderMentionText } from "@runly/ui";
 import { formatMessageTime } from "../lib/chatUtils";
 import { ConversationTypeBadge } from "./ConversationTypeBadge";
 
@@ -61,13 +61,13 @@ function Avatar({ name, avatarUrl, avatarEmoji, type, size = "md", online = fals
 }
 
 export function ChatConversationItem({ conversation, isActive, onClick, currentUserId, isOnline = false }) {
-  const isMeridian = conversation.type === "meridian";
+  const isMirai = conversation.type === "mirai";
   const otherMember = conversation.type === "direct"
     ? (conversation.members ?? []).find((m) => m.userId !== currentUserId)
     : null;
 
-  const displayName = isMeridian
-    ? "MeridIAn"
+  const displayName = isMirai
+    ? "MirAI"
     : (conversation.title ??
       otherMember?.displayName ??
       (conversation.type === "group" ? "Grupo" : "Conversacion directa"));
@@ -107,14 +107,14 @@ export function ChatConversationItem({ conversation, isActive, onClick, currentU
             : "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
         ].join(" ")}
       >
-        <Avatar name={displayName} avatarUrl={avatarUrl} avatarEmoji={avatarEmoji} type={conversation.type} online={isOnline} isBot={isMeridian} />
+        <Avatar name={displayName} avatarUrl={avatarUrl} avatarEmoji={avatarEmoji} type={conversation.type} online={isOnline} isBot={isMirai} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm truncate chat-font-display font-semibold flex items-center gap-1 min-w-0">
               {conversation.is_pinned && (
                 <Pin className="h-3 w-3 shrink-0 text-[hsl(var(--muted-foreground))] fill-current" />
               )}
-              <span className="truncate">{titleLabel}</span>
+              <span className="truncate">{isMirai ? <AssistantWordmark className="text-foreground" /> : titleLabel}</span>
             </span>
             {lastMsg?.createdAt && (
               <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">

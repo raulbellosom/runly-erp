@@ -19,7 +19,7 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
     });
     assert.deepEqual(result, [{
       entityType: "contact", recordId: "contact-1", title: "Ada Lovelace",
-      subtitle: null, url: "/app/m/atlas.contacts/contacts/contact-1",
+      subtitle: null, url: "/app/m/runly.contacts/contacts/contact-1",
     }]);
   });
 
@@ -61,7 +61,7 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
     });
     assert.deepEqual(result[0], {
       entityType: "file", recordId: "file-1", title: "contrato.pdf", subtitle: null,
-      url: "/app/m/atlas.files/files/file-1", mimeType: "application/pdf", sizeBytes: 12345,
+      url: "/app/m/runly.files/files/file-1", mimeType: "application/pdf", sizeBytes: 12345,
     });
   });
 
@@ -77,7 +77,7 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
     });
     assert.deepEqual(result[0], {
       entityType: "file", recordId: "file-1", title: "data.csv", subtitle: null,
-      url: "/app/m/atlas.files/files/file-1", mimeType: null, sizeBytes: null,
+      url: "/app/m/runly.files/files/file-1", mimeType: null, sizeBytes: null,
     });
   });
 
@@ -92,7 +92,7 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       entityRefs: [{ entityType: "hr_employee", recordId: "emp-1" }],
     });
     assert.equal(result[0].title, "Grace Hopper");
-    assert.equal(result[0].url, "/app/m/atlas.hr/hr/employees/emp-1");
+    assert.equal(result[0].url, "/app/m/runly.hr/hr/employees/emp-1");
     assert.equal(result[0].subtitle, null);
     assert.equal(result[0].photoFileId, null);
   });
@@ -157,7 +157,7 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
     });
     assert.deepEqual(capturedArgs, { companyId: "company-1", accountId: "acct-1", actorId: "profile-1" });
     assert.equal(result[0].title, "Cuenta principal · BBVA");
-    assert.equal(result[0].url, "/app/m/atlas.ledger/accounts/acct-1");
+    assert.equal(result[0].url, "/app/m/runly.ledger/accounts/acct-1");
     assert.equal(result[0].subtitle, "BBVA");
     assert.equal(result[0].currency, null);
     assert.equal(result[0].balance, null);
@@ -245,7 +245,7 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
     assert.deepEqual(capturedArgs, { id: "proj-1", userId: "profile-1" });
     assert.deepEqual(result, [{
       entityType: "project", recordId: "proj-1", title: "Relanzamiento web",
-      subtitle: null, url: "/app/m/atlas.projects/proj-1", color: "#6366f1", icon: "Rocket",
+      subtitle: null, url: "/app/m/runly.projects/proj-1", color: "#6366f1", icon: "Rocket",
     }]);
   });
 
@@ -278,7 +278,7 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
     });
     assert.deepEqual(result, [{
       entityType: "task", recordId: "task-1", title: "Diseñar landing",
-      subtitle: "En progreso", url: "/app/m/atlas.projects/tasks/task-1",
+      subtitle: "En progreso", url: "/app/m/runly.projects/tasks/task-1",
     }]);
   });
 
@@ -299,7 +299,7 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
     });
     assert.deepEqual(capturedArgs, { userId: "profile-1", id: "evt-1" });
     assert.equal(result[0].title, "Reunion de seguimiento");
-    assert.equal(result[0].url, "/app/m/atlas.calendar/events/evt-1");
+    assert.equal(result[0].url, "/app/m/runly.calendar/events/evt-1");
     assert.equal(typeof result[0].subtitle, "string");
   });
 });

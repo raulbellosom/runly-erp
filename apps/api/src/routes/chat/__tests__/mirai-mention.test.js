@@ -1,27 +1,27 @@
-// apps/api/src/routes/chat/__tests__/meridian-mention.test.js
+// apps/api/src/routes/chat/__tests__/mirai-mention.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMeridianService, matchMeridianMention, stripMentionTokens } from "../meridian-service.js";
+import { createMiraiService, matchMiraiMention, stripMentionTokens } from "../mirai-service.js";
 
-test("matchMeridianMention: hits real mentions, not emails or lookalikes", () => {
-  for (const s of ["@meridIAn hola", "@meridian resume", "hola @MeridIAn?", "(@meridian) ayuda", "linea 1\n@meridian y esto"]) {
-    assert.equal(matchMeridianMention(s), true, s);
+test("matchMiraiMention: hits real mentions, not emails or lookalikes", () => {
+  for (const s of ["@MirAI hola", "@mirai resume", "hola @MirAI?", "(@mirai) ayuda", "linea 1\n@mirai y esto"]) {
+    assert.equal(matchMiraiMention(s), true, s);
   }
-  for (const s of ["escribe a x@meridian.com", "meridian sin arroba", "@meridiano", "correo@meridianbank.mx", ""]) {
-    assert.equal(matchMeridianMention(s), false, s);
+  for (const s of ["escribe a x@mirai.com", "mirai sin arroba", "@miraio", "correo@miraibank.mx", ""]) {
+    assert.equal(matchMiraiMention(s), false, s);
   }
 });
 
-test("matchMeridianMention: detects the composer's @[sentinel:MeridIAn] token", () => {
-  assert.equal(matchMeridianMention("@[00000000-0000-0000-0000-00000000b07a:MeridIAn] que hora es"), true);
+test("matchMiraiMention: detects the composer's @[sentinel:MirAI] token", () => {
+  assert.equal(matchMiraiMention("@[00000000-0000-0000-0000-00000000b07a:MirAI] que hora es"), true);
   // a real user's @[uuid:Name] token must NOT trigger it
-  assert.equal(matchMeridianMention("@[019e7008-684d-711c-9b13-872f854651f0:Ana] hola"), false);
+  assert.equal(matchMiraiMention("@[019e7008-684d-711c-9b13-872f854651f0:Ana] hola"), false);
 });
 
-test("stripMentionTokens: @[uuid:Name] -> @Name (incl. the MeridIAn sentinel)", () => {
+test("stripMentionTokens: @[uuid:Name] -> @Name (incl. the MirAI sentinel)", () => {
   assert.equal(
-    stripMentionTokens("@[00000000-0000-0000-0000-00000000b07a:MeridIAn] resume @[019e7008-684d-711c-9b13-872f854651f0:Ana] pls"),
-    "@MeridIAn resume @Ana pls",
+    stripMentionTokens("@[00000000-0000-0000-0000-00000000b07a:MirAI] resume @[019e7008-684d-711c-9b13-872f854651f0:Ana] pls"),
+    "@MirAI resume @Ana pls",
   );
   assert.equal(stripMentionTokens("sin tokens"), "sin tokens");
 });
@@ -49,9 +49,9 @@ function svc({ fetchImpl, env = { GROQ_API_KEY: "k" }, channelRows } = {}) {
       return [];
     },
     $executeRaw: async () => 0,
-    chatMeridianRun: { create: async ({ data }) => { runs.push(data); return {}; } },
+    chatMiraiRun: { create: async ({ data }) => { runs.push(data); return {}; } },
   };
-  const service = createMeridianService({
+  const service = createMiraiService({
     prisma, env, fetchImpl,
     listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {},
     insertAssistantMessage: async ({ conversationId, body, replyToMessageId }) => {
@@ -64,7 +64,7 @@ function svc({ fetchImpl, env = { GROQ_API_KEY: "k" }, channelRows } = {}) {
 
 const mention = (service, over = {}) => service.handleChannelMention({
   companyId: "co1", conversationId: "ch1", actorProfileId: "p1", actorAuthUserId: "a1",
-  triggerMessageId: "u9", mentionText: "@meridIAn resume lo de hoy", ...over,
+  triggerMessageId: "u9", mentionText: "@MirAI resume lo de hoy", ...over,
 });
 
 test("handleChannelMention: uses get_channel_messages then replies, quoting the mention; surface='mention'", async () => {
@@ -106,8 +106,8 @@ test("handleChannelMention: no GROQ_API_KEY -> silent (no insert)", async () => 
 });
 
 test("handleChannelMention: route 'live' degrades to a no-internet reply, surface still 'mention'", async () => {
-  const { service, inserted, runs } = svc({ fetchImpl: groq({ routeWord: "live" }), env: { GROQ_API_KEY: "k", CHAT_MERIDIAN_WEB: "false" } });
-  await mention(service, { mentionText: "@meridIAn cuanto esta el dolar" });
+  const { service, inserted, runs } = svc({ fetchImpl: groq({ routeWord: "live" }), env: { GROQ_API_KEY: "k", CHAT_MIRAI_WEB: "false" } });
+  await mention(service, { mentionText: "@MirAI cuanto esta el dolar" });
   assert.match(inserted[0].body, /no tengo acceso|datos en vivo|internet/i);
   assert.equal(runs.at(-1).route, "live");
   assert.equal(runs.at(-1).surface, "mention");
@@ -116,7 +116,7 @@ test("handleChannelMention: route 'live' degrades to a no-internet reply, surfac
 
 test("handleChannelMention: general question answered directly, no channel tool needed", async () => {
   const { service, inserted, runs } = svc({ fetchImpl: groq({ routeWord: "general", answers: ["Idempotente = aplicar una vez o varias da el mismo resultado."] }) });
-  await mention(service, { mentionText: "@meridIAn que significa idempotente" });
+  await mention(service, { mentionText: "@MirAI que significa idempotente" });
   assert.match(inserted[0].body, /idempotente/i);
   assert.equal(runs.at(-1).surface, "mention");
 });

@@ -838,7 +838,7 @@ export const chatMap = createModuleManifest({
     { key: 'chat.conversations.read',   name: 'Ver conversaciones' },
     { key: 'chat.conversations.create', name: 'Crear y enviar mensajes' },
     { key: 'chat.support.manage',       name: 'Gestionar soporte externo' },
-    { key: 'chat.meridian.use',         name: 'Usar MeridIAn' },
+    { key: 'chat.mirai.use',            name: 'Usar MirAI' },
     { key: 'chat.calls.record',         name: 'Grabar llamadas' },
   ],
   acl: {
@@ -847,7 +847,7 @@ export const chatMap = createModuleManifest({
       'chat.conversations.read':   'chat.conversations.read',
       'chat.conversations.create': 'chat.conversations.create',
       'chat.support.manage':       'chat.support.manage',
-      'chat.meridian.use':         'chat.meridian.use',
+      'chat.mirai.use':            'chat.mirai.use',
       'chat.calls.record':         'chat.calls.record',
     },
   },

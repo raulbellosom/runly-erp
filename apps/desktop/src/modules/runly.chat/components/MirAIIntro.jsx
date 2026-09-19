@@ -1,10 +1,11 @@
-// apps/desktop/src/modules/runly.chat/components/MeridianIntro.jsx
+// apps/desktop/src/modules/runly.chat/components/MirAIIntro.jsx
 import { Sparkles } from "lucide-react";
-import { MERIDIAN_EXAMPLE_PROMPTS } from "../lib/meridian";
+import { AssistantWordmark } from "@runly/ui";
+import { MIRAI_EXAMPLE_PROMPTS } from "../lib/mirai";
 
-// Shown at the top of the MeridIAn conversation while it is still short.
+// Shown at the top of the MirAI conversation while it is still short.
 // Clicking a chip prefills the composer (does not send).
-export function MeridianIntro({ onPickPrompt }) {
+export function MirAIIntro({ onPickPrompt }) {
   return (
     <div className="mx-auto my-6 max-w-md px-4 text-center">
       <div
@@ -13,13 +14,13 @@ export function MeridianIntro({ onPickPrompt }) {
       >
         <Sparkles className="h-6 w-6" />
       </div>
-      <p className="text-sm font-semibold">MeridIAn</p>
+      <p className="text-sm font-semibold"><AssistantWordmark /></p>
       <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
         Puedo resumir mensajes, explicarte un mensaje o un archivo, y responder preguntas sobre tus chats.
         Reenvíame mensajes de otra conversación y pregúntame sobre ellos.
       </p>
       <div className="mt-4 flex flex-col gap-2">
-        {MERIDIAN_EXAMPLE_PROMPTS.map((p) => (
+        {MIRAI_EXAMPLE_PROMPTS.map((p) => (
           <button
             key={p}
             type="button"

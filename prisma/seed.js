@@ -383,7 +383,7 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
-  // MeridIAn bot profile — one per company, linked via membership. Idempotent.
+  // MirAI bot profile — one per company, linked via membership. Idempotent.
   // ------------------------------------------------------------------
   try {
     const allCompanies = await prisma.company.findMany({ select: { id: true } })
@@ -395,10 +395,10 @@ async function main() {
         WHERE up.is_bot = true LIMIT 1
       `
       if (existing.length) continue
-      const email = `meridian+${company.id}@bots.runly.local`
+      const email = `mirai+${company.id}@bots.runly.local`
       const inserted = await prisma.$queryRaw`
         INSERT INTO user_profile (id, auth_user_id, display_name, first_name, last_name, email, is_bot, enabled, updated_at)
-        VALUES (uuidv7(), gen_random_uuid(), 'MeridIAn', 'MeridIAn', '', ${email}, true, true, NOW())
+        VALUES (uuidv7(), gen_random_uuid(), 'MirAI', 'MirAI', '', ${email}, true, true, NOW())
         ON CONFLICT (email) DO UPDATE SET is_bot = true
         RETURNING id
       `
@@ -409,7 +409,7 @@ async function main() {
       `
       botsEnsured += 1
     }
-    console.log(`MeridIAn bot profile ensured for ${allCompanies.length} company(s) (${botsEnsured} created)`)
+    console.log(`MirAI bot profile ensured for ${allCompanies.length} company(s) (${botsEnsured} created)`)
   } catch {
     // Table doesn't exist yet or migration not run — skip silently
   }

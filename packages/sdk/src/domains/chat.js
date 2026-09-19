@@ -447,20 +447,20 @@ export function createChatDomain(request, withAuthHeaders, toQueryString) {
       }),
 
     // ----------------------------------------------------------------
-    // MeridIAn (AI assistant) — Spec 1
+    // MirAI (AI assistant) — Spec 1
     // ----------------------------------------------------------------
-    meridian: {
-      ensure: (token) => request("/chat/meridian", { headers: withAuthHeaders(token) }),
-      status: (token) => request("/chat/meridian/status", { headers: withAuthHeaders(token) }),
+    mirai: {
+      ensure: (token) => request("/chat/mirai", { headers: withAuthHeaders(token) }),
+      status: (token) => request("/chat/mirai/status", { headers: withAuthHeaders(token) }),
       // Spec 2 — private assistant panel scoped to one conversation.
       panel: (conversationId, token) =>
-        request(`/chat/meridian/panel/${encodeURIComponent(conversationId)}`, { headers: withAuthHeaders(token) }),
+        request(`/chat/mirai/panel/${encodeURIComponent(conversationId)}`, { headers: withAuthHeaders(token) }),
       panelSend: (conversationId, data, token) =>
-        request(`/chat/meridian/panel/${encodeURIComponent(conversationId)}/messages`, {
+        request(`/chat/mirai/panel/${encodeURIComponent(conversationId)}/messages`, {
           method: "POST", headers: withAuthHeaders(token), body: JSON.stringify(data),
         }),
       panelClear: (conversationId, token) =>
-        request(`/chat/meridian/panel/${encodeURIComponent(conversationId)}`, {
+        request(`/chat/mirai/panel/${encodeURIComponent(conversationId)}`, {
           method: "DELETE", headers: withAuthHeaders(token),
         }),
     },

@@ -1,6 +1,6 @@
-// apps/api/src/routes/chat/meridian-tools.js
+// apps/api/src/routes/chat/mirai-tools.js
 //
-// Read-only tools for the MeridIAn chat assistant (Spec 1). Every tool is
+// Read-only tools for the MirAI chat assistant (Spec 1). Every tool is
 // scoped to the caller: get_recent_messages / get_conversation_messages /
 // list_conversation_files go through chatService.listMessages, which
 // membership-checks and throws ChatServiceError; search_my_conversations goes
@@ -28,7 +28,7 @@ export const TOOL_DEFS = [
     type: "function",
     function: {
       name: "get_recent_messages",
-      description: "Devuelve los mensajes recientes de la conversacion actual (la que el usuario tiene abierta con MeridIAn o desde donde se te invoco).",
+      description: "Devuelve los mensajes recientes de la conversacion actual (la que el usuario tiene abierta con MirAI o desde donde se te invoco).",
       parameters: {
         type: "object",
         properties: {
@@ -158,7 +158,7 @@ export const TOOL_DEFS = [
 
 function trimMessage(m) {
   return {
-    senderName: m.sender?.displayName ?? (m.sender_type === "assistant" ? "MeridIAn" : m.sender_type === "system" ? "sistema" : "desconocido"),
+    senderName: m.sender?.displayName ?? (m.sender_type === "assistant" ? "MirAI" : m.sender_type === "system" ? "sistema" : "desconocido"),
     senderType: m.sender_type,
     body: m.deleted_at ? "(mensaje eliminado)" : String(m.body ?? "").slice(0, 2000),
     messageType: m.message_type,
@@ -181,12 +181,12 @@ export function buildToolRunners({
 
   // Resolve the caller's RBAC context, SCOPED TO ctx.companyId (the caller's
   // validated active company, sourced from c.get("companyId") upstream in
-  // meridian-routes.js — never from resolveUserContext's own raw,
+  // mirai-routes.js — never from resolveUserContext's own raw,
   // union-across-every-company isAdmin/permissionSet, which would let a
-  // user's admin role in Company A leak into a MeridIAn tool call made while
+  // user's admin role in Company A leak into a MirAI tool call made while
   // Company B is active). See
   // docs/superpowers/specs/2026-09-10-multi-tenant-architecture-design.md §16
-  // ("MeridIAn nunca debe obtener contexto de empresas diferentes").
+  // ("MirAI nunca debe obtener contexto de empresas diferentes").
   // Returns { uctx, companyId, userId, isAdmin, permissionSet } or { error }.
   async function resolveScopedErpContext(ctx) {
     if (typeof resolveUserContext !== "function") return { error: "Esa consulta no esta disponible aqui." };
@@ -470,7 +470,7 @@ export function buildToolRunners({
 }
 
 // ---------------------------------------------------------------------------
-// Spec 3 — the single tool for a `@meridIAn` channel mention. No assertMember:
+// Spec 3 — the single tool for a `@MirAI` channel mention. No assertMember:
 // the mention came from a channel member and the reply is public in that same
 // channel, so reading its recent history exposes nothing the members don't see.
 // ---------------------------------------------------------------------------
@@ -505,7 +505,7 @@ export function buildChannelToolRunners({ prisma }) {
     rows.reverse();
     return {
       messages: rows.map((m) => ({
-        senderName: m.sender_name ?? (m.sender_type === "assistant" ? "MeridIAn" : m.sender_type === "system" ? "sistema" : "desconocido"),
+        senderName: m.sender_name ?? (m.sender_type === "assistant" ? "MirAI" : m.sender_type === "system" ? "sistema" : "desconocido"),
         senderType: m.sender_type,
         body: String(m.body ?? "").slice(0, 2000),
         messageType: m.message_type,
@@ -518,7 +518,7 @@ export function buildChannelToolRunners({ prisma }) {
 }
 
 // Download an attachment's bytes via a service-role signed URL and return
-// base64. `signAttachmentUrl` is injected by meridian-service (Task 6), so this
+// base64. `signAttachmentUrl` is injected by mirai-service (Task 6), so this
 // module never imports supabase and the non-image tests never reach here.
 async function fetchAttachmentBase64({ signAttachmentUrl, att }) {
   const url = await signAttachmentUrl(att.bucket, att.object_key);

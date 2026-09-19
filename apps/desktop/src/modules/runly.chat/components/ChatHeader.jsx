@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Button,
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  ConfirmDialog,
+  ConfirmDialog, AssistantWordmark,
 } from "@runly/ui";
 import {
   ArrowLeft, Users, FolderOpen, MessageSquare,
@@ -14,7 +14,7 @@ import { usePinnedMessages } from "../hooks/usePinnedMessages";
 import { useGlobalPresence } from "../../../providers/RealtimeProvider";
 import { ConversationTypeBadge } from "./ConversationTypeBadge";
 import { MemberAvatarStack } from "./MemberAvatarStack";
-import { MERIDIAN_SUBTITLE } from "../lib/meridian";
+import { MIRAI_SUBTITLE } from "../lib/mirai";
 import { getConversationDisplayName, getConversationTitleLabel } from "../lib/chatUtils";
 
 function formatLastSeen(date) {
@@ -44,8 +44,8 @@ export function ChatHeader({
   onOpenProfile,
   onOpenPinned,
   callsEnabled, callPending, onStartAudioCall, onStartVideoCall, onOpenGuestLink,
-  isMeridian = false,
-  onOpenMeridian, meridianDisabled = false,
+  isMirai = false,
+  onOpenMirai, miraiDisabled = false,
   embedded = null, onCollapse = null,
   variant = "internal", externalStatus = null, onCloseExternal = null,
 }) {
@@ -282,10 +282,10 @@ export function ChatHeader({
         </button>
         <div className="flex-1 min-w-0">
           <button type="button" onClick={() => onOpenProfile(null)} className="block max-w-full text-left" title="Ver perfil">
-            <p className="chat-font-display text-sm font-semibold truncate">{titleLabel}</p>
+            <p className="chat-font-display text-sm font-semibold truncate">{isMirai ? <AssistantWordmark /> : titleLabel}</p>
           </button>
-          {isMeridian ? (
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">{MERIDIAN_SUBTITLE}</p>
+          {isMirai ? (
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">{MIRAI_SUBTITLE}</p>
           ) : conversation?.type === "direct" ? (
             <p className="text-xs text-[hsl(var(--muted-foreground))]">
               {directOnline ? (
@@ -308,7 +308,7 @@ export function ChatHeader({
 
         {/* Call actions — grouped under one control so the header row stays
             short on narrow screens (voz / video / invitado externo). */}
-        {!embedded && callsEnabled && !isMeridian && conversation?.type !== "external_support" && (
+        {!embedded && callsEnabled && !isMirai && conversation?.type !== "external_support" && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -344,14 +344,14 @@ export function ChatHeader({
           <Search className="h-4 w-4" />
         </button>
 
-        {/* MeridIAn assistant panel — collapses into the ⋮ menu below sm */}
-        {!isMeridian && onOpenMeridian && conversation?.type !== "external_support" && (
+        {/* MirAI assistant panel — collapses into the ⋮ menu below sm */}
+        {!isMirai && onOpenMirai && conversation?.type !== "external_support" && (
           <button
             type="button"
-            onClick={onOpenMeridian}
-            disabled={meridianDisabled}
-            className={[headerBtnCls, "hidden sm:flex", meridianDisabled ? "opacity-40 cursor-not-allowed" : ""].join(" ")}
-            title={meridianDisabled ? "MeridIAn no esta configurado" : "Preguntar a MeridIAn sobre esta conversacion"}
+            onClick={onOpenMirai}
+            disabled={miraiDisabled}
+            className={[headerBtnCls, "hidden sm:flex", miraiDisabled ? "opacity-40 cursor-not-allowed" : ""].join(" ")}
+            title={miraiDisabled ? "MirAI no esta configurado" : "Preguntar a MirAI sobre esta conversacion"}
           >
             <Sparkles className="h-4 w-4" />
           </button>
@@ -390,10 +390,10 @@ export function ChatHeader({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {/* Actions hoisted out of the header row on narrow screens */}
-            {!isMeridian && onOpenMeridian && conversation?.type !== "external_support" && (
-              <DropdownMenuItem className="sm:hidden" disabled={meridianDisabled} onSelect={onOpenMeridian}>
+            {!isMirai && onOpenMirai && conversation?.type !== "external_support" && (
+              <DropdownMenuItem className="sm:hidden" disabled={miraiDisabled} onSelect={onOpenMirai}>
                 <Sparkles className="h-3.5 w-3.5 mr-2" />
-                Preguntar a MeridIAn
+                Preguntar a MirAI
               </DropdownMenuItem>
             )}
             <DropdownMenuItem className="sm:hidden" onSelect={onToggleFilesView}>
@@ -412,7 +412,7 @@ export function ChatHeader({
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator className="sm:hidden" />
-            {!isMeridian && (
+            {!isMirai && (
               <DropdownMenuItem onSelect={() => onOpenProfile(isChannelOrGroup ? "members" : null)}>
                 <Users className="h-3.5 w-3.5 mr-2" />
                 {isChannelOrGroup ? "Ver miembros" : "Ver perfil"}
@@ -422,7 +422,7 @@ export function ChatHeader({
               <CheckSquare className="h-3.5 w-3.5 mr-2" />
               Seleccionar mensajes
             </DropdownMenuItem>
-            {!isMeridian && !embedded && onArchive && (
+            {!isMirai && !embedded && onArchive && (
               <DropdownMenuItem onSelect={onArchive}>
                 {isArchived
                   ? <><ArchiveRestore className="h-3.5 w-3.5 mr-2" />Desarchivar</>
@@ -430,7 +430,7 @@ export function ChatHeader({
                 }
               </DropdownMenuItem>
             )}
-            {!isMeridian && !embedded && (
+            {!isMirai && !embedded && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => setConfirmDelete(true)} className="text-red-500 focus:text-red-500">

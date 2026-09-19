@@ -381,6 +381,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | Export | Description |
 |---|---|
 | `Button`, `buttonVariants` | Action button with size/variant props |
+| `AssistantWordmark` | Two-tone MirAI label: “Mir” inherits the text color, “AI” uses `var(--brand-primary)`. Accepts `className`; use for assistant names and headings, not flowing prose. |
 | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | Content card container |
 | `Badge`, `badgeVariants` | Status and label badge |
 | `TypeBadge` | Accent-coloured pill (`accent` hex, e.g. file/asset type). Background/border derived via `color-mix` for light+dark. |

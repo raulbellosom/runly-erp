@@ -766,7 +766,7 @@ function hasProtectedIdentityAdminRole(user) {
 }
 
 function buildIdentityUsersWhere({ search, enabled, companyId }) {
-  // Bot profiles (e.g. the per-company MeridIAn assistant, is_bot = true) have no
+  // Bot profiles (e.g. the per-company MirAI assistant, is_bot = true) have no
   // login and are not administrable users — never list them in the users screen
   // or in any user picker that reads this endpoint (chat "Anadir miembros",
   // CreateChatModal, etc.).
@@ -4038,8 +4038,8 @@ app.route("/pwa", pwaRouter);
 //    marketing website (nginx proxies `/` -> `/public/site/` and needs a 404 to
 //    fall back to the SPA). Every auth guard in these routers MUST be scoped to a
 //    concrete path prefix — `internal.use("*", ...)` + `app.route("/chat", internal)`,
-//    `meridian.use("/chat/meridian/*", ...)`, etc. Regression on 2026-09-08 (MeridIAn
-//    guard mounted at root, commit 59a439a6); see meridian-mount-scope.test.js.
+//    `mirai.use("/chat/mirai/*", ...)`, etc. Regression on 2026-09-08 (MirAI
+//    guard mounted at root, commit 59a439a6); see mirai-mount-scope.test.js.
 app.route("/", createChatRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission, notificationService, broadcaster, resolveUserContext: getUserContextByAuthId, officeService }));
 const callsSmtpService = createSmtpService({ prisma });
 app.route("/", createCallsRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission, notificationService, broadcaster, deliveryWorker: notificationDeliveryWorker, smtpService: callsSmtpService }));

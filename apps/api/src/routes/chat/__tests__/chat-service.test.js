@@ -30,10 +30,10 @@ function buildPrismaMock(queryRawResults = [], executeRawResults = []) {
   let eIdx = 0;
   // Every guarded conversation mutation now issues a bare
   // `SELECT type FROM chat_conversations WHERE id = ? LIMIT 1` probe
-  // (assertNotMeridian) — byte-identical to the permission-check type probe
+  // (assertNotMirai) — byte-identical to the permission-check type probe
   // some of these fixtures already queue a `[{ type: "channel" }]` row for.
   // Answer both from the SAME queued row (consumed once, then cached), and
-  // when no type row is queued at all, synthesize a non-meridian answer
+  // when no type row is queued at all, synthesize a non-mirai answer
   // without disturbing the fixed-sequence queue.
   let convTypeAnswer;
   const isConvTypeProbe = (strings) =>
@@ -61,7 +61,7 @@ function buildPrismaMock(queryRawResults = [], executeRawResults = []) {
         if (convTypeAnswer !== undefined) return convTypeAnswer;
         convTypeAnswer = looksLikeTypeRow(queryRawResults[qIdx])
           ? queryRawResults[qIdx++]
-          : [{ type: "__nonmeridian__" }];
+          : [{ type: "__nonmirai__" }];
         return convTypeAnswer;
       }
       if (isConvCompanyProbe(strings)) {
@@ -677,9 +677,9 @@ describe("chat-service — sendMessage mentions", () => {
     };
     const permissionsService = { getMemberRole: async () => null, assertChannelPermission: async () => ({}) };
 
-    // Two tokens: a normal mention and the all-zero MeridIAn sentinel id — the
+    // Two tokens: a normal mention and the all-zero MirAI sentinel id — the
     // latter is exactly what surfaced as "[0000..." in a PWA push.
-    const body = `oye @[${MENTIONED_USER_ID}:Ana] avisale a @[00000000-0000-0000-0000-00000000b07a:MeridIAn] porfa`;
+    const body = `oye @[${MENTIONED_USER_ID}:Ana] avisale a @[00000000-0000-0000-0000-00000000b07a:MirAI] porfa`;
     const prisma = buildPrismaMock([
       [{ id: "sender-profile" }],
       [{ id: "m1" }],
@@ -708,7 +708,7 @@ describe("chat-service — sendMessage mentions", () => {
     }
     const mentionEvent = publishedEvents.find((e) => e.input.eventType === "chat.mention.new");
     assert.match(mentionEvent.input.body, /@Ana/);
-    assert.match(mentionEvent.input.body, /@MeridIAn/);
+    assert.match(mentionEvent.input.body, /@MirAI/);
   });
 });
 
@@ -729,7 +729,7 @@ describe("chat-service — sendMessage entity references (Phase F)", () => {
   //   6. getMessageFull                -> $queryRaw
 
   it("resolves entityRefs and round-trips them into metadata.entityRefs on the actual INSERT statement", async () => {
-    const resolved = [{ entityType: "contact", recordId: "contact-1", title: "Ada", subtitle: null, url: "/app/m/atlas.contacts/contacts/contact-1" }];
+    const resolved = [{ entityType: "contact", recordId: "contact-1", title: "Ada", subtitle: null, url: "/app/m/runly.contacts/contacts/contact-1" }];
     const entityReferencesService = {
       resolveEntityRefs: async ({ authUserId, entityRefs }) => {
         assert.equal(authUserId, "auth-1");
@@ -2195,7 +2195,7 @@ describe('chat membership notifications', () => {
     assert.equal(published[0].companyId, MOCK_COMPANY_ID);
     assert.deepEqual(published[0].input.recipients.userIds, [OTHER_PROFILE_ID]);
     assert.deepEqual(published[0].input.channels, ['in_app', 'email', 'web_push']);
-    assert.equal(published[0].input.link, `/app/m/atlas.chat/chat/inbox/${CONV_ID}`);
+    assert.equal(published[0].input.link, `/app/m/runly.chat/chat/inbox/${CONV_ID}`);
   });
   it('does not notify or write a system message for an existing active member', async () => {
     const prisma = buildPrismaMock([[{ id: PROFILE_ID }], [{ id: 'membership' }]], [0]);

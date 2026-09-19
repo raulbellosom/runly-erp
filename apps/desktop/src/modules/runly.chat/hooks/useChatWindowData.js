@@ -7,10 +7,10 @@ import {
   useToggleReaction,
 } from "./useChatMessages";
 import { useChatPresence } from "./useChatPresence";
-import { mapTypingNames } from "../lib/meridian";
+import { mapTypingNames } from "../lib/mirai";
 import { useExternalChatData } from "./useExternalChatData";
 
-// Internal (channel/group/direct/meridian) data path. Returns the shape
+// Internal (channel/group/direct/mirai) data path. Returns the shape
 // ChatWindow consumes; queries are disabled unless this branch is the active one.
 function useInternalChatData(conversationId, { enabled }) {
   const gatedId = enabled ? conversationId : null;

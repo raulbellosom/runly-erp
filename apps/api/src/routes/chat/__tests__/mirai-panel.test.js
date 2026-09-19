@@ -1,7 +1,7 @@
-// apps/api/src/routes/chat/__tests__/meridian-panel.test.js
+// apps/api/src/routes/chat/__tests__/mirai-panel.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMeridianService } from "../meridian-service.js";
+import { createMiraiService } from "../mirai-service.js";
 
 // Groq stub: classifier -> routeWord; else -> next `answers`.
 function groq({ routeWord = "general", answers = [] } = {}) {
@@ -26,15 +26,15 @@ function makePrisma({ focusRow } = {}) {
     membership: { findFirst: async () => ({ companyId: "co1" }) },
     $queryRaw: async (strings) => {
       const sql = strings.join("?");
-      if (/INSERT INTO chat_meridian_thread/i.test(sql)) return threadEnabled ? [{ id: threadId }] : [];
-      if (/SELECT id FROM chat_meridian_thread/i.test(sql)) return threadEnabled ? [{ id: threadId }] : [];
-      if (/SELECT role, content, created_at AS "createdAt"\s+FROM chat_meridian_message/i.test(sql)) {
+      if (/INSERT INTO chat_mirai_thread/i.test(sql)) return threadEnabled ? [{ id: threadId }] : [];
+      if (/SELECT id FROM chat_mirai_thread/i.test(sql)) return threadEnabled ? [{ id: threadId }] : [];
+      if (/SELECT role, content, created_at AS "createdAt"\s+FROM chat_mirai_message/i.test(sql)) {
         return threadMsgs.map((m) => ({ ...m, createdAt: new Date() }));
       }
-      if (/SELECT role, content FROM chat_meridian_message/i.test(sql)) {
+      if (/SELECT role, content FROM chat_mirai_message/i.test(sql)) {
         return [...threadMsgs].reverse();
       }
-      if (/INSERT INTO chat_meridian_message[\s\S]*RETURNING created_at/i.test(sql)) {
+      if (/INSERT INTO chat_mirai_message[\s\S]*RETURNING created_at/i.test(sql)) {
         return [{ createdAt: new Date() }];
       }
       if (/FROM chat_messages m LEFT JOIN user_profile/i.test(sql)) return focusRow ? [focusRow] : [];
@@ -44,19 +44,19 @@ function makePrisma({ focusRow } = {}) {
     },
     $executeRaw: async (strings, ...vals) => {
       const sql = strings.join("?");
-      if (/INSERT INTO chat_meridian_message/i.test(sql)) {
+      if (/INSERT INTO chat_mirai_message/i.test(sql)) {
         threadMsgs.push({ role: /'user'/.test(sql) ? "user" : "user", content: vals[vals.length - 1] });
       }
-      if (/UPDATE chat_meridian_thread SET enabled = false/i.test(sql)) threadEnabled = false;
+      if (/UPDATE chat_mirai_thread SET enabled = false/i.test(sql)) threadEnabled = false;
       return 0;
     },
-    chatMeridianRun: { create: async ({ data }) => { runs.push(data); return {}; } },
+    chatMiraiRun: { create: async ({ data }) => { runs.push(data); return {}; } },
   };
   return prisma;
 }
 
 function svc({ fetchImpl, env = { GROQ_API_KEY: "k" }, prisma } = {}) {
-  return createMeridianService({
+  return createMiraiService({
     prisma: prisma ?? makePrisma(), env, fetchImpl: fetchImpl ?? groq(),
     listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {},
     insertAssistantMessage: async () => ({ id: "x", created_at: new Date() }),
@@ -86,11 +86,11 @@ test("handlePanelMessage persists a user row + an assistant row; surface='panel'
   assert.equal(prisma._runs.at(-1).route, "general");
 });
 
-test("handlePanelMessage with no GROQ_API_KEY throws MERIDIAN_NOT_CONFIGURED", async () => {
+test("handlePanelMessage with no GROQ_API_KEY throws MIRAI_NOT_CONFIGURED", async () => {
   const service = svc({ env: {} });
   await assert.rejects(
     () => service.handlePanelMessage({ ownerProfileId: "p1", ownerAuthUserId: "a1", hostConversationId: "hc1", threadId: "th1", content: "hola" }),
-    /MERIDIAN_NOT_CONFIGURED/,
+    /MIRAI_NOT_CONFIGURED/,
   );
 });
 
@@ -113,7 +113,7 @@ test("focusMessageId from another conversation is ignored (no focus line)", asyn
 
 test("route 'live' + web disabled: still persists an assistant row, error web-disabled", async () => {
   const prisma = makePrisma();
-  const service = svc({ prisma, env: { GROQ_API_KEY: "k", CHAT_MERIDIAN_WEB: "false" }, fetchImpl: groq({ routeWord: "live" }) });
+  const service = svc({ prisma, env: { GROQ_API_KEY: "k", CHAT_MIRAI_WEB: "false" }, fetchImpl: groq({ routeWord: "live" }) });
   const out = await service.handlePanelMessage({
     companyId: "co1", ownerProfileId: "p1", ownerAuthUserId: "a1",
     hostConversationId: "hc1", threadId: "th1", content: "cuanto esta el dolar",

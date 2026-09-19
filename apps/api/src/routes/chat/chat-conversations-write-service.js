@@ -12,7 +12,7 @@
 // rebuilding its own — same instance, same caches.
 import { Prisma } from "@prisma/client";
 import { ChatServiceError } from "./chat-service-error.js";
-import { assertNotMeridian } from "./meridian-conversation-guard.js";
+import { assertNotMirai } from "./mirai-conversation-guard.js";
 
 export function createChatConversationsWriteService({
   prisma,
@@ -172,7 +172,7 @@ export function createChatConversationsWriteService({
   async function updateConversation({ conversationId, authUserId, updates }) {
     const profileId = await getUserProfileId(authUserId);
     await assertMember(conversationId, profileId);
-    await assertNotMeridian(prisma, conversationId, "renombrar");
+    await assertNotMirai(prisma, conversationId, "renombrar");
 
     if (permissionsService) {
       const [conv] = await prisma.$queryRaw`SELECT type FROM chat_conversations WHERE id = ${conversationId} LIMIT 1`;
@@ -240,7 +240,7 @@ export function createChatConversationsWriteService({
   async function deleteConversation({ conversationId, authUserId }) {
     const profileId = await getUserProfileId(authUserId);
     await assertMember(conversationId, profileId);
-    await assertNotMeridian(prisma, conversationId, "eliminar");
+    await assertNotMirai(prisma, conversationId, "eliminar");
 
     const [conv] = await prisma.$queryRaw`
       SELECT type FROM chat_conversations WHERE id = ${conversationId} AND deleted_at IS NULL LIMIT 1
@@ -275,7 +275,7 @@ export function createChatConversationsWriteService({
   async function addMembers({ conversationId, authUserId, userIds, role = "member" }) {
     const profileId = await getUserProfileId(authUserId);
     await assertMember(conversationId, profileId);
-    await assertNotMeridian(prisma, conversationId, "agregar miembros a");
+    await assertNotMirai(prisma, conversationId, "agregar miembros a");
 
     if (permissionsService) {
       const [conv] = await prisma.$queryRaw`SELECT type FROM chat_conversations WHERE id = ${conversationId} LIMIT 1`;
@@ -355,7 +355,7 @@ export function createChatConversationsWriteService({
   async function removeMember({ conversationId, authUserId, targetUserId }) {
     const profileId = await getUserProfileId(authUserId);
     await assertMember(conversationId, profileId);
-    await assertNotMeridian(prisma, conversationId, "quitar miembros de");
+    await assertNotMirai(prisma, conversationId, "quitar miembros de");
 
     if (permissionsService) {
       const isLast = await permissionsService.isLastOwner(conversationId, targetUserId);

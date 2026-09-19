@@ -8,13 +8,13 @@ import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, 
 export function buildMessageActions({
   hasBody, isOwn, canPin, isPinned, canReply,
   onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-  onDelete, onHideForMe, onAskMeridian, onShowReceipt,
+  onDelete, onHideForMe, onAskMirai, onShowReceipt,
 }) {
   const items = [];
   if (onReply) items.push({ key: "reply", label: "Responder", icon: CornerUpLeft, onSelect: onReply, group: "primary" });
   if (hasBody && onCopy) items.push({ key: "copy", label: "Copiar", icon: Copy, onSelect: onCopy, group: "primary" });
   if (onForward) items.push({ key: "forward", label: "Reenviar", icon: Forward, onSelect: onForward, group: "primary" });
-  if (onAskMeridian) items.push({ key: "ask-meridian", label: "Preguntar a MeridIAn", icon: Sparkles, onSelect: onAskMeridian, group: "primary" });
+  if (onAskMirai) items.push({ key: "ask-mirai", label: "Preguntar a MirAI", icon: Sparkles, onSelect: onAskMirai, group: "primary" });
   if (onEnterSelection) items.push({ key: "select", label: "Seleccionar", icon: CheckSquare, onSelect: onEnterSelection, group: "primary" });
   if (canPin && onPin) items.push({ key: "pin", label: isPinned ? "Desfijar mensaje" : "Fijar mensaje", icon: isPinned ? PinOff : Pin, onSelect: onPin, group: "primary" });
   if (onReact) items.push({ key: "react", label: "Reaccionar", icon: Smile, onSelect: onReact, group: "primary" });

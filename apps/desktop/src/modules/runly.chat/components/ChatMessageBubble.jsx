@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  renderMentionText, useLongPress, useSwipeToReply, useCoarsePointer, useIsMobile,
+  AssistantWordmark, renderMentionText, useLongPress, useSwipeToReply, useCoarsePointer, useIsMobile,
 } from "@runly/ui";
 import { formatMessageTime } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -107,12 +107,12 @@ function SwipeReplyHint({ translateX, isOwn }) {
 // shared with MessageActionSheet (mobile long-press / desktop right-click).
 function MessageActions({
   isOwn, hasBody, onCopy, onDelete, onHideForMe, onForward, onEnterSelection,
-  canPin, isPinned, onPin, onReact, canReply, onOpenThread, onReply, onAskMeridian, onShowReceipt,
+  canPin, isPinned, onPin, onReact, canReply, onOpenThread, onReply, onAskMirai, onShowReceipt,
 }) {
   const actions = buildMessageActions({
     hasBody, isOwn, canPin, isPinned, canReply,
     onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-    onDelete, onHideForMe, onAskMeridian, onShowReceipt,
+    onDelete, onHideForMe, onAskMirai, onShowReceipt,
   });
   const primary = actions.filter((a) => a.group === "primary");
   const danger = actions.filter((a) => a.group === "danger");
@@ -304,7 +304,7 @@ export function ChatMessageBubble({
   isThreadReplyView = false,
   onOpenThreadForMessage,
   onReply,
-  onAskMeridian,
+  onAskMirai,
   onJumpToMessage,
   onShowReceipt,
 }) {
@@ -538,7 +538,7 @@ export function ChatMessageBubble({
   const attachments = message.attachments ?? [];
   const isAssistant = message.sender_type === "assistant";
   const senderName = isAssistant
-    ? "MeridIAn"
+    ? "MirAI"
     : (message.sender?.displayName ??
       (message.sender_type === "guest" ? "Visitante" : "Usuario"));
 
@@ -663,7 +663,7 @@ export function ChatMessageBubble({
             canReply={canReply}
             onOpenThread={onOpenThread}
             onReply={onReply ? () => onReply(message) : undefined}
-            onAskMeridian={onAskMeridian ? () => onAskMeridian(message) : undefined}
+            onAskMirai={onAskMirai ? () => onAskMirai(message) : undefined}
             onShowReceipt={onShowReceipt ? () => onShowReceipt(message) : undefined}
           />
         )}
@@ -679,7 +679,7 @@ export function ChatMessageBubble({
             hasBody, isOwn: true, canPin, isPinned, canReply,
             onReply: onReply ? () => onReply(message) : undefined,
             onCopy, onForward, onEnterSelection, onPin, onOpenThread, onDelete, onHideForMe,
-            onAskMeridian: onAskMeridian ? () => onAskMeridian(message) : undefined,
+            onAskMirai: onAskMirai ? () => onAskMirai(message) : undefined,
             onShowReceipt: onShowReceipt ? () => onShowReceipt(message) : undefined,
           }}
           onQuickReact={(emoji) => onToggleReaction?.(message.id, emoji)}
@@ -884,7 +884,7 @@ export function ChatMessageBubble({
           hasBody, isOwn: false, canPin, isPinned, canReply,
           onReply: onReply ? () => onReply(message) : undefined,
           onCopy, onForward, onEnterSelection, onPin, onOpenThread, onDelete, onHideForMe,
-          onAskMeridian: onAskMeridian ? () => onAskMeridian(message) : undefined,
+          onAskMirai: onAskMirai ? () => onAskMirai(message) : undefined,
         }}
         onQuickReact={(emoji) => onToggleReaction?.(message.id, emoji)}
         onOpenFullPicker={() => setReactionPickerOpen(true)}
@@ -921,7 +921,7 @@ export function ChatMessageBubble({
         <div data-msg-bubble className="flex flex-col items-start max-w-[72%] sm:max-w-[65%]">
           {isFirst && (
             <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))] mb-1 ml-1 truncate max-w-full">
-              {senderName}
+              {isAssistant ? <AssistantWordmark /> : senderName}
             </span>
           )}
 
@@ -1071,7 +1071,7 @@ export function ChatMessageBubble({
           canReply={canReply}
           onOpenThread={onOpenThread}
           onReply={onReply ? () => onReply(message) : undefined}
-          onAskMeridian={onAskMeridian ? () => onAskMeridian(message) : undefined}
+          onAskMirai={onAskMirai ? () => onAskMirai(message) : undefined}
         />
       )}
     </div>

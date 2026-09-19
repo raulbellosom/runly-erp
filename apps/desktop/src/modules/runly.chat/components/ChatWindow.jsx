@@ -11,8 +11,8 @@ import { ChatFilesGallery } from "./ChatFilesGallery";
 import { ChatRecordingsGallery } from "./ChatRecordingsGallery";
 import { DropZoneOverlay } from "./DropZoneOverlay";
 import { ChatMessageList } from "./ChatMessageList";
-import { MeridianIntro } from "./MeridianIntro";
-import { MeridianPanel } from "./MeridianPanel";
+import { MirAIIntro } from "./MirAIIntro";
+import { MirAIPanel } from "./MirAIPanel";
 import { MessageComposer } from "./MessageComposer";
 import { ChatAttachmentViewer } from "./ChatAttachmentViewer";
 import { ForwardMessageModal } from "./ForwardMessageModal";
@@ -27,7 +27,7 @@ import { useChatMessageSearch } from "../hooks/useChatMessageSearch";
 import { useChatPresence } from "../hooks/useChatPresence";
 import { useChatConversations, useArchiveConversation, useUnarchiveConversation } from "../hooks/useChatConversations";
 import { useChatConversationDetail } from "../hooks/useChatConversationDetail";
-import { useMeridianStatus } from "../hooks/useMeridian";
+import { useMiraiStatus } from "../hooks/useMirAI";
 import { roleHasPermission, findOwnMember, CHAT_PERMISSIONS } from "../lib/chatPermissions";
 import { buildAllAttachments, buildMessagesTranscript } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -95,9 +95,9 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   // have no roles, so roleHasPermission would just resolve false for them —
   // guard by type instead of relying on that, same as the backend's own gate).
   const isChannelOrGroupType = conversation?.type === "channel" || conversation?.type === "group";
-  const isMeridian = conversation?.type === "meridian";
-  const { data: meridianStatus } = useMeridianStatus();
-  const meridianAvailable = !isMeridian || meridianStatus?.available !== false;
+  const isMirai = conversation?.type === "mirai";
+  const { data: miraiStatus } = useMiraiStatus();
+  const miraiAvailable = !isMirai || miraiStatus?.available !== false;
   const ownMemberForComposer = findOwnMember(detailMembers ?? conversation?.members ?? [], userProfile?.id);
   const canSendMessages = !isChannelOrGroupType || roleHasPermission(ownMemberForComposer, CHAT_PERMISSIONS.MESSAGES_SEND);
   // Pinned messages also drive the anchored strip above the message list (not
@@ -127,8 +127,8 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const [membersView, setMembersView] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState(null);
   const [showPinned, setShowPinned] = useState(false);
-  const [meridianPanelOpen, setMeridianPanelOpen] = useState(false);
-  const [meridianFocus, setMeridianFocus] = useState(null);
+  const [miraiPanelOpen, setMiraiPanelOpen] = useState(false);
+  const [miraiFocus, setMiraiFocus] = useState(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [jumpTarget, setJumpTarget] = useState(null);
   const [threadPanelRootId, setThreadPanelRootId] = useState(null);
@@ -574,9 +574,9 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
         onDeleteConversation={handleDeleteConversation}
         onOpenProfile={openProfile}
         onOpenPinned={() => setShowPinned(true)}
-        isMeridian={isMeridian}
-        onOpenMeridian={isExternal ? undefined : () => { setMeridianFocus(null); setMeridianPanelOpen(true); }}
-        meridianDisabled={meridianStatus?.available === false}
+        isMirai={isMirai}
+        onOpenMirai={isExternal ? undefined : () => { setMiraiFocus(null); setMiraiPanelOpen(true); }}
+        miraiDisabled={miraiStatus?.available === false}
         callsEnabled={isExternal ? false : callsEnabled}
         callPending={callPending}
         onStartAudioCall={() => startCall({ conversationId, kind: "AUDIO" })}
@@ -625,8 +625,8 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
             </div>
           ) : (
             <>
-            {isMeridian && !isLoading && (messages?.length ?? 0) <= 1 && (
-              <MeridianIntro onPickPrompt={(text) => composerRef.current?.prefill?.(text)} />
+            {isMirai && !isLoading && (messages?.length ?? 0) <= 1 && (
+              <MirAIIntro onPickPrompt={(text) => composerRef.current?.prefill?.(text)} />
             )}
             <ChatMessageList
               key={conversationId}
@@ -649,10 +649,10 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
               onToggleReaction={(messageId, emoji, attachmentId) => toggleReactionMutate({ messageId, emoji, attachmentId })}
               onOpenThread={(messageId) => setThreadPanelRootId(messageId)}
               onReplyToMessage={(msg) => setReplyingTo(msg)}
-              onAskMeridian={
-                isMeridian || conversation?.type === "external_support" || meridianStatus?.available === false
+              onAskMirai={
+                isMirai || conversation?.type === "external_support" || miraiStatus?.available === false
                   ? undefined
-                  : (msg) => { setMeridianFocus(msg); setMeridianPanelOpen(true); }
+                  : (msg) => { setMiraiFocus(msg); setMiraiPanelOpen(true); }
               }
               onJumpToMessage={(id) => setJumpTarget({ id, nonce: Date.now() })}
               onJumpFailed={() =>
@@ -731,10 +731,10 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
           onSend={handleSend}
           onTyping={sendTyping}
           placeholder={
-            isMeridian && !meridianAvailable
-              ? "MeridIAn no está configurado en este entorno"
-              : isMeridian
-                ? "Escribe a MeridIAn..."
+            isMirai && !miraiAvailable
+              ? "MirAI no está configurado en este entorno"
+              : isMirai
+                ? "Escribe a MirAI..."
                 : canSendMessages
                   ? "Escribe un mensaje..."
                   : "Solo un administrador puede escribir en este canal"
@@ -745,7 +745,7 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
           onCancelReply={() => setReplyingTo(null)}
           dropZoneDisabled
           edgeInset
-          disabled={!canSendMessages || !meridianAvailable}
+          disabled={!canSendMessages || !miraiAvailable}
         />
       )}
       </div>
@@ -820,12 +820,12 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
         onToggleReaction={(messageId, emoji, attachmentId) => toggleReactionMutate({ messageId, emoji, attachmentId })}
       />
 
-      {!isMeridian && conversation?.type !== "external_support" && (
-        <MeridianPanel
-          open={meridianPanelOpen}
-          onOpenChange={(o) => { setMeridianPanelOpen(o); if (!o) setMeridianFocus(null); }}
+      {!isMirai && conversation?.type !== "external_support" && (
+        <MirAIPanel
+          open={miraiPanelOpen}
+          onOpenChange={(o) => { setMiraiPanelOpen(o); if (!o) setMiraiFocus(null); }}
           conversationId={conversationId}
-          focusMessage={meridianFocus}
+          focusMessage={miraiFocus}
         />
       )}
     </div>

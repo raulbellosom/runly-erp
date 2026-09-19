@@ -1395,9 +1395,9 @@ export const PERMISSION_CATALOG = {
     groupKey: "chat",
     order: 40,
   },
-  "chat.meridian.use": {
-    displayNameEs: "Usar MeridIAn (IA del chat)",
-    descriptionEs: "Permite conversar con el asistente de IA MeridIAn dentro del chat.",
+  "chat.mirai.use": {
+    displayNameEs: "Usar MirAI (IA del chat)",
+    descriptionEs: "Permite conversar con el asistente de IA MirAI dentro del chat.",
     groupKey: "chat",
     order: 50,
   },

@@ -3483,10 +3483,10 @@ model PfmGoal {
   @@map("pfm_goal")
 }
 
-/// Per-turn audit for the MeridIAn chat assistant (Spec 1). No message content
+/// Per-turn audit for the MirAI chat assistant (Spec 1). No message content
 /// here — that lives in chat_messages. Written with prisma.$queryRaw like the
 /// rest of atlas.chat; this model exists so `pnpm db:studio` and typed reads work.
-model ChatMeridianRun {
+model ChatMiraiRun {
   id               String   @id @default(uuid(7)) @db.Uuid
   companyId        String?  @map("company_id") @db.Uuid
   conversationId   String   @map("conversation_id") @db.Uuid
@@ -3504,12 +3504,12 @@ model ChatMeridianRun {
 
   @@index([companyId, createdAt])
   @@index([conversationId])
-  @@map("chat_meridian_run")
+  @@map("chat_mirai_run")
 }
 
-/// MeridIAn assistant panel (Spec 2): one private thread per (owner, host
+/// MirAI assistant panel (Spec 2): one private thread per (owner, host
 /// conversation). Written with $queryRaw like the rest of atlas.chat.
-model ChatMeridianThread {
+model ChatMiraiThread {
   id                 String   @id @default(uuid(7)) @db.Uuid
   companyId          String?  @map("company_id") @db.Uuid
   ownerProfileId     String   @map("owner_profile_id") @db.Uuid
@@ -3517,20 +3517,20 @@ model ChatMeridianThread {
   enabled            Boolean  @default(true)
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  messages           ChatMeridianMessage[]
+  messages           ChatMiraiMessage[]
 
   @@index([ownerProfileId, hostConversationId])
-  @@map("chat_meridian_thread")
+  @@map("chat_mirai_thread")
 }
 
-model ChatMeridianMessage {
+model ChatMiraiMessage {
   id        String   @id @default(uuid(7)) @db.Uuid
   threadId  String   @map("thread_id") @db.Uuid
   role      String
   content   String
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  thread    ChatMeridianThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread    ChatMiraiThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId, createdAt])
-  @@map("chat_meridian_message")
+  @@map("chat_mirai_message")
 }

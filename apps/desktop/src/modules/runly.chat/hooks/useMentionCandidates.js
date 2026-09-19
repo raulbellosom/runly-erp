@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useChatConversationDetail } from "./useChatConversationDetail";
 import { useChannelRoles } from "./useChannelRoles";
-import { useMeridianStatus } from "./useMeridian";
-import { MERIDIAN_MENTION_ID, MERIDIAN_NAME } from "../lib/meridian";
+import { useMiraiStatus } from "./useMirAI";
+import { MIRAI_MENTION_ID, MIRAI_NAME } from "../lib/mirai";
 import { roleHasPermission, findOwnMember, CHAT_PERMISSIONS } from "../lib/chatPermissions";
 
 // Fixed sentinel UUIDs — must stay byte-identical to
@@ -20,7 +20,7 @@ export const HERE_MENTION_ID = "00000000-0000-0000-0000-000000000001";
 export function useMentionCandidates(conversationId, currentUserId) {
   const { data: convData } = useChatConversationDetail(conversationId);
   const { data: rolesData } = useChannelRoles(conversationId);
-  const { data: meridianStatus } = useMeridianStatus();
+  const { data: miraiStatus } = useMiraiStatus();
 
   return useMemo(() => {
     const members = convData?.data?.members ?? [];
@@ -28,15 +28,15 @@ export function useMentionCandidates(conversationId, currentUserId) {
     const convType = convData?.data?.type ?? null;
     const ownMember = findOwnMember(members, currentUserId);
 
-    // MeridIAn as a mention candidate — everywhere except its own dedicated
+    // MirAI as a mention candidate — everywhere except its own dedicated
     // chat and external_support, and only when the assistant is available to
-    // this user (configured + chat.meridian.use). Inserted as an @[id:name]
-    // token that the API resolves via matchMeridianMention.
-    const meridianCandidate =
-      meridianStatus?.available === true &&
-      convType !== "meridian" &&
+    // this user (configured + chat.mirai.use). Inserted as an @[id:name]
+    // token that the API resolves via matchMiraiMention.
+    const miraiCandidate =
+      miraiStatus?.available === true &&
+      convType !== "mirai" &&
       convType !== "external_support"
-        ? [{ id: MERIDIAN_MENTION_ID, displayName: MERIDIAN_NAME }]
+        ? [{ id: MIRAI_MENTION_ID, displayName: MIRAI_NAME }]
         : [];
 
     // Excludes guest members (userId is NULL for a chat_conversation_members row
@@ -60,6 +60,6 @@ export function useMentionCandidates(conversationId, currentUserId) {
       sentinelCandidates.push({ id: HERE_MENTION_ID, displayName: "here" });
     }
 
-    return [...meridianCandidate, ...memberCandidates, ...roleCandidates, ...sentinelCandidates];
-  }, [convData, rolesData, currentUserId, meridianStatus?.available]);
+    return [...miraiCandidate, ...memberCandidates, ...roleCandidates, ...sentinelCandidates];
+  }, [convData, rolesData, currentUserId, miraiStatus?.available]);
 }

@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
 import { useChatUpload } from "../hooks/useChatUpload";
 import { useMentionCandidates } from "../hooks/useMentionCandidates";
-import { MERIDIAN_MENTION_ID } from "../lib/meridian";
+import { MIRAI_MENTION_ID } from "../lib/mirai";
 import { formatFileSize } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
 import { EntityReferencePicker } from "./EntityReferencePicker";
@@ -300,11 +300,11 @@ export const MessageComposer = forwardRef(function MessageComposer(
   const currentUserId = userProfile?.id;
   const mentionCandidates = useMentionCandidates(conversationId, currentUserId);
   // @-mentions of people only make sense where there's a group to address — in
-  // a 1:1 there's nobody else to pick from. But @MeridIAn is still useful in a
+  // a 1:1 there's nobody else to pick from. But @MirAI is still useful in a
   // DM (ask the assistant a question you both see), so keep just that one.
   const mentionMembers =
     conversationType === "direct"
-      ? mentionCandidates.filter((m) => m.id === MERIDIAN_MENTION_ID)
+      ? mentionCandidates.filter((m) => m.id === MIRAI_MENTION_ID)
       : mentionCandidates;
 
   const fileInputRef = useRef(null);
@@ -342,7 +342,7 @@ export const MessageComposer = forwardRef(function MessageComposer(
     addFiles: (files) => addFilesToQueue(files),
     setBody: (text) => setBody(text),
     // Fill the composer with a suggested prompt (only if empty) and focus it,
-    // so the user can edit or send. Used by the MeridIAn intro chips.
+    // so the user can edit or send. Used by the MirAI intro chips.
     prefill: (text) => {
       setBody((prev) => (prev?.trim() ? prev : String(text ?? "")));
       requestAnimationFrame(() => mentionTaRef.current?.focus?.());

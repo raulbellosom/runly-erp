@@ -1,7 +1,7 @@
-// apps/api/src/routes/chat/__tests__/meridian-tools.test.js
+// apps/api/src/routes/chat/__tests__/mirai-tools.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TOOL_DEFS, buildToolRunners } from "../meridian-tools.js";
+import { TOOL_DEFS, buildToolRunners } from "../mirai-tools.js";
 
 const ctx = { companyId: "co1", actorAuthUserId: "auth1", actorProfileId: "prof1", conversationId: "conv1" };
 

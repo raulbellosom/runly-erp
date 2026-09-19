@@ -1,7 +1,7 @@
-// apps/api/src/routes/chat/__tests__/meridian-routing.test.js
+// apps/api/src/routes/chat/__tests__/mirai-routing.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMeridianService } from "../meridian-service.js";
+import { createMiraiService } from "../mirai-service.js";
 
 // A Groq stub that answers by inspecting the request body:
 //  - classifier calls (max_tokens 6, no tools) -> return `routeWord`
@@ -31,13 +31,13 @@ function svcForRoute({ fetchImpl, env = { GROQ_API_KEY: "k" }, listMessages, his
       // the just-sent user message the classifier reads
       if (/SELECT\s+body\s+FROM chat_messages WHERE id/i.test(sql)) return [{ body: "una pregunta" }];
       if (/FROM chat_messages/i.test(sql)) return historyRows ?? [];   // loadHistory / router history / web history
-      if (/FROM chat_conversations/i.test(sql)) return [{ id: "mconv1", type: "meridian", company_id: "co1" }];
+      if (/FROM chat_conversations/i.test(sql)) return [{ id: "mconv1", type: "mirai", company_id: "co1" }];
       return [];
     },
     $executeRaw: async () => 0,
-    chatMeridianRun: { create: async ({ data }) => { runs.push(data); return {}; } },
+    chatMiraiRun: { create: async ({ data }) => { runs.push(data); return {}; } },
   };
-  const svc = createMeridianService({
+  const svc = createMiraiService({
     prisma, env, fetchImpl,
     listMessages: listMessages ?? (async () => ({ data: [{ id: "m1", sender_type: "user", body: "hola", message_type: "text", created_at: new Date(), attachments: [], attachment_count: 0, sender: { displayName: "Ana" } }] })),
     chatSearchService: {}, visionService: {},
@@ -112,7 +112,7 @@ test("route live with no web provider configured -> canned 'no internet', error 
 test("route live + web disabled: canned reply, compound NOT called", async () => {
   let compoundCalled = false;
   const fetchImpl = groqRouter({ routeWord: "live", onBody: (b) => { if (String(b.model).includes("compound")) compoundCalled = true; } });
-  const { svc, inserted, runs } = svcForRoute({ fetchImpl, env: { GROQ_API_KEY: "k", CHAT_MERIDIAN_WEB: "false" } });
+  const { svc, inserted, runs } = svcForRoute({ fetchImpl, env: { GROQ_API_KEY: "k", CHAT_MIRAI_WEB: "false" } });
   await call(svc);
   assert.equal(compoundCalled, false);
   assert.match(inserted[0], /no tengo acceso|datos en vivo|internet/i);

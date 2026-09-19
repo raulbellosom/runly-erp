@@ -5,7 +5,7 @@ import { ChatServiceError } from "./chat-service-error.js";
 import { createChatConversationReadsService } from "./chat-conversation-reads-service.js";
 import { createChatAttachmentsService } from "./chat-attachments-service.js";
 import { buildReplyPreview } from "./chat-reply-preview.js";
-import { assertNotMeridian } from "./meridian-conversation-guard.js";
+import { assertNotMirai } from "./mirai-conversation-guard.js";
 import { createChatConversationsWriteService } from "./chat-conversations-write-service.js";
 
 export { ChatServiceError };
@@ -160,8 +160,8 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
     }
   }
 
-  // assertNotMeridian(prisma, conversationId, action) is shared from
-  // ./meridian-conversation-guard.js — the 'meridian' chat cannot be renamed,
+  // assertNotMirai(prisma, conversationId, action) is shared from
+  // ./mirai-conversation-guard.js — the 'mirai' chat cannot be renamed,
   // have its membership changed, or be deleted.
 
   // Only direct conversations can be blocked (spec Non-goal 2 — a block never
@@ -850,7 +850,7 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
             .filter((id) => !mentionedSet.has(id));
           // Notification previews render as plain text — turn the stored
           // @[uuid:Name] mention tokens into "@Name" so a raw UUID (e.g. the
-          // all-zero MeridIAn sentinel) never surfaces in a push/email.
+          // all-zero MirAI sentinel) never surfaces in a push/email.
           const previewSource = stripMentionTokens(body);
           const preview = previewSource.length > 80 ? `${previewSource.slice(0, 80)}...` : previewSource;
           const emailPreview = previewSource.length > 280 ? `${previewSource.slice(0, 280)}…` : previewSource;

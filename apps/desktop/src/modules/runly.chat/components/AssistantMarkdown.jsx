@@ -1,6 +1,6 @@
 // apps/desktop/src/modules/runly.chat/components/AssistantMarkdown.jsx
 //
-// MeridIAn answers in plain text but uses ```fences``` for code and `backticks`
+// MirAI answers in plain text but uses ```fences``` for code and `backticks`
 // inline. Render exactly those two — nothing else (no #, **, tables, HTML).
 import { useState } from "react";
 

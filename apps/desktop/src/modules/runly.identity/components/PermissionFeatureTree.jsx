@@ -77,7 +77,7 @@ const FEATURE_LABELS = {
   theme: "Tema",
   menus: "Menus",
   // chat
-  meridian: "MeridIAn",
+  mirai: "MirAI",
   conversations: "Conversaciones",
   support: "Soporte externo",
   chat_reports: "Reportes de chat",

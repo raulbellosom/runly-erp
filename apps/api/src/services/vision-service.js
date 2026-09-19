@@ -161,7 +161,7 @@ function createGroqAdapter({ env, fetchImpl }) {
     throw lastErr ?? new VisionServiceError("El servicio de vision no respondio.");
   }
 
-  // Generic image description for the MeridIAn chat assistant. Same Groq
+  // Generic image description for the MirAI chat assistant. Same Groq
   // OpenAI-compatible endpoint, retry/timeout pattern and reasoning-model
   // handling as call(), but returns free-form prose instead of receipt JSON.
   async function describe({ imageBase64, mimeType, question }) {

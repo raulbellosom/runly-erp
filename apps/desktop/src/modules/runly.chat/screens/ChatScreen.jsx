@@ -5,7 +5,7 @@ import "../chat-theme.css";
 import { ChatSidebar } from "../components/ChatSidebar";
 import { ChatWindow } from "../components/ChatWindow";
 import { useChatConversations, useArchivedConversations } from "../hooks/useChatConversations";
-import { useEnsureMeridianConversation } from "../hooks/useMeridian";
+import { useEnsureMiraiConversation } from "../hooks/useMirAI";
 import { ChatPreferencesProvider, useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
 
 export function ChatScreen() {
@@ -35,17 +35,17 @@ function ChatScreenInner() {
 
   const { data, isLoading } = useChatConversations();
 
-  // Make sure the user's MeridIAn conversation exists (backend also self-heals
+  // Make sure the user's MirAI conversation exists (backend also self-heals
   // in GET /chat/conversations). Fire-and-forget; the row shows up on the next
   // conversations refetch.
-  useEnsureMeridianConversation();
+  useEnsureMiraiConversation();
 
-  // MeridIAn always sits at the very top, above any other pinned conversation.
+  // MirAI always sits at the very top, above any other pinned conversation.
   const conversations = useMemo(() => {
     const list = data?.data ?? [];
     return list.slice().sort((a, b) => {
-      const am = a.type === "meridian" ? 1 : 0;
-      const bm = b.type === "meridian" ? 1 : 0;
+      const am = a.type === "mirai" ? 1 : 0;
+      const bm = b.type === "mirai" ? 1 : 0;
       return bm - am;
     });
   }, [data]);

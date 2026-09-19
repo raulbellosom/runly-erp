@@ -9,11 +9,11 @@ import {
 
 test("filterGrantableKeys keeps only active, non-role, de-duplicated keys", () => {
   const out = filterGrantableKeys({
-    requestedKeys: ["chat.meridian.use", "chat.meridian.use", "x.inactive", "hr.employee.read"],
-    activeKeys: ["chat.meridian.use", "hr.employee.read"], // x.inactive not active
+    requestedKeys: ["chat.mirai.use", "chat.mirai.use", "x.inactive", "hr.employee.read"],
+    activeKeys: ["chat.mirai.use", "hr.employee.read"], // x.inactive not active
     roleKeys: ["hr.employee.read"], // already from role -> dropped
   });
-  assert.deepEqual(out, ["chat.meridian.use"]);
+  assert.deepEqual(out, ["chat.mirai.use"]);
 });
 
 test("filterGrantableKeys ignores non-string / empty entries", () => {
@@ -36,8 +36,8 @@ test("findEscalatingKeys returns [] for an admin actor regardless of held keys",
 
 test("findEscalatingKeys flags keys the non-admin actor does not hold", () => {
   const out = findEscalatingKeys({
-    targetKeys: ["chat.meridian.use", "identity.roles.update"],
-    actorHeldKeys: new Set(["chat.meridian.use"]),
+    targetKeys: ["chat.mirai.use", "identity.roles.update"],
+    actorHeldKeys: new Set(["chat.mirai.use"]),
     actorIsAdmin: false,
   });
   assert.deepEqual(out, ["identity.roles.update"]);
@@ -74,11 +74,11 @@ test("mergeEffectiveKeys is the union of base, role and grant keys (never subtra
   const eff = mergeEffectiveKeys({
     baseKeys: ["profile.self.read"],
     roleKeys: ["chat.access", "chat.conversations.read"],
-    grantKeys: ["chat.meridian.use"],
+    grantKeys: ["chat.mirai.use"],
   });
   assert.equal(eff.has("profile.self.read"), true);
   assert.equal(eff.has("chat.access"), true);
-  assert.equal(eff.has("chat.meridian.use"), true);
+  assert.equal(eff.has("chat.mirai.use"), true);
   assert.equal(eff.size, 4);
 });
 

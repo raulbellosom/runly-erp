@@ -1,9 +1,9 @@
-// apps/api/src/routes/chat/meridian-service.js
+// apps/api/src/routes/chat/mirai-service.js
 //
-// MeridIAn — the runly.chat AI assistant (Spec 1). Owns: the per-company bot
-// user_profile, the per-user `meridian` conversation, an in-memory per-actor
+// MirAI — the runly.chat AI assistant (Spec 1). Owns: the per-company bot
+// user_profile, the per-user `mirai` conversation, an in-memory per-actor
 // rate limit, and (Task 7) the Groq tool-calling loop. Writes never happen via
-// the model — every tool is read-only; the only row MeridIAn creates is its
+// the model — every tool is read-only; the only row MirAI creates is its
 // own reply message.
 //
 // user_profile.company_id present on live DB: NO (checked 2026-09-07)
@@ -12,9 +12,9 @@ import { toLocalIso, toLocalMonth } from "@runly/core";
 import { isReasoningModel } from "../../services/groq-model-helpers.js";
 import { stripMentionTokens } from "../../lib/mention-utils.js";
 import { ChatServiceError } from "./chat-service-error.js";
-import { TOOL_DEFS, buildToolRunners, CHANNEL_TOOL_DEFS, buildChannelToolRunners } from "./meridian-tools.js";
+import { TOOL_DEFS, buildToolRunners, CHANNEL_TOOL_DEFS, buildChannelToolRunners } from "./mirai-tools.js";
 
-const DEFAULT_MERIDIAN_MODEL = "openai/gpt-oss-120b";
+const DEFAULT_MIRAI_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_WEB_MODEL = "groq/compound-mini";
 const DEFAULT_ROUTER_MODEL = "openai/gpt-oss-120b";
 const MAX_TOOL_ITERATIONS = 8;
@@ -43,19 +43,19 @@ const TAVILY_TIMEOUT_MS = 20_000;
 const LIVE_RATE_MAX = 10;
 const LIVE_RATE_WINDOW_MS = 300_000;
 const ROUTES = ["chat", "general", "live"];
-// Spec 3 — @meridIAn channel mention.
+// Spec 3 — @MirAI channel mention.
 const CHANNEL_COOLDOWN_MS = 15_000;
-// Literal "@meridIAn" token where a mention could sit. Case/accent-insensitive.
-// Does NOT match an email local-part ("x@meridian.com") or "@meridiano".
-const MERIDIAN_MENTION_RE = /(^|[\s([{<"'])@merid[ií]an\b/i;
-// Sentinel id the composer inserts for the "@MeridIAn" autocomplete candidate,
-// serialized by MentionTextarea as @[<id>:MeridIAn]. MUST stay byte-identical
-// to MERIDIAN_MENTION_ID in apps/desktop/src/modules/runly.chat/lib/meridian.js.
-const MERIDIAN_MENTION_ID = "00000000-0000-0000-0000-00000000b07a";
+// Literal "@MirAI" token where a mention could sit. Case-insensitive.
+// Does NOT match an email local-part ("x@mirai.com") or a longer word starting with "mirai".
+const MIRAI_MENTION_RE = /(^|[\s([{<"'])@mirai\b/i;
+// Sentinel id the composer inserts for the "@MirAI" autocomplete candidate,
+// serialized by MentionTextarea as @[<id>:MirAI]. MUST stay byte-identical
+// to MIRAI_MENTION_ID in apps/desktop/src/modules/runly.chat/lib/mirai.js.
+const MIRAI_MENTION_ID = "00000000-0000-0000-0000-00000000b07a";
 
-export function matchMeridianMention(body) {
+export function matchMiraiMention(body) {
   const s = String(body ?? "");
-  return MERIDIAN_MENTION_RE.test(s) || s.includes(`@[${MERIDIAN_MENTION_ID}:`);
+  return MIRAI_MENTION_RE.test(s) || s.includes(`@[${MIRAI_MENTION_ID}:`);
 }
 
 export { stripMentionTokens };
@@ -71,7 +71,7 @@ function chatSystemPrompt() {
   const date = toLocalIso();
   const month = toLocalMonth();
   return [
-    "Eres MeridIAn, el asistente de IA dentro del chat de Runly ERP.",
+    "Eres MirAI, el asistente inteligente de Runly. Si te preguntan tu nombre, responde: Soy MirAI, tu asistente inteligente de Runly.",
     "Voz: colega calido y conciso; espanol de Mexico; profesional pero cercano. Ve al grano.",
     `Hoy es ${date} y el mes en curso es ${month}. NO calcules fechas: usa estos valores.`,
     "Puedes responder preguntas de conocimiento general (definiciones, conceptos, explicaciones, redaccion, traduccion) con lo que ya sabes, igual que cualquier asistente.",
@@ -90,7 +90,7 @@ function chatSystemPrompt() {
 function liveSystemPrompt() {
   const date = toLocalIso();
   return [
-    "Eres MeridIAn, el asistente de IA de Runly ERP.",
+    "Eres MirAI, el asistente inteligente de Runly. Si te preguntan tu nombre, responde: Soy MirAI, tu asistente inteligente de Runly.",
     `Hoy es ${date}. Puedes buscar en internet para responder esta pregunta.`,
     "Da el dato y di de que fecha es y la fuente (el dominio) entre parentesis.",
     "Si la busqueda no arroja algo confiable, dilo; no inventes ni des un valor viejo como si fuera actual.",
@@ -100,12 +100,12 @@ function liveSystemPrompt() {
   ].join(" ");
 }
 
-// Used for a `@meridIAn` mention in a channel/group — the reply is public.
+// Used for a `@MirAI` mention in a channel/group — the reply is public.
 function channelSystemPrompt() {
   const date = toLocalIso();
   const month = toLocalMonth();
   return [
-    "Eres MeridIAn, el asistente de IA de Runly ERP. Te mencionaron en una conversacion: tu respuesta la ven TODOS los participantes de esa conversacion (no es privada).",
+    "Eres MirAI, el asistente inteligente de Runly. Si te preguntan tu nombre, responde: Soy MirAI, tu asistente inteligente de Runly. Te mencionaron en una conversacion: tu respuesta la ven TODOS los participantes de esa conversacion (no es privada).",
     `Hoy es ${date} y el mes en curso es ${month}. NO calcules fechas: usa estos valores.`,
     "Tu unico contexto es el historial reciente de ESA conversacion (herramienta get_channel_messages) y tu conocimiento general.",
     "Puedes responder conocimiento general (definiciones, conceptos, redaccion, traduccion). NUNCA inventes lo que alguien dijo, ni cifras o datos de la empresa: eso solo del historial del canal.",
@@ -135,7 +135,7 @@ function panelSystemPrompt() {
   const date = toLocalIso();
   const month = toLocalMonth();
   return [
-    "Eres MeridIAn, el asistente de IA de Runly ERP.",
+    "Eres MirAI, el asistente inteligente de Runly. Si te preguntan tu nombre, responde: Soy MirAI, tu asistente inteligente de Runly.",
     "El usuario esta viendo una conversacion de chat y te pregunta sobre ella en un panel PRIVADO: solo lo ve quien pregunta.",
     `Hoy es ${date} y el mes en curso es ${month}. NO calcules fechas: usa estos valores.`,
     "Usa get_recent_messages para leer los mensajes recientes de esa conversacion; list_conversation_files para sus archivos; describe_image para una imagen.",
@@ -153,7 +153,7 @@ export function __panelSystemPromptForTest() {
   return panelSystemPrompt();
 }
 
-export function createMeridianService({
+export function createMiraiService({
   prisma,
   env = process.env,
   fetchImpl,
@@ -171,15 +171,15 @@ export function createMeridianService({
   tasksService = null,
 }) {
   const fetchFn = fetchImpl ?? globalThis.fetch;
-  const model = env.CHAT_MERIDIAN_MODEL || DEFAULT_MERIDIAN_MODEL;
-  const webModel = env.CHAT_MERIDIAN_WEB_MODEL || DEFAULT_WEB_MODEL;
-  const routerModel = env.CHAT_MERIDIAN_ROUTER_MODEL || DEFAULT_ROUTER_MODEL;
+  const model = env.CHAT_MIRAI_MODEL || DEFAULT_MIRAI_MODEL;
+  const webModel = env.CHAT_MIRAI_WEB_MODEL || DEFAULT_WEB_MODEL;
+  const routerModel = env.CHAT_MIRAI_ROUTER_MODEL || DEFAULT_ROUTER_MODEL;
   const tavilyKey = env.TAVILY_API_KEY || "";
-  const webKillSwitch = String(env.CHAT_MERIDIAN_WEB ?? "true").toLowerCase() === "false";
+  const webKillSwitch = String(env.CHAT_MIRAI_WEB ?? "true").toLowerCase() === "false";
   // Prefer Tavily (works on the free tier); fall back to a Groq compound model
   // only if one is explicitly configured. `null` => no web path, `live` turns
   // degrade to "no internet".
-  const webProvider = webKillSwitch ? null : (tavilyKey ? "tavily" : (env.CHAT_MERIDIAN_WEB_MODEL ? "compound" : null));
+  const webProvider = webKillSwitch ? null : (tavilyKey ? "tavily" : (env.CHAT_MIRAI_WEB_MODEL ? "compound" : null));
   const webEnabled = webProvider !== null && Boolean(env.GROQ_API_KEY);
   const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
 
@@ -193,7 +193,7 @@ export function createMeridianService({
   // no global serialization of concurrent turns. Acceptable for v1.
   const buckets = new Map();       // actorProfileId -> number[]
   const liveBuckets = new Map();    // actorProfileId -> number[]  (Spec 4: `live` sub-limit)
-  const channelCooldowns = new Map(); // conversationId -> last @meridIAn reply epoch ms (Spec 3)
+  const channelCooldowns = new Map(); // conversationId -> last @MirAI reply epoch ms (Spec 3)
   const inFlight = new Set();       // conversationId currently being processed
   let routerFailStreak = 0;         // Spec 4: classifier circuit breaker
   const channelRunners = buildChannelToolRunners({ prisma });
@@ -214,7 +214,7 @@ export function createMeridianService({
     return true;
   }
 
-  // Spec 3: at most one @meridIAn reply per channel per CHANNEL_COOLDOWN_MS —
+  // Spec 3: at most one @MirAI reply per channel per CHANNEL_COOLDOWN_MS —
   // stops a channel from being flooded with bot replies.
   function checkChannelCooldown(conversationId) {
     const now = Date.now();
@@ -237,7 +237,7 @@ export function createMeridianService({
   }
 
   // -- bot identity -----------------------------------------------------
-  async function getOrCreateMeridianProfile({ companyId }) {
+  async function getOrCreateMiraiProfile({ companyId }) {
     const existing = await prisma.$queryRaw`
       SELECT up.id
       FROM user_profile up
@@ -248,10 +248,10 @@ export function createMeridianService({
     if (existing.length) return existing[0].id;
 
     const authUserId = crypto.randomUUID();
-    const email = `meridian+${companyId}@${BOT_EMAIL_DOMAIN}`;
+    const email = `mirai+${companyId}@${BOT_EMAIL_DOMAIN}`;
     const inserted = await prisma.$queryRaw`
       INSERT INTO user_profile (id, auth_user_id, display_name, first_name, last_name, email, is_bot, enabled, updated_at)
-      VALUES (uuidv7(), ${authUserId}::uuid, 'MeridIAn', 'MeridIAn', '', ${email}, true, true, NOW())
+      VALUES (uuidv7(), ${authUserId}::uuid, 'MirAI', 'MirAI', '', ${email}, true, true, NOW())
       ON CONFLICT (email) DO UPDATE SET is_bot = true
       RETURNING id
     `;
@@ -264,8 +264,8 @@ export function createMeridianService({
     return botId;
   }
 
-  // -- the meridian conversation --------------------------------------
-  async function ensureMeridianConversation({ companyId, actorProfileId }) {
+  // -- the mirai conversation --------------------------------------
+  async function ensureMiraiConversation({ companyId, actorProfileId }) {
     if (!actorProfileId) throw new ChatServiceError("Se requiere un usuario autenticado.", 401);
     const resolvedCompanyId = companyId
       ?? (await prisma.membership.findFirst({ where: { userId: String(actorProfileId), enabled: true }, orderBy: { createdAt: "desc" }, select: { companyId: true } }))?.companyId
@@ -274,28 +274,28 @@ export function createMeridianService({
     const existing = await prisma.$queryRaw`
       SELECT c.id
       FROM chat_conversations c
-      WHERE c.type = 'meridian'
+      WHERE c.type = 'mirai'
         AND c.deleted_at IS NULL
         AND EXISTS (SELECT 1 FROM chat_conversation_members m WHERE m.conversation_id = c.id AND m.user_id = ${actorProfileId}::uuid AND m.left_at IS NULL)
       LIMIT 1
     `;
     if (existing.length) return { conversationId: existing[0].id, created: false };
 
-    const botId = await getOrCreateMeridianProfile({ companyId: resolvedCompanyId });
-    // GET /chat/conversations and GET /chat/meridian both call this on first
-    // load; the partial unique index chat_conversations_one_meridian_per_user_idx
+    const botId = await getOrCreateMiraiProfile({ companyId: resolvedCompanyId });
+    // GET /chat/conversations and GET /chat/mirai both call this on first
+    // load; the partial unique index chat_conversations_one_mirai_per_user_idx
     // turns the loser of that race into a no-op insert instead of a duplicate.
     const convRows = await prisma.$queryRaw`
       INSERT INTO chat_conversations (type, title, created_by_user_id, company_id, is_public)
-      VALUES ('meridian', 'MeridIAn', ${actorProfileId}::uuid, ${resolvedCompanyId}, false)
-      ON CONFLICT ("created_by_user_id") WHERE type = 'meridian' AND deleted_at IS NULL DO NOTHING
+      VALUES ('mirai', 'MirAI', ${actorProfileId}::uuid, ${resolvedCompanyId}, false)
+      ON CONFLICT ("created_by_user_id") WHERE type = 'mirai' AND deleted_at IS NULL DO NOTHING
       RETURNING id
     `;
     if (!convRows.length) {
       const raced = await prisma.$queryRaw`
         SELECT c.id
         FROM chat_conversations c
-        WHERE c.type = 'meridian'
+        WHERE c.type = 'mirai'
           AND c.deleted_at IS NULL
           AND EXISTS (SELECT 1 FROM chat_conversation_members m WHERE m.conversation_id = c.id AND m.user_id = ${actorProfileId}::uuid AND m.left_at IS NULL)
         LIMIT 1
@@ -316,7 +316,7 @@ export function createMeridianService({
     await prisma.$executeRaw`
       INSERT INTO chat_messages (conversation_id, sender_user_id, sender_type, body, message_type)
       VALUES (${conversationId}::uuid, ${botId}::uuid, 'assistant',
-        'Hola, soy MeridIAn. Puedo resumir mensajes, explicarte un mensaje o un archivo, y responder preguntas sobre tus chats. Reenviame mensajes de otra conversacion y preguntame sobre ellos, o simplemente escribeme.',
+        'Hola, soy MirAI, tu asistente inteligente de Runly. Puedo resumir mensajes, explicarte un mensaje o un archivo, y responder preguntas sobre tus chats. Reenviame mensajes de otra conversacion y preguntame sobre ellos, o simplemente escribeme.',
         'text')
     `;
     return { conversationId, created: true };
@@ -600,10 +600,10 @@ export function createMeridianService({
       await insertAssistantMessage({ conversationId, body: finalText });
     } catch (err) {
       replyInsertError = String(err?.message ?? err).slice(0, 200);
-      console.error("[runly.chat] meridian reply insert failed", err);
+      console.error("[runly.chat] mirai reply insert failed", err);
     }
     try {
-      await prisma.chatMeridianRun.create({
+      await prisma.chatMiraiRun.create({
         data: {
           companyId: companyId ?? null, conversationId, actorProfileId,
           triggerMessageId: triggerMessageId ?? null, model: runModel,
@@ -619,13 +619,13 @@ export function createMeridianService({
     if (!broadcaster) return;
     await broadcaster.broadcastToChannel(
       `chat:presence:${conversationId}`, "typing",
-      { userId: "meridian", isTyping: typing },
+      { userId: "mirai", isTyping: typing },
     ).catch(() => {});
   }
 
   async function handleUserMessage({ companyId, conversationId, actorProfileId, actorAuthUserId, triggerMessageId }) {
     if (!isConfigured()) {
-      await insertAssistantMessage({ conversationId, body: "MeridIAn no esta configurado en este entorno." });
+      await insertAssistantMessage({ conversationId, body: "MirAI no esta configurado en este entorno." });
       return;
     }
     if (!checkRate(actorProfileId)) {
@@ -652,7 +652,7 @@ export function createMeridianService({
         routerError = c.routerError ?? null;
       }
     } catch (e) {
-      console.error("[runly.chat] meridian classify", e?.message ?? e);
+      console.error("[runly.chat] mirai classify", e?.message ?? e);
     }
 
     // Serialize per conversation so replies stay in order.
@@ -674,7 +674,7 @@ export function createMeridianService({
     }
   }
 
-  // -- Spec 3: @meridIAn channel mention -----------------------------
+  // -- Spec 3: @MirAI channel mention -----------------------------
   async function runChannelTurn({ conversationId, actorProfileId, actorAuthUserId, route, userText = "" }) {
     if (route === "live") {
       if (!webEnabled) return { text: "No tengo acceso a datos en vivo ni a internet.", error: "web-disabled" };
@@ -692,7 +692,7 @@ export function createMeridianService({
       }
     }
     const ctx = { conversationId, actorProfileId, actorAuthUserId };
-    const q = String(userText || "").replace(/@merid[ií]an/gi, "").trim();
+    const q = String(userText || "").replace(/@mirai/gi, "").trim();
     const llmMessages = [
       { role: "system", content: channelSystemPrompt() },
       {
@@ -740,7 +740,7 @@ export function createMeridianService({
     if (!checkRate(actorProfileId)) return;             // silent — no "saturado" bubble in a public channel
     if (!checkChannelCooldown(conversationId)) return;  // silent
     const started = Date.now();
-    // The body may carry @[uuid:Name] mention tokens (incl. @[<sentinel>:MeridIAn]) —
+    // The body may carry @[uuid:Name] mention tokens (incl. @[<sentinel>:MirAI]) —
     // give the classifier and the model a readable "@Name" instead.
     const cleanText = stripMentionTokens(mentionText);
     let route = "chat";
@@ -752,7 +752,7 @@ export function createMeridianService({
       routerMs = c.ms;
       routerError = c.routerError ?? null;
     } catch (e) {
-      console.error("[runly.chat] meridian mention classify", e?.message ?? e);
+      console.error("[runly.chat] mirai mention classify", e?.message ?? e);
     }
 
     let out;
@@ -765,10 +765,10 @@ export function createMeridianService({
     try {
       await insertAssistantMessage({ conversationId, body: out.text, replyToMessageId: triggerMessageId ?? null });
     } catch (err) {
-      console.error("[runly.chat] meridian mention reply insert failed", err);
+      console.error("[runly.chat] mirai mention reply insert failed", err);
     }
     try {
-      await prisma.chatMeridianRun.create({
+      await prisma.chatMiraiRun.create({
         data: {
           companyId: companyId ?? null, conversationId, actorProfileId,
           triggerMessageId: triggerMessageId ?? null, model, surface: "mention",
@@ -783,14 +783,14 @@ export function createMeridianService({
   // -- Spec 2: private assistant panel -------------------------------
   async function getOrCreatePanelThread({ companyId, ownerProfileId, hostConversationId }) {
     const ins = await prisma.$queryRaw`
-      INSERT INTO chat_meridian_thread (company_id, owner_profile_id, host_conversation_id)
+      INSERT INTO chat_mirai_thread (company_id, owner_profile_id, host_conversation_id)
       VALUES (${companyId ?? null}, ${ownerProfileId}::uuid, ${hostConversationId}::uuid)
       ON CONFLICT (owner_profile_id, host_conversation_id) WHERE enabled = true DO NOTHING
       RETURNING id
     `;
     if (ins.length) return ins[0].id;
     const [row] = await prisma.$queryRaw`
-      SELECT id FROM chat_meridian_thread
+      SELECT id FROM chat_mirai_thread
       WHERE owner_profile_id = ${ownerProfileId}::uuid AND host_conversation_id = ${hostConversationId}::uuid AND enabled = true
       LIMIT 1
     `;
@@ -802,7 +802,7 @@ export function createMeridianService({
     const messages = threadId
       ? await prisma.$queryRaw`
           SELECT role, content, created_at AS "createdAt"
-          FROM chat_meridian_message WHERE thread_id = ${threadId}::uuid ORDER BY created_at ASC
+          FROM chat_mirai_message WHERE thread_id = ${threadId}::uuid ORDER BY created_at ASC
         `
       : [];
     return { threadId, messages };
@@ -810,7 +810,7 @@ export function createMeridianService({
 
   async function clearPanelThread({ ownerProfileId, hostConversationId }) {
     await prisma.$executeRaw`
-      UPDATE chat_meridian_thread SET enabled = false, updated_at = NOW()
+      UPDATE chat_mirai_thread SET enabled = false, updated_at = NOW()
       WHERE owner_profile_id = ${ownerProfileId}::uuid AND host_conversation_id = ${hostConversationId}::uuid AND enabled = true
     `;
     return { cleared: true };
@@ -831,12 +831,12 @@ export function createMeridianService({
   }
 
   async function handlePanelMessage({ companyId, ownerProfileId, ownerAuthUserId, hostConversationId, threadId, content, focusMessageId }) {
-    if (!isConfigured()) throw new Error("MERIDIAN_NOT_CONFIGURED");
-    if (!checkRate(ownerProfileId)) throw new Error("MERIDIAN_RATE_LIMITED");
+    if (!isConfigured()) throw new Error("MIRAI_NOT_CONFIGURED");
+    if (!checkRate(ownerProfileId)) throw new Error("MIRAI_RATE_LIMITED");
     const started = Date.now();
 
     await prisma.$executeRaw`
-      INSERT INTO chat_meridian_message (thread_id, role, content)
+      INSERT INTO chat_mirai_message (thread_id, role, content)
       VALUES (${threadId}::uuid, 'user', ${String(content).slice(0, 2000)})
     `;
 
@@ -849,7 +849,7 @@ export function createMeridianService({
       routerMs = c.ms;
       routerError = c.routerError ?? null;
     } catch (e) {
-      console.error("[runly.chat] meridian panel classify", e?.message ?? e);
+      console.error("[runly.chat] mirai panel classify", e?.message ?? e);
     }
 
     let finalText = "";
@@ -873,7 +873,7 @@ export function createMeridianService({
     } else {
       const focus = await focusMessageContext({ hostConversationId, focusMessageId }).catch(() => null);
       const history = await prisma.$queryRaw`
-        SELECT role, content FROM chat_meridian_message
+        SELECT role, content FROM chat_mirai_message
         WHERE thread_id = ${threadId}::uuid ORDER BY created_at DESC LIMIT ${HISTORY_LIMIT}
       `;
       history.reverse();
@@ -914,13 +914,13 @@ export function createMeridianService({
     }
 
     const [saved] = await prisma.$queryRaw`
-      INSERT INTO chat_meridian_message (thread_id, role, content)
+      INSERT INTO chat_mirai_message (thread_id, role, content)
       VALUES (${threadId}::uuid, 'assistant', ${String(finalText).slice(0, 4000)})
       RETURNING created_at AS "createdAt"
     `;
-    await prisma.$executeRaw`UPDATE chat_meridian_thread SET updated_at = NOW() WHERE id = ${threadId}::uuid`;
+    await prisma.$executeRaw`UPDATE chat_mirai_thread SET updated_at = NOW() WHERE id = ${threadId}::uuid`;
     try {
-      await prisma.chatMeridianRun.create({
+      await prisma.chatMiraiRun.create({
         data: {
           companyId: companyId ?? null, conversationId: hostConversationId, actorProfileId: ownerProfileId,
           triggerMessageId: focusMessageId ?? null, model, surface: "panel",
@@ -933,7 +933,7 @@ export function createMeridianService({
     return { message: { role: "assistant", content: finalText, createdAt: saved?.createdAt ?? new Date() } };
   }
 
-  // Module surfaces reuse Meridian's transport and limits without constructing
+  // Module surfaces reuse MirAI's transport and limits without constructing
   // fake chat conversations or granting access to Chat's tool registry.
   async function answerWithTools({ messages, tools, executeTool, actorProfileId, finishAfterTools }) {
     if (!isConfigured()) throw new ChatServiceError('La IA no está configurada.', 503);
@@ -966,11 +966,11 @@ export function createMeridianService({
     searchPublicModel: tavilyKey && webEnabled ? tavilySearch : null,
     isConfigured,
     isWebEnabled: () => webEnabled,
-    getOrCreateMeridianProfile,
-    ensureMeridianConversation,
+    getOrCreateMiraiProfile,
+    ensureMiraiConversation,
     handleUserMessage,
     handleChannelMention,
-    matchMeridianMention,
+    matchMiraiMention,
     getPanelThread,
     handlePanelMessage,
     clearPanelThread,

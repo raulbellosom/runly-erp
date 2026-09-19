@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { ChatServiceError } from "./chat-service-error.js";
-import { assertNotMeridian } from "./meridian-conversation-guard.js";
+import { assertNotMirai } from "./mirai-conversation-guard.js";
 
 // Extracted from chat-service.js to keep that file under its documented
 // 1500-line hard ceiling. Receives getUserProfileId/assertMember/
@@ -11,8 +11,8 @@ import { assertNotMeridian } from "./meridian-conversation-guard.js";
 // instantiates this internally (see chat-service.js) using its own
 // existing closures.
 export function createChatConversationReadsService({ prisma, getUserProfileId, assertMember, batchSignAvatarUrls }) {
-  // assertNotMeridian(prisma, conversationId, action) is shared from
-  // ./meridian-conversation-guard.js — the 'meridian' chat cannot be archived
+  // assertNotMirai(prisma, conversationId, action) is shared from
+  // ./mirai-conversation-guard.js — the 'mirai' chat cannot be archived
   // or hidden from the list.
 
   async function listConversations({ authUserId, limit = 50, cursor = null, archived = false }) {
@@ -169,7 +169,7 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
 
   async function archiveConversation({ conversationId, authUserId }) {
     const profileId = await getUserProfileId(authUserId);
-    await assertNotMeridian(prisma, conversationId, "archivar");
+    await assertNotMirai(prisma, conversationId, "archivar");
     await prisma.$executeRaw`
       UPDATE chat_conversation_members
       SET archived_at = NOW()
@@ -200,7 +200,7 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
 
   async function hideConversation({ conversationId, authUserId }) {
     const profileId = await getUserProfileId(authUserId);
-    await assertNotMeridian(prisma, conversationId, "eliminar de la lista");
+    await assertNotMirai(prisma, conversationId, "eliminar de la lista");
     const [conv] = await prisma.$queryRaw`
       SELECT type FROM chat_conversations WHERE id = ${conversationId} AND deleted_at IS NULL LIMIT 1
     `;

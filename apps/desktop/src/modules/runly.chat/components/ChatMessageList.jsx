@@ -8,7 +8,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { groupMessagesByDate, formatDateSeparator } from "../lib/chatUtils";
 import { findOwnMember, isMentioned } from "../lib/chatPermissions";
 import { useChatPreferences } from "../hooks/useChatPreferences";
-import { MERIDIAN_NAME } from "../lib/meridian";
+import { MIRAI_NAME } from "../lib/mirai";
 
 function senderKey(msg) {
   return `${msg.sender_user_id ?? "guest"}::${msg.sender_type ?? "user"}`;
@@ -59,7 +59,7 @@ export function ChatMessageList({
   onToggleReaction,
   onOpenThread,
   onReplyToMessage,
-  onAskMeridian,
+  onAskMirai,
   onJumpToMessage,
   onJumpFailed,
   onJumpToThread,
@@ -296,12 +296,12 @@ export function ChatMessageList({
   const ownRoleId = findOwnMember(members, currentUserId)?.roleId;
   const [visitedMentionIds, setVisitedMentionIds] = useState(() => new Set());
 
-  // typingUsers carries raw userIds (the "meridian" sentinel already swapped
-  // for MERIDIAN_NAME upstream) — resolve ids against the member list so the
+  // typingUsers carries raw userIds (the "mirai" sentinel already swapped
+  // for MIRAI_NAME upstream) — resolve ids against the member list so the
   // indicator shows a display name instead of a UUID.
   const typingNames = useMemo(() => {
     return (typingUsers ?? []).map((entry) => {
-      if (entry === MERIDIAN_NAME) return entry;
+      if (entry === MIRAI_NAME) return entry;
       const member = members?.find((m) => m.userId === entry);
       return member?.displayName ?? entry;
     });
@@ -591,7 +591,7 @@ export function ChatMessageList({
               deletingAttachmentId={deletingAttachmentId}
               onOpenThreadForMessage={onOpenThread}
               onReply={!isDeleted && !isPending && onReplyToMessage ? onReplyToMessage : undefined}
-              onAskMeridian={!isDeleted && !isPending && onAskMeridian ? onAskMeridian : undefined}
+              onAskMirai={!isDeleted && !isPending && onAskMirai ? onAskMirai : undefined}
               onJumpToMessage={onJumpToMessage}
               onShowReceipt={isOwn && !isDeleted && !isPending ? () => setReceiptMessage(item) : undefined}
               selectionMode={selectionMode}

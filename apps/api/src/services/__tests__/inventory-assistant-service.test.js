@@ -25,7 +25,7 @@ function fixture({ run, authorize = async () => {}, exists = true } = {}) {
     auditLog: { create: async () => {} },
   };
   const service = createInventoryAssistantService({ prisma: db, env: { INVENTORY_AI_SIGNING_SECRET: 'test-secret' }, authorize,
-    meridian: {
+    mirai: {
       answerWithTools: async args => { transcripts.push(args.messages); await run?.(args); return { text: 'Respuesta con datos registrados', model: 'test', calls: 1 }; },
       searchPublicModel: async query => { searches.push(query); return { results: [{ title: 'Manufacturer', url: 'https://example.com/specs', content: 'Public specifications' }] }; },
     },

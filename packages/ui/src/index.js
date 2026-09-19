@@ -2,6 +2,7 @@
 export { cn } from "./lib/utils.js";
 
 // Core primitives
+export { AssistantWordmark } from "./components/AssistantWordmark.jsx";
 export { Button, buttonVariants } from "./components/Button.jsx";
 export {
   Card,

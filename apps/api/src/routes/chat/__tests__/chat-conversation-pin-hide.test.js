@@ -38,9 +38,9 @@ function buildPrisma(queryRawResults = []) {
   const executes = [];
   // archiveConversation/hideConversation now run a bare
   // `SELECT type FROM chat_conversations WHERE id = ? LIMIT 1` guard probe
-  // (assertNotMeridian) — identical to the type lookup hideConversation
+  // (assertNotMirai) — identical to the type lookup hideConversation
   // already does. Answer both from the same queued row (consumed once, then
-  // cached); synthesize a non-meridian answer when none is queued.
+  // cached); synthesize a non-mirai answer when none is queued.
   let convTypeAnswer;
   const isConvTypeProbe = (strings) =>
     /SELECT\s+type\s+FROM\s+chat_conversations/i.test(
@@ -57,7 +57,7 @@ function buildPrisma(queryRawResults = []) {
         if (convTypeAnswer !== undefined) return convTypeAnswer;
         convTypeAnswer = looksLikeTypeRow(queryRawResults[qIdx])
           ? queryRawResults[qIdx++]
-          : [{ type: "__nonmeridian__" }];
+          : [{ type: "__nonmirai__" }];
         return convTypeAnswer;
       }
       if (qIdx >= queryRawResults.length) throw new Error(`Unexpected $queryRaw call #${qIdx + 1}`);

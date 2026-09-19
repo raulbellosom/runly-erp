@@ -21,8 +21,8 @@ import {
   chatMessageSearchQuerySchema,
 } from "@runly/validators";
 import { createChatService, ChatServiceError, resolveUserProfileId } from "./chat-service.js";
-import { createMeridianService } from "./meridian-service.js";
-import { createMeridianRoutes } from "./meridian-routes.js";
+import { createMiraiService } from "./mirai-service.js";
+import { createMiraiRoutes } from "./mirai-routes.js";
 import { createVisionService } from "../../services/vision-service.js";
 import { createChatExternalInboxService } from "./chat-external-inbox-service.js";
 import { createChatModerationService, ChatModerationServiceError } from "./chat-moderation-service.js";
@@ -68,7 +68,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   const permissionsService = createChatPermissionsService({ prisma });
   const mentionsService = createChatMentionsService({ prisma });
   const channelLinksService = createChatChannelLinksService({ prisma });
-  // Built once and shared by entity-reference resolution and MeridIAn's ERP tools.
+  // Built once and shared by entity-reference resolution and MirAI's ERP tools.
   const ledgerService = createLedgerService({ prisma });
   const projectsService = createProjectsService({ prisma });
   const tasksService = createTasksService({ prisma });
@@ -94,15 +94,15 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   const chatSearchService = createChatSearchService({ prisma });
   const memberAvatarService = createChatMemberAvatarService({ prisma, supabaseAdmin });
 
-  // MeridIAn (AI assistant) — Spec 1.
+  // MirAI (AI assistant) — Spec 1.
   const visionService = createVisionService();
   async function signAttachmentUrl(bucket, objectKey) {
     const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(objectKey, 120);
     if (error || !data?.signedUrl) throw new Error("no se pudo firmar el adjunto");
     return data.signedUrl;
   }
-  async function insertMeridianReply({ conversationId, body, replyToMessageId = null }) {
-    // The bot is a member of the `meridian` direct chat, but NOT of channels it
+  async function insertMiraiReply({ conversationId, body, replyToMessageId = null }) {
+    // The bot is a member of the `mirai` direct chat, but NOT of channels it
     // is only @mentioned in — fall back to the company's bot profile there.
     const [botRow] = await prisma.$queryRaw`
       SELECT m.user_id AS bot_id
@@ -124,7 +124,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       botId = row?.bot_id ?? null;
     }
     if (!botId) {
-      console.warn("[runly.chat] MeridIAn reply: no bot profile found for conversation", conversationId);
+      console.warn("[runly.chat] MirAI reply: no bot profile found for conversation", conversationId);
     }
     const [msg] = await prisma.$queryRaw`
       INSERT INTO chat_messages (conversation_id, sender_user_id, sender_type, body, message_type, reply_to_message_id)
@@ -141,19 +141,19 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
         SELECT user_id FROM chat_conversation_members WHERE conversation_id = ${conversationId}::uuid AND left_at IS NULL
       `;
       broadcaster.broadcastToUsers(memberRows.map((m) => m.user_id.toString()), "chat.message.new", {
-        conversationId, messageId: msg.id, senderName: "MeridIAn",
+        conversationId, messageId: msg.id, senderName: "MirAI",
       }).catch(() => {});
     }
     return msg;
   }
-  const meridianService = createMeridianService({
+  const miraiService = createMiraiService({
     prisma,
     visionService,
     chatSearchService,
     listMessages: chatService.listMessages,
     broadcaster,
     signAttachmentUrl,
-    insertAssistantMessage: insertMeridianReply,
+    insertAssistantMessage: insertMiraiReply,
     resolveUserContext,
     inventoryService,
     ledgerService,
@@ -174,9 +174,9 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       const authUserId = c.get("authUserId");
       try {
         const actorProfileId = await resolveUserProfileId(prisma, authUserId);
-        await meridianService.ensureMeridianConversation({ companyId: c.get("companyId") ?? null, actorProfileId });
+        await miraiService.ensureMiraiConversation({ companyId: c.get("companyId") ?? null, actorProfileId });
       } catch (e) {
-        console.error("[runly.chat] meridian ensure (list)", e?.message ?? e);
+        console.error("[runly.chat] mirai ensure (list)", e?.message ?? e);
       }
       const { limit, cursor, archived } = c.req.query();
       const result = await chatService.listConversations({
@@ -346,44 +346,44 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       const data = chatSendMessageSchema.parse(body);
       const result = await chatService.sendMessage({ conversationId, authUserId, ...data });
 
-      // If this is the user's MeridIAn conversation, kick off the assistant
+      // If this is the user's MirAI conversation, kick off the assistant
       // turn in the background — do NOT await (the reply arrives via realtime).
       try {
         const [conv] = await prisma.$queryRaw`SELECT type, company_id FROM chat_conversations WHERE id = ${conversationId}::uuid LIMIT 1`;
-        if (conv?.type === "meridian") {
+        if (conv?.type === "mirai") {
           const actorProfileId = await resolveUserProfileId(prisma, authUserId);
-          meridianService.handleUserMessage({
+          miraiService.handleUserMessage({
             companyId: conv.company_id ?? c.get("companyId") ?? null,
             conversationId,
             actorProfileId,
             actorAuthUserId: authUserId,
             triggerMessageId: result?.id ?? null,
-          }).catch((e) => console.error("[runly.chat] meridian turn", e?.message ?? e));
+          }).catch((e) => console.error("[runly.chat] mirai turn", e?.message ?? e));
         } else if (
           (conv?.type === "channel" || conv?.type === "group" || conv?.type === "direct") &&
           result?.sender_type !== "assistant" &&
-          meridianService.matchMeridianMention(data.body)
+          miraiService.matchMiraiMention(data.body)
         ) {
-          // @meridIAn in a channel/group/DM: reply visibly, but only if the
-          // sender may use MeridIAn. userContext is already loaded by
-          // requirePermission. (The `meridian` and `external_support` types are
+          // @MirAI in a channel/group/DM: reply visibly, but only if the
+          // sender may use MirAI. userContext is already loaded by
+          // requirePermission. (The `mirai` and `external_support` types are
           // handled above / excluded on purpose.)
           const uctx = c.get("userContext");
-          const allowed = Boolean(uctx?.isAdmin || uctx?.permissionSet?.has("chat.meridian.use"));
+          const allowed = Boolean(uctx?.isAdmin || uctx?.permissionSet?.has("chat.mirai.use"));
           if (allowed) {
             const actorProfileId = await resolveUserProfileId(prisma, authUserId);
-            meridianService.handleChannelMention({
+            miraiService.handleChannelMention({
               companyId: conv.company_id ?? c.get("companyId") ?? null,
               conversationId,
               actorProfileId,
               actorAuthUserId: authUserId,
               triggerMessageId: result?.id ?? null,
               mentionText: data.body,
-            }).catch((e) => console.error("[runly.chat] meridian mention", e?.message ?? e));
+            }).catch((e) => console.error("[runly.chat] mirai mention", e?.message ?? e));
           }
         }
       } catch (e) {
-        console.error("[runly.chat] meridian dispatch", e?.message ?? e);
+        console.error("[runly.chat] mirai dispatch", e?.message ?? e);
       }
 
       return c.json({ data: result }, 201);
@@ -1209,23 +1209,23 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     }
   });
 
-  // MeridIAn (AI assistant) routes carry their own "/chat/..." paths, so they
+  // MirAI (AI assistant) routes carry their own "/chat/..." paths, so they
   // mount at the app root behind authMiddleware (not under the "/chat"-prefixed
   // `internal` sub-app, which would double the prefix).
-  // ⚠️ DO NOT widen this to `meridian.use("*", ...)` WITHOUT ASKING RAUL FIRST.
-  // Scope the auth guard to the MeridIAn route surface only. A bare
-  // `meridian.use("*", ...)` here — because this sub-app is mounted at the app
-  // root (`app.route("", meridian)`) and createChatRouter is registered early in
+  // ⚠️ DO NOT widen this to `mirai.use("*", ...)` WITHOUT ASKING RAUL FIRST.
+  // Scope the auth guard to the MirAI route surface only. A bare
+  // `mirai.use("*", ...)` here — because this sub-app is mounted at the app
+  // root (`app.route("", mirai)`) and createChatRouter is registered early in
   // apps/api/src/index.js (before `/public/site/*` and the dist-serve SPA
   // fallback) — intercepts EVERY unmatched anonymous request with a 401 and
   // takes down the public marketing website. Happened on 2026-09-08 (commit
-  // 59a439a6); guarded by meridian-mount-scope.test.js.
-  const meridian = new Hono();
-  meridian.use("/chat/meridian", authMiddleware);
-  meridian.use("/chat/meridian/*", authMiddleware);
-  meridian.route("", createMeridianRoutes({
+  // 59a439a6); guarded by mirai-mount-scope.test.js.
+  const mirai = new Hono();
+  mirai.use("/chat/mirai", authMiddleware);
+  mirai.use("/chat/mirai/*", authMiddleware);
+  mirai.route("", createMiraiRoutes({
     requirePermission,
-    meridianService,
+    miraiService,
     resolveProfileId: (authUserId) => resolveUserProfileId(prisma, authUserId),
     // listMessages membership-checks the caller and throws if they're not in.
     assertConversationMember: async (authUserId, conversationId) => {
@@ -1237,7 +1237,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   // Mount sub-routers
   app.route("/chat", internal);
   app.route("/public/chat", pub);
-  app.route("", meridian);
+  app.route("", mirai);
 
   return app;
 }

@@ -27,9 +27,9 @@ function buildPrisma(queryRawResults = []) {
   let qIdx = 0;
   const membershipByUser = { [PROFILE_ID]: COMPANY_A, [FOREIGN_PROFILE_ID]: COMPANY_B };
   // addMembers now runs a bare `SELECT type FROM chat_conversations WHERE
-  // id = ? LIMIT 1` guard probe (assertNotMeridian) right after assertMember,
+  // id = ? LIMIT 1` guard probe (assertNotMirai) right after assertMember,
   // before filterCompanyPeers. Answer it from a queued type row (consumed once,
-  // then cached) or synthesize a non-meridian answer without disturbing the
+  // then cached) or synthesize a non-mirai answer without disturbing the
   // fixed-sequence queue.
   let convTypeAnswer;
   const isConvTypeProbe = (strings) =>
@@ -55,7 +55,7 @@ function buildPrisma(queryRawResults = []) {
         if (convTypeAnswer !== undefined) return convTypeAnswer;
         convTypeAnswer = looksLikeTypeRow(queryRawResults[qIdx])
           ? queryRawResults[qIdx++]
-          : [{ type: "__nonmeridian__" }];
+          : [{ type: "__nonmirai__" }];
         return convTypeAnswer;
       }
       if (isConvCompanyProbe(strings)) {

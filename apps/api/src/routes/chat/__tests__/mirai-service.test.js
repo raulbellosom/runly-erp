@@ -1,7 +1,7 @@
-// apps/api/src/routes/chat/__tests__/meridian-service.test.js
+// apps/api/src/routes/chat/__tests__/mirai-service.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMeridianService, __systemPromptForTest } from "../meridian-service.js";
+import { createMiraiService, __systemPromptForTest } from "../mirai-service.js";
 
 function makePrismaStub() {
   const state = { profiles: [], conversations: [], members: [], messages: [], runs: [] };
@@ -16,14 +16,14 @@ function makePrismaStub() {
         return state.profiles.filter((p) => p.is_bot);
       }
       if (/INSERT INTO user_profile/i.test(sql)) {
-        const row = { id: "bot1", is_bot: true, display_name: "MeridIAn" };
+        const row = { id: "bot1", is_bot: true, display_name: "MirAI" };
         state.profiles.push(row); return [row];
       }
-      if (/FROM chat_conversations[\s\S]*type = 'meridian'/i.test(sql)) {
-        return state.conversations.filter((c) => c.type === "meridian");
+      if (/FROM chat_conversations[\s\S]*type = 'mirai'/i.test(sql)) {
+        return state.conversations.filter((c) => c.type === "mirai");
       }
       if (/INSERT INTO chat_conversations/i.test(sql)) {
-        const row = { id: "mconv1", type: "meridian" }; state.conversations.push(row); return [row];
+        const row = { id: "mconv1", type: "mirai" }; state.conversations.push(row); return [row];
       }
       return [];
     },
@@ -33,8 +33,8 @@ function makePrismaStub() {
 }
 
 test("isConfigured reflects GROQ_API_KEY", () => {
-  const on = createMeridianService({ prisma: makePrismaStub(), env: { GROQ_API_KEY: "k" }, visionService: {}, chatSearchService: {}, listMessages: async () => ({ data: [] }) });
-  const off = createMeridianService({ prisma: makePrismaStub(), env: {}, visionService: {}, chatSearchService: {}, listMessages: async () => ({ data: [] }) });
+  const on = createMiraiService({ prisma: makePrismaStub(), env: { GROQ_API_KEY: "k" }, visionService: {}, chatSearchService: {}, listMessages: async () => ({ data: [] }) });
+  const off = createMiraiService({ prisma: makePrismaStub(), env: {}, visionService: {}, chatSearchService: {}, listMessages: async () => ({ data: [] }) });
   assert.equal(on.isConfigured(), true);
   assert.equal(off.isConfigured(), false);
 });
@@ -46,11 +46,11 @@ test("systemPrompt carries the anti-injection and no-writes clauses and a resolv
   assert.match(p, /\d{4}-\d{2}-\d{2}/); // today injected
 });
 
-test("ensureMeridianConversation is idempotent", async () => {
+test("ensureMiraiConversation is idempotent", async () => {
   const prisma = makePrismaStub();
-  const svc = createMeridianService({ prisma, env: { GROQ_API_KEY: "k" }, visionService: {}, chatSearchService: {}, listMessages: async () => ({ data: [] }) });
-  const a = await svc.ensureMeridianConversation({ companyId: "co1", actorProfileId: "prof1" });
-  const b = await svc.ensureMeridianConversation({ companyId: "co1", actorProfileId: "prof1" });
+  const svc = createMiraiService({ prisma, env: { GROQ_API_KEY: "k" }, visionService: {}, chatSearchService: {}, listMessages: async () => ({ data: [] }) });
+  const a = await svc.ensureMiraiConversation({ companyId: "co1", actorProfileId: "prof1" });
+  const b = await svc.ensureMiraiConversation({ companyId: "co1", actorProfileId: "prof1" });
   assert.equal(a.conversationId, b.conversationId);
   assert.equal(prisma._state.conversations.length, 1);
 });
@@ -75,13 +75,13 @@ function serviceForLoop({ fetchImpl, env = { GROQ_API_KEY: "k" }, listMessages, 
     $queryRaw: async (strings) => {
       const sql = strings.join("?");
       if (/FROM chat_messages[\s\S]*ORDER BY .*created_at DESC/i.test(sql)) return []; // history
-      if (/FROM chat_conversations/i.test(sql)) return [{ id: "mconv1", type: "meridian", company_id: "co1" }];
+      if (/FROM chat_conversations/i.test(sql)) return [{ id: "mconv1", type: "mirai", company_id: "co1" }];
       return [];
     },
     $executeRaw: async () => 0,
-    chatMeridianRun: { create: async ({ data } = {}) => { runs.push(data ?? {}); return {}; } },
+    chatMiraiRun: { create: async ({ data } = {}) => { runs.push(data ?? {}); return {}; } },
   };
-  const svc = createMeridianService({
+  const svc = createMiraiService({
     prisma, env, fetchImpl,
     listMessages: listMessages ?? (async () => ({ data: [] })),
     chatSearchService, visionService,
