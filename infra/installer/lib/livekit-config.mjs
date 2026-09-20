@@ -143,15 +143,28 @@ export function resolveLiveKitConfig({
   };
 }
 
-export function renderLiveKitConfig({ apiKey, apiSecret, isLinux }) {
-  const redisAddress = isLinux ? "127.0.0.1:6380" : "livekit-redis:6379";
+// httpPort/rtcTcpPort/rtcUdpPort/redisPort only take effect on Linux, where
+// network_mode: host means these config values ARE the host-bound ports
+// (Compose's own port mapping is unused there). On Docker Desktop (bridge
+// networking) the container-internal ports must stay fixed at their
+// defaults — only the host-side mapping in docker-compose.yml varies, via
+// RUNLY_*_HOST_PORT / LIVEKIT_*_PORT env vars.
+export function renderLiveKitConfig({
+  apiKey, apiSecret, isLinux,
+  httpPort, rtcTcpPort, rtcUdpPort, redisPort,
+}) {
+  const port = isLinux ? (Number(httpPort) || 7880) : 7880;
+  const tcpPort = isLinux ? (Number(rtcTcpPort) || 7881) : 7881;
+  const udpPort = isLinux ? (Number(rtcUdpPort) || 7882) : 7882;
+  const resolvedRedisPort = isLinux ? (Number(redisPort) || 6380) : 6379;
+  const redisAddress = isLinux ? `127.0.0.1:${resolvedRedisPort}` : `livekit-redis:${resolvedRedisPort}`;
   return [
-    "port: 7880",
+    `port: ${port}`,
     "log_level: info",
     "",
     "rtc:",
-    "  tcp_port: 7881",
-    "  udp_port: 7882",
+    `  tcp_port: ${tcpPort}`,
+    `  udp_port: ${udpPort}`,
     "  use_external_ip: true",
     "  enable_loopback_candidate: true",
     "",

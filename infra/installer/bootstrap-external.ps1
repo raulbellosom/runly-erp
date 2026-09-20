@@ -34,6 +34,7 @@ $files = @(
   "lib/office-config.mjs",
   "lib/firebase-config.mjs",
   "lib/livekit-config.mjs",
+  "lib/instance-identity.mjs",
   "package.json",
   "setup-external.mjs",
   "setup-external.sh",

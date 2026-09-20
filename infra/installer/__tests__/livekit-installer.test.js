@@ -111,8 +111,8 @@ describe("LiveKit installer contract", () => {
     assert.match(compose, /livekit\/livekit-server:v1\.12\.0/);
     assert.match(compose, /livekit-caddy:/);
     assert.match(compose, /profiles: \["livekit-tls"\]/);
-    assert.match(compose, /"7881:7881\/tcp"/);
-    assert.match(compose, /"7882:7882\/udp"/);
+    assert.match(compose, /LIVEKIT_RTC_TCP_PORT:-7881.*7881\/tcp/);
+    assert.match(compose, /LIVEKIT_RTC_UDP_PORT:-7882.*7882\/udp/);
     assert.doesNotMatch(compose, /127\.0\.0\.1:6380:6379/);
     assert.doesNotMatch(compose, /LIVEKIT_API_SECRET/);
   });

@@ -1,4 +1,9 @@
-name: runlyerp
+# RUNLY_COMPOSE_PROJECT_NAME isolates this installation's project (and thus its
+# default network + all volume names, which Compose prefixes with the project
+# name) from any other Runly instance on the same host. Set automatically by
+# setup-local.mjs / setup-external.mjs; defaults to the legacy fixed name so
+# manual `docker compose` invocations against an existing install are unaffected.
+name: ${RUNLY_COMPOSE_PROJECT_NAME:-runlyerp}
 
 services:
   collabora:
@@ -9,7 +14,8 @@ services:
       extra_params: ${COLLABORA_EXTRA_PARAMS:---o:ssl.enable=false --o:ssl.termination=false --o:logging.level=warning}
       content_security_policy: ${COLLABORA_CONTENT_SECURITY_POLICY:-frame-ancestors http://localhost:5173 http://tauri.localhost https://tauri.localhost tauri://localhost;}
     ports:
-      - "127.0.0.1:9980:9980"
+      # Collabora is an internal editor backend — never publish beyond loopback.
+      - "127.0.0.1:${RUNLY_COLLABORA_HOST_PORT:-9980}:9980"
     # CODE 26 includes /usr/bin/coolwsd --probe; retain its native healthcheck.
     restart: unless-stopped
     logging:
@@ -20,7 +26,7 @@ services:
 
   runly-api-external:
     image: ${RUNLY_API_IMAGE:-raulbellosom/runlyerp:api-latest}
-    container_name: runly-api-external
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-api-external
     profiles: ["external"]
     env_file:
       - ./.env.external
@@ -28,7 +34,10 @@ services:
       RUNLY_PROJECT_ROOT: /app
       RUNLY_MODULES_DIR: /app/modules/custom
     ports:
-      - "4010:4010"
+      # RUNLY_PUBLIC_BIND_ADDR restricts the published port to a single
+      # interface (e.g. 127.0.0.1 when a reverse proxy sits in front); it
+      # defaults to 0.0.0.0 to preserve current behavior.
+      - "${RUNLY_PUBLIC_BIND_ADDR:-0.0.0.0}:${RUNLY_API_HOST_PORT:-4010}:4010"
     volumes:
       - ./custom-modules:/app/modules/custom
       - ./.secrets/firebase:/run/secrets/firebase:ro
@@ -40,7 +49,7 @@ services:
 
   runly-worker-external:
     image: ${RUNLY_WORKER_IMAGE:-raulbellosom/runlyerp:worker-latest}
-    container_name: runly-worker-external
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-worker-external
     profiles: ["external"]
     env_file:
       - ./.env.external
@@ -53,21 +62,21 @@ services:
 
   runly-web-external:
     image: ${RUNLY_WEB_EXTERNAL_IMAGE:-raulbellosom/runlyerp:web-latest}
-    container_name: runly-web-external
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-web-external
     profiles: ["external"]
     environment:
       RUNLY_API_URL: ${RUNLY_API_URL:-}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
     ports:
-      - "5173:80"
+      - "${RUNLY_PUBLIC_BIND_ADDR:-0.0.0.0}:${RUNLY_WEB_HOST_PORT:-5173}:80"
     depends_on:
       - runly-api-external
     restart: unless-stopped
 
   runly-api-local:
     image: ${RUNLY_API_LOCAL_IMAGE:-raulbellosom/runlyerp:api-latest}
-    container_name: runly-api-local
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-api-local
     profiles: ["local"]
     env_file:
       - ./.env.local
@@ -75,7 +84,7 @@ services:
       RUNLY_PROJECT_ROOT: /app
       RUNLY_MODULES_DIR: /app/modules/custom
     ports:
-      - "4010:4010"
+      - "${RUNLY_PUBLIC_BIND_ADDR:-0.0.0.0}:${RUNLY_API_HOST_PORT:-4010}:4010"
     volumes:
       - ./custom-modules:/app/modules/custom
       - ./.secrets/firebase:/run/secrets/firebase:ro
@@ -87,7 +96,7 @@ services:
 
   runly-worker-local:
     image: ${RUNLY_WORKER_LOCAL_IMAGE:-raulbellosom/runlyerp:worker-latest}
-    container_name: runly-worker-local
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-worker-local
     profiles: ["local"]
     env_file:
       - ./.env.local
@@ -100,21 +109,21 @@ services:
 
   runly-web-local:
     image: ${RUNLY_WEB_LOCAL_IMAGE:-raulbellosom/runlyerp:web-latest}
-    container_name: runly-web-local
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-web-local
     profiles: ["local"]
     environment:
       RUNLY_API_URL: ${RUNLY_API_URL:-http://localhost:4010}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
     ports:
-      - "5173:80"
+      - "${RUNLY_PUBLIC_BIND_ADDR:-0.0.0.0}:${RUNLY_WEB_HOST_PORT:-5173}:80"
     depends_on:
       - runly-api-local
     restart: unless-stopped
 
   livekit-redis:
     image: ${LIVEKIT_REDIS_IMAGE:-redis:7-alpine}
-    container_name: runly-livekit-redis
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-redis
     profiles: ["livekit"]
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     expose:
@@ -128,7 +137,7 @@ services:
 
   livekit:
     image: ${LIVEKIT_IMAGE:-livekit/livekit-server:v1.12.0}
-    container_name: runly-livekit
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit
     profiles: ["livekit"]
     command: ["--config", "/etc/livekit/livekit.yaml"]
     depends_on:
@@ -137,9 +146,9 @@ services:
     volumes:
       - ./livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
     ports:
-      - "7880:7880/tcp"
-      - "7881:7881/tcp"
-      - "7882:7882/udp"
+      - "${LIVEKIT_HTTP_HOST_PORT:-7880}:7880/tcp"
+      - "${LIVEKIT_RTC_TCP_PORT:-7881}:7881/tcp"
+      - "${LIVEKIT_RTC_UDP_PORT:-7882}:7882/udp"
     restart: unless-stopped
 
   # Separate opt-in profile (not bundled into "livekit") because this
@@ -151,7 +160,7 @@ services:
   #   docker compose --profile livekit --profile livekit-egress up -d
   egress:
     image: ${LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.9.0}
-    container_name: runly-livekit-egress
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-egress
     profiles: ["livekit-egress"]
     restart: unless-stopped
     environment:
@@ -167,7 +176,7 @@ services:
 
   livekit-caddy:
     image: ${LIVEKIT_CADDY_IMAGE:-caddy:2-alpine}
-    container_name: runly-livekit-caddy
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-caddy
     profiles: ["livekit-tls"]
     depends_on:
       - livekit
@@ -176,9 +185,12 @@ services:
       - livekit-caddy-data:/data
       - livekit-caddy-config:/config
     ports:
-      - "80:80/tcp"
-      - "443:443/tcp"
-      - "443:443/udp"
+      # Standard ACME/HTTPS ports — only remap these if you know your ACME
+      # flow tolerates it (most CAs assume 80/443). Prefer keeping an existing
+      # host reverse proxy in front instead of changing these on a shared host.
+      - "${LIVEKIT_TLS_HTTP_PORT:-80}:80/tcp"
+      - "${LIVEKIT_TLS_HTTPS_PORT:-443}:443/tcp"
+      - "${LIVEKIT_TLS_HTTPS_PORT:-443}:443/udp"
     restart: unless-stopped
 
 volumes:

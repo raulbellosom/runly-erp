@@ -255,6 +255,60 @@ sala de corta duracion desde la API.
 
 ---
 
+## Multiples instancias de Runly en el mismo host
+
+Cada carpeta de instalador (copia de `infra/installer`) es **una instancia**
+independiente: su propio `docker-compose.yml`, `.env.local`/`.env.external`,
+`custom-modules/`, y (en modo `local`) su propio `.supabase-local/`.
+
+En la primera ejecucion, `setup-local.mjs`/`setup-external.mjs` generan y
+persisten `RUNLY_INSTANCE_ID` en el archivo `.env.*` — un identificador
+aleatorio estable que nunca se regenera en ejecuciones posteriores. A partir
+de el se derivan:
+
+- `RUNLY_COMPOSE_PROJECT_NAME` — nombre de proyecto de Docker Compose (aisla
+  la red por defecto y todos los volumenes con nombre, que Compose prefija
+  con el nombre del proyecto).
+- `RUNLY_CONTAINER_PREFIX` — prefijo de `container_name` para cada servicio
+  (los nombres de contenedor son literales y Compose no los aisla por si
+  solo).
+- En modo `local`, el `project_id` de Supabase CLI en
+  `.supabase-local/supabase/config.toml` (evita que dos instancias locales
+  colisionen en los contenedores/volumenes que administra Supabase CLI).
+
+Una instalacion **ya existente** (archivo `.env.*` presente sin
+`RUNLY_INSTANCE_ID`) conserva el nombre de proyecto/prefijo heredado
+(`runlyerp` / `runly-*`) al actualizar el instalador — nunca se renombra
+automaticamente, para no huerfanar contenedores, redes o volumenes ya en uso.
+
+Para instalar una **segunda instancia** en el mismo host: copia el
+instalador a otra carpeta y ejecuta el setup normalmente — la identidad se
+genera sola y ya queda aislada del resto. Los puertos publicados tambien son
+configurables por instancia (ver `RUNLY_API_HOST_PORT`, `RUNLY_WEB_HOST_PORT`,
+`RUNLY_COLLABORA_HOST_PORT`, `RUNLY_PUBLIC_BIND_ADDR`, y las variables
+`LIVEKIT_*_PORT` en `.env.local.example`/`.env.external.example`) por si el
+puerto por defecto ya esta en uso en ese host.
+
+**Limitacion conocida — LiveKit embebido en Linux:** por requisitos de UDP,
+LiveKit corre con `network_mode: host` en Linux (ver
+`docker-compose.linux.yml`), lo que evita por completo el aislamiento de
+proyecto de Compose para esos contenedores. Una segunda instancia con
+LiveKit embebido en el mismo host Linux debe usar puertos distintos
+(`LIVEKIT_HTTP_HOST_PORT`, `LIVEKIT_RTC_TCP_PORT`, `LIVEKIT_RTC_UDP_PORT`,
+`LIVEKIT_REDIS_PORT`) explicitamente. El TLS gestionado de Caddy
+(`LIVEKIT_TLS_MODE=managed`) usa los puertos 80/443 estandar de ACME y no es
+practico remapear — para una segunda instancia con dominio propio, usa
+`LIVEKIT_TLS_MODE=external` con un proxy inverso compartido delante.
+
+**No cubierto por esta version del instalador:** Supabase self-hosted vía
+Docker Compose como alternativa a Supabase CLI en modo `local` (para
+produccion sin la CLI), generacion automatica de configuracion para
+Nginx/Caddy/Traefik existentes, y deteccion/asignacion automatica de puertos
+libres. El instalador valida y usa los puertos que le indiques, pero no
+escanea el host por ti — revisa manualmente que el puerto elegido este libre.
+
+---
+
 ## Iniciar / detener / resetear
 
 Los scripts de stop ejecutan `docker image prune -f` automaticamente al terminar

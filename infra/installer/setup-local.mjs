@@ -3,6 +3,7 @@ import { withRunlyEnvAliases, canonicalizeRunlyEnvText, mergeRunlyEnvText } from
 import { resolveDevKitDir } from './lib/devkit-installer.mjs';
 import { configureOffice, checkOfficeRuntime, OFFICE_ENV_KEYS, parseOfficeEnv } from "./lib/office-config.mjs";
 import { configureFirebase, preserveFirebaseEnv } from "./lib/firebase-config.mjs";
+import { resolveInstanceIdentity, renderInstanceIdentityEnv } from "./lib/instance-identity.mjs";
 
 import crypto from "node:crypto";
 import { lookup } from "node:dns/promises";
@@ -147,6 +148,55 @@ function parseEnvValue(content, key) {
   return undefined;
 }
 
+// Host-port / bind / identity vars that Docker Compose needs for ${VAR}
+// interpolation of docker-compose.yml itself. Compose only reads these from
+// the shell environment or the auto-loaded ".env" file — never from
+// .env.local (that file is only injected into containers via env_file:) — so
+// any value stored in .env.local must be mirrored into ".env" to take effect.
+const COMPOSE_INTERPOLATION_KEYS = [
+  "RUNLY_COMPOSE_PROJECT_NAME", "RUNLY_CONTAINER_PREFIX",
+  "RUNLY_API_HOST_PORT", "RUNLY_WEB_HOST_PORT", "RUNLY_COLLABORA_HOST_PORT", "RUNLY_PUBLIC_BIND_ADDR",
+  "LIVEKIT_HTTP_HOST_PORT", "LIVEKIT_RTC_TCP_PORT", "LIVEKIT_RTC_UDP_PORT", "LIVEKIT_REDIS_PORT",
+  "LIVEKIT_TLS_HTTP_PORT", "LIVEKIT_TLS_HTTPS_PORT",
+];
+
+function composeInterpolationEnvLines(existingEnvContent) {
+  return COMPOSE_INTERPOLATION_KEYS
+    .map((key) => [key, process.env[key] ?? parseEnvValue(existingEnvContent, key)])
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+}
+
+// Resolves this installation's identity before any docker/supabase command
+// runs, and exports it so every subsequent `docker compose` invocation in
+// this process (they all default env: process.env) targets the right
+// project and container names.
+async function resolveIdentity() {
+  let existingEnvContent = "";
+  try { existingEnvContent = await fs.readFile(localEnvFile, "utf8"); } catch { /* first run */ }
+  const identity = resolveInstanceIdentity(existingEnvContent);
+  process.env.RUNLY_COMPOSE_PROJECT_NAME = identity.projectName;
+  process.env.RUNLY_CONTAINER_PREFIX = identity.containerPrefix;
+  return identity;
+}
+
+// The shipped .supabase-local/supabase/config.toml ships with a fixed
+// project_id ("supabase-local"), which the Supabase CLI uses to name its own
+// containers/volumes/network — a second local install (a separate copy of
+// this installer directory) would otherwise collide on those Supabase
+// resources even though Runly's own containers are isolated. Only rewrite it
+// while it still holds the shipped default, so an admin's own customization
+// is never clobbered, and so re-runs are idempotent.
+async function adoptSupabaseProjectId(instanceId) {
+  let content;
+  try { content = await fs.readFile(supabaseConfig, "utf8"); } catch { return; }
+  const current = /^project_id\s*=\s*"([^"]*)"/m.exec(content)?.[1];
+  if (!current || current !== "supabase-local") return;
+  const updated = content.replace(/^project_id\s*=\s*".*"$/m, `project_id = "supabase-${instanceId}"`);
+  await fs.writeFile(supabaseConfig, updated, "utf8");
+}
+
 function pullWithRetry(image, label, retries = 3, delayMs = 5000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     console.log(`[setup-local] Pulling ${label} (attempt ${attempt}/${retries})...`);
@@ -276,7 +326,14 @@ async function writeLiveKitArtifacts(config) {
 
   await fs.writeFile(
     liveKitConfigFile,
-    renderLiveKitConfig({ ...config, isLinux }),
+    renderLiveKitConfig({
+      ...config,
+      isLinux,
+      httpPort: process.env.LIVEKIT_HTTP_HOST_PORT,
+      rtcTcpPort: process.env.LIVEKIT_RTC_TCP_PORT,
+      rtcUdpPort: process.env.LIVEKIT_RTC_UDP_PORT,
+      redisPort: process.env.LIVEKIT_REDIS_PORT,
+    }),
     { encoding: "utf8", mode: 0o600 },
   );
   try { await fs.chmod(liveKitConfigFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
@@ -343,14 +400,15 @@ function tryCapture(command, args, { cwd = installerDir, env = process.env } = {
 
 async function validateLiveKitRuntime(config) {
   if (config.mode === "disabled") return;
+  const containerPrefix = process.env.RUNLY_CONTAINER_PREFIX || "runly";
 
   console.log("[LiveKit] Validating runtime...");
   if (config.mode === "embedded") {
-    const redisPort = isLinux ? "6380" : "6379";
+    const redisPort = isLinux ? (process.env.LIVEKIT_REDIS_PORT || "6380") : "6379";
     let redis = { ok: false, output: "Redis is not ready." };
     for (let attempt = 1; attempt <= 24; attempt += 1) {
       redis = tryCapture("docker", [
-        "exec", "runly-livekit-redis", "redis-cli", "-p", redisPort, "ping",
+        "exec", `${containerPrefix}-livekit-redis`, "redis-cli", "-p", redisPort, "ping",
       ]);
       if (redis.ok && /PONG/i.test(redis.output)) break;
       await new Promise((resolve) => setTimeout(resolve, 2_500));
@@ -365,7 +423,7 @@ async function validateLiveKitRuntime(config) {
   for (let attempt = 1; attempt <= 24; attempt += 1) {
     smokeResult = tryCapture("docker", [
       "exec",
-      "runly-api-local",
+      `${containerPrefix}-api-local`,
       "node",
       "apps/api/src/scripts/livekit-smoke.js",
     ]);
@@ -397,7 +455,7 @@ async function validateLiveKitRuntime(config) {
   }
 }
 
-async function writeLocalEnv(envMap) {
+async function writeLocalEnv(envMap, identity) {
   const requiredKeys = ["API_URL", "ANON_KEY", "SERVICE_ROLE_KEY", "JWT_SECRET", "DB_URL"];
   const missing = requiredKeys.filter((key) => !envMap.get(key));
   if (missing.length > 0) {
@@ -458,6 +516,7 @@ async function writeLocalEnv(envMap) {
 # Re-run the script anytime to refresh local Supabase credentials.
 # Deployment-specific vars (CORS_ORIGIN, Google OAuth) are preserved across re-runs.
 
+${renderInstanceIdentityEnv(identity)}
 NODE_ENV=production
 ATLAS_API_PORT=4010
 ATLAS_TIME_ZONE=America/Mexico_City
@@ -529,6 +588,10 @@ LIVEKIT_API_SECRET=${liveKit.apiSecret}
 SUPABASE_URL=${browserSupabaseUrl}
 SUPABASE_ANON_KEY=${envMap.get("ANON_KEY")}
 ${publicApiUrl ? `RUNLY_API_URL=${publicApiUrl}` : "# ATLAS_API_URL defaults to http://localhost:4010 — override for VPS/public deployments"}
+# Isolation/ports: same values persisted in .env.local, mirrored here because
+# only this file (or the shell environment) drives Compose's own \${VAR}
+# interpolation of docker-compose.yml — env_file: values do not.
+${composeInterpolationEnvLines(existingEnvContent)}
 `;
   await fs.writeFile(composeEnvFile, canonicalizeRunlyEnvText(composeEnvContent), "utf8");
   const office = await configureOffice({ envFile: localEnvFile, composeEnvFile });
@@ -545,6 +608,9 @@ async function main() {
     return;
   }
 
+  const identity = await resolveIdentity();
+  console.log(`[setup-local] Instance identity: ${identity.instanceId} (project: ${identity.projectName}, containers: ${identity.containerPrefix}-*)`);
+
   console.log("[1/8] Validating dependencies...");
   run("docker", ["compose", "version"]);
   run(npxCommand, ["--version"]);
@@ -557,6 +623,7 @@ async function main() {
   if (!(await exists(supabaseConfig))) {
     run(npxCommand, ["--yes", "supabase", "init", "--yes", "--workdir", supabaseWorkdir]);
   }
+  await adoptSupabaseProjectId(identity.instanceId);
 
   console.log("[3/8] Starting Supabase local stack...");
   run(npxCommand, [
@@ -582,7 +649,7 @@ async function main() {
     "env",
   ]);
   const envMap = parseSupabaseStatusEnv(statusOutput);
-  const { liveKit, office } = await writeLocalEnv(envMap);
+  const { liveKit, office } = await writeLocalEnv(envMap, identity);
   await validateLiveKitDns(liveKit);
   console.log(`Generated ${localEnvFile}`);
 

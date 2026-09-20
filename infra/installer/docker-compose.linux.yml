@@ -9,7 +9,7 @@
 # Manual usage on Linux:
 #   docker compose -f docker-compose.yml -f docker-compose.linux.yml --profile local up -d
 
-name: runlyerp
+name: ${RUNLY_COMPOSE_PROJECT_NAME:-runlyerp}
 
 services:
   collabora:
@@ -31,12 +31,17 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # network_mode: host bypasses Docker Compose project isolation entirely —
+  # these ports are claimed directly on the host's network stack, so a second
+  # Runly instance with embedded LiveKit on the same Linux host collides here
+  # unless LIVEKIT_REDIS_PORT/LIVEKIT_HTTP_HOST_PORT/LIVEKIT_RTC_*_PORT are set
+  # to distinct values for that instance (see infra/installer/README.md).
   livekit-redis:
     network_mode: host
     expose: !reset []
-    command: ["redis-server", "--bind", "127.0.0.1", "--port", "6380", "--save", "", "--appendonly", "no"]
+    command: ["redis-server", "--bind", "127.0.0.1", "--port", "${LIVEKIT_REDIS_PORT:-6380}", "--save", "", "--appendonly", "no"]
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+      test: ["CMD", "redis-cli", "-p", "${LIVEKIT_REDIS_PORT:-6380}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 12

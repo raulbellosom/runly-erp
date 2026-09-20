@@ -11,15 +11,25 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
+import { resolveInstanceIdentity } from "./lib/instance-identity.mjs";
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const isWindows  = process.platform === "win32";
 const isReset    = process.argv.includes("--reset");
 const composeFile = path.resolve(__dirname, "docker-compose.yml");
 const linuxComposeOverride = path.resolve(__dirname, "docker-compose.linux.yml");
+const externalEnvFile = path.resolve(__dirname, ".env.external");
 const composeFiles = process.platform === "linux" && fs.existsSync(linuxComposeOverride)
   ? ["-f", composeFile, "-f", linuxComposeOverride]
   : ["-f", composeFile];
+
+// Resolve this installation's identity so we only ever stop/remove ITS
+// containers and Compose project — never another instance's on the same host.
+let existingEnvContent = "";
+try { existingEnvContent = fs.readFileSync(externalEnvFile, "utf8"); } catch { /* nothing installed yet */ }
+const identity = resolveInstanceIdentity(existingEnvContent);
+process.env.RUNLY_COMPOSE_PROJECT_NAME = identity.projectName;
+process.env.RUNLY_CONTAINER_PREFIX = identity.containerPrefix;
 
 function run(command, args, { cwd = __dirname, failOk = false } = {}) {
   const result = spawnSync(command, args, {

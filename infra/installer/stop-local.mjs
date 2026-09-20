@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
+import { resolveInstanceIdentity } from "./lib/instance-identity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isWindows = process.platform === "win32";
@@ -16,9 +17,26 @@ const isReset = process.argv.includes("--reset");
 const composeFile = path.resolve(__dirname, "docker-compose.yml");
 const linuxComposeOverride = path.resolve(__dirname, "docker-compose.linux.yml");
 const supabaseWorkdir = path.resolve(__dirname, ".supabase-local");
+const supabaseConfig = path.resolve(supabaseWorkdir, "supabase", "config.toml");
+const localEnvFile = path.resolve(__dirname, ".env.local");
 const composeFiles = process.platform === "linux" && fs.existsSync(linuxComposeOverride)
   ? ["-f", composeFile, "-f", linuxComposeOverride]
   : ["-f", composeFile];
+
+// Resolve this installation's identity so we only ever stop/remove ITS
+// containers/project/Supabase resources, never another instance's — even
+// when several Runly local installs share this host.
+let existingEnvContent = "";
+try { existingEnvContent = fs.readFileSync(localEnvFile, "utf8"); } catch { /* nothing installed yet */ }
+const identity = resolveInstanceIdentity(existingEnvContent);
+process.env.RUNLY_COMPOSE_PROJECT_NAME = identity.projectName;
+process.env.RUNLY_CONTAINER_PREFIX = identity.containerPrefix;
+
+let supabaseProjectId = "supabase-local";
+try {
+  const configText = fs.readFileSync(supabaseConfig, "utf8");
+  supabaseProjectId = /^project_id\s*=\s*"([^"]*)"/m.exec(configText)?.[1] || supabaseProjectId;
+} catch { /* no config.toml yet */ }
 
 function run(command, args, { cwd = __dirname, failOk = false } = {}) {
   const result = spawnSync(command, args, {
@@ -80,7 +98,7 @@ if (fs.existsSync(supabaseWorkdir)) {
 } else {
   console.log("  .supabase-local not found — stopping by label instead...");
   // Fall back to label-based cleanup
-  const containers = capture("docker", ["ps", "-a", "--filter", "label=com.supabase.cli.project=supabase-local", "-q"]);
+  const containers = capture("docker", ["ps", "-a", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
   if (containers) {
     containers.split(/\s+/).filter(Boolean).forEach((id) => run("docker", ["stop", id], { failOk: true }));
   }
@@ -93,7 +111,7 @@ run("docker", ["image", "prune", "-f"], { failOk: true });
 if (isReset) {
   // 4. Force-remove any remaining Supabase containers by label
   console.log("\n[4] Removing Supabase containers...");
-  const containers = capture("docker", ["ps", "-a", "--filter", "label=com.supabase.cli.project=supabase-local", "-q"]);
+  const containers = capture("docker", ["ps", "-a", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
   if (containers) {
     containers.split(/\s+/).filter(Boolean).forEach((id) => {
       run("docker", ["rm", "-f", id], { failOk: true });
@@ -104,7 +122,7 @@ if (isReset) {
 
   // 5. Remove networks
   console.log("\n[5] Removing Supabase networks...");
-  const networks = capture("docker", ["network", "ls", "--filter", "label=com.supabase.cli.project=supabase-local", "-q"]);
+  const networks = capture("docker", ["network", "ls", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
   if (networks) {
     networks.split(/\s+/).filter(Boolean).forEach((id) => {
       run("docker", ["network", "rm", id], { failOk: true });
@@ -115,7 +133,7 @@ if (isReset) {
 
   // 6. Remove volumes
   console.log("\n[6] Removing Supabase volumes...");
-  const volumes = capture("docker", ["volume", "ls", "--filter", "label=com.supabase.cli.project=supabase-local", "-q"]);
+  const volumes = capture("docker", ["volume", "ls", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
   if (volumes) {
     volumes.split(/\s+/).filter(Boolean).forEach((id) => {
       run("docker", ["volume", "rm", id], { failOk: true });
