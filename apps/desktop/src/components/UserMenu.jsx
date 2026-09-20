@@ -16,7 +16,7 @@ import {
   AvatarImage,
 } from "@runly/ui";
 import { useAuth } from "../auth/AuthProvider";
-import { RUNLY_DESKTOP_DOWNLOAD_URL } from "../lib/appConfig.js";
+import { RUNLY_DESKTOP_DOWNLOAD_URL, RUNLY_MOBILE_DOWNLOAD_URL } from "../lib/appConfig.js";
 import { getMobilePwaInstallMode } from "../lib/pwaInstallUi.js";
 
 const DESKTOP_REMINDER_KEY = "runly_desktop_reminder_dismissed_at";
@@ -216,6 +216,18 @@ export function UserMenu({
                   En Chrome, toca{" "}
                   <span className="font-medium text-[hsl(var(--foreground))]">⋮ → Añadir a pantalla de inicio</span>.
                 </p>
+              )}
+
+              {platform === "android" && (
+                <a
+                  href={RUNLY_MOBILE_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 w-full text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors pt-0.5"
+                >
+                  <Download size={11} />
+                  o descarga la app nativa (.apk)
+                </a>
               )}
             </div>
           </>

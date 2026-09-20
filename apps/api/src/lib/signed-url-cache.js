@@ -11,14 +11,18 @@
 const cache = new Map();
 const REFRESH_MARGIN = 0.9; // reissue at 90% of the requested TTL, not 100%
 
-export async function getCachedSignedUrls(supabaseAdmin, bucket, objectKeys, expiresIn = 3600) {
+// transformOptions: optional imgproxy transform (e.g. from image-variants.js's
+// transformOptions(variant)) — included in the cache key so a "thumb" and a
+// "full" signature for the same file never collide.
+export async function getCachedSignedUrls(supabaseAdmin, bucket, objectKeys, expiresIn = 3600, transformOptions = undefined) {
   const now = Date.now();
   const ttlMs = expiresIn * 1000 * REFRESH_MARGIN;
+  const variantKey = JSON.stringify(transformOptions ?? null);
   const result = new Map();
   const toFetch = [];
 
   for (const objectKey of objectKeys) {
-    const cacheKey = `${bucket}:${objectKey}`;
+    const cacheKey = `${bucket}:${variantKey}:${objectKey}`;
     const entry = cache.get(cacheKey);
     if (entry && entry.expiresAt > now) {
       result.set(objectKey, entry.url);
@@ -28,10 +32,10 @@ export async function getCachedSignedUrls(supabaseAdmin, bucket, objectKeys, exp
   }
 
   if (toFetch.length > 0) {
-    const { data } = await supabaseAdmin.storage.from(bucket).createSignedUrls(toFetch, expiresIn);
+    const { data } = await supabaseAdmin.storage.from(bucket).createSignedUrls(toFetch, expiresIn, transformOptions);
     for (let i = 0; i < toFetch.length; i++) {
       const url = data?.[i]?.signedUrl ?? null;
-      if (url) cache.set(`${bucket}:${toFetch[i]}`, { url, expiresAt: now + ttlMs });
+      if (url) cache.set(`${bucket}:${variantKey}:${toFetch[i]}`, { url, expiresAt: now + ttlMs });
       result.set(toFetch[i], url);
     }
   }

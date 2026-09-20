@@ -18,6 +18,11 @@ const Card = forwardRef(function Card(
         // on an already-white page). Same pattern SetupWizard/LoginScreen use
         // for their main card, just applied to regular module content.
         variant === "shell" && "glass-shell",
+        // "shell-flat" = same look as "shell" but with no backdrop-filter —
+        // for repeated structural cards (RunlyDetail's hero + section
+        // cards) where blur is cosmetic-only and kept causing rendering
+        // artifacts. See styles.css's .glass-shell-flat.
+        variant === "shell-flat" && "glass-shell-flat",
         variant === "solid" &&
           "bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-sm",
         variant === "bordered" &&

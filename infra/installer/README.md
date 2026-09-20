@@ -40,12 +40,24 @@ de entorno del container en `/runtime-config.js`.
 
 | Modo | Para que | Script |
 |------|----------|--------|
-| `local` | Desarrollo local con Supabase integrado | `setup-local.mjs` |
-| `external` | Produccion contra Supabase externo/self-hosted | `setup-external.mjs` |
+| `local` | Runly + Supabase, ambos en esta misma maquina (sirve para desarrollo **y** para una instalacion de produccion en un solo VPS) | `setup-local.mjs` |
+| `external` | Produccion contra Supabase externo/self-hosted en otra maquina | `setup-external.mjs` |
+
+Dentro del modo `local`, `RUNLY_SUPABASE_MODE` decide como se levanta Supabase:
+
+| `RUNLY_SUPABASE_MODE` | Que es | Para que sirve |
+|---|---|---|
+| `selfhosted` (**por defecto en instalaciones nuevas**) | Stack Supabase self-hosted real via Docker Compose (`infra/installer/supabase/docker-compose.supabase.yml`): Postgres, Auth, REST, Realtime, Storage, Meta y Studio, con secretos unicos por instancia y sin puertos administrativos publicos. | Instalacion de produccion en una sola maquina (VPS o equipo de desarrollo). |
+| `cli-dev` | El flujo antiguo basado en Supabase CLI (`supabase start`). Publica Postgres y Studio en el host sin autenticacion — pensado solo para conveniencia de desarrollo. | Desarrollo local rapido cuando no importa la postura de seguridad. Actívalo con `--dev-supabase-cli` en una instalacion nueva. |
+
+Una vez que una instalacion queda en un modo, las re-ejecuciones de
+`setup-local.mjs` se quedan en ese mismo modo aunque cambies la bandera —
+cambiar de modo en una instalacion existente es una migracion deliberada,
+ver [Migrar de `cli-dev` a `selfhosted`](#migrar-de-cli-dev-a-selfhosted) mas abajo.
 
 ---
 
-## Modo `local` — Desarrollo (Supabase integrado)
+## Modo `local` — Supabase self-hosted (produccion en una sola maquina)
 
 Requiere: Docker Desktop (o Docker Engine + Compose v2), Node.js 20+, npx.
 
@@ -70,29 +82,67 @@ chmod +x bootstrap-local.sh
 > `host.docker.internal` automaticamente y este override lo resuelve via `host-gateway`.
 > En Windows y macOS Docker Desktop lo inyecta solo y este archivo se ignora.
 
-### Que hace `setup-local.mjs`
+### Que hace `setup-local.mjs` (modo `selfhosted`, por defecto)
 
-1. Inicializa Supabase local en `.supabase-local/`.
-2. Levanta Supabase sin `logflare` ni `vector`.
-3. Genera `.env.local` automaticamente con las credenciales del stack local.
+1. Genera (o reutiliza, si ya existen) los secretos de Supabase — password de
+   Postgres, JWT secret, `SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY`
+   firmados localmente, claves de Realtime/Meta — y elige los puertos de
+   Kong/Studio una sola vez por instancia. Nunca se regeneran en
+   reejecuciones.
+2. Levanta `supabase-db`, `supabase-auth`, `supabase-rest`, `supabase-realtime`,
+   `supabase-storage` y `supabase-kong` (mas `supabase-meta`/`supabase-studio`,
+   sin bloquear el resto si tardan) y espera a que pasen su healthcheck.
+   Postgres nunca se publica al host; Studio solo en `127.0.0.1`.
+3. Ejecuta `pnpm db:migrate` y `pnpm db:seed` dentro de un container
+   `docker run --network <proyecto>_default`, contra `supabase-db` por su
+   nombre de servicio Docker.
 4. Descarga el Dev Kit RME3 exportado a `custom-modules/_runly-devkit/` (siempre actualizado
    desde main) usando un `manifest.json` versionado. Incluye `AGENTS.md`,
    guias RME3, `capabilities.runtime.json`, `prompt-starter.txt`,
    `troubleshooting.md` y `golden-path-module/`.
-5. Hace `docker pull` de API, worker y web (y de LiveKit + Redis cuando
-   `LIVEKIT_MODE=embedded`). Luego ejecuta `docker image prune -f`
-   para eliminar layers huerfanos de versiones anteriores.
-6. Ejecuta `pnpm db:migrate` y `pnpm db:seed` dentro del container API.
-7. Levanta `docker compose --profile local up -d`; agrega el perfil `livekit`
-   automaticamente cuando se usa el modo integrado.
+5. Hace `docker pull` de API, worker, web y de las imagenes de Supabase (y de
+   LiveKit + Redis cuando `LIVEKIT_MODE=embedded`). Luego ejecuta
+   `docker image prune -f` para eliminar layers huerfanos.
+6. Levanta `docker compose --profile local up -d` (agrega el perfil `livekit`
+   automaticamente cuando se usa el modo integrado).
+7. Imprime un reporte de "production readiness": si detecta una
+   configuracion critica insegura (por ejemplo, modo `cli-dev`, secretos
+   invalidos), **no** imprime el mensaje de "listo para produccion".
+
+### Modo `cli-dev` (desarrollo, Supabase CLI — no usar en produccion)
+
+```bash
+node ./setup-local.mjs --dev-supabase-cli   # solo en una instalacion NUEVA
+```
+
+Mismo flujo que antes: `supabase init`/`supabase start -x logflare -x vector`
+en `.supabase-local/`, credenciales leidas de `supabase status -o env`.
+Publica Postgres (`54322`) y Studio (`54323`) en el host sin autenticacion —
+por eso el reporte final siempre marca esta instalacion como no apta para
+produccion.
 
 ### Opciones utiles
 
 ```bash
-npm run runly:local       # instalacion / actualizacion completa
+npm run runly:local       # instalacion / actualizacion completa (modo actual de la instalacion)
 npm run runly:local:docs  # solo descarga/refresca el Dev Kit
 npm run runly:local:quick # salta docker pull y reutiliza imagenes locales
-node ./setup-local.mjs --skip-compose-up  # solo inicializa Supabase, no levanta Runly
+node ./setup-local.mjs --skip-compose-up  # solo prepara secretos/env, no levanta contenedores
+```
+
+### Migrar de `cli-dev` a `selfhosted`
+
+No hay migracion automatica de datos (son dos Postgres distintos). Para
+sustituir una instalacion `cli-dev` existente por una `selfhosted` nueva:
+
+```bash
+# 1. Respalda tus datos si los necesitas (pg_dump contra el Postgres del CLI).
+# 2. Detiene y borra la instalacion cli-dev por completo:
+node ./stop-local.mjs --reset
+# 3. Instala en modo selfhosted (el default):
+node ./setup-local.mjs
+# 4. Si tenias datos, restaura el dump contra el nuevo Postgres:
+#    docker exec -i <prefijo>-supabase-db psql -U postgres -d postgres < backup.sql
 ```
 
 En PowerShell, si `npm` falla por `ExecutionPolicy`, usa `npm.cmd`:
@@ -272,9 +322,18 @@ de el se derivan:
 - `RUNLY_CONTAINER_PREFIX` — prefijo de `container_name` para cada servicio
   (los nombres de contenedor son literales y Compose no los aisla por si
   solo).
-- En modo `local`, el `project_id` de Supabase CLI en
-  `.supabase-local/supabase/config.toml` (evita que dos instancias locales
-  colisionen en los contenedores/volumenes que administra Supabase CLI).
+- En modo `local` con `RUNLY_SUPABASE_MODE=selfhosted`, los servicios
+  `supabase-*` viven en el mismo proyecto Compose (mismo `RUNLY_COMPOSE_PROJECT_NAME`),
+  asi que heredan el mismo aislamiento de red/volumenes; sus puertos propios
+  (`RUNLY_SUPABASE_KONG_HOST_PORT`, `RUNLY_SUPABASE_STUDIO_HOST_PORT`) se
+  eligen automaticamente la primera vez, evitando colisiones con otra
+  instancia en el mismo host.
+- En modo `local` con `RUNLY_SUPABASE_MODE=cli-dev`, el `project_id` de
+  Supabase CLI en `.supabase-local/supabase/config.toml` (evita que dos
+  instancias locales colisionen en los contenedores/volumenes que administra
+  Supabase CLI) — pero sus puertos fijos (`54321-54329`) **no** se derivan de
+  `RUNLY_INSTANCE_ID`, asi que dos instancias `cli-dev` en el mismo host si
+  pueden colisionar entre si (una razon mas para preferir `selfhosted`).
 
 Una instalacion **ya existente** (archivo `.env.*` presente sin
 `RUNLY_INSTANCE_ID`) conserva el nombre de proyecto/prefijo heredado
@@ -300,12 +359,18 @@ LiveKit embebido en el mismo host Linux debe usar puertos distintos
 practico remapear — para una segunda instancia con dominio propio, usa
 `LIVEKIT_TLS_MODE=external` con un proxy inverso compartido delante.
 
-**No cubierto por esta version del instalador:** Supabase self-hosted vía
-Docker Compose como alternativa a Supabase CLI en modo `local` (para
-produccion sin la CLI), generacion automatica de configuracion para
-Nginx/Caddy/Traefik existentes, y deteccion/asignacion automatica de puertos
-libres. El instalador valida y usa los puertos que le indiques, pero no
-escanea el host por ti — revisa manualmente que el puerto elegido este libre.
+**Cubierto desde esta version:** Supabase self-hosted vía Docker Compose
+(`RUNLY_SUPABASE_MODE=selfhosted`) como alternativa de produccion a la
+Supabase CLI en modo `local` — ver la seccion de arriba.
+
+**No cubierto por esta version del instalador:** generacion automatica de
+configuracion para Nginx/Caddy/Traefik existentes (el administrador sigue
+configurando su propio proxy hacia `RUNLY_API_HOST_PORT` / `RUNLY_WEB_HOST_PORT`
+/ `RUNLY_SUPABASE_KONG_HOST_PORT`, igual que hoy). Los puertos de Kong/Studio
+de Supabase se escanean y asignan automaticamente **una sola vez** por
+instancia nueva (ver `lib/supabase-selfhosted-config.mjs`); los puertos de
+Runly/LiveKit/Collabora siguen sin escaneo automatico — el instalador valida
+y usa los que le indiques, pero no escanea el host por ti para esos.
 
 ---
 
@@ -320,7 +385,8 @@ para eliminar layers huerfanos sin tocar imagenes de otros proyectos en el mismo
 |--------|---------|
 | Primera instalacion o tras reset | `node ./setup-local.mjs` (o `./setup-local.sh`) |
 | Detener (conserva datos) | `node ./stop-local.mjs` (o `./stop-local.sh`) |
-| Reiniciar sin reinstalar | `docker compose --profile local --profile livekit --profile livekit-tls up -d` |
+| Reiniciar sin reinstalar (`selfhosted`) | `docker compose -f docker-compose.yml -f supabase/docker-compose.supabase.yml --profile local --profile livekit --profile livekit-tls up -d` |
+| Reiniciar sin reinstalar (`cli-dev`) | `docker compose --profile local --profile livekit --profile livekit-tls up -d` |
 | Reset total (borra todo) | `node ./stop-local.mjs --reset` |
 
 ### External / Produccion

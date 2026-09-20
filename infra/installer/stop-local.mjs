@@ -16,12 +16,10 @@ const isWindows = process.platform === "win32";
 const isReset = process.argv.includes("--reset");
 const composeFile = path.resolve(__dirname, "docker-compose.yml");
 const linuxComposeOverride = path.resolve(__dirname, "docker-compose.linux.yml");
+const supabaseComposeFile = path.resolve(__dirname, "supabase", "docker-compose.supabase.yml");
 const supabaseWorkdir = path.resolve(__dirname, ".supabase-local");
 const supabaseConfig = path.resolve(supabaseWorkdir, "supabase", "config.toml");
 const localEnvFile = path.resolve(__dirname, ".env.local");
-const composeFiles = process.platform === "linux" && fs.existsSync(linuxComposeOverride)
-  ? ["-f", composeFile, "-f", linuxComposeOverride]
-  : ["-f", composeFile];
 
 // Resolve this installation's identity so we only ever stop/remove ITS
 // containers/project/Supabase resources, never another instance's — even
@@ -31,6 +29,24 @@ try { existingEnvContent = fs.readFileSync(localEnvFile, "utf8"); } catch { /* n
 const identity = resolveInstanceIdentity(existingEnvContent);
 process.env.RUNLY_COMPOSE_PROJECT_NAME = identity.projectName;
 process.env.RUNLY_CONTAINER_PREFIX = identity.containerPrefix;
+
+function parseEnvValue(content, key) {
+  const match = new RegExp(`^${key}=(.*)$`, "m").exec(content ?? "");
+  return match ? match[1].trim().replace(/^(['"])(.*)\1$/, "$2") : undefined;
+}
+
+// cli-dev: this install's Supabase is CLI-managed (.supabase-local/), stopped
+// via `supabase stop` below. selfhosted: it's a Compose service in
+// supabaseComposeFile, stopped as part of the normal `docker compose down`.
+// Pre-feature installs (no RUNLY_SUPABASE_MODE recorded yet, but a CLI
+// workdir already exists) are treated as cli-dev, mirroring setup-local.mjs.
+const supabaseMode = parseEnvValue(existingEnvContent, "RUNLY_SUPABASE_MODE")
+  || (fs.existsSync(supabaseConfig) ? "cli-dev" : "selfhosted");
+const composeFiles = [
+  "-f", composeFile,
+  ...(process.platform === "linux" && fs.existsSync(linuxComposeOverride) ? ["-f", linuxComposeOverride] : []),
+  ...(supabaseMode === "selfhosted" && fs.existsSync(supabaseComposeFile) ? ["-f", supabaseComposeFile] : []),
+];
 
 let supabaseProjectId = "supabase-local";
 try {
@@ -90,18 +106,24 @@ if (fs.existsSync(composeFile)) {
   console.log("[1] docker-compose.yml not found, skipping compose down.");
 }
 
-// 2. Stop Supabase local stack
-console.log("\n[2] Stopping Supabase local stack...");
-if (fs.existsSync(supabaseWorkdir)) {
-  const noBackup = isReset ? ["--no-backup"] : [];
-  run("npx", ["--yes", "supabase", "stop", "--workdir", supabaseWorkdir, ...noBackup], { failOk: true });
-} else {
-  console.log("  .supabase-local not found — stopping by label instead...");
-  // Fall back to label-based cleanup
-  const containers = capture("docker", ["ps", "-a", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
-  if (containers) {
-    containers.split(/\s+/).filter(Boolean).forEach((id) => run("docker", ["stop", id], { failOk: true }));
+// 2. Stop Supabase local stack (cli-dev only — selfhosted's supabase-* services
+// were already stopped/removed as part of step 1's compose down, since they
+// carry no `profiles:` restriction and so are always included in that call).
+if (supabaseMode === "cli-dev") {
+  console.log("\n[2] Stopping Supabase local stack (Supabase CLI)...");
+  if (fs.existsSync(supabaseWorkdir)) {
+    const noBackup = isReset ? ["--no-backup"] : [];
+    run("npx", ["--yes", "supabase", "stop", "--workdir", supabaseWorkdir, ...noBackup], { failOk: true });
+  } else {
+    console.log("  .supabase-local not found — stopping by label instead...");
+    // Fall back to label-based cleanup
+    const containers = capture("docker", ["ps", "-a", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
+    if (containers) {
+      containers.split(/\s+/).filter(Boolean).forEach((id) => run("docker", ["stop", id], { failOk: true }));
+    }
   }
+} else {
+  console.log("\n[2] Self-hosted Supabase already stopped in step 1.");
 }
 
 // Always prune dangling images after stopping — safe, only removes untagged layers.
@@ -109,37 +131,45 @@ console.log("\n[3] Pruning dangling images...");
 run("docker", ["image", "prune", "-f"], { failOk: true });
 
 if (isReset) {
-  // 4. Force-remove any remaining Supabase containers by label
-  console.log("\n[4] Removing Supabase containers...");
-  const containers = capture("docker", ["ps", "-a", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
-  if (containers) {
-    containers.split(/\s+/).filter(Boolean).forEach((id) => {
-      run("docker", ["rm", "-f", id], { failOk: true });
-    });
-  } else {
-    console.log("  No leftover containers.");
-  }
+  if (supabaseMode === "cli-dev") {
+    // 4. Force-remove any remaining Supabase containers by label
+    console.log("\n[4] Removing Supabase containers...");
+    const containers = capture("docker", ["ps", "-a", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
+    if (containers) {
+      containers.split(/\s+/).filter(Boolean).forEach((id) => {
+        run("docker", ["rm", "-f", id], { failOk: true });
+      });
+    } else {
+      console.log("  No leftover containers.");
+    }
 
-  // 5. Remove networks
-  console.log("\n[5] Removing Supabase networks...");
-  const networks = capture("docker", ["network", "ls", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
-  if (networks) {
-    networks.split(/\s+/).filter(Boolean).forEach((id) => {
-      run("docker", ["network", "rm", id], { failOk: true });
-    });
-  } else {
-    console.log("  No leftover networks.");
-  }
+    // 5. Remove networks
+    console.log("\n[5] Removing Supabase networks...");
+    const networks = capture("docker", ["network", "ls", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
+    if (networks) {
+      networks.split(/\s+/).filter(Boolean).forEach((id) => {
+        run("docker", ["network", "rm", id], { failOk: true });
+      });
+    } else {
+      console.log("  No leftover networks.");
+    }
 
-  // 6. Remove volumes
-  console.log("\n[6] Removing Supabase volumes...");
-  const volumes = capture("docker", ["volume", "ls", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
-  if (volumes) {
-    volumes.split(/\s+/).filter(Boolean).forEach((id) => {
-      run("docker", ["volume", "rm", id], { failOk: true });
-    });
+    // 6. Remove volumes
+    console.log("\n[6] Removing Supabase volumes...");
+    const volumes = capture("docker", ["volume", "ls", "--filter", `label=com.supabase.cli.project=${supabaseProjectId}`, "-q"]);
+    if (volumes) {
+      volumes.split(/\s+/).filter(Boolean).forEach((id) => {
+        run("docker", ["volume", "rm", id], { failOk: true });
+      });
+    } else {
+      console.log("  No leftover volumes.");
+    }
   } else {
-    console.log("  No leftover volumes.");
+    // Self-hosted named volumes (supabase-db-data, supabase-db-config,
+    // supabase-storage-data) were already removed by step 1's
+    // `down --volumes`, which is namespaced to this instance's own Compose
+    // project — no label-based cross-instance cleanup needed here.
+    console.log("\n[4-6] Self-hosted Supabase volumes already removed in step 1 (--volumes).");
   }
 
   // 7. Remove generated files

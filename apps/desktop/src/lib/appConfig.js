@@ -8,6 +8,9 @@ export const RUNLY_GITHUB_REPO = 'raulbellosom/runly-erp'
 export const RUNLY_DESKTOP_RELEASE_ASSET_NAME = 'Runly-ERP-Setup.exe'
 export const RUNLY_DESKTOP_DOWNLOAD_URL = `https://github.com/${RUNLY_GITHUB_REPO}/releases/latest/download/${RUNLY_DESKTOP_RELEASE_ASSET_NAME}`
 
+export const RUNLY_MOBILE_RELEASE_ASSET_NAME = 'Runly-ERP.apk'
+export const RUNLY_MOBILE_DOWNLOAD_URL = `https://github.com/${RUNLY_GITHUB_REPO}/releases/latest/download/${RUNLY_MOBILE_RELEASE_ASSET_NAME}`
+
 export const RUNLY_SERVER_STORE_FILE = 'store.json'
 export const RUNLY_SERVER_URL_KEY = 'serverUrl'
 export const RUNLY_PUBLIC_DESKTOP_CONFIG_PATH = '/public/website/desktop/config'

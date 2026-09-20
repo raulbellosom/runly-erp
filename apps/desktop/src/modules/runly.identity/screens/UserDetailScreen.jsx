@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   RunlyDetail,
-  LoadingState,
   ErrorState,
   ConfirmDialog,
   DetailActionBar,
@@ -83,14 +82,7 @@ export default function UserDetailScreen() {
     },
   });
 
-  if (userQuery.isLoading) {
-    return (
-      <div className="p-4 md:p-6">
-        <LoadingState message="Cargando usuario" />
-      </div>
-    );
-  }
-  if (!user) {
+  if (!userQuery.isLoading && !user) {
     return (
       <div className="p-4 md:p-6">
         <ErrorState title="Usuario no encontrado" />
@@ -103,6 +95,7 @@ export default function UserDetailScreen() {
       <RunlyDetail
         blueprint={IDENTITY_USER_DETAIL}
         data={user}
+        loading={userQuery.isLoading}
         token={token}
         companyId={activeCompanyId}
         apiBaseUrl={API_BASE}
@@ -142,7 +135,7 @@ export default function UserDetailScreen() {
         onOpenChange={setDeleteOpen}
         title="¿Eliminar usuario?"
         description="Esta acción es irreversible. Se eliminará la cuenta del usuario y no podrá recuperarse."
-        detail={user.displayName || user.email}
+        detail={user?.displayName || user?.email}
         confirmLabel="Eliminar"
         onConfirm={() => {
           if (isProtectedAdminUser(user)) {

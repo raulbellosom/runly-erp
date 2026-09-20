@@ -897,7 +897,14 @@ export function PublicWebsiteEntry() {
   if (resolveQuery.isError)   return <PublicWebsite404 />
   if (resolveData?.initialized === false) return null
 
-  const sourceType = resolveData?.site?.sourceType ?? 'builder'
+  // No site row at all — website module not initialized/configured for this
+  // company (e.g. fresh install, or the wizard was never completed). There is
+  // no public site to show, so the base route shouldn't exist for visitors.
+  if (!resolveData?.site) {
+    return <Navigate to="/app" replace />
+  }
+
+  const sourceType = resolveData.site.sourceType ?? 'builder'
 
   // source_type = 'none': no public site — go to login
   if (sourceType === 'none') {

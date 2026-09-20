@@ -140,7 +140,7 @@ export function DetailHero({
 
   if (bare) return <div className="p-4 sm:p-5">{inner}</div>;
   return (
-    <Card variant="shell" className="overflow-hidden p-4 sm:p-5">
+    <Card variant="shell-flat" className="overflow-hidden p-4 sm:p-5">
       {inner}
     </Card>
   );

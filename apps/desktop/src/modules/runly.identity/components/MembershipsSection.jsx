@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, SelectField, SwitchField, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, EmptyState } from "@runly/ui";
+import { Badge, Button, SelectField, SwitchField, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, EmptyState } from "@runly/ui";
 import { Building2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
+import { CompanyLogo } from "../../../components/CompanySwitcher";
 
 const NO_ROLE_VALUE = "__none__";
 
@@ -76,14 +77,31 @@ export default function MembershipsSection({ data }) {
       {memberships.length === 0 ? (
         <EmptyState icon={Building2} title="Sin empresas asignadas" description="Este usuario no tiene acceso a ninguna empresa todavía." />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {memberships.map((membership) => (
-            <div key={membership.id} className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--border))] p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{membership.companyName ?? "Empresa"}</p>
+            <div key={membership.id} className="flex flex-col gap-3 rounded-lg border border-[hsl(var(--border))] p-3">
+              <div className="flex items-center gap-2.5">
+                <CompanyLogo
+                  company={{
+                    name: membership.companyName,
+                    logoUrl: membership.companyLogoUrl,
+                    primaryColor: membership.companyPrimaryColor,
+                  }}
+                  size={28}
+                />
+                <p
+                  className="min-w-0 flex-1 text-sm font-medium leading-snug"
+                  title={membership.companyName ?? "Empresa"}
+                >
+                  {membership.companyName ?? "Empresa"}
+                </p>
+                <Badge variant={membership.enabled ? "success" : "secondary"} className="shrink-0">
+                  {membership.enabled ? "Activo" : "Inactivo"}
+                </Badge>
               </div>
               <div className="flex items-center gap-2">
                 <SelectField
+                  className="flex-1"
                   value={membership.roleId ?? NO_ROLE_VALUE}
                   options={roleOptionsForCompany(roles, membership.companyId)}
                   disabled={savingMembershipId === membership.id}

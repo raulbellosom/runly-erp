@@ -1,5 +1,15 @@
 # Supabase Self-hosted para Runly ERP
 
+> **Deprecado para el modo `local`.** Este directorio es un stub manual y
+> desconectado del instalador — nunca lo invoca `setup-local.mjs`. Para una
+> instalacion real de Supabase self-hosted gestionada por Runly (secretos por
+> instancia, puertos administrativos no publicos, healthchecks, migrate/seed
+> automatico), usa `RUNLY_SUPABASE_MODE=selfhosted` en
+> `infra/installer/setup-local.mjs` — ver `infra/installer/README.md` y
+> `infra/installer/supabase/VENDORED_FROM.md`. Este README se conserva solo
+> como referencia para quien administre un Supabase self-hosted totalmente
+> independiente (modo `external`, en otra maquina).
+
 Este bundle no copia el `docker-compose.yml` oficial completo de Supabase porque cambia con frecuencia. La forma recomendada es mantenerlo como infraestructura externa versionada dentro de `infra/supabase/runtime`.
 
 ## Opción recomendada

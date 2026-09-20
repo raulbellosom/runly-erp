@@ -144,6 +144,7 @@ export function resolveKpis(schema, record) {
         label: def.label ? String(def.label) : String(def.field ?? ""),
         rawValue: raw === undefined ? null : raw,
         type: def.type ? String(def.type) : "text",
+        options: Array.isArray(def.options) ? def.options : null,
         icon:
           typeof def.icon === "string" && def.icon.trim() ? def.icon.trim() : null,
         href,

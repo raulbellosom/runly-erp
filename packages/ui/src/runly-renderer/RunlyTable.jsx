@@ -686,7 +686,7 @@ export function RunlyTable({
 
     if (loading) {
       return (
-        <div className="rounded-2xl glass-shell overflow-clip">
+        <div className="rounded-2xl glass-shell-flat overflow-clip">
           <Table>
             <TableHeader>
               <TableRow className="bg-[hsl(var(--muted))]/40 hover:bg-[hsl(var(--muted))]/40">
@@ -743,7 +743,7 @@ export function RunlyTable({
     }
 
     return (
-      <div className="rounded-2xl glass-shell overflow-clip">
+      <div className="rounded-2xl glass-shell-flat overflow-clip">
         <Table>
           <TableHeader>
             <TableRow className="bg-[hsl(var(--muted))]/40 hover:bg-[hsl(var(--muted))]/40">
@@ -939,7 +939,7 @@ export function RunlyTable({
 
     if (loading) {
       return (
-        <div className="rounded-2xl glass-shell overflow-clip">
+        <div className="rounded-2xl glass-shell-flat overflow-clip">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={`sk-list-${i}`}
@@ -990,7 +990,7 @@ export function RunlyTable({
     }
 
     return (
-      <div className="rounded-2xl glass-shell overflow-clip">
+      <div className="rounded-2xl glass-shell-flat overflow-clip">
         {rows.map((row, rowIndex) => {
           const id = getRowId(row, rowIndex);
           const isSelected = selectedIds.has(id);

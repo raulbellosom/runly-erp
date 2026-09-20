@@ -82,7 +82,7 @@ export function StatStrip({ items, className, bare = false }) {
       {list.map((item) => {
         const body = (
           <Card
-            variant="shell"
+            variant="shell-flat"
             className="flex h-full min-w-[150px] snap-start flex-col justify-between gap-2 p-3 sm:min-w-0"
           >
             <div className="flex items-center justify-between gap-2">

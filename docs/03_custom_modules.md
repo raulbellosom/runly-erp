@@ -328,17 +328,18 @@ Available from Phase 3. In Phase 1–2, register screens manually in `apps/deskt
 
 `api/index.js` exports a default factory function that returns a Hono router. The Route Loader mounts this automatically in Phase 4. In Phase 1–2, import and mount it manually in `apps/api/src/index.js`.
 
+`requirePermission` and `moduleContext` are not importable — they are injected by the Route Loader as parameters to the factory function (`apps/api/src/services/route-loader-service.js`). There is no resolvable `@runly/api` package to import them from.
+
 ```js
 // modules/custom/custom.deliveries/api/index.js
 import { Hono } from 'hono'
-import { requirePermission } from '@runly/api/middleware'
 import { deliveriesService } from './deliveries-service.js'
-import { registerModuleHandler } from '@runly/api/services/module-cleanup-registry'
 import { deliveriesCleanupHandler } from './deliveries-cleanup.js'
 
-registerModuleHandler('custom.deliveries', deliveriesCleanupHandler)
+export default function createDeliveriesRouter({ prisma, requirePermission, moduleContext }) {
+  // Bound to this module's own key by the Route Loader — see "Cleanup handler" below.
+  moduleContext?.cleanup?.registerHandler(deliveriesCleanupHandler)
 
-export default function createDeliveriesRouter() {
   const app = new Hono()
 
   app.get('/deliveries/shipments', requirePermission('deliveries.shipments.read'), async (c) => {
@@ -388,7 +389,9 @@ export const updateShipmentSchema = createShipmentSchema.partial()
 
 Required when `resettable: true` or `supportsDataPurge: true`. Must scope all deletes to the active company. Delete child rows before parent rows to respect FK constraints.
 
-RME3 tables are not Prisma models — use `prisma.$queryRaw` tagged template literals, never `prisma.<model>` accessors.
+RME3 tables are not Prisma models — use `prisma.$queryRaw`/`tx.$executeRaw` tagged template literals, never `prisma.<model>` accessors.
+
+Register the handler by calling `moduleContext.cleanup.registerHandler(handler)` from inside the `api/index.js` factory function (see above) — it is bound to this module's own key, so there is no `moduleKey` argument to get wrong. `count` receives the real `prisma` client (used for dry-run reporting outside a transaction); `purge` receives `tx`, the transaction client the platform runs the whole reset/uninstall inside — mixing these up silently breaks the transaction. Use `$executeRaw` for the deletes, not `$queryRaw`: `$executeRaw` returns the affected row count directly, while a `DELETE ... RETURNING COUNT(*)` (aggregating inside `RETURNING`) is invalid SQL — `RETURNING` is evaluated per affected row, it cannot contain an aggregate.
 
 ```js
 // modules/custom/custom.deliveries/api/deliveries-cleanup.js
@@ -396,10 +399,10 @@ RME3 tables are not Prisma models — use `prisma.$queryRaw` tagged template lit
 export const deliveriesCleanupHandler = {
   async count({ prisma, companyId }) {
     const [shipmentRows] = await prisma.$queryRaw`
-      SELECT COUNT(*)::int AS count FROM deliveries_shipment WHERE company_id = ${companyId}
+      SELECT COUNT(*)::int AS count FROM deliveries_shipment WHERE company_id = ${companyId}::uuid
     `
     const [carrierRows] = await prisma.$queryRaw`
-      SELECT COUNT(*)::int AS count FROM deliveries_carrier WHERE company_id = ${companyId}
+      SELECT COUNT(*)::int AS count FROM deliveries_carrier WHERE company_id = ${companyId}::uuid
     `
     return [
       { entity: 'Shipment', rows: shipmentRows.count, companyScoped: true },
@@ -407,12 +410,13 @@ export const deliveriesCleanupHandler = {
     ]
   },
 
-  async purge({ prisma, companyId }) {
-    const [{ count: shipmentsDeleted }] = await prisma.$queryRaw`
-      DELETE FROM deliveries_shipment WHERE company_id = ${companyId} RETURNING COUNT(*)::int AS count
+  async purge({ tx, companyId }) {
+    // Shipment references Carrier — delete it first.
+    const shipmentsDeleted = await tx.$executeRaw`
+      DELETE FROM deliveries_shipment WHERE company_id = ${companyId}::uuid
     `
-    const [{ count: carriersDeleted }] = await prisma.$queryRaw`
-      DELETE FROM deliveries_carrier WHERE company_id = ${companyId} RETURNING COUNT(*)::int AS count
+    const carriersDeleted = await tx.$executeRaw`
+      DELETE FROM deliveries_carrier WHERE company_id = ${companyId}::uuid
     `
     return shipmentsDeleted + carriersDeleted
   },

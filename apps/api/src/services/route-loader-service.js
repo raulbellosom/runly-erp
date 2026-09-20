@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { Hono } from 'hono'
 import { resolveModuleRoots } from './module-root-resolver.js'
 import { publishNotificationFromContext } from './notification-publisher.js'
+import { registerModuleHandler, getModuleHandler } from './module-cleanup-registry.js'
 
 function isWithinPath(parentPath, childPath) {
   const rel = path.relative(parentPath, childPath)
@@ -326,6 +327,17 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
         notifications: {
           publishFromContext: (c, payload, options) =>
             publishNotificationFromContext(prisma, c, payload, options),
+        },
+        cleanup: {
+          // Bound to this module's own key so a handler can never be registered
+          // under the wrong moduleKey. Docs show a bare `registerModuleHandler`
+          // import from `@runly/api/services/module-cleanup-registry`, but that
+          // subpath isn't actually resolvable from an externally-distributed
+          // module (apps/api is never symlinked as a dependency for any other
+          // workspace package) — moduleContext is the real, working injection
+          // point, the same pattern already used for `notifications` above.
+          registerHandler: (handler) => registerModuleHandler(moduleKey, handler),
+          getHandler: () => getModuleHandler(moduleKey),
         },
       },
     })

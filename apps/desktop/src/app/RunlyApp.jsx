@@ -85,6 +85,25 @@ function SidebarSkeleton({ collapsed }) {
   );
 }
 
+// Isolates useIsFetching/useIsMutating from RunlyApp's own render. Both
+// hooks re-render their subscriber on EVERY query fetch/mutation state
+// transition ANYWHERE in the app — with the realtime revision channels
+// polling every 10s, notifications every 30s, memberships every 15s, etc.,
+// that's near-continuous. RunlyApp renders <Outlet/> (the entire active
+// screen) directly in its own body, so subscribing to these hooks there
+// forced the whole visible page to re-render on every poll tick, which is
+// what kept re-triggering the glass-shell backdrop-filter flicker across
+// every screen no matter what else got fixed — the re-render source itself
+// was never inside any individual screen. Moving the subscription to this
+// sibling of <Outlet/> means only the topbar's sync indicator re-renders on
+// each tick, not the page content. See the "glassic flicker" bug report.
+function TopbarWithNetworkStatus(props) {
+  const isFetching = useIsFetching();
+  const isMutating = useIsMutating();
+  const networkBusy = isFetching > 0 || isMutating > 0;
+  return <Topbar {...props} networkBusy={networkBusy} />;
+}
+
 export function RunlyApp() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -129,8 +148,6 @@ export function RunlyApp() {
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(false);
-  const isFetching = useIsFetching();
-  const isMutating = useIsMutating();
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -183,7 +200,6 @@ export function RunlyApp() {
       ? layoutMode === "default" && (activeModule?.navigation?.length ?? 0) > 0
       : true);
   const sidebarLoading = showSidebar && modulesLoading && !activeModule;
-  const networkBusy = isFetching > 0 || isMutating > 0;
 
   const sidebarSlot = useMemo(() => {
     if (!activeModule) return null
@@ -206,7 +222,7 @@ export function RunlyApp() {
             fall back to content height and make <main> double-scroll).
             With height set, `bottom:0` is ignored as over-constrained. */}
         <div className="app-shell-root fixed inset-x-0 top-0 h-dvh overflow-hidden bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <Topbar
+      <TopbarWithNetworkStatus
         onLauncherOpen={openLauncher}
         onMobileMenuToggle={showSidebar ? () => setMobileOpen((o) => !o) : undefined}
         onModuleMenuToggle={
@@ -214,7 +230,6 @@ export function RunlyApp() {
             ? () => setSidebarOverlayOpen((o) => !o)
             : undefined
         }
-        networkBusy={networkBusy}
         activeModuleKey={activeModule?.key ?? moduleKeyFromPath}
         canInstall={canInstall}
         manualInstallReady={manualInstallReady}

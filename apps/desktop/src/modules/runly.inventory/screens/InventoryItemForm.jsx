@@ -60,7 +60,7 @@ export default function InventoryItemForm() {
           apiBaseUrl={API_BASE}
           asideActions={
             isEdit && editItem?.id ? (
-              <div className="glass-shell flex flex-col gap-2 rounded-2xl p-3 sm:flex-row sm:items-stretch xl:flex-col">
+              <div className="glass-shell-flat flex flex-col gap-2 rounded-2xl p-3 sm:flex-row sm:items-stretch xl:flex-col">
                 <Button
                   type="button"
                   variant="glass"

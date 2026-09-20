@@ -15,8 +15,19 @@
 -- the app (chat, calls, company presence/events) opts into `private: true`
 -- today, so enabling RLS here has no effect on them — a non-private channel
 -- never consults realtime.messages policies at all.
-
-ALTER TABLE "realtime"."messages" ENABLE ROW LEVEL SECURITY;
+--
+-- Deliberately NOT running `ALTER TABLE "realtime"."messages" ENABLE ROW
+-- LEVEL SECURITY` here (removed 2026-09-20): Supabase's own Realtime
+-- Authorization docs confirm RLS is already enabled by default on this
+-- table, and the statement requires literal ownership of realtime.messages
+-- (owned by supabase_realtime_admin) — a role the `postgres` connection
+-- string used by every self-hosted/CLI-provisioned Supabase instance is NOT
+-- a member of, unlike CREATE/ALTER/DROP POLICY on the same table, which
+-- Postgres permits without ownership. Verified by reproducing this exact
+-- migration against a brand-new `supabase start` instance: `relrowsecurity`
+-- is already `t` before this migration runs, and re-issuing ENABLE ROW LEVEL
+-- SECURITY as `postgres` fails with `must be owner of table messages`
+-- (42501) while the CREATE POLICY statements below succeed unmodified.
 
 -- note:ydoc:<uuid> — the TipTap collaborative editor. Never joined by an
 -- unauthenticated/public client (NoteEditor.jsx gates collabEnabled on

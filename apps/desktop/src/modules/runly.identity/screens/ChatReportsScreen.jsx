@@ -90,7 +90,7 @@ export default function ChatReportsScreen() {
 
       {canRead ? (
         <div className="space-y-4">
-          <div className="glass-shell max-w-xs rounded-xl p-3">
+          <div className="glass-shell-flat max-w-xs rounded-xl p-3">
             <SelectField
               label="Estado"
               value={statusFilter}

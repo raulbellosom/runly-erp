@@ -15,7 +15,7 @@ import { BellRing, Building2, Clock3, Coins, Mail, Settings } from "lucide-react
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
-import { RUNLY_DESKTOP_DOWNLOAD_URL } from "../../../lib/appConfig.js";
+import { RUNLY_DESKTOP_DOWNLOAD_URL, RUNLY_MOBILE_DOWNLOAD_URL } from "../../../lib/appConfig.js";
 import { CURRENCY_OPTIONS, TIME_ZONE_OPTIONS } from "../../../lib/localeCatalogs";
 
 function SettingsTabs() {
@@ -185,24 +185,33 @@ export default function InstanceSettings() {
 
         <Card className="p-0">
           <div className="px-4 py-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 rounded-t-2xl">
-            <p className="text-sm font-semibold">App de escritorio</p>
+            <p className="text-sm font-semibold">Apps nativas</p>
           </div>
           <div className="p-4 space-y-4">
             <div className="space-y-1">
               <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                ¿Quieres usar Runly ERP desde tu escritorio?
+                ¿Quieres usar Runly ERP fuera del navegador?
               </p>
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                Descarga la app y conéctala a esta instancia.
+                Descarga la app nativa y conéctala a esta instancia.
               </p>
             </div>
 
-            <Button
-              type="button"
-              onClick={() => window.open(RUNLY_DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer")}
-            >
-              Descargar para Windows
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => window.open(RUNLY_DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer")}
+              >
+                Descargar para Windows
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.open(RUNLY_MOBILE_DOWNLOAD_URL, "_blank", "noopener,noreferrer")}
+              >
+                Descargar para Android (.apk)
+              </Button>
+            </div>
           </div>
         </Card>
       </div>

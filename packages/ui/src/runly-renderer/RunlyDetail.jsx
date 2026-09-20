@@ -940,7 +940,8 @@ function FieldLabel({ field }) {
 export function RunlyDetail({
   blueprint,
   fields,
-  data,
+  data: dataProp,
+  loading = false,
   onEdit,
   onBack,
   heroActions,
@@ -956,6 +957,21 @@ export function RunlyDetail({
     () => normalizeSections(schema, fieldMap),
     [schema, fieldMap],
   );
+  // loading=true + no data yet: fall back to {} so the section/hero shell
+  // (the .glass-shell-flat divs below) renders immediately with blank ("—")
+  // field values, instead of this whole tree being swapped in for the first
+  // time only once real data arrives. That swap — a totally different
+  // component (e.g. a caller's <LoadingState/>) being replaced by this one —
+  // is what caused a backdrop-filter "first paint" flash: Chromium briefly
+  // renders a freshly-created blurred layer blank/white before it has
+  // sampled real content behind it. Callers that pass `loading` and always
+  // render <RunlyDetail/> (rather than conditionally swapping it in) keep
+  // the same glass layers mounted across the loading→loaded transition, so
+  // there's nothing left to freshly paint once data lands — see the
+  // "glassic flicker" bug report. Callers that never pass `loading` (the
+  // default) get byte-for-byte the original behavior below.
+  const data =
+    loading && (!dataProp || typeof dataProp !== "object") ? {} : dataProp;
   const heroModel = useMemo(
     () =>
       data && typeof data === "object"
@@ -972,7 +988,7 @@ export function RunlyDetail({
     [sections, schema?.layout],
   );
 
-  if (!data || typeof data !== "object") {
+  if (!loading && (!data || typeof data !== "object")) {
     return (
       <Alert variant="warning">
         <AlertTitle>Sin información</AlertTitle>
@@ -1008,7 +1024,7 @@ export function RunlyDetail({
     <div
       key={section.id}
       className={cn(
-        "glass-shell rounded-xl px-5 py-4 space-y-4",
+        "glass-shell-flat rounded-xl px-5 py-4 space-y-4",
         section.type === "fields" &&
           "border-l-2 border-l-(--brand-primary) shadow-[inset_10px_0_16px_-14px_var(--brand-primary)]",
       )}

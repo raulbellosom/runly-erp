@@ -119,7 +119,7 @@ export default function UserEditScreen() {
           </Button>
         }
       />
-      {(isSelf || isSystemAdmin) && <Card variant="shell" className="mt-6 p-4 md:p-5 space-y-3">
+      {(isSelf || isSystemAdmin) && <Card variant="shell-flat" className="mt-6 p-4 md:p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Camera className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
           <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">Foto de perfil</h3>
@@ -135,7 +135,7 @@ export default function UserEditScreen() {
         />
       </Card>}
       {!isSelf && (isSystemAdmin || canSubmit) && (
-        <Card variant="shell" className="mt-6 p-4 md:p-5 space-y-3">
+        <Card variant="shell-flat" className="mt-6 p-4 md:p-5 space-y-3">
           <div className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
             <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">Contraseña</h3>
@@ -227,7 +227,7 @@ export default function UserEditScreen() {
             navigate(`/app/m/runly.identity/identity/users/${userId}`);
           }}
           onCancel={() => navigate(`/app/m/runly.identity/identity/users/${userId}`)}
-        /> : <Card variant="shell" className="p-4">
+        /> : <Card variant="shell-flat" className="p-4">
           <p>La persona administra su perfil desde Mi perfil. Los roles y el acceso a esta empresa se administran en el detalle del usuario.</p>
           <Button className="mt-3" onClick={() => navigate(`/app/m/runly.identity/identity/users/${userId}`)}>Administrar acceso empresarial</Button>
         </Card>}

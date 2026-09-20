@@ -132,7 +132,7 @@ import {
 } from "./lib/permission-grants.js";
 import {
   signedUrlWithVariant,
-  signedUrlsWithVariant,
+  transformOptions as imageVariantTransformOptions,
 } from "./lib/image-variants.js";
 import { loadInstallerLiveKitDevEnv } from "./lib/livekit-dev-env.js";
 import { getCachedSignedUrls } from "./lib/signed-url-cache.js";
@@ -922,14 +922,22 @@ async function buildAvatarUrlMapByFileIds(fileIds, variant = "thumb") {
   await Promise.all(
     [...byBucket.entries()].map(async ([bucket, assets]) => {
       const paths = assets.map((asset) => asset.objectKey);
-      const signedUrls = await signedUrlsWithVariant(
+      // Cached, not signedUrlsWithVariant directly — this feeds
+      // GET /identity/users and GET /identity/users/:id, both refetched on
+      // window focus (TanStack Query's default). A fresh signature per
+      // avatar per refocus broke structural sharing on those queries' data,
+      // forcing a full re-render of the user list/detail screen each time —
+      // the same "glassic flicker" root cause already fixed for
+      // /memberships/me's company logos, recurring here for user avatars.
+      const signedByPath = await getCachedSignedUrls(
         supabaseAdmin,
         bucket,
         paths,
-        variant,
+        3600,
+        imageVariantTransformOptions(variant),
       );
-      assets.forEach((asset, index) => {
-        avatarUrlMap.set(asset.id, signedUrls[index] ?? null);
+      assets.forEach((asset) => {
+        avatarUrlMap.set(asset.id, signedByPath.get(asset.objectKey) ?? null);
       });
     }),
   );
@@ -937,7 +945,33 @@ async function buildAvatarUrlMapByFileIds(fileIds, variant = "thumb") {
   return avatarUrlMap;
 }
 
-function serializeIdentityUser(user, avatarUrlMap, includePersonal = false) {
+async function buildCompanyLogoUrlMapByFileIds(fileIds) {
+  const logoUrlMap = new Map();
+  if (!fileIds.length) return logoUrlMap;
+
+  const fileAssets = await prisma.fileAsset.findMany({
+    where: { id: { in: fileIds } },
+    select: { id: true, bucket: true, objectKey: true },
+  });
+  const byBucket = new Map();
+  for (const asset of fileAssets) {
+    if (!byBucket.has(asset.bucket)) byBucket.set(asset.bucket, []);
+    byBucket.get(asset.bucket).push(asset);
+  }
+  await Promise.all(
+    [...byBucket.entries()].map(async ([bucket, assets]) => {
+      const paths = assets.map((asset) => asset.objectKey);
+      const signedByPath = await getCachedSignedUrls(supabaseAdmin, bucket, paths, 3600);
+      for (const asset of assets) {
+        logoUrlMap.set(asset.id, signedByPath.get(asset.objectKey) ?? null);
+      }
+    }),
+  );
+
+  return logoUrlMap;
+}
+
+function serializeIdentityUser(user, avatarUrlMap, includePersonal = false, companyLogoUrlMap = new Map()) {
   const personalFields = ['phone', 'birthDate', 'gender', 'country', 'state', 'city', 'colony', 'street', 'extNumber', 'intNumber', 'postalCode', 'bio'];
   return {
     ...(includePersonal ? Object.fromEntries(personalFields.map((key) => [key, user[key]])) : {}),
@@ -947,15 +981,20 @@ function serializeIdentityUser(user, avatarUrlMap, includePersonal = false) {
     avatarUrl: user.avatarFileId
       ? (avatarUrlMap.get(user.avatarFileId) ?? null)
       : null,
-    memberships: (user.memberships ?? []).map((membership) => ({
-      id: membership.id,
-      companyId: membership.companyId,
-      companyName: membership.company?.name ?? null,
-      roleId: membership.roleId,
-      roleKey: membership.role?.key ?? null,
-      roleName: membership.role?.name ?? null,
-      enabled: membership.enabled,
-    })),
+    memberships: (user.memberships ?? []).map((membership) => {
+      const logoFileId = membership.company?.brandingConfig?.logoFileId;
+      return {
+        id: membership.id,
+        companyId: membership.companyId,
+        companyName: membership.company?.name ?? null,
+        companyLogoUrl: logoFileId ? (companyLogoUrlMap.get(logoFileId) ?? null) : null,
+        companyPrimaryColor: membership.company?.brandingConfig?.primaryColor ?? null,
+        roleId: membership.roleId,
+        roleKey: membership.role?.key ?? null,
+        roleName: membership.role?.name ?? null,
+        enabled: membership.enabled,
+      };
+    }),
   };
 }
 
@@ -2904,13 +2943,16 @@ app.get(
       }
       // Intentionally includes disabled memberships too, unlike the list
       // route above (which filters to enabled-only) — membershipsTotal below
-      // depends on seeing the full set.
+      // depends on seeing the full set. Also intentionally NOT scoped to
+      // tenant.companyId: per spec non-goal 4, a holder of
+      // identity.users.update can already see and manage a user's access to
+      // ANY company in the instance via this payload, not just the admin's
+      // active one.
       const user = await prisma.userProfile.findUnique({
         where: { id },
         include: {
           memberships: {
-            where: { companyId: tenant.companyId },
-            include: { role: true, company: true },
+            include: { role: true, company: { include: { brandingConfig: true } } },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -2918,8 +2960,14 @@ app.get(
       if (!user) return c.json({ error: "Usuario no encontrado." }, 404);
 
       const avatarFileIds = user.avatarFileId ? [user.avatarFileId] : [];
-      const avatarUrlMap = await buildAvatarUrlMapByFileIds(avatarFileIds);
-      const serialized = serializeIdentityUser(user, avatarUrlMap, tenant.isSystemAdmin);
+      const logoFileIds = user.memberships
+        .map((m) => m.company?.brandingConfig?.logoFileId)
+        .filter(Boolean);
+      const [avatarUrlMap, companyLogoUrlMap] = await Promise.all([
+        buildAvatarUrlMapByFileIds(avatarFileIds),
+        buildCompanyLogoUrlMapByFileIds(logoFileIds),
+      ]);
+      const serialized = serializeIdentityUser(user, avatarUrlMap, tenant.isSystemAdmin, companyLogoUrlMap);
 
       return c.json({
         data: { ...serialized, membershipsTotal: serialized.memberships.length },
@@ -2951,7 +2999,7 @@ app.patch(
         where: { id: membershipId },
         include: { role: { select: { key: true } } },
       });
-      if (!membership || membership.userId !== id || membership.companyId !== tenant.companyId) {
+      if (!membership || membership.userId !== id) {
         return c.json({ error: "La membresia no corresponde a este usuario." }, 400);
       }
 
@@ -3049,7 +3097,6 @@ app.post(
 
       const body = await c.req.json();
       const fields = createMembershipSchema.parse(body);
-      if (fields.companyId !== tenant.companyId) return c.json({ error: "Empresa no encontrada." }, 404);
 
       const company = await prisma.company.findUnique({
         where: { id: fields.companyId },
@@ -3148,7 +3195,7 @@ app.get(
   async (c) => {
     try {
       const companies = await prisma.company.findMany({
-        where: { id: c.get("tenantContext").companyId, enabled: true },
+        where: { enabled: true },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       });

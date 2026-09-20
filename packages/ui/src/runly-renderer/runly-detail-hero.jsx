@@ -201,12 +201,12 @@ export function HeroContainer({
     label: item.label,
     icon: item.icon,
     href: item.href,
-    value: renderValue({ type: item.type }, item.rawValue, data),
+    value: renderValue({ type: item.type, options: item.options }, item.rawValue, data),
   }));
 
   return (
     <Card
-      variant="shell"
+      variant="shell-flat"
       className="overflow-hidden"
       style={
         heroModel.accentHex

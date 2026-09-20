@@ -178,7 +178,10 @@ export async function purgeModuleFromDb(key, prisma) {
       await tx.runlyField.deleteMany({ where: { modelId: { in: modelIds } } });
     }
     await tx.runlyModel.deleteMany({ where: { moduleKey: key } });
-    await tx.blueprint.deleteMany({ where: { moduleKey: key } });
+    // Blueprint has no moduleKey column — it relates to RunlyModule by moduleId (uuid).
+    // (Its FK is ON DELETE CASCADE, so runlyModule.delete below would clean these up
+    // on its own; this stays explicit so the deletion order documented above holds.)
+    await tx.blueprint.deleteMany({ where: { moduleId: module.id } });
     await tx.runlyModule.delete({ where: { key } });
 
     return { moduleKey: key };

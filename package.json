@@ -43,6 +43,7 @@
     "prisma:studio": "prisma studio --port 5555 --browser none",
     "modules:seed": "node scripts/seed-core-modules.js",
     "check:uuid-policy": "node scripts/enforce-uuid-policy.mjs",
+    "check:supabase-schema-ownership": "node scripts/enforce-supabase-schema-ownership-policy.mjs",
     "module:checksums": "node scripts/check-module-manifest-migrations.mjs",
     "module:checksums:fleet": "node scripts/check-module-manifest-migrations.mjs modules/official/runly.fleet",
     "module:checksums:write": "node scripts/check-module-manifest-migrations.mjs modules/official/runly.fleet --write",

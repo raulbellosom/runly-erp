@@ -638,9 +638,16 @@ export function createModuleLifecycleService({ prisma }) {
   // ── ORM migration helpers ─────────────────────────────────────────────────
 
   async function applyModuleOrmMigrations({ moduleKey, actorId }) {
+    // orderBy is required: modules with FK relationships between their own tables
+    // (e.g. a ticket table referencing a site table) need CREATE TABLE statements
+    // to run in the same order the models were declared/discovered in, or the
+    // referenced table won't exist yet. createdAt (and id, which is UUIDv7 and
+    // therefore time-ordered too) reflects first-discovery order because
+    // syncModuleMetadata upserts models sequentially in manifest.models order.
     const models = await prisma.runlyModel.findMany({
       where: { moduleKey },
       select: { schema: true },
+      orderBy: { createdAt: 'asc' },
     })
     if (!models.length) return
 

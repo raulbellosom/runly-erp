@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url'
 import {
   RUNLY_DESKTOP_RELEASE_ASSET_NAME,
   RUNLY_GITHUB_REPO,
+  RUNLY_MOBILE_RELEASE_ASSET_NAME,
 } from '../src/lib/appConfig.js'
+import { resolveApkPaths } from './rename-apk.mjs'
 
 export const DEFAULT_RELEASE_NOTES = 'Instalador universal de Runly ERP para escritorio'
 
@@ -59,6 +61,11 @@ export function resolveInstallerPath(desktopDir) {
   return installerPath
 }
 
+export function resolveApkPath(desktopDir) {
+  const { fixedApkPath } = resolveApkPaths(desktopDir)
+  return fixedApkPath && existsSync(fixedApkPath) ? fixedApkPath : null
+}
+
 export function releaseExists(tag, repo) {
   const result = runGh(['release', 'view', tag, '--repo', repo], {
     captureOutput: true,
@@ -74,11 +81,16 @@ export function publishRelease({
   const version = readDesktopVersion(desktopDir)
   const tag = buildReleaseTag(version)
   const installerPath = resolveInstallerPath(desktopDir)
-  const assetSpec = `${installerPath}#${RUNLY_DESKTOP_RELEASE_ASSET_NAME}`
+  const apkPath = resolveApkPath(desktopDir)
+
+  const assetSpecs = [`${installerPath}#${RUNLY_DESKTOP_RELEASE_ASSET_NAME}`]
+  if (apkPath) {
+    assetSpecs.push(`${apkPath}#${RUNLY_MOBILE_RELEASE_ASSET_NAME}`)
+  }
 
   if (releaseExists(tag, repo)) {
     const uploadResult = runGh(
-      ['release', 'upload', tag, assetSpec, '--repo', repo, '--clobber'],
+      ['release', 'upload', tag, ...assetSpecs, '--repo', repo, '--clobber'],
       { cwd: desktopDir },
     )
 
@@ -92,7 +104,7 @@ export function publishRelease({
       throw new Error(`Failed to mark ${tag} as latest`)
     }
 
-    return { tag, installerPath, action: 'updated' }
+    return { tag, installerPath, apkPath, action: 'updated' }
   }
 
   const createResult = runGh(
@@ -100,7 +112,7 @@ export function publishRelease({
       'release',
       'create',
       tag,
-      assetSpec,
+      ...assetSpecs,
       '--repo',
       repo,
       '--title',
@@ -116,7 +128,7 @@ export function publishRelease({
     throw new Error(`Failed to create release ${tag}`)
   }
 
-  return { tag, installerPath, action: 'created' }
+  return { tag, installerPath, apkPath, action: 'created' }
 }
 
 const currentFilePath = fileURLToPath(import.meta.url)
@@ -125,7 +137,8 @@ const desktopDir = path.resolve(currentDir, '..')
 
 if (process.argv[1] === currentFilePath) {
   const result = publishRelease({ desktopDir })
+  const apkNote = result.apkPath ? ` · APK ready at ${result.apkPath}` : ''
   console.log(
-    `Release ${result.tag} ${result.action}. Asset ready at ${result.installerPath}`,
+    `Release ${result.tag} ${result.action}. Installer ready at ${result.installerPath}${apkNote}`,
   )
 }

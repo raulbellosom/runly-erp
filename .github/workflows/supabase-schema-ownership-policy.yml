@@ -1,0 +1,20 @@
+name: Supabase Schema Ownership Policy
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  enforce-supabase-schema-ownership-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Supabase Managed-Schema Ownership Check
+        run: node scripts/enforce-supabase-schema-ownership-policy.mjs

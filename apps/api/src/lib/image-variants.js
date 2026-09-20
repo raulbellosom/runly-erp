@@ -18,7 +18,10 @@ export const IMAGE_VARIANTS = Object.freeze({
   full: null,
 })
 
-function transformOptions(variant) {
+// Exported (not just used internally) so callers that need to route through
+// a caching layer — e.g. getCachedSignedUrls in signed-url-cache.js — can
+// compute the same transform shape without duplicating the variant lookup.
+export function transformOptions(variant) {
   if (variant !== 'full' && !(variant in IMAGE_VARIANTS)) {
     console.warn(`[image-variants] unrecognized variant "${variant}" — serving full resolution`)
   }

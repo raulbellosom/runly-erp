@@ -125,7 +125,7 @@ export default function UserCreateScreen() {
       </CardContent></Card>}
 
       {canManageUsers && (
-        <Card variant="shell">
+        <Card variant="shell-flat">
           <CardHeader>
             <CardTitle>Datos del nuevo usuario</CardTitle>
           </CardHeader>

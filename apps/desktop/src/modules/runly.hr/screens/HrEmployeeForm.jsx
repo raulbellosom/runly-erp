@@ -89,7 +89,7 @@ export default function HrEmployeeForm({ employeeId }) {
           apiBaseUrl={API_BASE}
           asideActions={
             isEdit && editEmployee ? (
-              <div className="glass-shell flex flex-col gap-2 rounded-2xl p-3">
+              <div className="glass-shell-flat flex flex-col gap-2 rounded-2xl p-3">
                 <Button
                   type="button"
                   variant="glass"
