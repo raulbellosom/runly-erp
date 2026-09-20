@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { mergeChunkedRows } from '../ai-import-extraction.js'
+import { mergeChunkedRows, extractRowsFromText } from '../ai-import-extraction.js'
 
 describe('ai-import-extraction', () => {
   it('mergeChunkedRows concatenates rows from multiple chunks in order', () => {
@@ -15,5 +15,37 @@ describe('ai-import-extraction', () => {
   it('mergeChunkedRows drops rows with neither fecha nor nombre (unusable extraction noise)', () => {
     const merged = mergeChunkedRows([[{ fecha: null, nombre: null, deposito: null, retiro: null }]])
     assert.equal(merged.length, 0)
+  })
+})
+
+describe('extractRowsFromText', () => {
+  it('sends the statement text to Groq and parses the JSON row list', async () => {
+    const fetchImpl = async (url, opts) => {
+      const body = JSON.parse(opts.body)
+      assert.ok(url.includes('/openai/v1/chat/completions'))
+      assert.ok(body.messages[1].content.includes('SALDO'))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'test-model',
+          choices: [{ message: { content: JSON.stringify({ rows: [{ fecha: '2026-03-27', nombre: 'ACEITES SUPERFINOS', deposito: null, retiro: 21342.67, referencia: null, concepto: null, numero: null }] }) } }],
+        }),
+      }
+    }
+    const result = await extractRowsFromText({
+      text: 'FECHA NOMBRE SALDO\n260327 ACEITES SUPERFINOS 21,342.67 79,094.35',
+      env: { GROQ_API_KEY: 'test-key' },
+      fetchImpl,
+    })
+    assert.equal(result.rows.length, 1)
+    assert.equal(result.rows[0].nombre, 'ACEITES SUPERFINOS')
+  })
+
+  it('throws a 503 ExtractionError when GROQ_API_KEY is missing', async () => {
+    await assert.rejects(
+      () => extractRowsFromText({ text: 'x', env: {}, fetchImpl: async () => { throw new Error('should not be called') } }),
+      (err) => { assert.equal(err.status, 503); return true },
+    )
   })
 })
