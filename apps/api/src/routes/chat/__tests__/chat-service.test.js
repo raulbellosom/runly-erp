@@ -27,6 +27,7 @@ beforeEach(() => {
 // vacuous assertion that would pass regardless.
 function buildPrismaMock(queryRawResults = [], executeRawResults = []) {
   let qIdx = 0;
+  let profileAnswer;
   let eIdx = 0;
   // Every guarded conversation mutation now issues a bare
   // `SELECT type FROM chat_conversations WHERE id = ? LIMIT 1` probe
@@ -57,6 +58,10 @@ function buildPrismaMock(queryRawResults = [], executeRawResults = []) {
     _transactionCallCount: 0,
     _executeRawCallCount: 0,
     $queryRaw: async (strings) => {
+      if (/SELECT id FROM user_profile WHERE auth_user_id/.test(strings.join('?'))) {
+        if (!profileAnswer) profileAnswer = queryRawResults[qIdx++];
+        return profileAnswer;
+      }
       if (isConvTypeProbe(strings)) {
         if (convTypeAnswer !== undefined) return convTypeAnswer;
         convTypeAnswer = looksLikeTypeRow(queryRawResults[qIdx])
@@ -79,7 +84,7 @@ function buildPrismaMock(queryRawResults = [], executeRawResults = []) {
       return fn(client);
     },
     membership: {
-      findFirst: async () => null,
+      findFirst: async () => ({ companyId: MOCK_COMPANY_ID, role: { key: 'runly.admin' } }),
       // Default fixture: PROFILE_ID and OTHER_PROFILE_ID are colleagues in the
       // same company, so filterCompanyPeers' cross-tenant guard (used by
       // createConversation/addMembers) doesn't reject the ids most tests
@@ -523,7 +528,7 @@ describe("chat-service — createConversation transactional role-seeding regress
       },
     };
     const svc = createChatService({ prisma, permissionsService });
-    await svc.createConversation({
+    await svc.createConversation({ companyId: MOCK_COMPANY_ID,
       authUserId: AUTH_USER_ID,
       type: "channel",
       title: "General",
@@ -1537,7 +1542,7 @@ describe("chat-service — block enforcement", () => {
     ]);
     const service = createChatService({ prisma, supabaseAdmin: buildSupabaseAdminMock() });
     await assert.rejects(
-      () => service.createConversation({ authUserId: AUTH_USER_ID, type: "direct", memberUserIds: [OTHER_PROFILE_ID] }),
+      () => service.createConversation({ companyId: MOCK_COMPANY_ID, authUserId: AUTH_USER_ID, type: "direct", memberUserIds: [OTHER_PROFILE_ID] }),
       (err) => err instanceof ChatServiceError && err.status === 403,
     );
   });
@@ -1700,7 +1705,7 @@ describe("chat-service — createConversation with a channel link", () => {
       assertLinkAvailable: async () => { throw new Error("should not be called when a link already exists"); },
     };
     const chatService = createChatService({ prisma, channelLinksService });
-    const result = await chatService.createConversation({
+    const result = await chatService.createConversation({ companyId: MOCK_COMPANY_ID,
       authUserId: AUTH_USER_ID, type: "channel", title: "Proyecto X", memberUserIds: [],
       linkedModule: "atlas.projects", linkedEntityId: "proj-1",
     });
@@ -1716,7 +1721,7 @@ describe("chat-service — createConversation with a channel link", () => {
     };
     const chatService = createChatService({ prisma, channelLinksService });
     await assert.rejects(
-      () => chatService.createConversation({
+      () => chatService.createConversation({ companyId: MOCK_COMPANY_ID,
         authUserId: AUTH_USER_ID, type: "channel", title: "Proyecto X", memberUserIds: [],
         linkedModule: "atlas.projects", linkedEntityId: "proj-1",
       }),
@@ -1733,7 +1738,7 @@ describe("chat-service — createConversation with a channel link", () => {
     };
     const chatService = createChatService({ prisma, channelLinksService });
     await assert.rejects(
-      () => chatService.createConversation({
+      () => chatService.createConversation({ companyId: MOCK_COMPANY_ID,
         authUserId: AUTH_USER_ID, type: "channel", title: "Proyecto X", memberUserIds: [],
         linkedModule: "atlas.projects",
       }),
@@ -2212,7 +2217,7 @@ it('creating a channel notifies initial members but not its creator', async () =
   const prisma = buildPrismaMock([[{ id: PROFILE_ID }], [conv], [{ id: 'member-row' }], [{ ...conv, members: null }]]);
   const published = [];
   const svc = createChatService({ prisma, notificationService: { publish: async args => published.push(args) } });
-  await svc.createConversation({ authUserId: AUTH_USER_ID, type: 'channel', title: 'General', memberUserIds: [OTHER_PROFILE_ID] });
+  await svc.createConversation({ companyId: MOCK_COMPANY_ID, authUserId: AUTH_USER_ID, type: 'channel', title: 'General', memberUserIds: [OTHER_PROFILE_ID] });
   assert.equal(published.length, 1);
   assert.deepEqual(published[0].input.recipients.userIds, [OTHER_PROFILE_ID]);
 });

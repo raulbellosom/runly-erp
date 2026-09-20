@@ -5,8 +5,10 @@ import { createTagsService } from './tags-service.js'
 import { createSharesService } from './shares-service.js'
 import { createYDocService } from './ydoc-service.js'
 import { createCanvasService } from './canvas-service.js'
+import { withResourceInvitationAccess } from '../../services/resource-invitation-access.js'
 
 export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission, broadcaster, notificationService }) {
+  requirePermission = withResourceInvitationAccess({ prisma, requirePermission, resourceType: 'note' })
   const app = new Hono()
   const notes = createNotesService({ prisma, broadcaster })
   const folders = createFoldersService({ prisma })
@@ -22,6 +24,17 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   // ----------------------------------------------------------------
   const internal = new Hono()
   internal.use('*', authMiddleware)
+  internal.use('*', async (c, next) => {
+    const match = new URL(c.req.url).pathname.match(/\/notes\/([0-9a-f-]{36})(?:\/|$)/i)
+    if (match) {
+      const [row] = await prisma.$queryRaw`SELECT 1 FROM user_profile u
+        WHERE u.auth_user_id = ${c.get('authUserId')}::uuid
+          AND public.runly_note_user_access(${match[1]}::uuid, u.id, false)`
+      if (!row) return c.json({ error: 'Recurso no encontrado.' }, 404)
+    }
+    return next()
+  })
+
 
   // Helper — extract userId and companyId from Hono context. companyId
   // comes from the tenant middleware's already-validated active company
@@ -187,7 +200,7 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
     try {
       const { userId } = getAuth(c)
       const { folderId, tagId, q, archived, trashed, shared, page, pageSize } = c.req.query()
-      const notesList = await notes.listNotes({
+      const notesList = await notes.listNotes({ companyId: c.get('companyId'),
         userId,
         folderId: folderId || undefined,
         tagId: tagId || undefined,
@@ -222,7 +235,7 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   internal.get('/shareable-users', requirePermission('notes.shares.create'), async (c) => {
     try {
       const { userId } = getAuth(c)
-      const users = await shares.listShareableUsers(userId, c.req.query('search') ?? null)
+      const users = await shares.listShareableUsers(userId, c.req.query('search') ?? null, c.get('companyId'))
       return c.json({ users })
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)

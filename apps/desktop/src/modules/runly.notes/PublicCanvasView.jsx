@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ErrorState } from '@runly/ui'
 import { usePublicCanvasScene } from './hooks/useCanvasScene.js'
@@ -12,6 +12,12 @@ import { exportCanvasPdf, exportCanvasPng } from './lib/canvasExport.js'
 
 const CanvasStage = lazy(() => import('./components/CanvasStage.jsx'))
 
+function filesArrayToMap(arr) {
+  const map = {}
+  for (const f of arr) map[f.id] = f
+  return map
+}
+
 // Live, read-only public canvas. Seeds from GET /public/notes/:slug/canvas then
 // subscribes to the same broadcast channel as the editors in readOnly mode:
 // it applies scene.delta / scene.full and never emits.
@@ -20,18 +26,17 @@ export default function PublicCanvasView({ slug, note }) {
   const apiRef = useRef(null)
   const elementsRef = useRef([])
   const layersRef = useRef([])
+  // <Excalidraw> only mounts (via CanvasStage below) once this is populated —
+  // it must carry the hydrated files from the start. Excalidraw is lazy-loaded
+  // (Suspense), so on a cold visit the JS chunk can still be downloading when
+  // hydrateImages() resolves; calling the imperative apiRef.current.addFiles()
+  // at that point is a silent no-op (apiRef.current is still null, never
+  // retried) and every image renders as a permanently broken placeholder.
+  // Mirrors CanvasEditor.jsx's proven initialDataRef pattern.
+  const initialDataRef = useRef(null)
+  const [ready, setReady] = useState(false)
 
   const scene = data?.scene
-
-  const initialData = useMemo(() => {
-    if (!scene) return null
-    return {
-      elements: [],
-      appState: { ...(scene.appState ?? {}), collaborators: new Map() },
-      files: {},
-      scrollToContent: true,
-    }
-  }, [scene])
 
   const handleExcalidrawAPI = useCallback((api) => {
     apiRef.current = api
@@ -45,10 +50,13 @@ export default function PublicCanvasView({ slug, note }) {
     ;(async () => {
       const files = await hydrateImages(scene.files)
       if (cancelled) return
-      if (apiRef.current && files.length) apiRef.current.addFiles(files)
-      apiRef.current?.updateScene({
+      initialDataRef.current = {
         elements: deriveScene(elementsRef.current, layersRef.current),
-      })
+        appState: { ...(scene.appState ?? {}), collaborators: new Map() },
+        files: filesArrayToMap(files),
+        scrollToContent: true,
+      }
+      setReady(true)
     })()
 
     const sync = new SupabaseCanvasSync({
@@ -89,7 +97,7 @@ export default function PublicCanvasView({ slug, note }) {
     }
   }, [scene])
 
-  if (isLoading) {
+  if (isLoading || (scene && !ready)) {
     return (
       <div className="min-h-screen grid place-items-center bg-gray-50 text-sm text-gray-400">
         Cargando lienzo...
@@ -152,7 +160,7 @@ export default function PublicCanvasView({ slug, note }) {
           }
         >
           <CanvasStage
-            initialData={initialData}
+            initialData={initialDataRef.current}
             viewModeEnabled
             onExcalidrawAPI={handleExcalidrawAPI}
           />

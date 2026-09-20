@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js'
 import { CalendarServiceError } from './calendar-service.js'
 
 const RECURRENCE_FREQS = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']
@@ -105,13 +106,14 @@ function expandRecurrence(event, rangeStart, rangeEnd) {
 }
 
 export function createCalendarEventService({ prisma }) {
-  async function getAccessibleCalendarIds(userId) {
+  async function getAccessibleCalendarIds(userId, companyId) {
+    const scope = { OR: [{ companyId: null }, { ...(companyId ? { companyId } : {}), company: { enabled: true, memberships: { some: { userId, enabled: true, user: { enabled: true } } } } }] }
     const owned = await prisma.calendarCalendar.findMany({
-      where: { ownerId: userId, enabled: true },
+      where: { ownerId: userId, enabled: true, ...scope },
       select: { id: true },
     })
     const shared = await prisma.calendarShare.findMany({
-      where: { userId },
+      where: { userId, calendar: { enabled: true, ...scope } },
       select: { calendarId: true },
     })
     return [
@@ -122,34 +124,19 @@ export function createCalendarEventService({ prisma }) {
 
   // Returns the subset of candidateIds that share a company with actingUserId
   // (plus the acting user themselves). Blocks adding out-of-company attendees.
-  async function filterCompanyPeers(actingUserId, candidateIds) {
+  async function filterCompanyPeers(actingUserId, candidateIds, calendarId) {
     const ids = [...new Set((candidateIds ?? []).filter(Boolean))]
-    if (ids.length === 0) return []
-    const ownerMemberships = await prisma.membership.findMany({
-      where: { userId: actingUserId, enabled: true },
-      select: { companyId: true },
-    })
-    const companyIds = ownerMemberships.map((m) => m.companyId)
-    if (companyIds.length === 0) {
-      return ids.includes(actingUserId) ? [actingUserId] : []
-    }
-    const peers = await prisma.membership.findMany({
-      where: {
-        userId: { in: ids },
-        enabled: true,
-        companyId: { in: companyIds },
-      },
-      select: { userId: true },
-    })
-    const allowed = new Set(peers.map((m) => m.userId))
-    allowed.add(actingUserId)
-    return ids.filter((id) => allowed.has(id))
+    if (!ids.length) return []
+    const calendar = await prisma.calendarCalendar.findFirst({ where: { id: calendarId, enabled: true }, select: { companyId: true } })
+    const access = createUserAccessService({ prisma })
+    await access.assertCompanyMember(calendar?.companyId, actingUserId)
+    return access.assertCandidates({ companyId: calendar.companyId, userIds: ids })
   }
 
-  async function listEvents({ userId, start, end, calendarIds, sourceModule, sourceEntityId }) {
+  async function listEvents({ userId, companyId, start, end, calendarIds, sourceModule, sourceEntityId }) {
     if (!start || !end) throw new CalendarServiceError('start y end son requeridos.', 400)
 
-    const accessibleIds = await getAccessibleCalendarIds(userId)
+    const accessibleIds = await getAccessibleCalendarIds(userId, companyId)
     const filterIds = calendarIds?.length
       ? calendarIds.filter((id) => accessibleIds.includes(id))
       : accessibleIds
@@ -232,8 +219,11 @@ export function createCalendarEventService({ prisma }) {
     const accessible = await getAccessibleCalendarIds(userId)
     if (!accessible.includes(calendarId)) throw new CalendarServiceError('No tienes acceso a ese calendario.', 403)
 
+    const calendar = await prisma.calendarCalendar.findFirst({ where: { id: calendarId, enabled: true }, select: { ownerId: true } })
+    const grant = calendar?.ownerId === userId || await prisma.calendarShare.findFirst({ where: { calendarId, userId, role: { in: ['EDITOR', 'MANAGER'] } }, select: { id: true } })
+    if (!grant) throw new CalendarServiceError('Recurso no encontrado.', 404)
     const normalizedRecurrence = normalizeRecurrenceRule(recurrenceRule)
-    const validAttendeeIds = await filterCompanyPeers(userId, attendeeIds)
+    const validAttendeeIds = await filterCompanyPeers(userId, attendeeIds, calendarId)
 
     // Event row + its attendees + reminders are written atomically.
     const event = await prisma.$transaction(async (tx) => {
@@ -290,6 +280,10 @@ export function createCalendarEventService({ prisma }) {
     const updateData = {}
     if (data.calendarId !== undefined && data.calendarId !== event.calendarId) {
       if (!accessible.includes(data.calendarId)) throw new CalendarServiceError('No tienes acceso al calendario destino.', 403)
+      const destination = await prisma.calendarCalendar.findFirst({ where: { id: data.calendarId, enabled: true } })
+      if (!destination || destination.companyId !== event.calendar.companyId) throw new CalendarServiceError('Calendario no disponible.', 404)
+      const destinationShare = await prisma.calendarShare.findFirst({ where: { calendarId: data.calendarId, userId } })
+      if (destination.ownerId !== userId && !['EDITOR', 'MANAGER'].includes(destinationShare?.role)) throw new CalendarServiceError('Calendario no disponible.', 404)
       updateData.calendarId = data.calendarId
     }
     if (data.title !== undefined) updateData.title = data.title.trim()
@@ -363,7 +357,7 @@ export function createCalendarEventService({ prisma }) {
       throw new CalendarServiceError('No tienes permiso para agregar invitados.', 403)
     }
 
-    const [peer] = await filterCompanyPeers(userId, [attendeeUserId])
+    const [peer] = await filterCompanyPeers(userId, [attendeeUserId], event.calendarId)
     if (peer !== attendeeUserId) {
       throw new CalendarServiceError('Solo puedes invitar a usuarios de tu empresa.', 403)
     }

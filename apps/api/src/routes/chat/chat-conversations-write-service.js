@@ -27,17 +27,11 @@ export function createChatConversationsWriteService({
   notifyMembersAdded,
   getConversation,
 }) {
-  // companyId: the requester's active company (resolved server-side by
-  // requirePermission's tenant middleware, never client-supplied). When
-  // provided, both the peer-eligibility guard and the new conversation's own
-  // company_id are pinned to it — a multi-company creator must not be able
-  // to pull in a peer who only shares a DIFFERENT company with them, nor
-  // land the new conversation in whichever company their most-recently-
-  // created membership happens to be. Omitted (e.g. existing tests calling
-  // the service directly), this falls back to the old union-of-all-
-  // companies / most-recent-membership behavior.
+  // New conversations require the server-resolved active company; existing
+  // resources use their own company and explicit participant grants.
   async function createConversation({ authUserId, type, title, memberUserIds, metadata = {}, isPublic = false, slug = null, description = null, linkedModule = null, linkedEntityId = null, companyId: requestedCompanyId = null }) {
     if (channelLinksService) channelLinksService.assertBothOrNeither(linkedModule, linkedEntityId);
+    if (!requestedCompanyId) throw new ChatServiceError("Empresa activa requerida.", 400);
     const creatorProfileId = await getUserProfileId(authUserId);
 
     // Cross-tenant guard: a member id must share a company with the creator.
@@ -51,6 +45,7 @@ export function createChatConversationsWriteService({
       throw new ChatServiceError("Uno o mas usuarios no pertenecen a tu empresa.", 403);
     }
     memberUserIds = validMemberIds;
+    if (type === "direct" && memberUserIds.length !== 1) throw new ChatServiceError("Selecciona un participante.", 400);
 
     // Prevent self-chat
     if (type === "direct" && memberUserIds.length === 1 && memberUserIds[0] === creatorProfileId.toString()) {
@@ -64,6 +59,7 @@ export function createChatConversationsWriteService({
       const existing = await prisma.$queryRaw`
         SELECT c.id FROM chat_conversations c
         WHERE c.type = 'direct'
+          AND c.company_id = ${requestedCompanyId}
           AND c.deleted_at IS NULL
           AND EXISTS (
             SELECT 1 FROM chat_conversation_members WHERE conversation_id = c.id AND user_id = ${creatorProfileId} AND left_at IS NULL
@@ -85,15 +81,7 @@ export function createChatConversationsWriteService({
       await channelLinksService.assertLinkAvailable(linkedModule, linkedEntityId);
     }
 
-    let companyId = requestedCompanyId;
-    if (!companyId) {
-      const membership = await prisma.membership.findFirst({
-        where: { userId: creatorProfileId.toString(), enabled: true },
-        orderBy: { createdAt: "desc" },
-        select: { companyId: true },
-      });
-      companyId = membership?.companyId ?? null;
-    }
+    const companyId = requestedCompanyId;
 
     if (type === "channel" && slug) {
       // IS NOT DISTINCT FROM (not =) because company_id can be NULL for a creator

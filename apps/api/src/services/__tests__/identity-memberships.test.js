@@ -48,11 +48,12 @@ test("checkProtectedRoleAssignment rejects a protected role for an actor without
   assert.equal(result.status, 403);
 });
 
-test("checkProtectedRoleAssignment allows a protected role for an actor with identity.roles.update", () => {
+test("checkProtectedRoleAssignment allows a platform role only for a system administrator", () => {
   const result = checkProtectedRoleAssignment({
     roleKey: "system.admin",
     protectedKeys: new Set(["runly.admin", "system.admin"]),
     actorCanManageRoles: true,
+    isSystemAdmin: true,
   });
   assert.equal(result.ok, true);
 });
@@ -121,3 +122,7 @@ test("findExistingMembership returns null when the user has no membership for th
   const memberships = [{ id: "m1", companyId: "co-1", enabled: true }];
   assert.equal(findExistingMembership({ memberships, companyId: "co-9" }), null);
 });
+
+ test("company role management does not grant system administration", () => {
+   assert.equal(checkProtectedRoleAssignment({ roleKey: 'system.admin', actorCanManageRoles: true }).ok, false);
+ });

@@ -1,3 +1,5 @@
+import { UserAccessError } from '../../services/user-access-service.js';
+import { withResourceInvitationAccess } from '../../services/resource-invitation-access.js';
 import crypto from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -53,7 +55,7 @@ import { createTasksService } from "../projects/tasks-service.js";
 import { createCalendarEventService } from "../calendar/calendar-event-service.js";
 
 function handleError(c, err, fallback) {
-  if (err instanceof ChatServiceError || err instanceof GuestChatServiceError || err instanceof ChatPermissionsError || err instanceof ChatReactionsError || err instanceof ChatModerationServiceError) {
+  if (err instanceof UserAccessError || err instanceof ChatServiceError || err instanceof GuestChatServiceError || err instanceof ChatPermissionsError || err instanceof ChatReactionsError || err instanceof ChatModerationServiceError) {
     return c.json({ error: err.message }, err.status);
   }
   console.error("[runly.chat]", err?.message ?? err);
@@ -64,6 +66,7 @@ function handleError(c, err, fallback) {
 const uuidParamSchema = z.string().uuid();
 
 export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission, notificationService = null, broadcaster = null, resolveUserContext = null, officeService = null }) {
+  requirePermission = withResourceInvitationAccess({ prisma, requirePermission, resourceType: 'chat' });
   const app = new Hono();
   const permissionsService = createChatPermissionsService({ prisma });
   const mentionsService = createChatMentionsService({ prisma });
@@ -167,6 +170,20 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   // ================================================================
   const internal = new Hono();
   internal.use("*", authMiddleware);
+  // Revalidate corporate access even while an old session remains open.
+  internal.use('*', async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    const resource = path.match(/\/(conversations|messages)\/([0-9a-f-]{36})(?:\/|$)/i);
+    if (resource) {
+      const authUserId = c.get('authUserId');
+      const [allowed] = resource[1] === 'conversations'
+        ? await prisma.$queryRaw`SELECT 1 FROM user_profile u WHERE u.auth_user_id = ${authUserId} AND public.runly_chat_user_access(${resource[2]}::uuid, u.id)`
+        : await prisma.$queryRaw`SELECT 1 FROM chat_messages m JOIN user_profile u ON u.auth_user_id = ${authUserId} WHERE m.id = ${resource[2]}::uuid AND public.runly_chat_user_access(m.conversation_id, u.id)`;
+      if (!allowed) return c.json({ error: 'Recurso no encontrado.' }, 404);
+    }
+    return next();
+  });
+
 
   // GET /chat/conversations
   internal.get("/conversations", requirePermission("chat.conversations.read"), async (c) => {
@@ -180,6 +197,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       }
       const { limit, cursor, archived } = c.req.query();
       const result = await chatService.listConversations({
+        companyId: c.get('companyId'),
         authUserId,
         limit: limit ? Math.min(parseInt(limit, 10), 100) : 50,
         cursor: cursor || null,
@@ -202,6 +220,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       const { q, conversationId, limit, offset } = parsed.data;
       const result = await chatSearchService.searchMessages({
         authUserId: c.get("authUserId"),
+        companyId: c.get("companyId"),
         q,
         conversationId: conversationId || null,
         limit,
@@ -1202,7 +1221,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
 
   internal.post("/internal/expire-sessions", requirePermission("chat.conversations.create"), async (c) => {
     try {
-      const result = await expireStaleGuestSessions(prisma);
+      const result = await expireStaleGuestSessions(prisma, { supabaseAdmin });
       return c.json({ data: result });
     } catch (err) {
       return handleError(c, err, "Error expirando sesiones.");

@@ -4,6 +4,9 @@ import { runly } from '../lib/runly'
 import { getApiUrl } from '../lib/runtimeConfig.js'
 import { RunlyOfflineDatabase, SessionVault } from '@runly/offline'
 import { isSessionFresh } from './sessionFreshness.js'
+import { useQueryClient } from '@tanstack/react-query'
+import { useChatFloatStore } from '../modules/runly.chat/store/chatFloatStore.js'
+import { setActiveCompanyId } from '../lib/runly'
 
 const _vaultDb = new RunlyOfflineDatabase()
 const _sessionVault = new SessionVault(_vaultDb)
@@ -11,6 +14,7 @@ const _sessionVault = new SessionVault(_vaultDb)
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const queryClient = useQueryClient()
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -18,6 +22,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
     let profileLoadedForAuthUserId = null
+    let currentAuthId = null
+
+    function changeIdentity(nextId) {
+      if (currentAuthId === nextId) return
+      currentAuthId = nextId
+      queryClient.cancelQueries()
+      queryClient.clear()
+      setUserProfile(null)
+      setActiveCompanyId(null)
+      useChatFloatStore.setState({ openChats: [], isOpen: false })
+      supabase.removeAllChannels().catch(() => {})
+      if (!nextId) _sessionVault.clear().catch(() => {})
+    }
 
     async function forceLogout() {
       // Re-check the shared session BEFORE attempting our own refresh —
@@ -79,6 +96,7 @@ export function AuthProvider({ children }) {
         const { data } = await supabase.auth.getSession()
         if (!mounted) return
         const currentSession = data?.session ?? null
+        changeIdentity(currentSession?.user?.id ?? null)
         setSession(currentSession)
         if (currentSession) {
           _sessionVault.store({
@@ -92,7 +110,7 @@ export function AuthProvider({ children }) {
 
           runly.auth.me(currentSession.access_token)
             .then(profile => {
-              if (!mounted) return
+              if (!mounted || currentAuthId !== currentSession?.user?.id) return
               setUserProfile(profile)
               profileLoadedForAuthUserId = currentSession?.user?.id ?? null
               _sessionVault.update({
@@ -120,6 +138,7 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
+      changeIdentity(session?.user?.id ?? null)
       setSession(session)
       setLoading(false)
       if (session) {
@@ -141,7 +160,7 @@ export function AuthProvider({ children }) {
         }
         runly.auth.me(session.access_token)
           .then(profile => {
-            if (!mounted) return
+            if (!mounted || currentAuthId !== authUserId) return
             setUserProfile(profile)
             profileLoadedForAuthUserId = authUserId
           })
@@ -162,7 +181,7 @@ export function AuthProvider({ children }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [queryClient])
 
   useEffect(() => {
     function handleVisibilityChange() {

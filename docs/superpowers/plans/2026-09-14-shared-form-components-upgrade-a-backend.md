@@ -648,7 +648,7 @@ With the API running against a real (or a test) database that has had the migrat
 - Call `PATCH /inventory/items/:id/files/reorder` with a new order and confirm subsequent `GET .../files` reflects the new `sortOrder`.
 - `GET /hr/employees` (paginated) and confirm `photo_file_id` appears on each row.
 
-Not performed in this pass: requires a running API instance, an authenticated session, and real test data (an inventory item with attachments). Skipped rather than fabricated; recommended as a follow-up manual/QA pass before shipping to users. Live-DB evidence collected instead: `pnpm db:migrate` applied migration `20260914020000_add_inv_item_file_sort_cover` cleanly against the real Supabase Postgres instance (76.13.114.109:5433), confirming `sort_order`/`is_cover` columns exist on `inv_item_file`.
+Not performed in this pass: requires a running API instance, an authenticated session, and real test data (an inventory item with attachments). Skipped rather than fabricated; recommended as a follow-up manual/QA pass before shipping to users. Live-DB evidence collected instead: `pnpm db:migrate` applied migration `20260914020000_add_inv_item_file_sort_cover` cleanly against the real Supabase Postgres instance (192.0.2.10:5433), confirming `sort_order`/`is_cover` columns exist on `inv_item_file`.
 
 - [x] **Step 3: Commit verification note**
 

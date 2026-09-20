@@ -1,5 +1,14 @@
 # Runly ERP v2 — Agent Instructions
 
+## Public repository privacy
+
+Never copy real infrastructure addresses, personal emails, credentials, production
+logs or workstation paths into tracked files, including plans and verification notes.
+Use `example.com`, `.example`, `.test`, `.invalid` and RFC 5737 documentation IPs.
+Keep deployment values in ignored `.env` files or private operational documentation.
+Scripts must get connection targets from configuration, never a real server fallback.
+Run `pnpm check:privacy` before sharing changes; see `docs/REPOSITORY_PRIVACY.md`.
+
 New code uses `@runly/*`, `defineRunlyModule`, `createRunlyClient`, and `RunlyTable`/`RunlyForm`.
 Legacy `@atlas/*` imports and `defineAtlasModule`, `createAtlasClient`, and `Atlas*` renderer exports remain supported aliases of the same implementation.
 Keep existing `atlas.*` module keys, permissions and stored identities until the separate data migration.

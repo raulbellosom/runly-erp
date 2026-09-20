@@ -5,7 +5,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the outdated local-lite dev stack with a Supabase-first architecture, write the full numbered documentation suite, and verify that the Atlas API connects to the live Supabase instance at https://supabase.racoondevs.com.
+**Goal:** Replace the outdated local-lite dev stack with a Supabase-first architecture, write the full numbered documentation suite, and verify that the Atlas API connects to the live Supabase instance at https://supabase.example.com.
 
 **Architecture:** All development connects to a dedicated self-hosted Supabase instance. The Atlas ERP Docker stack (api, worker, web-preview) connects to Supabase via environment variables. No local PostgreSQL, MinIO, or Redis. The InstanceConfig Prisma model is added to support first-run detection in Phase 2.
 
@@ -106,15 +106,15 @@ TZ=America/Mexico_City
 
 # â”€â”€â”€ Supabase â€” define once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Get these from Supabase Studio â†’ Project Settings â†’ API
-SUPABASE_URL=https://supabase.racoondevs.com
+SUPABASE_URL=https://supabase.example.com
 SUPABASE_ANON_KEY=                   # public â€” safe for frontend
 SUPABASE_SERVICE_ROLE_KEY=           # SECRET â€” API/worker only, never expose to frontend
 
 # â”€â”€â”€ Prisma / PostgreSQL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Get the connection string from Supabase Studio â†’ Settings â†’ Database â†’ URI
 # Use the same value for both in self-hosted Supabase (no pgBouncer by default)
-DATABASE_URL=postgresql://postgres:[password]@db.supabase.racoondevs.com:5432/postgres
-DIRECT_URL=postgresql://postgres:[password]@db.supabase.racoondevs.com:5432/postgres
+DATABASE_URL=postgresql://postgres:[password]@db.supabase.example.com:5432/postgres
+DIRECT_URL=postgresql://postgres:[password]@db.supabase.example.com:5432/postgres
 
 # â”€â”€â”€ Security â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 JWT_SECRET=change_me_in_production   # SECRET â€” generate a random 64-char string
@@ -377,8 +377,8 @@ AtlasModule, ModuleDependency, Blueprint, InstanceConfig, Company, UserProfile, 
 
 | Endpoint | URL |
 |---|---|
-| API | https://supabase.racoondevs.com |
-| Studio | https://studio.supabase.racoondevs.com |
+| API | https://supabase.example.com |
+| Studio | https://studio.supabase.example.com |
 
 Dedicated to Atlas ERP. All development connects to this instance. No local PostgreSQL/MinIO fallback.
 
@@ -455,7 +455,7 @@ prisma/
 
 **apps/worker** â€” Background jobs: reports, file processing, scheduled tasks. Connects to Prisma directly. No public endpoints.
 
-**Supabase (external, self-hosted)** â€” PostgreSQL (Atlas tables via Prisma), Auth (sessions, JWTs, user creation), Storage (physical files), Realtime (future). Studio at https://studio.supabase.racoondevs.com for admin use only.
+**Supabase (external, self-hosted)** â€” PostgreSQL (Atlas tables via Prisma), Auth (sessions, JWTs, user creation), Storage (physical files), Realtime (future). Studio at https://studio.supabase.example.com for admin use only.
 
 ## Data flows
 
@@ -502,8 +502,8 @@ React â†’ GET /instance/status â†’ { initialized: false }
 
 | Purpose | URL |
 |---|---|
-| API | https://supabase.racoondevs.com |
-| Studio | https://studio.supabase.racoondevs.com |
+| API | https://supabase.example.com |
+| Studio | https://studio.supabase.example.com |
 ```
 
 - [ ] **Step 2: Commit**
@@ -835,8 +835,8 @@ git commit -m "docs: add 04_onboarding_setup"
 
 | Endpoint | URL |
 |---|---|
-| API | https://supabase.racoondevs.com |
-| Studio | https://studio.supabase.racoondevs.com |
+| API | https://supabase.example.com |
+| Studio | https://studio.supabase.example.com |
 
 Dedicated to Atlas ERP. Not shared with other projects.
 
@@ -870,8 +870,8 @@ datasource db {
 
 ```bash
 # .env
-DATABASE_URL=postgresql://postgres:[password]@db.supabase.racoondevs.com:5432/postgres
-DIRECT_URL=postgresql://postgres:[password]@db.supabase.racoondevs.com:5432/postgres
+DATABASE_URL=postgresql://postgres:[password]@db.supabase.example.com:5432/postgres
+DIRECT_URL=postgresql://postgres:[password]@db.supabase.example.com:5432/postgres
 ```
 
 Self-hosted Supabase typically does not use pgBouncer by default, so DATABASE_URL and DIRECT_URL may have the same value. Verify in Studio.
@@ -941,7 +941,7 @@ git commit -m "docs: add 05_supabase_prisma_strategy"
 ## Two independent stacks
 
 **Supabase stack** (already deployed externally):
-- https://supabase.racoondevs.com â€” PostgreSQL, Auth, Storage, Realtime, Studio
+- https://supabase.example.com â€” PostgreSQL, Auth, Storage, Realtime, Studio
 - Not managed by Atlas ERP's docker-compose
 - Credentials in `.env`, never in version control
 
@@ -953,7 +953,7 @@ git commit -m "docs: add 05_supabase_prisma_strategy"
 
 ## No local database
 
-There is no local PostgreSQL, Redis, or MinIO in the Atlas ERP dev setup. All development connects to https://supabase.racoondevs.com.
+There is no local PostgreSQL, Redis, or MinIO in the Atlas ERP dev setup. All development connects to https://supabase.example.com.
 
 ## Development setup (local, without Docker)
 
@@ -1132,7 +1132,7 @@ app.get('/contacts', requirePermission('contacts.read'), async (c) => { ... })
 
 ## Supabase Auth configuration (in Studio)
 
-Navigate to https://studio.supabase.racoondevs.com â†’ Authentication:
+Navigate to https://studio.supabase.example.com â†’ Authentication:
 - Enable Email provider (email + password)
 - JWT secret must match `JWT_SECRET` in `.env`
 - Configure SMTP for password recovery emails
@@ -1279,7 +1279,7 @@ git commit -m "docs: add 08_blueprints"
 ### Phase 0 â€” Repository and environment cleanup
 Remove obsolete local-lite stack, write numbered docs, align .env.example to Supabase-first, add atlas.branding manifest and InstanceConfig schema model.
 
-**Success:** Repo has one coherent view of the architecture. All docs reference https://supabase.racoondevs.com.
+**Success:** Repo has one coherent view of the architecture. All docs reference https://supabase.example.com.
 
 ### Phase 1 â€” Supabase + Prisma connection
 Connect to live Supabase, run migrations, seed 4 core modules, verify API responds.
@@ -1377,7 +1377,7 @@ Desktop-first, full-stack modular ERP built with React + Vite + Tauri, a Node/Ho
 cp .env.example .env
 # Open .env and fill in: SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
 # DATABASE_URL, DIRECT_URL, JWT_SECRET
-# Get connection strings from https://studio.supabase.racoondevs.com
+# Get connection strings from https://studio.supabase.example.com
 
 # 2. Install dependencies
 pnpm install
@@ -1429,8 +1429,8 @@ Open **http://localhost:5173** in your browser or run `pnpm dev:tauri` for the n
 | API | http://localhost:4010 |
 | Frontend (Vite) | http://localhost:5173 |
 | Prisma Studio | http://localhost:5555 |
-| Supabase API | https://supabase.racoondevs.com |
-| Supabase Studio | https://studio.supabase.racoondevs.com |
+| Supabase API | https://supabase.example.com |
+| Supabase Studio | https://studio.supabase.example.com |
 
 ## Architecture
 
@@ -1469,7 +1469,7 @@ See [docs/02_module_system.md](docs/02_module_system.md) and [docs/01_erp_archit
 - JavaScript only â€” no TypeScript.
 - Tailwind for all styles.
 - Prisma is pinned to `^6`. Do not upgrade to v7 (breaking API changes).
-- Supabase Studio: https://studio.supabase.racoondevs.com (admin use only).
+- Supabase Studio: https://studio.supabase.example.com (admin use only).
 ```
 
 - [ ] **Step 2: Commit**
@@ -1501,7 +1501,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # First-time setup
 cp .env.example .env
 # Fill in SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL, DIRECT_URL, JWT_SECRET
-# Get connection strings from https://studio.supabase.racoondevs.com
+# Get connection strings from https://studio.supabase.example.com
 
 pnpm install          # install all dependencies
 pnpm db:generate      # generate Prisma client
@@ -1528,7 +1528,7 @@ pnpm db:fresh         # migrate + generate + seed (non-destructive)
 pnpm build            # build all packages/apps
 ```
 
-There is no `pnpm infra:up` or local database stack. All development connects to https://supabase.racoondevs.com.
+There is no `pnpm infra:up` or local database stack. All development connects to https://supabase.example.com.
 
 ### Desktop native build (Windows only)
 
@@ -1575,8 +1575,8 @@ No direct database access from the frontend. The API is the authority for all bu
 ### Supabase infrastructure
 
 All development uses the dedicated self-hosted Supabase instance:
-- API: https://supabase.racoondevs.com
-- Studio: https://studio.supabase.racoondevs.com (admin use only)
+- API: https://supabase.example.com
+- Studio: https://studio.supabase.example.com (admin use only)
 
 ### Module system (packages/core + packages/maps)
 
@@ -1875,8 +1875,8 @@ Atlas ERP es un ERP modular desktop-first construido con React + Vite + Tauri. A
 
 Atlas ERP usa una instancia dedicada de Supabase self-hosted:
 
-- API: https://supabase.racoondevs.com
-- Studio: https://studio.supabase.racoondevs.com (solo administraciÃ³n)
+- API: https://supabase.example.com
+- Studio: https://studio.supabase.example.com (solo administraciÃ³n)
 
 Esta instancia es exclusiva de Atlas ERP. No se comparte con otros proyectos.
 
@@ -1889,7 +1889,7 @@ Esta instancia es exclusiva de Atlas ERP. No se comparte con otros proyectos.
 - State: Zustand cuando sea necesario
 - API: Node.js + Hono
 - ORM: Prisma (pinned a ^6)
-- DB: Supabase PostgreSQL (https://supabase.racoondevs.com)
+- DB: Supabase PostgreSQL (https://supabase.example.com)
 - Auth: Supabase Auth self-hosted
 - Storage: Supabase Storage self-hosted
 - Realtime: futuro
@@ -2003,7 +2003,7 @@ DIRECT_URL=<same as DATABASE_URL for self-hosted Supabase>
 JWT_SECRET=<generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
 ```
 
-The `SUPABASE_URL` is already set to `https://supabase.racoondevs.com` in `.env.example`.
+The `SUPABASE_URL` is already set to `https://supabase.example.com` in `.env.example`.
 
 - [ ] **Step 2: Verify .env is not tracked by git**
 
@@ -2044,7 +2044,7 @@ pnpm db:studio
 
 Navigate to http://localhost:5555. Verify the `InstanceConfig` table appears in the left sidebar.
 
-Alternatively, check via Supabase Studio at https://studio.supabase.racoondevs.com â†’ Table Editor. The `instance_config` table should be visible.
+Alternatively, check via Supabase Studio at https://studio.supabase.example.com â†’ Table Editor. The `instance_config` table should be visible.
 
 ---
 
@@ -2062,7 +2062,7 @@ Expected output: success messages for seeding atlas.core, atlas.identity, atlas.
 
 - [ ] **Step 2: Verify modules in Supabase Studio**
 
-Open https://studio.supabase.racoondevs.com â†’ Table Editor â†’ `atlas_module` table.
+Open https://studio.supabase.example.com â†’ Table Editor â†’ `atlas_module` table.
 
 Expected: 4 rows with keys `atlas.core`, `atlas.identity`, `atlas.files`, `atlas.branding`.
 
@@ -2130,7 +2130,7 @@ git commit -m "chore: mark Phase 1 complete â€” Supabase connection verifie
 
 At this point:
 - Repository has a single coherent architectural view
-- All docs reference https://supabase.racoondevs.com as the real target
+- All docs reference https://supabase.example.com as the real target
 - No local-lite references remain
 - Atlas API is connected to live Supabase PostgreSQL
 - 4 core modules seeded and serving via API

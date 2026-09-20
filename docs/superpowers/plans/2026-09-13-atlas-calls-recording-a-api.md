@@ -1017,7 +1017,7 @@ redis:
 ```bash
 # LiveKit Egress → Supabase Storage S3-compatible upload (call recordings).
 # Get these from the self-hosted Supabase Storage container's own config on
-# the VPS (/opt/supabase-atlaserp/supabase/docker/.env) — NOT the same as
+# the VPS (/path/to/supabase/docker/.env) — NOT the same as
 # SUPABASE_SERVICE_ROLE_KEY. See docs/superpowers/specs/2026-09-13-atlas-calls-recording-design.md §24 risk 2.
 SUPABASE_S3_ENDPOINT=
 SUPABASE_S3_ACCESS_KEY_ID=

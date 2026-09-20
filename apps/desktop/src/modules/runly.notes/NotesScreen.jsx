@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import {
   Plus, ArrowLeft,
@@ -22,7 +22,7 @@ import { NoteSettingsPanel } from './components/NoteSettingsPanel.jsx'
 import { NoteShareModal } from './components/NoteShareModal.jsx'
 import { NoteTitleEditor } from './components/NoteTitleEditor.jsx'
 import { ZoomControl } from './components/ZoomControl.jsx'
-import { fitNoteZoom, useNoteZoom } from './hooks/useNoteZoom.js'
+import { useNoteZoom } from './hooks/useNoteZoom.js'
 
 // Lazy so the Excalidraw bundle only loads when a canvas note is opened.
 const CanvasEditor = lazy(() =>
@@ -64,9 +64,8 @@ export default function NotesScreen() {
   const isTrashView = activeView === 'trash'
 
   const [selectedNote, setSelectedNote] = useState(null)
-  const [editingNoteId, setEditingNoteId] = useState(null)
-  const editorPanelRef = useRef(null)
-  const viewOnly = editingNoteId !== selectedNote?.id
+  const [viewingNoteId, setViewingNoteId] = useState(null)
+  const viewOnly = viewingNoteId === selectedNote?.id
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen]       = useState(false)
   const [restoreOpen, setRestoreOpen]   = useState(false)
@@ -158,7 +157,7 @@ export default function NotesScreen() {
         onSuccess: (res) => {
           if (res?.note) {
             setSelectedNote(res.note)
-            setEditingNoteId(res.note.id)
+            setViewingNoteId(null)
             setNoteParam(res.note.id)
             setMobileView('editor')
           }
@@ -204,7 +203,7 @@ export default function NotesScreen() {
   }
 
   function selectNote(note) {
-    setEditingNoteId(null)
+    setViewingNoteId(null)
     setSelectedNote(note)
     setNoteParam(note.id)
     setMobileView('editor')
@@ -303,7 +302,6 @@ export default function NotesScreen() {
 
       {/* Panel 2: Editor / Settings */}
       <div
-        ref={editorPanelRef}
         className={[
           'flex-1 min-w-0 flex flex-col overflow-hidden',
           // fixed inset-x-0 top-0 h-dvh (not bare inset-0) — see RunlyApp.jsx's
@@ -349,7 +347,7 @@ export default function NotesScreen() {
                   size="sm"
                   variant="ghost"
                   aria-label={viewOnly ? 'Editar nota' : 'Ver nota'}
-                  onClick={() => setEditingNoteId(viewOnly ? selectedNote.id : null)}
+                  onClick={() => setViewingNoteId(viewOnly ? null : selectedNote.id)}
                 >
                   {viewOnly ? <PenLine size={14} /> : <Eye size={14} />}
                   {viewOnly ? 'Editar' : 'Ver'}
@@ -397,7 +395,7 @@ export default function NotesScreen() {
         )}
 
         {!isTrashView && !isCanvasNote && selectedNote && (
-          <ZoomControl zoom={zoom} onZoomChange={setZoom} onFit={() => setZoom(fitNoteZoom(editorPanelRef.current.clientWidth - 16))} />
+          <ZoomControl zoom={zoom} onZoomChange={setZoom} onReset={() => setZoom(100)} />
         )}
       </div>
 

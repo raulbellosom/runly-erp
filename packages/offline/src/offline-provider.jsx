@@ -9,6 +9,7 @@ import { useOfflineStore } from './offline-store.js'
 import { OFFLINE_MODULES } from './offline-modules.js'
 import { LedgerSQLiteStore, isTauriAvailable } from './ledger-sqlite.js'
 import { LedgerSyncAdapter } from './ledger-sync-adapter.js'
+import { createDatabaseLifecycle } from './database-lifecycle.js'
 
 const PULL_INTERVAL_MS = 10 * 60 * 1000 // 10 minutes
 const LEDGER_MODULE_KEY = 'runly.ledger'
@@ -31,9 +32,11 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
   useEffect(() => {
     const database = new RunlyOfflineDatabase()
     dbRef.current = database
-    database.open().catch((err) => {
+    const lifecycle = createDatabaseLifecycle(database, (err) => {
       console.warn('[runly/offline] IndexedDB failed to open - offline features unavailable', err)
     })
+    let ledgerStore = null
+    let ledgerSyncAdapter = null
 
     const vault = new SessionVault(database)
     const engine = new SyncEngine({
@@ -55,18 +58,20 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
     async function updatePendingCount() {
       try {
         const count = await transport.mutationQueue.getPendingCount()
-        setPendingCount(count)
+        if (lifecycle.isActive()) setPendingCount(count)
       } catch (err) {
         console.warn('[runly/offline] getPendingCount failed', err?.message ?? err)
       }
     }
 
     async function disposeLedgerRuntime() {
-      ledgerSyncAdapterRef.current = null
-      const ledgerStore = ledgerStoreRef.current
-      ledgerStoreRef.current = null
-      if (ledgerStore) {
-        await ledgerStore.close().catch(() => {})
+      const previousStore = ledgerStore
+      if (ledgerSyncAdapterRef.current === ledgerSyncAdapter) ledgerSyncAdapterRef.current = null
+      if (ledgerStoreRef.current === previousStore) ledgerStoreRef.current = null
+      ledgerSyncAdapter = null
+      ledgerStore = null
+      if (previousStore) {
+        await previousStore.close().catch(() => {})
       }
     }
 
@@ -74,6 +79,7 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
       if (!isTauriAvailable()) return null
 
       const session = await vault.load()
+      if (!lifecycle.isActive()) return null
       const companyId = session?.companyId ?? null
 
       if (!companyId) {
@@ -81,17 +87,18 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
         return null
       }
 
-      const existingStore = ledgerStoreRef.current
-      if (existingStore?.companyId === companyId && ledgerSyncAdapterRef.current) {
-        return ledgerSyncAdapterRef.current
+      if (ledgerStore?.companyId === companyId && ledgerSyncAdapter) {
+        return ledgerSyncAdapter
       }
 
       await disposeLedgerRuntime()
 
-      const ledgerStore = new LedgerSQLiteStore({ companyId })
+      if (!lifecycle.isActive()) return null
+      ledgerStore = new LedgerSQLiteStore({ companyId })
       await ledgerStore.open()
+      if (!lifecycle.isActive()) return null
 
-      const ledgerSyncAdapter = new LedgerSyncAdapter({
+      ledgerSyncAdapter = new LedgerSyncAdapter({
         db: database,
         apiBaseUrl,
         getToken: () => vault.load().then((currentSession) => currentSession?.accessToken ?? null),
@@ -103,35 +110,44 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
       return ledgerSyncAdapter
     }
 
-    async function runSync() {
-      setSyncing(true)
-      try {
-        let ledgerSyncAdapter = null
-        if (isTauriAvailable()) {
-          try {
-            ledgerSyncAdapter = await ensureLedgerRuntime()
-          } catch (err) {
-            console.warn('[runly/offline] Ledger SQLite unavailable - runly.ledger stays online-only', err?.message ?? err)
+    function runSync() {
+      return lifecycle.run(async (isActive) => {
+        setSyncing(true)
+        try {
+          let ledgerSyncAdapter = null
+          if (isTauriAvailable()) {
+            try {
+              ledgerSyncAdapter = await ensureLedgerRuntime()
+            } catch (err) {
+              console.warn('[runly/offline] Ledger SQLite unavailable - runly.ledger stays online-only', err?.message ?? err)
+            }
+          }
+
+          // Push first, then pull so the server sees our changes before we refresh.
+          if (!isActive()) return
+          await engine.push().catch((err) => {
+            console.warn('[runly/offline] Push failed', err?.message ?? err)
+          })
+          if (!isActive()) return
+          await engine.pull({ modules: OFFLINE_MODULES.filter((moduleKey) => moduleKey !== LEDGER_MODULE_KEY) })
+          if (!isActive()) return
+          if (ledgerSyncAdapter) {
+            await ledgerSyncAdapter.pull().catch((err) => {
+              console.warn('[runly/offline] Ledger pull failed', err?.message ?? err)
+            })
+          }
+          if (isActive()) setLastSyncAt(new Date().toISOString())
+        } catch (err) {
+          console.warn('[runly/offline] Pull failed', err?.message ?? err)
+        } finally {
+          if (isActive()) {
+            setSyncing(false)
+            await updatePendingCount()
           }
         }
-
-        // Push first, then pull so the server sees our changes before we refresh.
-        await engine.push().catch((err) => {
-          console.warn('[runly/offline] Push failed', err?.message ?? err)
-        })
-        await engine.pull({ modules: OFFLINE_MODULES.filter((moduleKey) => moduleKey !== LEDGER_MODULE_KEY) })
-        if (ledgerSyncAdapter) {
-          await ledgerSyncAdapter.pull().catch((err) => {
-            console.warn('[runly/offline] Ledger pull failed', err?.message ?? err)
-          })
-        }
-        setLastSyncAt(new Date().toISOString())
-      } catch (err) {
-        console.warn('[runly/offline] Pull failed', err?.message ?? err)
-      } finally {
-        setSyncing(false)
-        await updatePendingCount()
-      }
+      }).catch((err) => {
+        if (lifecycle.isActive()) console.warn('[runly/offline] Sync failed', err?.message ?? err)
+      })
     }
 
     const detector = new OnlineDetector({
@@ -157,9 +173,12 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
 
     return () => {
       detector.destroy()
-      disposeLedgerRuntime().catch(() => {})
-      database.close()
       clearInterval(intervalRef.current)
+      onTransportReady?.(null)
+      setSyncing(false)
+      lifecycle.dispose(disposeLedgerRuntime).catch((err) => {
+        console.warn('[runly/offline] Cleanup failed', err?.message ?? err)
+      })
     }
   }, [apiBaseUrl, setOnline, setLastSyncAt, setSyncing, setPendingCount, onTransportReady])
 

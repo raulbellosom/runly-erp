@@ -17,7 +17,7 @@ El chat de soporte externo (visitantes) tiene tres piezas de la misma función:
 | **Widget storefront** — `ChatWidget.jsx` (`@raulbellosom/atlas-sdk/react`) | Lo que ve el visitante en el sitio del cliente | Texto + subida de archivo (rota), realtime, sin previews, sin typing/read |
 | `ExternalChatWidget.jsx` (in-app) | — | **Código muerto**: cero imports en todo el repo |
 
-El test site `C:\Users\raulb\atlaserp-installer\racoondevs` monta el widget storefront
+El test site `C:\path\to\storefront` monta el widget storefront
 vía `src/components/LiveChat.tsx` → `import { ChatWidget } from '@raulbellosom/atlas-sdk/react'`.
 No usa `ExternalChatWidget.jsx`.
 

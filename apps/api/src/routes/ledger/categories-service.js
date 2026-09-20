@@ -39,8 +39,8 @@ export function createCategoriesService({ prisma }) {
     const kind  = data.kind ?? 'both'
     try {
       const rows = await prisma.$queryRaw`
-        INSERT INTO ledger_category (id, company_id, owner_id, name, color, kind, enabled, updated_at)
-        VALUES (gen_random_uuid(), ${companyId}::uuid, ${actorId}::uuid, ${name}, ${color}, ${kind}, true, NOW())
+        INSERT INTO ledger_category (company_id, owner_id, name, color, kind, enabled, updated_at)
+        VALUES (${companyId}::uuid, ${actorId}::uuid, ${name}, ${color}, ${kind}, true, NOW())
         RETURNING *, (owner_id IS NULL) AS is_system
       `
       return firstRow(rows)

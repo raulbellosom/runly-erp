@@ -1,3 +1,4 @@
+import { UserAccessError } from '../../services/user-access-service.js';
 import { parseMentionIds } from "../../lib/mention-utils.js";
 
 // Fixed, never-real-UUID sentinels so @everyone/@here can ride the exact same
@@ -26,7 +27,8 @@ export function createChatMentionsService({ prisma }) {
       return { userIds: [], roleIds: [], everyone: false, here: false, notifyUserIds: [] };
     }
 
-    const candidateIds = rawIds.filter((id) => id !== EVERYONE_MENTION_ID && id !== HERE_MENTION_ID);
+    // MirAI's composer token is handled by the assistant's own permission gate.
+    const candidateIds = rawIds.filter((id) => id !== EVERYONE_MENTION_ID && id !== HERE_MENTION_ID && id !== '00000000-0000-0000-0000-00000000b07a');
     const wantsEveryone = rawIds.includes(EVERYONE_MENTION_ID);
     const wantsHere = rawIds.includes(HERE_MENTION_ID);
 
@@ -36,7 +38,7 @@ export function createChatMentionsService({ prisma }) {
     if (candidateIds.length) {
       const memberRows = await prisma.$queryRaw`
         SELECT user_id FROM chat_conversation_members
-        WHERE conversation_id = ${conversationId} AND left_at IS NULL AND user_id = ANY(${candidateIds}::uuid[])
+        WHERE conversation_id = ${conversationId} AND left_at IS NULL AND public.runly_chat_user_access(conversation_id, user_id) AND user_id = ANY(${candidateIds}::uuid[])
       `;
       userIds = memberRows
         .map((r) => r.user_id.toString())
@@ -46,6 +48,8 @@ export function createChatMentionsService({ prisma }) {
         SELECT id FROM chat_channel_roles WHERE conversation_id = ${conversationId} AND id = ANY(${candidateIds}::uuid[])
       `;
       roleIds = roleRows.map((r) => r.id);
+      const eligible = new Set([...memberRows.map((r) => r.user_id.toString()), ...roleIds]);
+      if (candidateIds.some((id) => !eligible.has(id))) throw new UserAccessError();
     }
 
     const everyone = wantsEveryone && hasPermission(senderRole, "mentions.everyone");
@@ -56,7 +60,7 @@ export function createChatMentionsService({ prisma }) {
     if (roleIds.length) {
       const roleHolderRows = await prisma.$queryRaw`
         SELECT user_id FROM chat_conversation_members
-        WHERE conversation_id = ${conversationId} AND left_at IS NULL
+        WHERE conversation_id = ${conversationId} AND left_at IS NULL AND public.runly_chat_user_access(conversation_id, user_id)
           AND role_id = ANY(${roleIds}::uuid[]) AND user_id != ${senderProfileId}
       `;
       for (const r of roleHolderRows) notifySet.add(r.user_id.toString());
@@ -65,7 +69,7 @@ export function createChatMentionsService({ prisma }) {
     if (everyone || here) {
       const allRows = await prisma.$queryRaw`
         SELECT user_id FROM chat_conversation_members
-        WHERE conversation_id = ${conversationId} AND left_at IS NULL
+        WHERE conversation_id = ${conversationId} AND left_at IS NULL AND public.runly_chat_user_access(conversation_id, user_id)
           AND user_id IS NOT NULL AND user_id != ${senderProfileId}
       `;
       for (const r of allRows) notifySet.add(r.user_id.toString());

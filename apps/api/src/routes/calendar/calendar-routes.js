@@ -196,7 +196,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
       try {
         const userId = getUserId(c);
         await svc.ensureDefaultCalendar(userId, getCompanyId(c));
-        const result = await svc.listCalendars(userId);
+        const result = await svc.listCalendars(userId, getCompanyId(c));
         return c.json(result);
       } catch (err) {
         return handleError(c, err, "No se pudieron obtener los calendarios.");
@@ -612,7 +612,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
         const userId = getUserId(c);
         const { start, end, source_module, source_entity_id } = c.req.query();
         const calendarIds = c.req.queries("calendar_ids") ?? [];
-        const events = await eventSvc.listEvents({
+        const events = await eventSvc.listEvents({ companyId: getCompanyId(c),
           userId,
           start,
           end,

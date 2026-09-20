@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js'
 export class ProjectServiceError extends Error {
   constructor(message, status = 500) {
     super(message)
@@ -161,13 +162,7 @@ export function createProjectsService({ prisma }) {
     if (!validRoles.includes(role)) throw new ProjectServiceError('Rol invalido.', 400)
     if (!userId) throw new ProjectServiceError('Usuario invalido.', 400)
     // The invitee must belong to the project's company.
-    const peer = await prisma.membership.findFirst({
-      where: { userId, companyId: project.companyId, enabled: true },
-      select: { id: true },
-    })
-    if (!peer) {
-      throw new ProjectServiceError('Solo puedes agregar usuarios de tu empresa.', 403)
-    }
+    await createUserAccessService({ prisma }).assertCandidates({ companyId: project.companyId, userIds: [userId], permission: 'projects.project.read' })
     try {
       return await prisma.projectMember.create({ data: { projectId, userId, role } })
     } catch (err) {

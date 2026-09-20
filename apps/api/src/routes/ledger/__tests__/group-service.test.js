@@ -31,8 +31,12 @@ function buildPrismaMock(queryRawHandler) {
     userProfile: {
       findUnique: async () => null,
     },
+    // Default: any invited user is treated as an active company member (assertCandidates,
+    // called by inviteMember before the SQL insert) so happy-path tests don't need to
+    // separately stub it; tests that specifically exercise non-member rejection can
+    // override this per-call.
     membership: {
-      findFirst: async () => null,
+      findFirst: async () => ({ id: 'membership-1', companyId: COMPANY_ID, enabled: true, role: null }),
       findMany: async () => [],
     },
     notification: {

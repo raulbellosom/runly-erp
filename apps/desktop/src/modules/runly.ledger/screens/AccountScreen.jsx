@@ -8,6 +8,7 @@ import {
   UserSearchModal,
   ConfirmDialog,
   EmptyState,
+  PageHeader,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -21,7 +22,6 @@ import {
   Table,
   Download,
   Upload,
-  ArrowLeft,
   UserPlus,
   Trash2,
   FolderOpen,
@@ -110,6 +110,9 @@ export default function AccountScreen() {
     account != null &&
     account.group_id == null &&
     account.is_owner === true;
+  // Owner-only, regardless of group membership — used for actions like
+  // "Mover a personal" that only make sense while the account IS in a group.
+  const isOwner = !isUsingLocalLedger && account?.is_owner === true;
   // Transaction register write access: owner OR editor member OR group editor/admin.
   const canWriteRegister = account == null || account.can_write !== false;
   const types = typesData?.data ?? [];
@@ -248,52 +251,36 @@ export default function AccountScreen() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[hsl(var(--border))] shrink-0">
-        {/* Title row */}
-        <div className="flex items-start gap-3 justify-between">
-          <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={() => navigate("/app/m/runly.ledger/accounts")}
-              className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] mb-1.5 transition-colors"
-            >
-              <ArrowLeft size={11} />
-              Cuentas bancarias
-            </button>
-
-            {accountLoading ? (
-              <div className="space-y-1.5">
-                <div className="h-7 w-44 rounded-lg bg-[hsl(var(--muted))] animate-pulse" />
-                <div className="h-4 w-56 rounded bg-[hsl(var(--muted))] animate-pulse opacity-70" />
-              </div>
-            ) : (
+        <PageHeader
+          className="pb-0"
+          onBack={() => navigate("/app/m/runly.ledger/accounts")}
+          backLabel="Cuentas bancarias"
+          loading={accountLoading}
+          title={account?.name ?? "Cuenta"}
+          description={
+            account && (
               <>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] truncate">
-                  {account?.name ?? "Cuenta"}
-                </h1>
-                {account && (
-                  <p className="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">
-                    {account.bank}
-                    <span className="mx-1.5 opacity-40">·</span>
-                    {account.currency}
-                    <span className="mx-1.5 opacity-40">·</span>
-                    <span
-                      className="font-semibold tabular-nums"
-                      style={{ color: "var(--module-accent, #16a34a)" }}
-                    >
-                      {fmtCurrency(account.current_balance, account.currency)}
-                    </span>
-                  </p>
-                )}
+                {account.bank}
+                <span className="mx-1.5 opacity-40">·</span>
+                {account.currency}
+                <span className="mx-1.5 opacity-40">·</span>
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{ color: "var(--module-accent, #16a34a)" }}
+                >
+                  {fmtCurrency(account.current_balance, account.currency)}
+                </span>
               </>
-            )}
-          </div>
-
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={openEdit} className="shrink-0 mt-5 sm:mt-6">
-              <Pencil size={12} /> Editar
-            </Button>
-          )}
-        </div>
+            )
+          }
+          actions={
+            canEdit && (
+              <Button variant="outline" size="sm" onClick={openEdit}>
+                <Pencil size={12} /> Editar
+              </Button>
+            )
+          }
+        />
 
         {/* Export actions row — only on Registro tab */}
         {activeTab === "registro" && (
@@ -464,7 +451,7 @@ export default function AccountScreen() {
                   El acceso a esta cuenta está controlado por el grupo. Para
                   gestionar miembros ve al grupo.
                 </p>
-                {canEdit && (
+                {isOwner && (
                   <Button
                     variant="ghost"
                     size="sm"

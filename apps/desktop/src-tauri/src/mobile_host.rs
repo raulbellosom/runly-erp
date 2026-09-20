@@ -14,7 +14,7 @@ use tauri_plugin_opener::OpenerExt;
 
 const ORIGIN: &str = match option_env!("ATLAS_NATIVE_ORIGIN") {
     Some(value) => value,
-    None => "https://atlas.racoondevs.com",
+    None => "https://app.example.invalid",
 };
 const VERSION: &str = match option_env!("ATLAS_NATIVE_VERSION") {
     Some(value) => value,
@@ -314,20 +314,20 @@ mod tests {
     #[test]
     fn exact_origin_and_app_path() {
         for value in [
-            "https://atlas.racoondevs.com.evil/app/",
-            "http://atlas.racoondevs.com/app/",
-            "https://atlas.racoondevs.com:444/app/",
-            "https://user@atlas.racoondevs.com/app/",
-            "https://atlas.racoondevs.com/public/file",
+            "https://atlas.example.com.evil/app/",
+            "http://atlas.example.com/app/",
+            "https://atlas.example.com:444/app/",
+            "https://user@atlas.example.com/app/",
+            "https://atlas.example.com/public/file",
         ] {
             assert!(!allowed_remote(
                 &Url::parse(value).unwrap(),
-                "https://atlas.racoondevs.com"
+                "https://atlas.example.com"
             ));
         }
         assert!(allowed_remote(
-            &Url::parse("https://atlas.racoondevs.com/app/login").unwrap(),
-            "https://atlas.racoondevs.com"
+            &Url::parse("https://atlas.example.com/app/login").unwrap(),
+            "https://atlas.example.com"
         ));
     }
     #[test]

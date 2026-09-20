@@ -583,6 +583,8 @@ describe("createPosOrderService", () => {
   it("assignOrderWaiter reassigns waiter and writes an audit entry", async () => {
     const db = makePrisma();
     db.profiles.set("user-2", { id: "user-2", displayName: "Otro Mesero" });
+    db.membership = { findFirst: async ({ where }) =>
+      where.companyId === "company-1" && where.userId === "user-2" ? { id: "member-2" } : null };
     db.userProfile = {
       findUnique: async ({ where }) => db.profiles.get(where.id) ?? null,
     };
@@ -602,6 +604,9 @@ describe("createPosOrderService", () => {
     assert.equal(updated.waiterName, "Otro Mesero");
     const auditEntry = db.audits.find((a) => a.action === "pos.order.waiter.assign");
     assert.ok(auditEntry, "audit entry for waiter.assign must exist");
+    await assert.rejects(svc.assignOrderWaiter({ companyId: "company-1", actorId: "user-1", id: created.id, waiterId: "foreign-user" }),
+      (error) => error.status === 404);
+    assert.equal(db.audits.filter((entry) => entry.action === "pos.order.waiter.assign").length, 1);
   });
 
   it("getSeatTotals groups lines by seat and puts unassigned lines last", async () => {

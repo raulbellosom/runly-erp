@@ -15,7 +15,7 @@ chart, comment threads), even though the on-screen display size is often 24-96px
 No thumbnail/resize logic exists anywhere in the codebase today (verified: no `render/image`,
 no `transform`, no client- or server-side resize on upload). Supabase Storage's built-in
 image-transform pipeline (imgproxy sidecar) was probed directly against the self-hosted
-instance (`https://supabase.racoondevs.com/storage/v1/render/image/...`) and confirmed
+instance (`https://supabase.example.com/storage/v1/render/image/...`) and confirmed
 active — it returned `404 Object not found` for a nonexistent test object rather than a
 "transformation not enabled" error, meaning the transform pipeline is live and ready to use
 without any new infrastructure.

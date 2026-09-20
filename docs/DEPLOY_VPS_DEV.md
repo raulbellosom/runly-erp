@@ -55,7 +55,7 @@ nano .env
 chmod 600 .env
 ```
 
-Valores a completar (obténlos del VPS de Supabase en `/opt/supabase-atlaserp/supabase/docker/.env`):
+Valores a completar (obténlos del VPS de Supabase en `/path/to/supabase/docker/.env`):
 
 ```dotenv
 NODE_ENV=production
@@ -64,7 +64,7 @@ RUNLY_API_PORT=4010
 RUNLY_TIME_ZONE=America/Mexico_City
 TZ=America/Mexico_City
 
-SUPABASE_URL=https://supabase.racoondevs.com
+SUPABASE_URL=https://supabase.example.com
 SUPABASE_ANON_KEY=<ANON_KEY>
 SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY>
 SUPABASE_JWT_SECRET=<JWT_SECRET>
@@ -77,7 +77,7 @@ DIRECT_URL=postgresql://postgres:<POSTGRES_PASSWORD>@<IP_VPS_SUPABASE>:5432/post
 JWT_SECRET=<JWT_SECRET>
 CORS_ORIGIN=https://<SUBDOMINIO>
 
-VITE_SUPABASE_URL=https://supabase.racoondevs.com
+VITE_SUPABASE_URL=https://supabase.example.com
 VITE_SUPABASE_ANON_KEY=<ANON_KEY>
 VITE_RUNLY_API_URL=https://<SUBDOMINIO>/api
 ```

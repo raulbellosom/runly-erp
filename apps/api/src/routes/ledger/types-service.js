@@ -34,8 +34,8 @@ export function createTypesService({ prisma }) {
     const name = String(data.name).trim()
     try {
       const rows = await prisma.$queryRaw`
-        INSERT INTO ledger_transaction_type (id, company_id, code, name, enabled, updated_at)
-        VALUES (gen_random_uuid(), ${companyId}::uuid, ${code}, ${name}, true, NOW())
+        INSERT INTO ledger_transaction_type (company_id, code, name, enabled, updated_at)
+        VALUES (${companyId}::uuid, ${code}, ${name}, true, NOW())
         RETURNING *
       `
       return firstRow(rows)

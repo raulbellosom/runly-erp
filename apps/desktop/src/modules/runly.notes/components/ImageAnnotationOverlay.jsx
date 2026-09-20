@@ -19,6 +19,7 @@ import { ImageCropModal } from './ImageCropModal.jsx'
 import { ImageEditModal } from './ImageEditModal.jsx'
 import { NoteImagePreviewButton } from './NoteImagePreviewButton.jsx'
 import { NoteInteractionContext } from './NoteInteractionContext.js'
+import { NoteBlockDragHandle } from './NoteBlockDragHandle.jsx'
 
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#1a1a1a', '#ffffff']
 const TOOLS = [
@@ -62,7 +63,9 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
   const rotation = normalizeRotation(node.attrs.rotation)
-  const editable = !viewing && editor?.isEditable !== false
+  // Context already combines permission and view mode. editor.isEditable
+  // updates in an effect and can still hold the previous mode during render.
+  const editable = !viewing
   const isEditing = editable && mode === 'edit'
   const inTableCell = typeof getPos === 'function' && isInsideTableCell(editor.state, getPos())
   // null = full width, for images inserted before this attribute existed.
@@ -73,22 +76,37 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
   const effectiveCrop = crop ?? { x: 0, y: 0, w: 1, h: 1 }
   const effNat = effectiveNaturalSize(natural, rotation)
   const fillSize = useRotatedFillSize(rotWrapRef, rotation, effNat?.w, effNat?.h)
+  const drag = useBlockDragReorder({
+    editor, getPos, editable: editable && !inTableCell, isEditing,
+    getBoxEl: () => boxRef.current,
+    getFrameEl: () => frameRef.current,
+  })
   const {
     onPointerDown: onDragPointerDown,
     onPointerMove: onDragPointerMove,
     onPointerUp: onDragPointerUp,
     onPointerCancel: onDragPointerCancel,
     wasDragRef,
-  } = useBlockDragReorder({
-    editor, getPos, editable, isEditing,
-    getBoxEl: () => boxRef.current,
-    getFrameEl: () => frameRef.current,
-  })
+  } = drag
 
   const {
     draft, textInput, onDrawPointerDown, onDrawPointerMove, onDrawPointerUp,
     commitTextInput, cancelTextInput, cancelDraft, removeAnnotation, renderAnnotation, renderDraft,
   } = useImageAnnotationDrawing({ svgRef, crop, annotations, tool, color, lineWidth, isEditing, updateAttributes })
+
+  // Toggling the whole note from edit to view mode (the note-level Ver/Editar
+  // button, not this image's own mode) never runs exitEditMode — the note can
+  // switch to view-only while an image is mid-annotation. Without this,
+  // `mode` stays stuck at 'edit' and switching the note back to edit mode
+  // immediately re-enters the annotation toolbar instead of showing the
+  // normal Editar/Eliminar controls.
+  useEffect(() => {
+    if (editable) return
+    cancelDraft()
+    cancelTextInput()
+    setMode('view')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editable])
 
   // Deselect when clicking outside the image (Word/PPT-style click-away).
   useEffect(() => {
@@ -242,6 +260,11 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
 
   return (
     <NodeViewWrapper className="group/img relative my-2 block w-full">
+      {editable && !inTableCell && !isEditing && (
+        <div contentEditable={false} className="mb-1 flex" data-html2canvas-ignore>
+          <NoteBlockDragHandle label="Mover imagen" drag={drag} />
+        </div>
+      )}
       <div
         ref={boxRef}
         onClick={onImageClick}
@@ -456,9 +479,8 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
           <div
             // Top-right: keeps the primary "Editar imagen" affordance in view
             // above the fold on a tall image, clear of the corner resize
-            // handles. No separate move handle any more — press-and-hold
-            // anywhere on the image body (via boxRef's own pointer handlers
-            // above) starts a reorder drag instead.
+            // handles. The separate grip and press-and-hold on the image
+            // both support reordering.
             className="absolute top-2 right-2 flex items-center gap-1.5"
           >
             <NoteImagePreviewButton src={node.attrs.src} alt={node.attrs.alt} />
@@ -554,6 +576,12 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
               crop: nextCrop,
               rotation: nextRotation,
               annotations: JSON.stringify(rotatedAnnotations),
+              // A prior manual corner-resize freezes the frame's aspect ratio
+              // in this attribute, which otherwise keeps overriding the new
+              // crop's own shape — the image would visibly not change size
+              // after cropping (e.g. cropping to 1:1 while a wide aspectRatio
+              // is still stored). The new crop defines the frame's shape now.
+              aspectRatio: null,
             })
             setCropOpen(false)
           }}

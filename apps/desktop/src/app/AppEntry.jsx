@@ -1,3 +1,5 @@
+import { AcceptInvitationScreen } from '../company/AcceptInvitationScreen.jsx';
+import { SharedResourceScreen } from '../company/SharedResourceScreen.jsx';
 import { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -35,6 +37,7 @@ import { ServerSetup } from "./ServerSetup.jsx";
 import { native } from '../native/index.js';
 import { NativeHostDiagnostics } from '../native/NativeHostDiagnostics.jsx';
 import { AppRouteGuard } from "./AppRouteGuard.jsx";
+import { ResetPasswordScreen } from "../auth/ResetPasswordScreen.jsx";
 import PublicNoteScreen from "../modules/runly.notes/PublicNoteScreen.jsx";
 
 const GuestCallScreen = lazy(() => import("../modules/runly.chat/calls/guest/GuestCallScreen.jsx"));
@@ -126,7 +129,10 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
       persistOptions={{
         persister: _persister,
         maxAge: 24 * 60 * 60 * 1000,
-        buster: import.meta.env.VITE_APP_VERSION ?? '1',
+        buster: `isolated-v1-${import.meta.env.VITE_APP_VERSION ?? '1'}`,
+        // Authenticated data cannot be restored before identity and membership
+        // have been checked. Offline business data needs a separate scoped store.
+        dehydrateOptions: { shouldDehydrateQuery: () => false, shouldDehydrateMutation: () => false },
       }}
     >
       <TooltipProvider>
@@ -137,6 +143,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
               <Route path="/" element={<PublicWebsiteEntry />} />
               <Route path="/app/setup" element={<AppRouteGuard mode="setup" />} />
               <Route path="/app/login" element={<AppRouteGuard mode="login" />} />
+              <Route path="/app/reset-password" element={<ResetPasswordScreen />} />
               <Route path="/app/acceso" element={<PublicClientLogin />} />
               <Route
                 path="/app/google/calendar/callback"
@@ -149,6 +156,8 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
                 <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
               </Route>
               <Route element={<AppRouteGuard mode="access" />}>
+                <Route path="/app/accept-invitation" element={<AcceptInvitationScreen />} />
+                <Route path="/app/shared/:resourceType/:id" element={<SharedResourceScreen />} />
                 <Route
                   path="/app"
                   element={

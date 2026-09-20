@@ -38,6 +38,12 @@ export function RealtimeProvider({ children }) {
 
   // User events channel — receives broadcasts sent by the API after writes
   useEffect(() => {
+    setOnlineUsers({})
+    setLastSeenMap({})
+    useChatFloatStore.setState({ openChats: [], isOpen: false })
+  }, [activeCompanyId, userProfile?.id])
+
+  useEffect(() => {
     if (!userProfile?.id || !session?.access_token) return
     const client = getSupabaseClient()
     // private: true enables Realtime Authorization — the server checks the

@@ -43,7 +43,7 @@ Then add at the end of the file:
 ```js
 describe('injectAtlasConfig', () => {
   const cfg = {
-    supabaseUrl: 'https://supabase.racoondevs.com',
+    supabaseUrl: 'https://supabase.example.com',
     supabaseAnonKey: 'eyJtest',
     apiUrl: '/',
   }
@@ -52,7 +52,7 @@ describe('injectAtlasConfig', () => {
     const html = '<html><head></head><body></body></html>'
     const result = injectAtlasConfig(html, cfg)
     assert.ok(result.includes('window.ATLAS_CONFIG='))
-    assert.ok(result.includes('supabase.racoondevs.com'))
+    assert.ok(result.includes('supabase.example.com'))
     assert.ok(result.includes('eyJtest'))
   })
 
@@ -786,7 +786,7 @@ node -e "
 import('./apps/api/src/services/dist-serve-service.js').then(m => {
   const html = '<html><head></head><body></body></html>'
   const result = m.injectAtlasConfig(html, {
-    supabaseUrl: 'https://supabase.racoondevs.com',
+    supabaseUrl: 'https://supabase.example.com',
     supabaseAnonKey: 'testkey',
     apiUrl: '/'
   })

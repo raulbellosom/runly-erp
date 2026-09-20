@@ -20,7 +20,7 @@ The session already lives in `localStorage` (Supabase stores it as `sb-{projectR
 
 Supabase derives the localStorage key from the project URL:  
 `sb-{hostname_first_segment}-auth-token`  
-e.g. for `https://supabase.racoondevs.com` → `sb-supabase-auth-token`
+e.g. for `https://supabase.example.com` → `sb-supabase-auth-token`
 
 If the dist frontend creates a `@supabase/supabase-js` client with the same `supabaseUrl` and `supabaseAnonKey`, it automatically reads and writes the exact same localStorage entry as Atlas ERP. No custom sync required.
 
@@ -35,7 +35,7 @@ If the dist frontend creates a `@supabase/supabase-js` client with the same `sup
 ```html
 <script>
 window.ATLAS_CONFIG = {
-  supabaseUrl:   "https://supabase.racoondevs.com",
+  supabaseUrl:   "https://supabase.example.com",
   supabaseAnonKey: "eyJ...",
   apiUrl:        "/api",
   storageKey:    "sb-supabase-auth-token"

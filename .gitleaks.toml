@@ -1,0 +1,9 @@
+title = "Runly public repository secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Literal documentation placeholders, never actual credentials"
+regexTarget = "secret"
+regexes = ['''^(?:ATLAS_TOKEN|RUNLY_TOKEN|invalid-token)$''']

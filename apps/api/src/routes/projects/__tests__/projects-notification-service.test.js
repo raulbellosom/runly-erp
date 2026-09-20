@@ -125,7 +125,7 @@ describe('projects notification regressions', () => {
     await createProjectsNotificationService({ prisma }).notifyTaskReaction({ companyId: COMPANY_ID, actorId: ACTOR_ID, commentId: 'comment-a' });
     assert.equal(prisma._published.length, 1);
     assert.equal(prisma._published[0].userId, USER_A);
-    assert.equal(prisma._published[0].link, `/app/m/atlas.projects?open=task:${TASK_ID}`);
+    assert.equal(prisma._published[0].link, `/app/m/runly.projects?open=task:${TASK_ID}`);
   });
 });
 

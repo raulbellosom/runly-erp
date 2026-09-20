@@ -1,3 +1,4 @@
+import { authorizeRealtimeClient } from './authorizedRealtime.js'
 import { createClient } from '@supabase/supabase-js'
 import { RUNLY_PUBLIC_DESKTOP_CONFIG_PATH } from './appConfig.js'
 import { getApiUrl, runtimeConfig } from './runtimeConfig.js'
@@ -52,7 +53,7 @@ export async function initSupabaseClient({
 
   const nextKey = `${resolvedConfig.url}::${resolvedConfig.anonKey}`
   if (!forceReload && currentSupabaseClient && currentSupabaseKey === nextKey) {
-    return currentSupabaseClient
+    return authorizeRealtimeClient(currentSupabaseClient)
   }
 
   currentSupabaseClient = createClient(resolvedConfig.url, resolvedConfig.anonKey, {
@@ -63,7 +64,7 @@ export async function initSupabaseClient({
     },
   })
   currentSupabaseKey = nextKey
-  return currentSupabaseClient
+  return authorizeRealtimeClient(currentSupabaseClient)
 }
 
 export function getSupabaseClient() {
@@ -85,7 +86,7 @@ export function getSupabaseClient() {
     currentSupabaseKey = `${fallbackConfig.url}::${fallbackConfig.anonKey}`
   }
 
-  return currentSupabaseClient
+  return authorizeRealtimeClient(currentSupabaseClient)
 }
 
 export const supabase = new Proxy(

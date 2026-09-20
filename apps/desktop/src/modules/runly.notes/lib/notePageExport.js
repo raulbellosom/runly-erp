@@ -21,13 +21,18 @@ const safeName = (title) => (title?.trim() || 'nota').replace(/[^\w\-. ]+/g, '_'
 
 async function renderNoteSheetToCanvas(el, backgroundColor) {
   const { default: html2canvas } = await import('html2canvas')
+  const layoutWidth = getComputedStyle(el).width
   return html2canvas(el, {
     backgroundColor: backgroundColor || '#ffffff',
     useCORS: true,
     scale: Math.min(window.devicePixelRatio || 1, 2),
-    // Export the document at its canonical dimensions, independently of
-    // the viewer's mobile zoom and scroll position.
+    // Preserve this device's wrapping when removing zoom for export.
+    // The clone must not reflow to a different width or clip scrolled content.
     onclone: (_document, sheet) => {
+      sheet.style.width = layoutWidth
+      sheet.style.minWidth = layoutWidth
+      sheet.style.maxWidth = 'none'
+      sheet.style.minHeight = '0'
       sheet.style.zoom = '1'
       sheet.style.margin = '0'
       normalizeExportColors(_document, sheet)

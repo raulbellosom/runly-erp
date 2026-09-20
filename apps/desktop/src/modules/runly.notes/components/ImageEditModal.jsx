@@ -185,7 +185,10 @@ export function ImageEditModal({ open, onOpenChange, src, alt, annotations, crop
             crop={crop}
             rotation={rotation}
             onApply={({ crop: nextCrop, rotation: nextRotation }) => {
-              updateAttributes({ crop: nextCrop, rotation: nextRotation })
+              // See ImageAnnotationOverlay's crop onApply: a stale aspectRatio
+              // from a manual resize would otherwise keep overriding the new
+              // crop's shape.
+              updateAttributes({ crop: nextCrop, rotation: nextRotation, aspectRatio: null })
               setCropOpen(false)
             }}
           />

@@ -15,6 +15,7 @@ export function createYDocService({ prisma }) {
     const [note] = await prisma.$queryRaw`
       SELECT id FROM notes
       WHERE id = ${noteId}::uuid
+        AND public.runly_note_user_access(id, ${userId}::uuid, false)
         AND (
           owner_user_id = ${userId}::uuid
           OR id IN (
@@ -48,7 +49,7 @@ export function createYDocService({ prisma }) {
     const [note] = await prisma.$queryRaw`
       SELECT id FROM notes
       WHERE public_slug = ${slug}
-        AND is_public = true
+        AND is_public = true AND public.notes_realtime_is_public(id)
         AND deleted_at IS NULL
         AND is_trashed = false
     `
@@ -75,6 +76,7 @@ export function createYDocService({ prisma }) {
     const [note] = await prisma.$queryRaw`
       SELECT id FROM notes
       WHERE id = ${noteId}::uuid
+        AND public.runly_note_user_access(id, ${userId}::uuid, false)
         AND (
           owner_user_id = ${userId}::uuid
           OR id IN (

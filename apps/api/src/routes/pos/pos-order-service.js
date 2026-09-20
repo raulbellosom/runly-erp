@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js';
 import {
   PosServiceError,
   assertEditableOrder,
@@ -264,6 +265,7 @@ export function createPosOrderService({ prisma, waiterShifts, modifiers }) {
     if (!order) throw new PosServiceError("Orden POS no encontrada.", 404);
     assertEditableOrder(order);
 
+    if (waiterId) await createUserAccessService({ prisma }).assertCandidates({ companyId: scopedCompanyId, userIds: [waiterId] });
     if (waiterId) {
       const profile = await prisma.userProfile.findUnique({
         where: { id: waiterId },

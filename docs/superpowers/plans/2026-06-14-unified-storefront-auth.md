@@ -790,7 +790,7 @@ export { StorefrontError }
  * No `initialSession` or `onSessionChange` needed for basic use.
  *
  * @param {object} options
- * @param {string} options.baseUrl        - Atlas ERP instance URL (e.g. 'https://erp.acme.mx')
+ * @param {string} options.baseUrl        - Atlas ERP instance URL (e.g. 'https://erp.example.com')
  * @param {string} options.company        - Company slug. Sent as X-Atlas-Company on every request.
  * @param {string} options.supabaseUrl    - Supabase project URL (available in window.ATLAS_CONFIG.supabaseUrl)
  * @param {string} options.supabaseAnonKey - Supabase anon key (available in window.ATLAS_CONFIG.supabaseAnonKey)

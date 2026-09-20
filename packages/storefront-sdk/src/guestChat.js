@@ -102,6 +102,8 @@ export function createGuestChatDomain(request, supabaseUrl, supabaseAnonKey) {
     const { onMessage, onTyping, onRead, onClose } = opts
     let channel = null
     let cancelled = false
+    let revision = null
+    let refreshing = false
 
     async function setup() {
       let client
@@ -110,6 +112,14 @@ export function createGuestChatDomain(request, supabaseUrl, supabaseAnonKey) {
       } catch {
         return
       }
+      if (cancelled || refreshing) return
+      refreshing = true
+      let next
+      try { next = (await request('GET', '/realtime/revision')).revision } catch { refreshing = false; return }
+      if (cancelled || next === revision) { refreshing = false; return }
+      revision = next
+      if (channel) await client.removeChannel(channel)
+      refreshing = false
       if (cancelled) return
 
       // private: true — chat_conv_receive RLS policy (migration
@@ -118,7 +128,7 @@ export function createGuestChatDomain(request, supabaseUrl, supabaseAnonKey) {
       // join; an unauthenticated/wrong-guest client is rejected at the
       // server, not just left to the topic string being unguessable.
       channel = client
-        .channel(`chat:conv:${conversationId}`, { config: { private: true } })
+        .channel(`chat:conv:${conversationId}@${revision}`, { config: { private: true } })
         .on('broadcast', { event: 'new_operator_message' }, ({ payload }) => {
           onMessage?.(payload)
         })
@@ -135,9 +145,11 @@ export function createGuestChatDomain(request, supabaseUrl, supabaseAnonKey) {
     }
 
     setup().catch(() => {})
+    const refreshTimer = setInterval(() => setup().catch(() => {}), 10_000)
 
     return function unsubscribe() {
       cancelled = true
+      clearInterval(refreshTimer)
       if (channel && _realtimeClient) {
         _realtimeClient.removeChannel(channel).catch(() => {})
       }

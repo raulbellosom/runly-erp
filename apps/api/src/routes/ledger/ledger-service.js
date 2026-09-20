@@ -35,6 +35,7 @@ export function createLedgerService({ prisma }) {
             )
             OR EXISTS (
               SELECT 1 FROM ledger_group_member gm
+              JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
               WHERE gm.group_id = a.group_id AND gm.user_id = ${actorId}::uuid AND gm.status = 'active'
             )
           )
@@ -66,6 +67,7 @@ export function createLedgerService({ prisma }) {
             )
             OR EXISTS (
               SELECT 1 FROM ledger_group_member gm
+              JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
               WHERE gm.group_id = a.group_id AND gm.user_id = ${actorId}::uuid
                 AND gm.status = 'active' AND (gm.role = 'editor' OR gm.role = 'admin')
             )
@@ -75,6 +77,7 @@ export function createLedgerService({ prisma }) {
         LEFT JOIN ledger_transaction t ON t.account_id = a.id
         WHERE a.id = ${accountId}::uuid
           AND a.company_id = ${companyId}::uuid
+          AND a.enabled = true
           AND (
             a.owner_id = ${actorId}::uuid
             OR EXISTS (
@@ -83,6 +86,7 @@ export function createLedgerService({ prisma }) {
             )
             OR EXISTS (
               SELECT 1 FROM ledger_group_member gm
+              JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
               WHERE gm.group_id = a.group_id AND gm.user_id = ${actorId}::uuid AND gm.status = 'active'
             )
           )
@@ -118,9 +122,8 @@ export function createLedgerService({ prisma }) {
     try {
       const rows = await prisma.$queryRaw`
         INSERT INTO ledger_account
-          (id, company_id, owner_id, group_id, name, bank, account_number, currency, opening_balance, enabled, updated_at)
+          (company_id, owner_id, group_id, name, bank, account_number, currency, opening_balance, enabled, updated_at)
         VALUES (
-          gen_random_uuid(),
           ${companyId}::uuid,
           ${ownerId},
           ${groupId},
@@ -146,6 +149,7 @@ export function createLedgerService({ prisma }) {
       SELECT 1 FROM ledger_account a
       WHERE a.id = ${accountId}::uuid
         AND a.company_id = ${companyId}::uuid
+        AND a.enabled = true
         AND (
           a.owner_id = ${actorId}::uuid
           OR EXISTS (
@@ -154,6 +158,7 @@ export function createLedgerService({ prisma }) {
           )
           OR EXISTS (
             SELECT 1 FROM ledger_group_member gm
+            JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
             WHERE gm.group_id = a.group_id AND gm.user_id = ${actorId}::uuid AND gm.status = 'active'
           )
         )
@@ -166,6 +171,7 @@ export function createLedgerService({ prisma }) {
       SELECT 1 FROM ledger_account a
       WHERE a.id = ${accountId}::uuid
         AND a.company_id = ${companyId}::uuid
+        AND a.enabled = true
         AND (
           a.owner_id = ${actorId}::uuid
           OR EXISTS (
@@ -175,6 +181,7 @@ export function createLedgerService({ prisma }) {
           )
           OR EXISTS (
             SELECT 1 FROM ledger_group_member gm
+            JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
             WHERE gm.group_id = a.group_id AND gm.user_id = ${actorId}::uuid
               AND gm.status = 'active' AND (gm.role = 'editor' OR gm.role = 'admin')
           )
@@ -201,7 +208,7 @@ export function createLedgerService({ prisma }) {
             currency = ${currency},
             opening_balance = ${opening_balance},
             updated_at = NOW()
-        WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid
+        WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid AND enabled = true
         RETURNING *
       `
       return firstRow(rows)
@@ -250,10 +257,21 @@ export function createLedgerService({ prisma }) {
       if (!firstRow(groupRows)) throw new LedgerServiceError('Grupo no encontrado o sin permisos.', 403)
 
       // Access now flows from the group — drop any direct per-account members so
-      // there is a single source of truth for who can see the account.
-      await prisma.$queryRaw`
-        DELETE FROM ledger_account_member WHERE account_id = ${accountId}::uuid
-      `
+      // there is a single source of truth for who can see the account. Both writes
+      // run in one transaction so a mid-failure can't strand the account without
+      // members AND without its new group_id.
+      const rows = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          DELETE FROM ledger_account_member WHERE account_id = ${accountId}::uuid
+        `
+        return tx.$queryRaw`
+          UPDATE ledger_account
+          SET group_id = ${groupId}, updated_at = NOW()
+          WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid
+          RETURNING *
+        `
+      })
+      return firstRow(rows)
     }
 
     const rows = await prisma.$queryRaw`
@@ -361,10 +379,9 @@ export function createLedgerService({ prisma }) {
           AND enabled = true
       )
       INSERT INTO ledger_transaction
-        (id, account_id, company_id, fecha, tipo_id, numero, nombre,
+        (account_id, company_id, fecha, tipo_id, numero, nombre,
          referencia, concepto, deposito, retiro, category_id, enabled, updated_at)
       SELECT
-        gen_random_uuid(),
         ${accountId}::uuid,
         ${companyId}::uuid,
         ${fecha}::date,

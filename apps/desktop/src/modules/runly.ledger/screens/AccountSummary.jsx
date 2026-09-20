@@ -7,6 +7,7 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { ErrorState } from '@runly/ui'
 import { useAccountSummary } from '../hooks/use-ledger-queries.js'
 
 const C_INCOME = '#22c55e'
@@ -136,7 +137,7 @@ function renderLegend(value) {
 }
 
 export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, dateTo }) {
-  const { data, isLoading, isError } = useAccountSummary(accountId, { dateFrom, dateTo })
+  const { data, isLoading, isError, refetch } = useAccountSummary(accountId, { dateFrom, dateTo })
 
   if (isLoading) {
     return (
@@ -156,7 +157,11 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
   }
 
   if (isError) {
-    return <div className="p-4 text-sm text-red-500">No se pudo cargar el resumen.</div>
+    return (
+      <div className="p-6">
+        <ErrorState description="No se pudo cargar el resumen." onRetry={refetch} />
+      </div>
+    )
   }
 
   const { kpis = {}, balance_series = [], by_category = [] } = data ?? {}

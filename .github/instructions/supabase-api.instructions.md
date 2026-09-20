@@ -5,7 +5,9 @@ applyTo: "apps/api/**"
 
 # Supabase API Patterns — Runly ERP
 
-Self-hosted Supabase at https://supabase.racoondevs.com. Not Supabase Cloud.
+All endpoints and paths are examples. Read docs/REPOSITORY_PRIVACY.md and use your private environment configuration; never connect to example addresses.
+
+Self-hosted Supabase at https://supabase.example.com. Not Supabase Cloud.
 
 ## Client
 

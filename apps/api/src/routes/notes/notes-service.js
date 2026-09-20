@@ -29,6 +29,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
         AND ns.shared_with_user_id = ${userId}
       WHERE n.id = ${noteId}
         AND n.deleted_at IS NULL
+        AND public.runly_note_user_access(n.id, ${userId}::uuid, false)
       LIMIT 1
     `;
 
@@ -133,6 +134,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
         ON sup.id = ns.shared_with_user_id
       WHERE n.id = ${noteId}
         AND n.deleted_at IS NULL
+        AND public.runly_note_user_access(n.id, ${userId}::uuid, false)
       GROUP BY n.id, up.display_name, up.avatar_file_id
       LIMIT 1
     `;
@@ -150,6 +152,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
 
   async function listNotes({
     userId,
+    companyId,
     folderId,
     tagId,
     q,
@@ -175,7 +178,9 @@ export function createNotesService({ prisma, broadcaster = null }) {
         LEFT JOIN note_shares ns_mine
           ON ns_mine.note_id = n.id
           AND ns_mine.shared_with_user_id = ${userId}
-        WHERE n.deleted_at IS NULL
+        WHERE (n.company_id = ${companyId ?? null}::uuid OR n.company_id IS NULL OR ns_mine.external_access)
+          AND n.deleted_at IS NULL
+          AND public.runly_note_user_access(n.id, ${userId}::uuid, false)
           AND n.is_trashed   = ${isTrashed}
           AND n.is_archived  = ${isArchived}
           AND (

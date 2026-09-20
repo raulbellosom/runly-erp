@@ -1,4 +1,7 @@
+import { createRealtimeAccessService } from './services/realtime-access-service.js';
+import { createCollaborationInvitationsService } from './services/collaboration-invitations-service.js';
 import { createOfficeService } from "./services/office/service.js";
+import { createUserAccessService } from "./services/user-access-service.js";
 import { createOfficeRouter } from "./routes/office.js";
 import { createFilesRouter } from "./routes/files.js";
 import { serve } from "@hono/node-server";
@@ -111,6 +114,8 @@ import { createNotificationDeliveryWorker } from "./services/notification-delive
 import { createNotificationService } from "./services/notification-service.js";
 import { createRealtimeBroadcaster } from "./services/realtime-broadcaster.js";
 import { createSmtpService } from "./services/smtp-service.js";
+import { buildPasswordResetEmail, resolveAppBaseUrl } from "./services/email-templates.js";
+import { createCompanyBrandService } from "./services/company-brand-service.js";
 import {
   get as cacheGet,
   set as cacheSet,
@@ -187,6 +192,7 @@ const supabaseAnon = createClient(
   process.env.SUPABASE_ANON_KEY,
 );
 const broadcaster = createRealtimeBroadcaster({
+  prisma,
   supabaseUrl: process.env.SUPABASE_URL,
   serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
 });
@@ -307,8 +313,8 @@ const _userContextInFlight = new Map();
 
 async function getUserContextByAuthId(authUserId) {
   const cacheKey = `user_ctx:${authUserId}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) return cached;
+  // Authorization is loaded for every request. A cached membership must not
+  // survive revocation, including writes made by a different API process.
 
   // Deduplicate concurrent requests for the same user — only one DB round-trip
   if (_userContextInFlight.has(authUserId)) {
@@ -327,7 +333,7 @@ async function _loadUserContext(authUserId, cacheKey) {
   const profile = await prisma.userProfile.findUnique({
     where: { authUserId },
   });
-  if (!profile) return null;
+  if (!profile?.enabled) return null;
   const memberships = await prisma.membership.findMany({
     where: { userId: profile.id, enabled: true },
     include: {
@@ -348,7 +354,8 @@ async function _loadUserContext(authUserId, cacheKey) {
   });
 
   const activeMemberships = memberships.filter((membership) =>
-    Boolean(membership?.role?.enabled),
+    Boolean(membership?.role?.enabled !== false && membership?.company?.enabled
+      && (!membership.role?.companyId || membership.role.companyId === membership.companyId)),
   );
   const adminMembership = activeMemberships.find((membership) =>
     ADMIN_ROLE_KEYS.has(membership?.role?.key),
@@ -526,6 +533,7 @@ function requirePermission(permissionKey) {
     const { tenant } = resolved;
     c.set("companyId", tenant.companyId);
     c.set("tenantContext", tenant);
+    c.set("userContext", { ...context, isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
     c.set("userId", context.profile.id);
     if (tenant.isAdmin || tenant.permissionSet.has(permissionKey)) {
       await next();
@@ -549,6 +557,7 @@ function requireAnyPermission(permissionKeys = []) {
     const { tenant } = resolved;
     c.set("companyId", tenant.companyId);
     c.set("tenantContext", tenant);
+    c.set("userContext", { ...context, isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
     c.set("userId", context.profile.id);
     if (tenant.isAdmin) {
       await next();
@@ -611,6 +620,7 @@ function requireModuleAccess(moduleKey) {
     const { tenant } = resolved;
     c.set("companyId", tenant.companyId);
     c.set("tenantContext", tenant);
+    c.set("userContext", { ...context, isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
     const moduleRow = await prisma.runlyModule.findUnique({
       where: { key: moduleKey },
       select: {
@@ -778,10 +788,10 @@ function buildIdentityUsersWhere({ search, enabled, companyId }) {
   // safely returns zero users instead of every instance user.
   const where = {
     isBot: false,
-    memberships: { some: { enabled: true, companyId } },
+    memberships: { some: { companyId } },
   };
   if (typeof enabled === "boolean") {
-    where.enabled = enabled;
+    where.memberships.some.enabled = enabled;
   }
   if (search) {
     where.OR = [
@@ -810,10 +820,67 @@ function buildIdentityUsersWhere({ search, enabled, companyId }) {
 async function assertUserInCompany(id, companyId) {
   if (!companyId || !id) return false;
   const row = await prisma.userProfile.findFirst({
-    where: { id, memberships: { some: { enabled: true, companyId } } },
+    where: { id, memberships: { some: { companyId } } },
     select: { id: true },
   });
   return Boolean(row);
+}
+
+// Minimal in-memory throttle for the public forgot-password endpoint — keyed
+// by normalized email, not IP, so it also caps admin-triggered resets for the
+// same target. Not meant to survive a restart or a multi-process deployment;
+// just enough to blunt naive abuse of an unauthenticated endpoint.
+const forgotPasswordAttempts = new Map();
+const FORGOT_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
+const FORGOT_PASSWORD_MAX_ATTEMPTS = 3;
+
+function isForgotPasswordRateLimited(key) {
+  const now = Date.now();
+  const attempts = (forgotPasswordAttempts.get(key) ?? []).filter(
+    (t) => now - t < FORGOT_PASSWORD_WINDOW_MS,
+  );
+  if (attempts.length >= FORGOT_PASSWORD_MAX_ATTEMPTS) {
+    forgotPasswordAttempts.set(key, attempts);
+    return true;
+  }
+  attempts.push(now);
+  forgotPasswordAttempts.set(key, attempts);
+  return false;
+}
+
+const companyBrandService = createCompanyBrandService({ prisma, supabaseAdmin });
+
+// Shared by the public "olvidé mi contraseña" flow and the admin-triggered
+// "enviar restablecimiento" action. Never throws on a missing SMTP config or
+// unknown email — callers must always answer the caller with a generic
+// success message so this can't be used to enumerate accounts.
+async function sendPasswordResetEmail(email, { requestedByAdmin = false } = {}) {
+  const normalized = String(email ?? "").trim().toLowerCase();
+  if (!normalized) return;
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email: normalized,
+    });
+    if (error || !data?.properties?.hashed_token) return;
+
+    const appBaseUrl = resolveAppBaseUrl(process.env);
+    if (!appBaseUrl) return;
+    const resetUrl = `${appBaseUrl}/app/reset-password?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
+
+    const brand = await companyBrandService.getBrandForEmail(normalized);
+    const mail = buildPasswordResetEmail({ resetUrl, requestedByAdmin, brand });
+    const smtp = createSmtpService({ prisma });
+    await smtp.sendEmail({
+      to: normalized,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+      fromName: companyBrandService.fromNameFor(brand),
+    });
+  } catch (err) {
+    console.warn("[auth] password reset email failed:", err?.message ?? err);
+  }
 }
 
 // Same check, batched: returns only the subset of `ids` that belong to
@@ -821,7 +888,7 @@ async function assertUserInCompany(id, companyId) {
 async function filterUserIdsInCompany(ids, companyId) {
   if (!ids.length || !companyId) return [];
   const rows = await prisma.userProfile.findMany({
-    where: { id: { in: ids }, memberships: { some: { enabled: true, companyId } } },
+    where: { id: { in: ids }, memberships: { some: { companyId } } },
     select: { id: true },
   });
   return rows.map((r) => r.id);
@@ -858,9 +925,13 @@ async function buildAvatarUrlMapByFileIds(fileIds, variant = "thumb") {
   return avatarUrlMap;
 }
 
-function serializeIdentityUser(user, avatarUrlMap) {
+function serializeIdentityUser(user, avatarUrlMap, includePersonal = false) {
+  const personalFields = ['phone', 'birthDate', 'gender', 'country', 'state', 'city', 'colony', 'street', 'extNumber', 'intNumber', 'postalCode', 'bio'];
   return {
-    ...user,
+    ...(includePersonal ? Object.fromEntries(personalFields.map((key) => [key, user[key]])) : {}),
+    id: user.id, displayName: user.displayName, firstName: user.firstName, lastName: user.lastName,
+    email: user.email, createdAt: user.createdAt, updatedAt: user.updatedAt,
+    enabled: user.enabled && (user.memberships ?? []).some((m) => m.enabled),
     avatarUrl: user.avatarFileId
       ? (avatarUrlMap.get(user.avatarFileId) ?? null)
       : null,
@@ -1027,6 +1098,29 @@ app.get("/health", (c) => {
     localTime: formatLogTimestamp(now),
     timeZone: getConfiguredTimeZone(),
   });
+});
+
+// Public, unauthenticated self-service password recovery for the login
+// screen. Always answers with the same generic message so this can't be
+// used to enumerate which emails have an account.
+app.post("/auth/forgot-password", async (c) => {
+  const GENERIC_RESPONSE = {
+    data: { ok: true, message: "Si el correo existe, enviamos un enlace para restablecer la contraseña." },
+  };
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return c.json({ error: "Ingresa un correo válido." }, 400);
+    }
+    if (isForgotPasswordRateLimited(email)) {
+      return c.json(GENERIC_RESPONSE);
+    }
+    await sendPasswordResetEmail(email, { requestedByAdmin: false });
+    return c.json(GENERIC_RESPONSE);
+  } catch {
+    return c.json(GENERIC_RESPONSE);
+  }
 });
 
 const BRAND_DIR = path.resolve(currentDir, "../../../apps/desktop/public/brand");
@@ -1738,9 +1832,9 @@ app.get("/memberships/me", authMiddleware, async (c) => {
     const profile = await prisma.userProfile.findUnique({
       where: { authUserId },
     });
-    if (!profile) return c.json({ data: [] });
+    if (!profile?.enabled) return c.json({ error: "Perfil no disponible." }, 401);
     const memberships = await prisma.membership.findMany({
-      where: { userId: profile.id, enabled: true },
+      where: { userId: profile.id, enabled: true, company: { enabled: true }, OR: [{ roleId: null }, { role: { enabled: true } }] },
       include: {
         role: true,
         company: {
@@ -1779,7 +1873,7 @@ app.get("/memberships/me", authMiddleware, async (c) => {
       );
     }
 
-    const data = memberships.map((m) => {
+    const data = memberships.filter((m) => !m.role?.companyId || m.role.companyId === m.companyId).map((m) => {
       const logoFileId = m.company?.brandingConfig?.logoFileId;
       return {
         ...m,
@@ -1794,7 +1888,8 @@ app.get("/memberships/me", authMiddleware, async (c) => {
       };
     });
 
-    return c.json({ data });
+    const [scope] = await prisma.$queryRaw`SELECT revision::text FROM realtime_authorization_revision WHERE id`;
+    return c.json({ data, authorizationRevision: scope.revision });
   } catch (e) {
     console.error("[GET /memberships/me]", e);
     return c.json({ error: "Internal server error" }, 500);
@@ -2287,6 +2382,7 @@ app.post(
       }
       const body = await c.req.json();
       const key = String(body.key ?? "").trim();
+      if (PROTECTED_IDENTITY_ROLE_KEYS.has(key.toLowerCase())) return c.json({ error: "Identificador de rol reservado." }, 403);
       const name = String(body.name ?? "").trim();
       const description = String(body.description ?? "").trim() || null;
       if (!key || !name)
@@ -2494,26 +2590,26 @@ app.get(
       const where = {
         roleId: id,
         enabled: true,
-        userProfile: tenant.isSystemAdmin ? {} : { memberships: { some: { enabled: true, companyId: tenant.companyId } } },
+        companyId: tenant.companyId,
       };
       const memberships = await prisma.membership.findMany({
         where,
         distinct: ["userId"],
         include: {
-          userProfile: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
+          user: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
           company: { select: { name: true } },
         },
-        orderBy: { userProfile: { displayName: "asc" } },
+        orderBy: { user: { displayName: "asc" } },
       });
 
       const avatarFileIds = memberships
-        .map((m) => m.userProfile?.avatarFileId)
+        .map((m) => m.user?.avatarFileId)
         .filter(Boolean);
       const avatarUrlMap = await buildAvatarUrlMapByFileIds(avatarFileIds);
 
       const data = [];
       for (const m of memberships) {
-        const user = m.userProfile;
+        const user = m.user;
         if (!user) continue;
         data.push({
           id: user.id,
@@ -2555,7 +2651,7 @@ app.get(
                 role: true,
                 company: true,
               },
-              where: { enabled: true },
+              where: { companyId: tenant.companyId },
             },
           },
           orderBy,
@@ -2584,6 +2680,68 @@ app.get(
   },
 );
 
+const realtimeAccess = createRealtimeAccessService({ prisma, broadcaster });
+app.get('/realtime/revision', async (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ revision: await realtimeAccess.revision() });
+});
+app.post('/realtime/broadcast', authMiddleware, async (c) => {
+  const context = await getOrLoadUserContext(c);
+  if (!context?.profile?.enabled) return c.json({ error: 'Recurso no disponible.' }, 404);
+  const body = await c.req.json();
+  const ok = await realtimeAccess.relay({ topic: body.topic, event: body.event, payload: body.payload, actorId: context.profile.id });
+  return c.json({ ok }, ok ? 200 : 404);
+});
+app.post('/realtime/presence', authMiddleware, async (c) => {
+  const context = await getOrLoadUserContext(c);
+  if (!context?.profile?.enabled) return c.json({ error: 'Recurso no disponible.' }, 404);
+  const body = await c.req.json();
+  const data = await realtimeAccess.presence({ topic: body.topic, actorId: context.profile.id, leave: body.leave === true });
+  return data ? c.json({ data }) : c.json({ error: 'Recurso no disponible.' }, 404);
+});
+
+const collaborationInvitations = createCollaborationInvitationsService({ prisma });
+app.get('/collaboration/invitations', authMiddleware, requirePermission('profile.self.read'), async (c) => {
+  try {
+    return c.json({ data: await collaborationInvitations.list({ resourceType: c.req.query('resourceType'), resourceId: c.req.query('resourceId'), companyId: c.get('companyId'), actorId: c.get('userId') }) });
+  } catch (err) { return c.json({ error: 'Recurso no encontrado o no disponible.' }, err.status ?? 400); }
+});
+app.post('/collaboration/invitations', authMiddleware, requirePermission('profile.self.read'), async (c) => {
+  try {
+    const body = await c.req.json();
+    return c.json({ data: await collaborationInvitations.create({ resourceType: body.resourceType, resourceId: body.resourceId, permission: body.permission, email: body.email, roleId: body.roleId, companyId: c.get('companyId'), actorId: c.get('userId') }) }, 201);
+  } catch (err) { return c.json({ error: 'Recurso no encontrado o no disponible.' }, err.status ?? 400); }
+});
+app.post('/collaboration/invitations/accept', authMiddleware, async (c) => {
+  try {
+    const context = await getOrLoadUserContext(c);
+    if (!context?.profile?.enabled) return c.json({ error: 'Recurso no encontrado o no disponible.' }, 404);
+    const body = await c.req.json();
+    return c.json({ data: await collaborationInvitations.accept({ token: body.token, actorId: context.profile.id }) });
+  } catch (err) { return c.json({ error: 'Recurso no encontrado o no disponible.' }, err.status ?? 400); }
+});
+app.delete('/collaboration/invitations/:id', authMiddleware, requirePermission('profile.self.read'), async (c) => {
+  try {
+    return c.json(await collaborationInvitations.revoke({ invitationId: c.req.param('id'), actorId: c.get('userId'), companyId: c.get('companyId') }));
+  } catch (err) { return c.json({ error: 'Recurso no encontrado o no disponible.' }, err.status ?? 400); }
+});
+
+app.get("/identity/users/candidates", authMiddleware, requirePermission("profile.self.read"), async (c) => {
+  try {
+    const data = await createUserAccessService({ prisma }).listCandidates({
+      companyId: c.get("tenantContext").companyId,
+      actorId: c.get("userContext").profile.id,
+      search: c.req.query("search"), limit: c.req.query("pageSize"),
+      permission: ({ chat: 'chat.conversations.read', notes: 'notes.notes.read', projects: 'projects.project.read', calendar: 'calendar.calendars.read', growth: 'growth.leads.read', inventory: 'inventory.item.read' })[c.req.query('action')] ?? null,
+      projectId: c.req.query('projectId') ?? null,
+    });
+    const avatars = await buildAvatarUrlMapByFileIds(data.map((u) => u.avatarFileId).filter(Boolean));
+    return c.json({ data: data.map(({ avatarFileId, ...user }) => ({ ...user, avatarUrl: avatars.get(avatarFileId) ?? null })) });
+  } catch (err) {
+    return c.json({ error: "Recurso no encontrado o no disponible." }, err.status ?? 500);
+  }
+});
+
 app.get(
   "/identity/users/:id",
   authMiddleware,
@@ -2602,6 +2760,7 @@ app.get(
         where: { id },
         include: {
           memberships: {
+            where: { companyId: tenant.companyId },
             include: { role: true, company: true },
             orderBy: { createdAt: "asc" },
           },
@@ -2611,7 +2770,7 @@ app.get(
 
       const avatarFileIds = user.avatarFileId ? [user.avatarFileId] : [];
       const avatarUrlMap = await buildAvatarUrlMapByFileIds(avatarFileIds);
-      const serialized = serializeIdentityUser(user, avatarUrlMap);
+      const serialized = serializeIdentityUser(user, avatarUrlMap, tenant.isSystemAdmin);
 
       return c.json({
         data: { ...serialized, membershipsTotal: serialized.memberships.length },
@@ -2643,7 +2802,7 @@ app.patch(
         where: { id: membershipId },
         include: { role: { select: { key: true } } },
       });
-      if (!membership || membership.userId !== id) {
+      if (!membership || membership.userId !== id || membership.companyId !== tenant.companyId) {
         return c.json({ error: "La membresia no corresponde a este usuario." }, 400);
       }
 
@@ -2663,8 +2822,9 @@ app.patch(
         const protectedCheck = checkProtectedRoleAssignment({
           roleKey: targetRole.key,
           protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
+          isSystemAdmin: tenant.isSystemAdmin,
           actorCanManageRoles: Boolean(
-            context?.isAdmin || context?.permissionSet?.has("identity.roles.update"),
+            tenant.isAdmin || tenant.permissionSet?.has("identity.roles.update"),
           ),
         });
         if (!protectedCheck.ok) return c.json({ error: protectedCheck.error }, protectedCheck.status);
@@ -2740,6 +2900,7 @@ app.post(
 
       const body = await c.req.json();
       const fields = createMembershipSchema.parse(body);
+      if (fields.companyId !== tenant.companyId) return c.json({ error: "Empresa no encontrada." }, 404);
 
       const company = await prisma.company.findUnique({
         where: { id: fields.companyId },
@@ -2764,8 +2925,9 @@ app.post(
         const protectedCheck = checkProtectedRoleAssignment({
           roleKey: targetRole.key,
           protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
+          isSystemAdmin: tenant.isSystemAdmin,
           actorCanManageRoles: Boolean(
-            context?.isAdmin || context?.permissionSet?.has("identity.roles.update"),
+            tenant.isAdmin || tenant.permissionSet?.has("identity.roles.update"),
           ),
         });
         if (!protectedCheck.ok) return c.json({ error: protectedCheck.error }, protectedCheck.status);
@@ -2837,7 +2999,7 @@ app.get(
   async (c) => {
     try {
       const companies = await prisma.company.findMany({
-        where: { enabled: true },
+        where: { id: c.get("tenantContext").companyId, enabled: true },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       });
@@ -2848,94 +3010,39 @@ app.get(
   },
 );
 
-app.post(
-  "/identity/users",
-  authMiddleware,
-  requirePermission("identity.users.create"),
-  async (c) => {
-    try {
-      const body = await c.req.json();
-      const fields = createUserSchema.parse(body);
-
-      const { data: authData, error: authError } =
-        await supabaseAdmin.auth.admin.createUser({
-          email: fields.email,
-          password: fields.password,
-          email_confirm: true,
-        });
-      if (authError) {
-        return c.json(
-          { error: translateSupabaseCreateUserError(authError) },
-          400,
-        );
-      }
-      const authUserId = authData.user.id;
-
-      const tenant = c.get("tenantContext");
-      const companyId = tenant.companyId;
-      if (!companyId) {
-        await supabaseAdmin.auth.admin.deleteUser(authUserId);
-        return c.json(
-          { error: "No se pudo determinar la empresa activa." },
-          400,
-        );
-      }
-
-      if (fields.roleId) {
-        const role = await prisma.role.findUnique({
-          where: { id: fields.roleId },
-          select: { companyId: true },
-        });
-        if (!role || (role.companyId !== null && role.companyId !== companyId)) {
-          await supabaseAdmin.auth.admin.deleteUser(authUserId);
-          return c.json({ error: "El rol seleccionado no pertenece a esta empresa." }, 400);
-        }
-      }
-
+app.post('/identity/users', authMiddleware, requirePermission('identity.users.create'), async (c) => {
+  try {
+    const fields = createUserSchema.parse(await c.req.json());
+    const companyId = c.get('companyId');
+    const invitation = await collaborationInvitations.create({ resourceType: 'company', resourceId: companyId, companyId,
+      actorId: c.get('userId'), email: fields.email, roleId: fields.roleId ?? null });
+    // Provision a login for a new identity. An existing identity receives the
+    // same invitation response and keeps its password and personal profile.
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({ email: fields.email, password: fields.password, email_confirm: true });
+    if (authError && !["email_exists", "user_already_exists"].includes(authError.code)) throw new Error("Provisioning unavailable");
+    if (authData?.user?.id) {
       try {
-        const userProfile = await prisma.$transaction(async (tx) => {
-          const profile = await tx.userProfile.create({
-            data: {
-              authUserId,
-              firstName: fields.firstName,
-              lastName: fields.lastName,
-              displayName: `${fields.firstName} ${fields.lastName}`.trim(),
-              email: fields.email,
-            },
-          });
-          await tx.membership.create({
-            data: {
-              companyId,
-              userId: profile.id,
-              roleId: fields.roleId ?? null,
-            },
-          });
-          return profile;
-        });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: "identity.user.create",
-          severity: "success",
-          entityType: "UserProfile",
-          entityId: userProfile.id,
-          summary: `${actorName} creó al usuario ${fields.email}`,
-        });
-        return c.json({ data: userProfile }, 201);
-      } catch (txError) {
-        await supabaseAdmin.auth.admin.deleteUser(authUserId);
-        throw txError;
+        await prisma.userProfile.create({ data: { authUserId: authData.user.id, firstName: fields.firstName, lastName: fields.lastName,
+          displayName: `${fields.firstName} ${fields.lastName}`.trim(), email: fields.email.trim().toLowerCase() } });
+      } catch (err) {
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        throw err;
       }
-    } catch (err) {
-      if (err?.name === "ZodError") {
-        return c.json(
-          { error: err.errors[0]?.message ?? "Datos inválidos." },
-          400,
-        );
-      }
-      return c.json({ error: "No se pudo crear el usuario." }, 500);
     }
-  },
-);
+    const invitationPath = `/app/accept-invitation?token=${encodeURIComponent(invitation.token)}`;
+    const baseUrl = resolveAppBaseUrl(process.env);
+    const invitationUrl = baseUrl ? `${baseUrl}${invitationPath}` : invitationPath;
+    // SMTP is optional on a fresh installation; the administrator can copy the
+    // same link. Neither result discloses whether the email had an account.
+    if (baseUrl) {
+      await createSmtpService({ prisma }).sendEmail({ to: fields.email, subject: 'Invitacion a Runly',
+        text: `Te invitaron a una empresa en Runly. Inicia sesion y acepta: ${invitationUrl}`, html: `<p>Te invitaron a una empresa en Runly.</p><p><a href="${invitationUrl}">Aceptar invitacion</a></p>` }).catch(() => {});
+    }
+    return c.json({ data: { invitationId: invitation.id, invitationUrl, expiresAt: invitation.expiresAt } }, 201);
+  } catch (err) {
+    return c.json({ error: 'No se pudo preparar la invitacion con los datos proporcionados.' }, err.status ?? 400);
+  }
+});
 
 app.patch(
   "/identity/users/bulk/enabled",
@@ -2960,8 +3067,9 @@ app.patch(
       if (validIds.length !== ids.length) {
         return c.json({ error: "Uno o mas usuarios no pertenecen a tu empresa." }, 403);
       }
-      const result = await prisma.userProfile.updateMany({
-        where: { id: { in: validIds } },
+      if (!enabled && validIds.includes(c.get("userContext").profile.id)) return c.json({ error: "No puedes revocar tu propio acceso." }, 400);
+      const result = await prisma.membership.updateMany({
+        where: { companyId: tenant.companyId, userId: { in: validIds } },
         data: { enabled },
       });
       const { actorName } = getActivityContext(c);
@@ -3015,7 +3123,7 @@ app.delete(
           id: true,
           authUserId: true,
           memberships: {
-            where: { enabled: true },
+            where: { companyId: tenant.companyId },
             select: {
               enabled: true,
               role: { select: { key: true } },
@@ -3036,24 +3144,11 @@ app.delete(
         );
       }
 
-      for (const user of users) {
-        const { error } = await supabaseAdmin.auth.admin.deleteUser(
-          user.authUserId,
-        );
-        if (error) {
-          return c.json(
-            { error: "No se pudo eliminar uno o mas usuarios en Auth." },
-            500,
-          );
-        }
-      }
-
-      const deleted = await prisma.userProfile.deleteMany({
-        where: { id: { in: users.map((user) => user.id) } },
+      const deleted = await prisma.membership.updateMany({
+        where: { companyId: tenant.companyId, userId: { in: validIds } },
+        data: { enabled: false },
       });
-      for (const user of users) {
-        cacheDel(`user_ctx:${user.authUserId}`);
-      }
+      cacheDelByPrefix("user_ctx:");
 
       const { actorName } = getActivityContext(c);
       await publishActivityFromContext(prisma, c, {
@@ -3088,7 +3183,7 @@ app.post(
         include: {
           memberships: {
             include: { role: true, company: true },
-            where: { enabled: true },
+            where: { companyId: tenant.companyId },
           },
         },
         orderBy: toIdentitySortOrder(
@@ -3108,18 +3203,6 @@ app.post(
         { header: "Rol", key: "roleName", width: 24 },
         { header: "Empresa", key: "companyName", width: 28 },
         { header: "Estado", key: "enabled", width: 12 },
-        { header: "Telefono", key: "phone", width: 18 },
-        { header: "Fecha nacimiento", key: "birthDate", width: 18 },
-        { header: "Sexo", key: "gender", width: 18 },
-        { header: "Pais", key: "country", width: 18 },
-        { header: "Estado/Provincia", key: "state", width: 20 },
-        { header: "Ciudad", key: "city", width: 20 },
-        { header: "Colonia", key: "colony", width: 20 },
-        { header: "Calle", key: "street", width: 20 },
-        { header: "Numero exterior", key: "extNumber", width: 16 },
-        { header: "Numero interior", key: "intNumber", width: 16 },
-        { header: "Codigo postal", key: "postalCode", width: 16 },
-        { header: "Biografia", key: "bio", width: 40 },
         { header: "Creado", key: "createdAt", width: 20 },
       ];
       sheet.getRow(1).font = { bold: true };
@@ -3134,22 +3217,7 @@ app.post(
           email: user.email ?? "",
           roleName: membership?.role?.name ?? "",
           companyName: membership?.company?.name ?? "",
-          enabled: user.enabled ? "Activo" : "Inactivo",
-          phone: user.phone ?? "",
-          birthDate: user.birthDate
-            ? // eslint-disable-next-line no-restricted-syntax -- deliberate UTC: @db.Date calendar value
-              new Date(user.birthDate).toISOString().slice(0, 10)
-            : "",
-          gender: user.gender ?? "",
-          country: user.country ?? "",
-          state: user.state ?? "",
-          city: user.city ?? "",
-          colony: user.colony ?? "",
-          street: user.street ?? "",
-          extNumber: user.extNumber ?? "",
-          intNumber: user.intNumber ?? "",
-          postalCode: user.postalCode ?? "",
-          bio: user.bio ?? "",
+          enabled: user.enabled && membership?.enabled ? "Activo" : "Inactivo",
           createdAt: user.createdAt
             ? formatLocalDateTime(user.createdAt)
             : "",
@@ -3189,15 +3257,14 @@ app.post(
         include: {
           memberships: {
             include: { role: true, company: true },
-            where: { enabled: true },
+            where: { companyId: tenant.companyId },
           },
         },
         orderBy: toIdentitySortOrder(normalizedQuery.sortBy, normalizedQuery.sortDir),
       });
 
       const authUserId = c.get("userId");
-      const membership = await prisma.membership.findFirst({ where: { userId: authUserId, enabled: true } });
-      const companyId = membership?.companyId ?? null;
+      const companyId = tenant.companyId;
 
       const { resolvePdfDocumentCtor, resolveCompanyBranding, drawPdfHeader, drawPdfFooter, formatDateEs, toSafeText } =
         await import("./services/pdf-branding-service.js");
@@ -3285,6 +3352,7 @@ app.post(
     try {
       const tenant = c.get("tenantContext");
       const id = c.req.param("id");
+      if (!tenant.isSystemAdmin && id !== c.get("userContext").profile.id) return c.json({ error: "El avatar solo puede modificarlo su titular." }, 403);
       const target = await prisma.userProfile.findFirst({
         where: { id, memberships: { some: { enabled: true, companyId: tenant.companyId } } },
         select: { id: true, authUserId: true },
@@ -3362,7 +3430,7 @@ app.delete(
         where: { id },
         include: {
           memberships: {
-            where: { enabled: true },
+            where: { companyId: tenant.companyId },
             include: { role: { select: { key: true } } },
           },
         },
@@ -3380,8 +3448,8 @@ app.delete(
         );
       }
 
-      await supabaseAdmin.auth.admin.deleteUser(targetUser.authUserId);
-      await prisma.userProfile.delete({ where: { id } });
+      await prisma.membership.updateMany({ where: { companyId: tenant.companyId, userId: id }, data: { enabled: false } });
+      cacheDelByPrefix("user_ctx:");
 
       const { actorName } = getActivityContext(c);
       await publishActivityFromContext(prisma, c, {
@@ -3399,6 +3467,109 @@ app.delete(
   },
 );
 
+// Sysadmin-only: set another user's password directly, no email round-trip.
+// Kept separate from identity.users.update's PATCH so a regular company
+// admin (who also holds that permission) can't set passwords for users
+// outside their reach — only a true system admin gets this shortcut; anyone
+// else must use POST .../send-password-reset below.
+app.patch(
+  "/identity/users/:id/password",
+  authMiddleware,
+  requirePermission("identity.users.update"),
+  async (c) => {
+    try {
+      const id = c.req.param("id");
+      const tenant = c.get("tenantContext");
+      const context = c.get("userContext");
+      if (!tenant.isSystemAdmin) {
+        return c.json(
+          { error: "Solo un administrador del sistema puede cambiar la contraseña de otro usuario." },
+          403,
+        );
+      }
+      if (!(await assertUserInCompany(id, tenant.companyId))) {
+        return c.json({ error: "Usuario no encontrado." }, 404);
+      }
+      const body = await c.req.json();
+      const newPassword = String(body?.password ?? "");
+      if (newPassword.length < 8) {
+        return c.json({ error: "La contraseña debe tener al menos 8 caracteres." }, 400);
+      }
+
+      const targetUser = await prisma.userProfile.findUnique({
+        where: { id },
+        select: { authUserId: true, email: true },
+      });
+      if (!targetUser) return c.json({ error: "Usuario no encontrado." }, 404);
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUser.authUserId,
+        { password: newPassword },
+      );
+      if (updateError) {
+        return c.json({ error: "No se pudo actualizar la contraseña." }, 500);
+      }
+
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: "identity.user.password_changed_by_admin",
+        severity: "critical",
+        entityType: "UserProfile",
+        entityId: id,
+        summary: `${actorName} cambió la contraseña de ${targetUser.email ?? id}`,
+      });
+
+      return c.json({ data: { ok: true } });
+    } catch {
+      return c.json({ error: "No se pudo actualizar la contraseña." }, 500);
+    }
+  },
+);
+
+// Any holder of identity.users.update (not just sysadmin) can send a target
+// user a branded reset-password email — same mechanism as the public
+// forgot-password flow, just triggered on someone else's behalf.
+app.post(
+  "/identity/users/:id/send-password-reset",
+  authMiddleware,
+  requirePermission("identity.users.update"),
+  async (c) => {
+    try {
+      const id = c.req.param("id");
+      const tenant = c.get("tenantContext");
+      if (!(await assertUserInCompany(id, tenant.companyId))) {
+        return c.json({ error: "Usuario no encontrado." }, 404);
+      }
+      const targetUser = await prisma.userProfile.findUnique({
+        where: { id },
+        select: { email: true },
+      });
+      if (!targetUser?.email) return c.json({ error: "Usuario no encontrado." }, 404);
+
+      if (isForgotPasswordRateLimited(targetUser.email.toLowerCase())) {
+        return c.json(
+          { error: "Ya se envió un enlace recientemente. Espera unos minutos." },
+          429,
+        );
+      }
+      await sendPasswordResetEmail(targetUser.email, { requestedByAdmin: true });
+
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: "identity.user.password_reset_sent",
+        severity: "info",
+        entityType: "UserProfile",
+        entityId: id,
+        summary: `${actorName} envió un enlace de restablecimiento de contraseña a ${targetUser.email}`,
+      });
+
+      return c.json({ data: { ok: true } });
+    } catch {
+      return c.json({ error: "No se pudo enviar el enlace de restablecimiento." }, 500);
+    }
+  },
+);
+
 app.patch(
   "/identity/users/:id",
   authMiddleware,
@@ -3411,6 +3582,15 @@ app.patch(
         return c.json({ error: "Usuario no encontrado." }, 404);
       }
       const body = await c.req.json();
+      if (!tenant.isSystemAdmin) {
+        const keys = Object.keys(body);
+        if (keys.some((key) => key !== "enabled")) return c.json({ error: "El perfil personal solo puede modificarlo su titular o la administracion de la plataforma." }, 403);
+        if (typeof body.enabled !== "boolean") return c.json({ error: "Datos invalidos." }, 400);
+        if (!body.enabled && id === c.get("userContext").profile.id) return c.json({ error: "No puedes revocar tu propio acceso." }, 400);
+        await prisma.membership.updateMany({ where: { companyId: tenant.companyId, userId: id }, data: { enabled: body.enabled } });
+        cacheDelByPrefix("user_ctx:");
+        return c.json({ data: { id, enabled: body.enabled } });
+      }
       const patch = {};
 
       // Disabling an Atlas Admin / System Admin here would achieve the same
@@ -3421,7 +3601,7 @@ app.patch(
           where: { id },
           include: {
             memberships: {
-              where: { enabled: true },
+              where: { companyId: tenant.companyId },
               include: { role: { select: { key: true } } },
             },
           },
@@ -3542,9 +3722,9 @@ app.patch(
       if (body.membershipId && body.roleId) {
         const membership = await prisma.membership.findUnique({
           where: { id: body.membershipId },
-          select: { userId: true },
+          select: { userId: true, companyId: true },
         });
-        if (!membership || membership.userId !== id) {
+        if (!membership || membership.userId !== id || membership.companyId !== tenant.companyId) {
           return c.json(
             { error: "La membresia no corresponde a este usuario." },
             400,
@@ -3560,7 +3740,7 @@ app.patch(
         if (targetIsProtectedRole) {
           const context = c.get("userContext");
           const canManageRoles =
-            context?.isAdmin || context?.permissionSet?.has("identity.roles.update");
+            tenant.isAdmin || tenant.permissionSet?.has("identity.roles.update");
           if (!canManageRoles) {
             return c.json(
               {

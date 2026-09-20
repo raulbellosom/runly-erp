@@ -1,3 +1,4 @@
+import { authorizeRealtimeClient } from '../../../lib/authorizedRealtime.js'
 // apps/desktop/src/modules/runly.notes/lib/SupabaseYjsProvider.js
 import * as Y from 'yjs'
 import * as awarenessProtocol from 'y-protocols/awareness'
@@ -51,7 +52,7 @@ export class SupabaseYjsProvider {
     // HTML column and the editor must seed the empty ydoc from it once.
     this.hadServerState = false
     this.awareness = new awarenessProtocol.Awareness(ydoc)
-    this._supabase = supabase
+    this._supabase = authorizeRealtimeClient(supabase)
     this._readOnly = readOnly
     this._publicSlug = publicSlug
     this._channel = null

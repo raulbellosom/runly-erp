@@ -205,7 +205,7 @@ The "¿Olvidaste tu contraseña?" link renders as `<button type="button">` that 
 The following `VITE_` vars must be present in `apps/desktop` (Vite only exposes `VITE_` prefix to the browser). Add to root `.env` and `.env.example`:
 
 ```env
-VITE_SUPABASE_URL=https://supabase.racoondevs.com
+VITE_SUPABASE_URL=https://supabase.example.com
 VITE_SUPABASE_ANON_KEY=<same as SUPABASE_ANON_KEY>
 ```
 

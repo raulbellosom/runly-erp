@@ -20,7 +20,7 @@ export default function MembershipsScreen() {
   const [leaveGroup, setLeaveGroup]     = useState(null)
   const [leaveAccount, setLeaveAccount] = useState(null)
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-memberships', token],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/ledger/memberships`, { headers })
@@ -63,7 +63,7 @@ export default function MembershipsScreen() {
     )
   }
 
-  if (isError) return <ErrorState message="No se pudieron cargar las membresias." />
+  if (isError) return <ErrorState description="No se pudieron cargar las membresias." onRetry={refetch} />
 
   const isEmpty = groups.length === 0 && accounts.length === 0
 
@@ -80,8 +80,9 @@ export default function MembershipsScreen() {
       <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-8 max-w-2xl">
         {isEmpty && (
           <EmptyState
-            icon={<LogOut size={32} />}
-            message="No tienes membresías activas en grupos ni cuentas compartidas."
+            icon={LogOut}
+            title="Sin membresías"
+            description="No tienes membresías activas en grupos ni cuentas compartidas."
           />
         )}
 

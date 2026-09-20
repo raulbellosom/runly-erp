@@ -1,6 +1,7 @@
-import { useEffect, useRef, lazy, Suspense } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowUp } from 'lucide-react'
 import { runly } from '../../lib/runly'
 import { NoteEditor } from './components/NoteEditor.jsx'
 import { NOTE_SHEET_MAX_WIDTH_CLASS } from './components/NoteSheet.jsx'
@@ -9,16 +10,29 @@ import { PublicNoteCollaborators } from './components/PublicNoteCollaborators.js
 import { PublicNoteDates } from './components/PublicNoteDates.jsx'
 import { copyNoteContent } from './lib/noteClipboard.js'
 import { ZoomControl } from './components/ZoomControl.jsx'
-import { fitNoteZoom, useNoteZoom } from './hooks/useNoteZoom.js'
+import { useNoteZoom } from './hooks/useNoteZoom.js'
 import { exportNoteSheetAsJpg, exportNoteSheetAsPdf } from './lib/notePageExport.js'
 import { ErrorState } from '@runly/ui'
 
 const PublicCanvasView = lazy(() => import('./PublicCanvasView.jsx'))
+const SCROLL_TOP_THRESHOLD = 240
 
 export default function PublicNoteScreen() {
   const { slug } = useParams()
+  const scrollRef = useRef(null)
   const contentRef = useRef(null)
   const [zoom, setZoom] = useNoteZoom()
+  const [showScrollTop, setShowScrollTop] = useState(false)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    function onScroll() {
+      setShowScrollTop(el.scrollTop > SCROLL_TOP_THRESHOLD)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
 
   // Force light theme for the public view — remove .dark from <html> and restore on unmount
   useEffect(() => {
@@ -95,36 +109,54 @@ export default function PublicNoteScreen() {
     // html/body are globally overflow:hidden (the authenticated app shell
     // does its own internal scrolling) — this page needs its own bounded,
     // scrollable region or content taller than the viewport is unreachable.
-    <div className="relative h-dvh flex flex-col overflow-hidden bg-gray-100">
-      <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} w-full px-4 py-3 shrink-0 space-y-2`}>
-        <div className="flex justify-end">
-          <PublicNoteToolbar
-            title={note.title}
-            publicUrl={publicUrl}
-            onCopyContent={() => copyNoteContent(contentRef.current?.querySelector('.note-sheet'), { coverUrl: note.cover_url })}
-            onDownloadPdf={() =>
-              exportNoteSheetAsPdf(contentRef.current?.querySelector('.note-sheet'), {
-                title: note.title,
-                backgroundColor: note.background_color,
-              })
-            }
-            onDownloadImage={() =>
-              exportNoteSheetAsJpg(contentRef.current?.querySelector('.note-sheet'), {
-                title: note.title,
-                backgroundColor: note.background_color,
-              })
-            }
-          />
+    // The date/actions row and the collaborators list scroll away with the
+    // note instead of staying pinned — only the zoom control and the
+    // scroll-to-top button float, fixed to the viewport.
+    <div className="relative h-dvh overflow-hidden bg-gray-100">
+      <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
+        <div className={`${NOTE_SHEET_MAX_WIDTH_CLASS} w-full px-4 py-3 space-y-2`}>
+          <div className="flex justify-end">
+            <PublicNoteToolbar
+              title={note.title}
+              publicUrl={publicUrl}
+              onCopyContent={() => copyNoteContent(contentRef.current?.querySelector('.note-sheet'), { coverUrl: note.cover_url })}
+              onDownloadPdf={() =>
+                exportNoteSheetAsPdf(contentRef.current?.querySelector('.note-sheet'), {
+                  title: note.title,
+                  backgroundColor: note.background_color,
+                })
+              }
+              onDownloadImage={() =>
+                exportNoteSheetAsJpg(contentRef.current?.querySelector('.note-sheet'), {
+                  title: note.title,
+                  backgroundColor: note.background_color,
+                })
+              }
+            />
+          </div>
+          <PublicNoteDates createdAt={note.created_at} updatedAt={note.updated_at} />
         </div>
-        <PublicNoteDates createdAt={note.created_at} updatedAt={note.updated_at} />
+        <div ref={contentRef} className="relative">
+          {/* Both views share a responsive sheet. scrollable=false because
+              this page (scrollRef above), not NoteEditor, owns the scroll —
+              header and footer need to scroll away with it. publicSlug keeps
+              this read-only view connected to live updates. */}
+          <NoteEditor note={note} readOnly zoom={zoom} publicSlug={slug} scrollable={false} />
+        </div>
+        {note.show_public_collaborators !== false && <PublicNoteCollaborators collaborators={note.collaborators} />}
       </div>
-      <div ref={contentRef} className="relative flex-1 min-h-0">
-        {/* Both views share one fixed sheet and its scroll/zoom behavior.
-            publicSlug keeps this read-only view connected to live updates. */}
-        <NoteEditor note={note} readOnly zoom={zoom} publicSlug={slug} />
-        <ZoomControl zoom={zoom} onZoomChange={setZoom} onFit={() => setZoom(fitNoteZoom(contentRef.current.clientWidth - 16))} />
-      </div>
-      {note.show_public_collaborators !== false && <PublicNoteCollaborators collaborators={note.collaborators} />}
+      <ZoomControl zoom={zoom} onZoomChange={setZoom} onReset={() => setZoom(100)} />
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Ir arriba"
+          title="Ir arriba"
+          className="absolute bottom-4 left-4 z-30 flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card/95 backdrop-blur-sm shadow-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <ArrowUp size={16} />
+        </button>
+      )}
     </div>
   )
 }

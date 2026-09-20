@@ -15,6 +15,11 @@ import { createRealtimeBroadcaster } from "../realtime-broadcaster.js";
 // subscriber received nothing from a broadcast lacking this flag, and
 // received it correctly once the flag was added).
 
+const prisma = {
+  userProfile: { findFirst: async () => ({ id: 'enabled-user' }) },
+  $queryRaw: async () => [{ revision: '7' }],
+  $transaction: async (fn) => fn(prisma),
+};
 let originalFetch;
 let calls;
 
@@ -36,15 +41,15 @@ describe("createRealtimeBroadcaster — private:true on every message", () => {
   afterEach(restoreFetch);
 
   it("broadcastToUser marks its message private", async () => {
-    const b = createRealtimeBroadcaster({ supabaseUrl: "https://x", serviceRoleKey: "key" });
+    const b = createRealtimeBroadcaster({ prisma, supabaseUrl: "https://x", serviceRoleKey: "key" });
     await b.broadcastToUser("user-1", "notification.new", { a: 1 });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].body.messages[0].private, true);
-    assert.equal(calls[0].body.messages[0].topic, "user:user-1:events");
+    assert.equal(calls[0].body.messages[0].topic, "user:user-1:events@7");
   });
 
   it("broadcastToUsers marks EVERY message private, not just the first", async () => {
-    const b = createRealtimeBroadcaster({ supabaseUrl: "https://x", serviceRoleKey: "key" });
+    const b = createRealtimeBroadcaster({ prisma, supabaseUrl: "https://x", serviceRoleKey: "key" });
     await b.broadcastToUsers(["user-1", "user-2", "user-3"], "chat.message.new", {});
     assert.equal(calls.length, 1);
     const messages = calls[0].body.messages;
@@ -53,16 +58,16 @@ describe("createRealtimeBroadcaster — private:true on every message", () => {
   });
 
   it("broadcastToCompany marks its message private", async () => {
-    const b = createRealtimeBroadcaster({ supabaseUrl: "https://x", serviceRoleKey: "key" });
+    const b = createRealtimeBroadcaster({ prisma, supabaseUrl: "https://x", serviceRoleKey: "key" });
     await b.broadcastToCompany("company-1", "pos.order.updated", {});
     assert.equal(calls[0].body.messages[0].private, true);
-    assert.equal(calls[0].body.messages[0].topic, "company:company-1:events");
+    assert.equal(calls[0].body.messages[0].topic, "company:company-1:events@7");
   });
 
   it("broadcastToChannel marks its message private, for any channel name", async () => {
-    const b = createRealtimeBroadcaster({ supabaseUrl: "https://x", serviceRoleKey: "key" });
+    const b = createRealtimeBroadcaster({ prisma, supabaseUrl: "https://x", serviceRoleKey: "key" });
     await b.broadcastToChannel("chat:conv:conv-1", "new_operator_message", {});
     assert.equal(calls[0].body.messages[0].private, true);
-    assert.equal(calls[0].body.messages[0].topic, "chat:conv:conv-1");
+    assert.equal(calls[0].body.messages[0].topic, "chat:conv:conv-1@7");
   });
 });

@@ -195,7 +195,7 @@ export function useUserSearch(query) {
   return useQuery({
     queryKey: ["identity", "users", "search", q],
     queryFn: () =>
-      runly.identity.listUsers(token, {
+      runly.identity.listCandidates(token, { action: 'calendar',
         search: q,
         pageSize: 10,
         enabled: true,

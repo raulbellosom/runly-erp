@@ -21,6 +21,8 @@ import { getCompanyId, getActorId, getValidationErrorMessage } from "./service-h
 function handleError(c, err, fallback) {
   if (err instanceof LedgerServiceError)
     return c.json({ error: err.message }, err.status);
+  if (err instanceof SyntaxError)
+    return c.json({ error: 'El cuerpo de la solicitud no es JSON valido.' }, 400);
   if (process.env.NODE_ENV !== "production")
     console.error("[runly.ledger]", err);
   return c.json({ error: fallback }, 500);

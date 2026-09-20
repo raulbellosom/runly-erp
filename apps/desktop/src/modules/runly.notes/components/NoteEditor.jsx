@@ -20,6 +20,7 @@ import { isCaretHiddenByKeyboard, computeCaretScrollDelta } from '../lib/keyboar
 import { computeLineUnitPx, computePaperPhase } from '../lib/paperAlignment.js'
 import { NoteToolbar } from './NoteToolbar.jsx'
 import { TableFloatingMenu } from './TableFloatingMenu.jsx'
+import { TableDragHandles } from './TableDragHandles.jsx'
 import { NoteCoverBanner } from './NoteCoverBanner.jsx'
 import { NoteIconPickerContent } from './NoteIconPicker.jsx'
 import { PresenceStack } from './PresenceStack.jsx'
@@ -206,7 +207,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       const scale = sheetRect.width / sheetEl.offsetWidth
       const distanceFromSheetTop = (bodyRect.top - sheetRect.top) / scale
       const rootFontSizePx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-      const lineUnitPx = computeLineUnitPx(rootFontSizePx)
+      const lineUnitPx = computeLineUnitPx(rootFontSizePx, window.matchMedia('(max-width: 639px)').matches)
       const phase = computePaperPhase(distanceFromSheetTop, lineUnitPx)
       sheetEl.style.setProperty('--note-content-top', `${distanceFromSheetTop}px`)
       sheetEl.style.setProperty('--note-paper-phase', `${phase}px`)
@@ -494,7 +495,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       onSelectionUpdate={handleSelectionUpdate}
       editorProps={{
         attributes: {
-          class: 'focus:outline-none px-8 pt-1 pb-6 min-h-full',
+          class: 'focus:outline-none note-sheet-inset pt-1 pb-6 min-h-full',
         },
       }}
       slotBefore={
@@ -518,7 +519,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
             // SupabaseYjsProvider's readOnly mode) — just the plain icon, so
             // the note's internal title line matches the editable editor
             // instead of showing bare text with no icon next to it.
-            <div className="relative z-10 px-8 pt-4 flex items-center justify-between gap-2 -mb-10">
+            <div className="relative z-10 note-sheet-inset pt-4 flex items-center justify-between gap-2 -mb-10">
               {viewing ? (
                 <div className="w-10 h-10 flex items-center justify-center">
                   <NoteIcon name={note.icon || 'NotebookPen'} size={22} className="text-amber-500" />
@@ -551,6 +552,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       }
     >
       {!viewing && <TableFloatingMenu />}
+      {!viewing && <TableDragHandles />}
     </EditorProvider>
   )
 

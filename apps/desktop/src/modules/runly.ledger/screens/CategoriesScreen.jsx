@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, EyeOff } from 'lucide-react'
 import {
-  PageHeader, Badge, Button, EmptyState, ConfirmDialog,
+  PageHeader, Badge, Button, EmptyState, ErrorState, ConfirmDialog,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   TextField, SelectField,
 } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { useLedgerCategories, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
 
 const API_BASE = getApiUrl()
 
@@ -41,16 +42,14 @@ export default function CategoriesScreen() {
   const { session } = useAuth()
   const token = session?.access_token ?? null
   const queryClient = useQueryClient()
+  const { isUsingLocalLedger } = useLedgerSQLite()
+  const canEdit = !isUsingLocalLedger && !!token
 
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deactivateTarget, setDeactivateTarget] = useState(null)
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['ledger-categories'],
-    queryFn: () => apiRequest('GET', '/ledger/categories', token).then(r => r.data ?? []),
-    enabled: !!token,
-  })
+  const { data, isLoading, isError, refetch } = useLedgerCategories()
 
   const form = useForm({
     resolver: zodResolver(categorySchema),
@@ -88,7 +87,7 @@ export default function CategoriesScreen() {
     },
   })
 
-  const categories = data ?? []
+  const categories = data?.data ?? []
   const system = categories.filter(c => c.is_system)
   const personal = categories.filter(c => !c.is_system)
 
@@ -141,7 +140,7 @@ export default function CategoriesScreen() {
         title="Categorias"
         description="Agrupa movimientos por naturaleza. Las categorias de sistema son visibles para todos; las personales solo para ti."
         actions={
-          <Button onClick={openCreate} disabled={!token}>
+          <Button onClick={openCreate} disabled={!canEdit}>
             <Plus size={15} className="mr-1.5" />
             Nueva categoria
           </Button>
@@ -157,7 +156,11 @@ export default function CategoriesScreen() {
       )}
 
       {isError && (
-        <div className="mt-4 text-sm text-red-500">No se pudieron cargar las categorias.</div>
+        <ErrorState
+          className="mt-4"
+          description="No se pudieron cargar las categorias."
+          onRetry={refetch}
+        />
       )}
 
       {!isLoading && !isError && categories.length === 0 && (
@@ -165,7 +168,7 @@ export default function CategoriesScreen() {
           icon={Plus}
           title="Sin categorias"
           description="Crea tu primera categoria personal para clasificar tus movimientos."
-          action={{ label: 'Nueva categoria', onClick: openCreate }}
+          action={canEdit ? { label: 'Nueva categoria', onClick: openCreate } : undefined}
         />
       )}
 
@@ -198,7 +201,7 @@ export default function CategoriesScreen() {
                       Mis categorias
                     </td>
                   </tr>
-                  {renderRows(personal, true)}
+                  {renderRows(personal, canEdit)}
                 </>
               )}
             </tbody>

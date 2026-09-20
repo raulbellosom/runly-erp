@@ -13,15 +13,23 @@ import '@excalidraw/excalidraw/index.css'
 // referentially stable for the life of the note.
 
 // Scoped tweaks for the embed:
-//  - hide Excalidraw's own shape "Library" (book icon) — not part of the Atlas
-//    UX and renders with broken theming here.
+//  - hide Excalidraw's own shape "Library" (sidebar + its trigger button) —
+//    not part of the Atlas UX, renders with broken theming here, and on the
+//    public read-only view "Explorar bibliotecas" lets a visitor pull in and
+//    render third-party content on a page that's supposed to be inert. The
+//    selectors below are the real classes @excalidraw/excalidraw emits
+//    (verified against the installed 0.18.1 bundle — the previous selectors,
+//    `.library-button` / `[data-testid="library-button"]` /
+//    `[aria-label="Library"]`, matched nothing in that version and silently
+//    hid nothing). This only hides the UI; onDropCapture below (viewModeEnabled
+//    only) is what actually blocks importing a dropped .excalidrawlib file,
+//    since Excalidraw's own drop handler has no read-only guard.
 //  - on small screens Excalidraw reserves a big top inset assuming it owns the
 //    viewport top; our 44px toolbar sits above it, so pull its UI up.
 const EXCALIDRAW_TWEAKS_CSS = `
-.excalidraw .library-button,
-.excalidraw [data-testid="library-button"],
-.excalidraw button[aria-label="Library"],
-.excalidraw button[aria-label="Biblioteca"] { display: none !important; }
+.excalidraw .sidebar-trigger,
+.excalidraw .default-sidebar,
+.excalidraw .sidebar.default-sidebar { display: none !important; }
 
 /* We are embedded below the app chrome, never at the true viewport edge, so
    Excalidraw must NOT add the device safe-area inset to its top toolbar (that
@@ -46,6 +54,15 @@ const CANVAS_ACTIONS = {
   toggleTheme: false,
 }
 
+// Excalidraw's own onDrop handler (handleAppOnDrop) never checks
+// viewModeEnabled — an image, .excalidraw scene, or .excalidrawlib library
+// file dropped on a "read-only" canvas is still parsed and applied. Block it
+// ourselves in the capture phase before it reaches Excalidraw's listener.
+function blockDropWhenReadOnly(e) {
+  e.preventDefault()
+  e.stopPropagation()
+}
+
 function CanvasStage({
   initialData,
   viewModeEnabled = false,
@@ -55,8 +72,11 @@ function CanvasStage({
   onPointerUpdate,
   langCode = 'es-ES',
 }) {
+  const dropGuardProps = viewModeEnabled
+    ? { onDropCapture: blockDropWhenReadOnly, onDragOverCapture: blockDropWhenReadOnly }
+    : {}
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" {...dropGuardProps}>
       <style>{EXCALIDRAW_TWEAKS_CSS}</style>
       <Excalidraw
         excalidrawAPI={onExcalidrawAPI}

@@ -17,7 +17,7 @@ This spec was produced after a full codebase audit of the existing starter bundl
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Local dev stack (docker-compose.local-lite) | **Remove entirely** | All development connects to the dedicated Supabase at https://supabase.racoondevs.com |
+| Local dev stack (docker-compose.local-lite) | **Remove entirely** | All development connects to the dedicated Supabase at https://supabase.example.com |
 | First-run detection | **InstanceConfig table** | Explicit, transactional, supports future reset operations |
 | Documentation structure | **Replace old docs with numbered set** | Single source of truth, no drift between overlapping doc sets |
 | Implementation plan scope | **Phase 0 + Phase 1** | Phase 0 alone is too thin; together they produce a meaningful milestone: running API connected to real Supabase |
@@ -40,8 +40,8 @@ packages/sdk     createAtlasClient factory — typed API client
 packages/validators  Zod schemas shared between API and frontend
 
 Supabase (external, self-hosted)
-  API:    https://supabase.racoondevs.com
-  Studio: https://studio.supabase.racoondevs.com
+  API:    https://supabase.example.com
+  Studio: https://studio.supabase.example.com
   PostgreSQL, Auth, Storage, Realtime
 ```
 
@@ -154,16 +154,16 @@ Define each value once. Use dotenv `${VAR}` substitution for Vite aliases. Only 
 
 ```bash
 # ─── Supabase (define once) ─────────────────────────────────────────────────
-SUPABASE_URL=https://supabase.racoondevs.com
+SUPABASE_URL=https://supabase.example.com
 SUPABASE_ANON_KEY=                  # public — safe for frontend
 SUPABASE_SERVICE_ROLE_KEY=          # SECRET — API only, never expose to frontend
 
 # ─── Prisma / PostgreSQL ─────────────────────────────────────────────────────
 # Self-hosted Supabase exposes PostgreSQL directly — get exact URL from Supabase Studio
 # Settings → Database → Connection string (URI)
-DATABASE_URL=postgresql://postgres:[password]@db.supabase.racoondevs.com:5432/postgres
+DATABASE_URL=postgresql://postgres:[password]@db.supabase.example.com:5432/postgres
 # DIRECT_URL bypasses pgBouncer — required for Prisma migrations
-DIRECT_URL=postgresql://postgres:[password]@db.supabase.racoondevs.com:5432/postgres
+DIRECT_URL=postgresql://postgres:[password]@db.supabase.example.com:5432/postgres
 
 # ─── Atlas API ───────────────────────────────────────────────────────────────
 ATLAS_API_PORT=4010
@@ -313,7 +313,7 @@ Depends on: `atlas.core`, `atlas.files`
 - `prisma/schema.prisma` includes `InstanceConfig`
 - No reference to local-lite, MinIO as primary, or Redis as required anywhere in the repo
 
-**Success criteria:** The repo contains a single coherent view of the architecture. Every documentation file points to `https://supabase.racoondevs.com`. `.env.example` is the single source of truth for configuration with no duplicated values.
+**Success criteria:** The repo contains a single coherent view of the architecture. Every documentation file points to `https://supabase.example.com`. `.env.example` is the single source of truth for configuration with no duplicated values.
 
 ### Phase 1 — Supabase + Prisma connection
 

@@ -68,7 +68,7 @@ function buildPrisma(queryRawResults = []) {
       throw new Error("Unexpected $executeRaw call — guard should reject before any write");
     },
     membership: {
-      findFirst: async () => null,
+      findFirst: async ({ where }) => membershipByUser[where.userId] === where.companyId ? { userId: where.userId, companyId: where.companyId, role: { key: "runly.admin" } } : null,
       findMany: async ({ where }) => {
         const raw = where?.userId;
         const ids = typeof raw === "string" ? [raw] : (raw?.in ?? []);
@@ -83,38 +83,40 @@ function buildPrisma(queryRawResults = []) {
 }
 
 describe("chat-service — cross-tenant member guard", () => {
-  it("createConversation (group) rejects a memberUserId from another company with 403, before any write", async () => {
+  it("createConversation (group) rejects a memberUserId from another company with 404, before any write", async () => {
     _resetProfileIdCacheForTests();
     const prisma = buildPrisma([[{ id: PROFILE_ID }]]); // resolveUserProfileId only
     const svc = createChatService({ prisma });
     await assert.rejects(
       () =>
         svc.createConversation({
+          companyId: COMPANY_A,
           authUserId: AUTH_USER_ID,
           type: "group",
           title: "Grupo",
           memberUserIds: [FOREIGN_PROFILE_ID],
         }),
-      (err) => err instanceof ChatServiceError && err.status === 403,
+      (err) => err.status === 404,
     );
   });
 
-  it("createConversation (direct) rejects a memberUserId from another company with 403", async () => {
+  it("createConversation (direct) rejects a memberUserId from another company with 404", async () => {
     _resetProfileIdCacheForTests();
     const prisma = buildPrisma([[{ id: PROFILE_ID }]]);
     const svc = createChatService({ prisma });
     await assert.rejects(
       () =>
         svc.createConversation({
+          companyId: COMPANY_A,
           authUserId: AUTH_USER_ID,
           type: "direct",
           memberUserIds: [FOREIGN_PROFILE_ID],
         }),
-      (err) => err instanceof ChatServiceError && err.status === 403,
+      (err) => err.status === 404,
     );
   });
 
-  it("addMembers rejects a foreign-company userId with 403 when no permissionsService is wired", async () => {
+  it("addMembers rejects a foreign-company userId with 404 when no permissionsService is wired", async () => {
     _resetProfileIdCacheForTests();
     const prisma = buildPrisma([
       [{ id: PROFILE_ID }], // resolveUserProfileId
@@ -128,7 +130,7 @@ describe("chat-service — cross-tenant member guard", () => {
           authUserId: AUTH_USER_ID,
           userIds: [FOREIGN_PROFILE_ID],
         }),
-      (err) => err instanceof ChatServiceError && err.status === 403,
+      (err) => err.status === 404,
     );
   });
 
@@ -156,7 +158,7 @@ describe("chat-service — cross-tenant member guard", () => {
           authUserId: AUTH_USER_ID,
           userIds: [PROFILE_ID],
         }),
-      (err) => !(err instanceof ChatServiceError && err.status === 403),
+      (err) => err.status === 404,
     );
   });
 
@@ -182,7 +184,7 @@ describe("chat-service — cross-tenant member guard", () => {
           authUserId: AUTH_USER_ID,
           userIds: [FOREIGN_PROFILE_ID],
         }),
-      (err) => err instanceof ChatServiceError && err.status === 403,
+      (err) => err.status === 404,
     );
   });
 
@@ -204,7 +206,7 @@ describe("chat-service — cross-tenant member guard", () => {
           authUserId: AUTH_USER_ID,
           userIds: [FOREIGN_PROFILE_ID],
         }),
-      (err) => err instanceof ChatServiceError && err.status === 403,
+      (err) => err.status === 404,
     );
   });
 });

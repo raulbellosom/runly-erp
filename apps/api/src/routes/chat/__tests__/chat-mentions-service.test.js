@@ -26,6 +26,10 @@ function buildPrismaMock(queryRawResults) {
 }
 
 describe("chat-mentions-service — resolveMentions", () => {
+  it('rejects an unknown or unauthorized mention instead of storing its claimed identity', async () => {
+    const svc = createChatMentionsService({ prisma: buildPrismaMock([[], []]) });
+    await assert.rejects(svc.resolveMentions({ conversationId: CONV_ID, senderProfileId: SENDER_ID, body: `@[${USER_A}:Foreign]`, senderRole: null }), { status: 404 });
+  });
   it("returns an empty result when the body has no mention tokens", async () => {
     const prisma = buildPrismaMock([]);
     const svc = createChatMentionsService({ prisma });

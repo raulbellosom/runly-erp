@@ -46,11 +46,11 @@ function buildRouter() {
     InventoryServiceError,
     inventoryNotifSvc: { notifyInvComment() {}, notifyInvReaction() {} },
     commentsService: {
-      listComments: async () => [],
+      listComments: handler('listComments'),
       createComment: async () => ({ mentions: [] }),
-      updateComment: async () => ({}),
-      deleteComment: async () => {},
-      toggleReaction: async () => ({ removed: false }),
+      updateComment: handler('updateComment'),
+      deleteComment: handler('deleteComment'),
+      toggleReaction: handler('toggleReaction'),
     },
     CommentsServiceError,
     enrichFilesWithSignedUrls: async (x) => x,
@@ -59,6 +59,23 @@ function buildRouter() {
 }
 
 describe("inventory router — path + permission wiring", () => {
+  for (const [method, suffix, name, expected] of [
+    ['GET', '', 'listComments', ['InvItem', 'item-a', COMPANY, 'user-1']],
+    ['PATCH', '/comment-a', 'updateComment', ['comment-a', 'auth-1', 'text', COMPANY, 'item-a']],
+    ['DELETE', '/comment-a', 'deleteComment', ['comment-a', 'auth-1', COMPANY, 'item-a']],
+    ['POST', '/comment-a/reactions', 'toggleReaction', ['comment-a', 'auth-1', 'ok', COMPANY, 'item-a']],
+  ]) {
+    it(`${name} receives the authorized company and parent item`, async () => {
+      const { router, serviceCalls } = buildRouter();
+      const response = await router.request(`/inventory/items/item-a/comments${suffix}`, {
+        method, headers: { 'content-type': 'application/json' },
+        ...(['POST', 'PATCH'].includes(method) ? { body: JSON.stringify({ body: 'text', emoji: 'ok', companyId: 'foreign' }) } : {}),
+      });
+      assert.equal(response.status, 200);
+      assert.deepEqual(serviceCalls.find((entry) => entry.name === name)?.args, expected);
+    });
+  }
+
   const cases = [
     ["GET", "/inventory/items", "inventory.item.read", "listItems"],
     ["POST", "/inventory/items", "inventory.item.create", "createItem"],

@@ -1,3 +1,4 @@
+import { UserAccessError } from '../../services/user-access-service.js'
 // apps/api/src/routes/ledger/groups-routes.js
 import { Hono } from 'hono'
 import {
@@ -10,6 +11,8 @@ import { getActivityContext } from '../../services/activity-publisher.js'
 
 function handleError(c, err, fallback) {
   if (err instanceof GroupServiceError) return c.json({ error: err.message }, err.status)
+  if (err instanceof UserAccessError) return c.json({ error: err.message }, err.status)
+  if (err instanceof SyntaxError) return c.json({ error: 'El cuerpo de la solicitud no es JSON valido.' }, 400)
   if (process.env.NODE_ENV !== 'production') console.error('[runly.ledger/groups]', err)
   return c.json({ error: fallback }, 500)
 }

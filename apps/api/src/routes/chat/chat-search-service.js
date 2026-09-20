@@ -97,6 +97,7 @@ export function computeMatchRanges(body, tokens) {
 export function createChatSearchService({ prisma }) {
   async function searchMessages({
     authUserId,
+    companyId = null,
     q,
     conversationId = null,
     limit = 30,
@@ -209,6 +210,8 @@ export function createChatSearchService({ prisma }) {
         LIMIT 1
       ) AS matched_att ON true
       WHERE m.deleted_at IS NULL
+        AND public.runly_chat_user_access(conv.id, ${profileId}::uuid)
+        AND (conv.company_id = ${companyId}::uuid OR (${conversationId}::uuid IS NOT NULL AND cm.external_access))
         ${convFilter}
         AND (${whereTokens})
       ORDER BY score DESC, m.created_at DESC

@@ -19,6 +19,7 @@ import { NoteIcon } from '../noteIcons.jsx'
 import { useNoteShares, useShareNote, useUpdateNoteShare, useRevokeNoteShare } from '../hooks/useNoteShares.js'
 import { runly } from '../../../lib/runly'
 import { useAuth } from '../../../auth/AuthProvider'
+import { ResourceInvitationControl } from '../../../company/ResourceInvitationControl.jsx'
 
 const PERMISSION_OPTIONS = [
   { value: 'read', label: 'Solo lectura' },
@@ -309,6 +310,7 @@ export function NoteShareModal({ note, noteId, open, onOpenChange }) {
           </div>
 
         </div>
+        <ResourceInvitationControl resourceType="note" resourceId={id} />
       </DialogContent>
     </Dialog>
   )

@@ -1676,7 +1676,7 @@ Expected: green.
 - [ ] **Step 2: Live end-to-end with the test site**
 
 - `pnpm dev` (API + web).
-- In `C:\Users\raulb\atlaserp-installer\racoondevs`: point its `.env.development` API base at the local API if not already, `pnpm dev`, open the site.
+- In `C:\path\to\storefront`: point its `.env.development` API base at the local API if not already, `pnpm dev`, open the site.
 - From the widget: start a chat, send a text, send an image → thumbnail shows in the widget AND in Bandeja externa; click → lightbox.
 - Operator replies with an image → shows as thumbnail in the widget.
 - Operator types → widget shows "escribiendo"; operator opens/reads → widget shows "Visto".

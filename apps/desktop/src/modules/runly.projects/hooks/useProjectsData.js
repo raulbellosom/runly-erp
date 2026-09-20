@@ -351,11 +351,11 @@ export function useDeleteTask(projectId) {
 
 // ── Workspace users (for assignee picker) ────────────────────────────────────
 
-export function useWorkspaceUsers() {
+export function useWorkspaceUsers(projectId = null) {
   const token = useToken()
   return useQuery({
-    queryKey: ['identity', 'users'],
-    queryFn: () => runly.identity.listUsers(token),
+    queryKey: ['identity', 'candidates', 'projects', projectId],
+    queryFn: () => runly.identity.listCandidates(token, { action: 'projects', ...(projectId ? { projectId } : {}) }),
     enabled: Boolean(token),
     staleTime: 5 * 60 * 1000,
   })

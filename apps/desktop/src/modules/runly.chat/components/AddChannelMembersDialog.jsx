@@ -22,6 +22,7 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
 import { useAddMembers } from "../hooks/useCreateConversation";
 import { UserAvatar, UserPickerItem, UserListSkeleton } from "./UserPicker";
+import { ResourceInvitationControl } from '../../../company/ResourceInvitationControl.jsx';
 
 export function AddChannelMembersDialog({ open, onClose, conversationId, existingMemberIds = [] }) {
   const { session } = useAuth();
@@ -33,7 +34,7 @@ export function AddChannelMembersDialog({ open, onClose, conversationId, existin
 
   const { data: usersData, isLoading } = useQuery({
     queryKey: ["users-for-chat-picker"],
-    queryFn: () => runly.identity.listUsers(token, { pageSize: 100 }),
+    queryFn: () => runly.identity.listCandidates(token, { pageSize: 100, action: 'chat' }),
     enabled: Boolean(token) && open,
     staleTime: 120_000,
   });
@@ -139,6 +140,7 @@ export function AddChannelMembersDialog({ open, onClose, conversationId, existin
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
+        <ResourceInvitationControl resourceType="chat" resourceId={conversationId} />
         <DialogFooter className="px-5 py-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)]">
           <Button variant="outline" onClick={resetAndClose} disabled={isAdding}>
             Cancelar

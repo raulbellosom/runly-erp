@@ -19,7 +19,7 @@ export default function GroupsScreen() {
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName]       = useState('')
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-groups', token],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/ledger/groups`, {
@@ -60,7 +60,7 @@ export default function GroupsScreen() {
     )
   }
 
-  if (isError) return <ErrorState message="No se pudieron cargar los grupos." />
+  if (isError) return <ErrorState description="No se pudieron cargar los grupos." onRetry={refetch} />
 
   return (
     <div className="flex flex-col h-full">

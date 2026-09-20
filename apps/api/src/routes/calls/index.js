@@ -57,7 +57,7 @@ export function createCallsRouter({
   const internal = new Hono();
 
   const calls = service ?? createCallService({ prisma, notificationService, broadcaster, deliveryWorker });
-  const linksService = createCallLinksService({ prisma, smtpService, callService: calls });
+  const linksService = createCallLinksService({ prisma, smtpService, callService: calls, supabaseAdmin });
   const guestService = createCallGuestService({
     prisma, supabaseAdmin, linksService, callService: calls, broadcaster, notificationService,
   });

@@ -10,6 +10,7 @@ function makePrisma(overrides = {}) {
   return {
     calendarCalendar: {
       findMany: async () => [{ id: 'cal-1' }],
+      findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1' }),
       ...(overrides.calendarCalendar ?? {}),
     },
     calendarShare: {
@@ -50,6 +51,7 @@ function makePrisma(overrides = {}) {
     },
     // Default: candidate users all share company-1 with the actor.
     membership: {
+      findFirst: async ({ where }) => where.userId === 'outsider' ? null : { id: 'member', role: { key: 'runly.admin' } },
       findMany: async ({ where }) => {
         if (where?.userId?.in) {
           return where.userId.in.map((userId) => ({ userId, companyId: 'company-1' }))
@@ -135,7 +137,7 @@ describe('calendar-event-service', () => {
       )
     })
 
-    it('drops attendees that are not company peers', async () => {
+    it('rejects the whole operation when any attendee is outside the calendar company', async () => {
       let insertedAttendees = null
       const prisma = makePrisma({
         calendarEventAttendee: {
@@ -155,21 +157,15 @@ describe('calendar-event-service', () => {
         },
       })
       const svc = createCalendarEventService({ prisma })
-      await svc.createEvent('user-1', {
-        calendarId: 'cal-1',
-        title: 'X',
-        startAt: '2026-06-01T00:00:00Z',
-        attendeeIds: ['peer', 'outsider'],
-      })
-      assert.ok(insertedAttendees)
-      const ids = insertedAttendees.map((a) => a.userId)
-      assert.ok(ids.includes('peer'))
-      assert.ok(!ids.includes('outsider'))
+      await assert.rejects(svc.createEvent('user-1', {
+        calendarId: 'cal-1', title: 'X', startAt: '2026-06-01T00:00:00Z', attendeeIds: ['peer', 'outsider'],
+      }), { status: 404 })
+      assert.equal(insertedAttendees, null)
     })
   })
 
   describe('addAttendee company guard', () => {
-    it('throws 403 when the attendee is not a company peer', async () => {
+    it('throws 404 when the attendee is not a company peer', async () => {
       const prisma = makePrisma({
         membership: {
           findMany: async ({ where }) => {
@@ -181,7 +177,7 @@ describe('calendar-event-service', () => {
       const svc = createCalendarEventService({ prisma })
       await assert.rejects(
         () => svc.addAttendee('user-1', 'evt-1', 'outsider'),
-        (e) => e instanceof CalendarServiceError && e.status === 403,
+        (e) => e.status === 404,
       )
     })
   })

@@ -44,7 +44,7 @@ export function createInventoryRouter({
   }
 
   const isInvErr = (err) => err instanceof InventoryServiceError;
-  const isCommentErr = (err) => err instanceof CommentsServiceError;
+  const isCommentErr = (err) => err instanceof CommentsServiceError || err?.status === 404;
 
   // ── Items ────────────────────────────────────────────────────────────────
   router.get("/inventory/items", requirePermission("inventory.item.read"), async (c) => {
@@ -250,7 +250,7 @@ export function createInventoryRouter({
   router.get("/inventory/items/:id/comments", requirePermission("inventory.item.read"), async (c) => {
     try {
       const { id } = c.req.param();
-      const comments = await commentsService.listComments("InvItem", id);
+      const comments = await commentsService.listComments("InvItem", id, c.get("companyId"), c.get("userId"));
       return c.json({ data: comments });
     } catch (err) {
       if (isCommentErr(err)) return c.json({ error: err.message }, err.status);
@@ -289,7 +289,7 @@ export function createInventoryRouter({
       const authUserId = c.get("authUserId");
       const { cid } = c.req.param();
       const { body } = await c.req.json();
-      const comment = await commentsService.updateComment(cid, authUserId, body);
+      const comment = await commentsService.updateComment(cid, authUserId, body, c.get("companyId"), c.req.param("id"));
       return c.json({ data: comment });
     } catch (err) {
       if (isCommentErr(err)) return c.json({ error: err.message }, err.status);
@@ -302,7 +302,7 @@ export function createInventoryRouter({
       const companyId = c.get("companyId");
       const authUserId = c.get("authUserId");
       const { cid } = c.req.param();
-      await commentsService.deleteComment(cid, authUserId, companyId);
+      await commentsService.deleteComment(cid, authUserId, companyId, c.req.param("id"));
       return c.json({ success: true });
     } catch (err) {
       if (isCommentErr(err)) return c.json({ error: err.message }, err.status);
@@ -317,7 +317,7 @@ export function createInventoryRouter({
       const actorId = c.get("userId");
       const { cid } = c.req.param();
       const { emoji } = await c.req.json();
-      const result = await commentsService.toggleReaction(cid, authUserId, emoji);
+      const result = await commentsService.toggleReaction(cid, authUserId, emoji, companyId, c.req.param("id"));
       if (!result.removed) {
         await inventoryNotifSvc.notifyInvReaction({ companyId, actorId, commentId: cid });
       }

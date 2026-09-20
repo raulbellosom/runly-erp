@@ -30,7 +30,7 @@ describe('normalizeHost', () => {
 
   it('a bare domain and its stored https:// form normalize identically', () => {
     // The exact shapes seen in practice: Host header is bare, website_site.domain is a full URL.
-    assert.equal(normalizeHost('maquinariaycanteras.com.mx'), normalizeHost('https://maquinariaycanteras.com.mx'))
+    assert.equal(normalizeHost('storefront.example.com'), normalizeHost('https://storefront.example.com'))
   })
 })
 
@@ -227,7 +227,7 @@ describe('injectSeoTags', () => {
 
 describe('injectRunlyConfig', () => {
   const cfg = {
-    supabaseUrl: 'https://supabase.racoondevs.com',
+    supabaseUrl: 'https://supabase.example.com',
     supabaseAnonKey: 'eyJtest',
     apiUrl: 'https://mysite.com',
     company: 'acme',
@@ -244,7 +244,7 @@ describe('injectRunlyConfig', () => {
     const result = injectRunlyConfig(html, cfg)
     assert.ok(result.includes('window.RUNLY_CONFIG='))
     assert.ok(result.includes('<script src="/public/site/runly-sdk.js" defer></script>'))
-    assert.ok(result.includes('supabase.racoondevs.com'))
+    assert.ok(result.includes('supabase.example.com'))
     assert.ok(result.includes('eyJtest'))
   })
 

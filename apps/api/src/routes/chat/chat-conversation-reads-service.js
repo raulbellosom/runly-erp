@@ -15,7 +15,7 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
   // ./mirai-conversation-guard.js — the 'mirai' chat cannot be archived
   // or hidden from the list.
 
-  async function listConversations({ authUserId, limit = 50, cursor = null, archived = false }) {
+  async function listConversations({ authUserId, companyId = null, limit = 50, cursor = null, archived = false }) {
     const profileId = await getUserProfileId(authUserId);
 
     const cursorClause = cursor ? Prisma.sql`AND c.last_message_at < ${new Date(cursor)}` : Prisma.empty;
@@ -55,7 +55,7 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
             AND m.sender_user_id IS DISTINCT FROM ${profileId}
             AND m.created_at > COALESCE(
               (SELECT last_read_at FROM chat_conversation_members
-               WHERE conversation_id = c.id AND user_id = ${profileId}),
+               WHERE conversation_id = c.id AND user_id = ${profileId} AND left_at IS NULL),
               '1970-01-01'::timestamptz
             )
         ) AS unread_count,
@@ -72,7 +72,7 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
             AND m.sender_user_id IS DISTINCT FROM ${profileId}
             AND m.created_at > COALESCE(
               (SELECT last_read_at FROM chat_conversation_members
-               WHERE conversation_id = c.id AND user_id = ${profileId}),
+               WHERE conversation_id = c.id AND user_id = ${profileId} AND left_at IS NULL),
               '1970-01-01'::timestamptz
             )
             AND (
@@ -128,7 +128,9 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
         ON ccm.conversation_id = c.id
         AND ccm.user_id = ${profileId}
         AND ccm.left_at IS NULL
+        AND public.runly_chat_user_access(ccm.conversation_id, ccm.user_id)
       WHERE c.deleted_at IS NULL
+        AND (c.company_id = ${companyId}::uuid OR ccm.external_access)
         AND c.type != 'external_support'
         ${archiveClause}
         ${hiddenClause}
@@ -293,6 +295,7 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
         ON ccm.conversation_id = m.conversation_id
        AND ccm.user_id = ${profileId}
        AND ccm.left_at IS NULL
+        AND public.runly_chat_user_access(ccm.conversation_id, ccm.user_id)
       JOIN chat_conversations c ON c.id = m.conversation_id
       WHERE m.id = ${messageId} AND m.deleted_at IS NULL
       LIMIT 1

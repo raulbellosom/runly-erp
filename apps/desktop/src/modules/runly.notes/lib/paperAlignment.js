@@ -7,10 +7,10 @@
 // real text — this computes the correction from an actually-measured
 // distance instead.
 
-// The same typography and paper unit are used on every screen. Measurements
-// from viewport rectangles must be divided by sheet zoom before calling this.
-export function computeLineUnitPx(rootFontSizePx) {
-  return 0.9375 * 1.72 * rootFontSizePx
+// Match responsive body typography. Viewport distances must first be
+// divided by sheet zoom to keep the rules aligned at every zoom level.
+export function computeLineUnitPx(rootFontSizePx, isMobile = false) {
+  return (isMobile ? 0.875 : 0.9375) * 1.72 * rootFontSizePx
 }
 
 // How far (px) to shift the pattern's background-position so a line

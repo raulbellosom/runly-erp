@@ -27,7 +27,7 @@ export function CreateChatModal({ open, onClose, onCreated }) {
 
   const { data: usersData, isLoading } = useQuery({
     queryKey: ["users-for-chat-picker"],
-    queryFn: () => runly.identity.listUsers(token, { pageSize: 100 }),
+    queryFn: () => runly.identity.listCandidates(token, { pageSize: 100, action: 'chat' }),
     enabled: Boolean(token),
     staleTime: 120_000,
   });

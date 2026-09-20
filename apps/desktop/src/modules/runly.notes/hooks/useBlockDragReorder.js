@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   findDropPosition, moveNode, computeBlockRects, computeShiftMap,
   exceedsDragThreshold, LONG_PRESS_MS, computeIndicatorRect,
@@ -48,9 +48,17 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
   const dragRef = useRef(null) // { pointerId, originalPos, originalIndex, blockRects, draggedHeightPx, cloneEl, grabDX, grabDY, candidatePos }
   const wasDragRef = useRef(false) // set true right after a real drag commits; consumed once by the caller's click handler
 
+  useEffect(() => () => {
+    clearTimeout(pressRef.current?.timerId)
+    pressRef.current = null
+    dragRef.current?.cleanup()
+  }, [editor, editable, isEditing])
+
   function cleanupDrag() {
     const d = dragRef.current
     if (!d) return
+    clearTimeout(pressRef.current?.timerId)
+    pressRef.current = null
     for (const b of d.blockRects) {
       const dom = editor.view.nodeDOM(b.offset)
       if (dom?.style) dom.style.transform = ''
@@ -62,6 +70,14 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     dragRef.current = null
     window.removeEventListener('pointerup', onWindowPointerUp)
     window.removeEventListener('pointercancel', onWindowPointerCancel)
+    window.removeEventListener('touchmove', preventDragScroll)
+  }
+
+  // Pointer capture alone doesn't stop the browser from starting a pan and
+  // cancelling our pointer stream. Block scrolling only after the long press
+  // arms a drag; ordinary swipes on the image/table still scroll the note.
+  function preventDragScroll(e) {
+    if (dragRef.current && e.cancelable) e.preventDefault()
   }
 
   // Fallback for when the release/cancel event doesn't reach the dragged
@@ -80,7 +96,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     const active = dragRef.current
     if (!active || active.pointerId !== e.pointerId) return
     const { originalPos, candidatePos } = active
-    cleanupDrag()
+    active.cleanup()
     if (candidatePos !== originalPos) moveNode(editor, originalPos, candidatePos)
     wasDragRef.current = true
   }
@@ -88,7 +104,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
   function abortDrag(e) {
     const active = dragRef.current
     if (!active || active.pointerId !== e.pointerId) return
-    cleanupDrag()
+    active.cleanup()
   }
 
   function startDrag(e) {
@@ -96,7 +112,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     // Self-healing: if a previous gesture's clone/indicator never got
     // cleaned up (e.g. an interrupted drag left dragRef populated), clear
     // it before starting a new one instead of leaving it orphaned forever.
-    if (dragRef.current) cleanupDrag()
+    dragRef.current?.cleanup()
     const boxEl = getBoxEl()
     const frameEl = getFrameEl()
     if (!boxEl || !frameEl) return
@@ -106,13 +122,26 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     const originalIndex = blockRects.findIndex((b) => b.offset === originalPos)
     if (originalIndex === -1) return
     const rect = frameEl.getBoundingClientRect()
+    const layout = getComputedStyle(frameEl)
+    const zoom = rect.width / parseFloat(layout.width) || 1
 
     const clone = frameEl.cloneNode(true)
+    // cloneNode doesn't copy canvas pixels (drawing blocks).
+    const canvases = frameEl.querySelectorAll('canvas')
+    clone.querySelectorAll('canvas').forEach((canvas, i) => {
+      canvas.getContext('2d')?.drawImage(canvases[i], 0, 0)
+    })
+    clone.inert = true
+    clone.setAttribute('aria-hidden', 'true')
     Object.assign(clone.style, CLONE_LIFT_STYLE, {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
+      // The preview lives outside the zoomed sheet. Scale its descendants
+      // together so pixel-sized images keep filling their frame.
+      width: layout.width,
+      height: layout.height,
+      transform: `scale(${zoom * 1.03})`,
+      transformOrigin: 'top left',
     })
     document.body.appendChild(clone)
 
@@ -139,21 +168,26 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       grabDX: e.clientX - rect.left,
       grabDY: e.clientY - rect.top,
       candidatePos: originalPos,
+      cleanup: cleanupDrag,
     }
     window.addEventListener('pointerup', onWindowPointerUp)
     window.addEventListener('pointercancel', onWindowPointerCancel)
+    if (e.pointerType === 'touch') {
+      window.addEventListener('touchmove', preventDragScroll, { passive: false })
+    }
   }
 
-  function onPointerDown(e) {
-    if (!editable || isEditing) return
+  function onPointerDown(e, fromHandle = false) {
+    if (!editable || isEditing || e.button !== 0) return
     pressRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       pointerType: e.pointerType,
+      fromHandle,
       timerId: null,
     }
-    if (e.pointerType === 'touch') {
+    if (e.pointerType === 'touch' && !fromHandle) {
       pressRef.current.timerId = setTimeout(() => {
         if (pressRef.current?.pointerId === e.pointerId) {
           e.target.setPointerCapture?.(e.pointerId)
@@ -161,6 +195,14 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
         }
       }, LONG_PRESS_MS)
     }
+  }
+
+  function onHandlePointerDown(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!editable || isEditing || e.button !== 0) return
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    onPointerDown(e, true)
   }
 
   function onPointerMove(e) {
@@ -179,7 +221,10 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       })
       for (const [offset, shiftPx] of shiftMap) {
         const dom = view.nodeDOM(offset)
-        if (dom?.style) dom.style.transform = shiftPx ? `translateY(${shiftPx}px)` : ''
+        if (dom?.style) {
+          const zoom = dom.getBoundingClientRect().width / parseFloat(getComputedStyle(dom).width) || 1
+          dom.style.transform = shiftPx ? `translateY(${shiftPx / zoom}px)` : ''
+        }
       }
       active.candidatePos = candidatePos
       active.cloneEl.style.left = `${e.clientX - active.grabDX}px`
@@ -195,7 +240,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     const press = pressRef.current
     if (!press || press.pointerId !== e.pointerId) return
     const deltaPx = Math.hypot(e.clientX - press.startX, e.clientY - press.startY)
-    if (press.pointerType === 'touch') {
+    if (press.pointerType === 'touch' && !press.fromHandle) {
       if (exceedsDragThreshold(deltaPx)) {
         clearTimeout(press.timerId)
         pressRef.current = null
@@ -233,5 +278,5 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     }
   }
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, wasDragRef }
+  return { onPointerDown, onHandlePointerDown, onPointerMove, onPointerUp, onPointerCancel, wasDragRef }
 }

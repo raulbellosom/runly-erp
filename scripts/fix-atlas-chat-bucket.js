@@ -29,11 +29,11 @@ for (const line of envRaw.split("\n")) {
   env[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
 }
 
-const supabaseUrl = env.SUPABASE_URL ?? "https://supabase.racoondevs.com";
+const supabaseUrl = env.SUPABASE_URL;
 const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!serviceKey) {
-  console.error("SUPABASE_SERVICE_ROLE_KEY not found in .env");
+if (!supabaseUrl || !serviceKey) {
+  console.error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in .env");
   process.exit(1);
 }
 

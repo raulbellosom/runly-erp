@@ -93,6 +93,11 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     auth: {
       me: (token) =>
         request("/user/me", { headers: { Authorization: `Bearer ${token}` } }),
+      forgotPassword: (email) =>
+        request("/auth/forgot-password", {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        }),
     },
     profile: {
       me: (token) =>
@@ -335,7 +340,15 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           headers: withAuthHeaders(token),
         }),
     },
+    collaboration: {
+      listInvitations: (params, token) => request(`/collaboration/invitations${toQueryString(params)}`, { headers: withAuthHeaders(token) }),
+      createInvitation: (data, token) => request('/collaboration/invitations', { method: 'POST', headers: withAuthHeaders(token), body: JSON.stringify(data) }),
+      acceptInvitation: (invitationToken, token) => request('/collaboration/invitations/accept', { method: 'POST', headers: withAuthHeaders(token), body: JSON.stringify({ token: invitationToken }) }),
+      revokeInvitation: (id, token) => request(`/collaboration/invitations/${encodeURIComponent(id)}`, { method: 'DELETE', headers: withAuthHeaders(token) }),
+    },
     identity: {
+      listCandidates: (token, query = null) =>
+        request(`/identity/users/candidates${toQueryString(query)}`, { headers: withAuthHeaders(token) }),
       listUsers: (token, query = null) =>
         request(`/identity/users${toQueryString(query)}`, {
           headers: withAuthHeaders(token),
@@ -370,6 +383,17 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           method: "PATCH",
           headers: withAuthHeaders(token),
           body: JSON.stringify(data),
+        }),
+      setUserPassword: (id, password, token) =>
+        request(`/identity/users/${encodeURIComponent(id)}/password`, {
+          method: "PATCH",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify({ password }),
+        }),
+      sendUserPasswordReset: (id, token) =>
+        request(`/identity/users/${encodeURIComponent(id)}/send-password-reset`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
         }),
       setUsersEnabled: (ids, enabled, token) =>
         request("/identity/users/bulk/enabled", {

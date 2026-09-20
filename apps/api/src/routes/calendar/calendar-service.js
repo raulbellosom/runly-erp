@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js';
 export class CalendarServiceError extends Error {
   constructor(message, status = 500) {
     super(message);
@@ -7,41 +8,12 @@ export class CalendarServiceError extends Error {
 }
 
 export function createCalendarService({ prisma }) {
-  // A calendar may only be shared with a user who belongs to (at least) one
-  // company the owner also belongs to. Blocks cross-tenant sharing and
-  // self-sharing. Mirrors notes shares-service._assertShareableTarget.
-  async function assertShareableTarget(ownerId, targetUserId) {
-    if (!targetUserId || typeof targetUserId !== "string") {
-      throw new CalendarServiceError("Usuario destino invalido.", 400);
-    }
-    if (targetUserId === ownerId) {
-      throw new CalendarServiceError("No puedes invitarte a ti mismo.", 400);
-    }
-    const ownerMemberships = await prisma.membership.findMany({
-      where: { userId: ownerId, enabled: true },
-      select: { companyId: true },
-    });
-    const companyIds = ownerMemberships.map((m) => m.companyId);
-    if (companyIds.length === 0) {
-      throw new CalendarServiceError(
-        "Solo puedes compartir con usuarios de tu empresa.",
-        403,
-      );
-    }
-    const targetMembership = await prisma.membership.findFirst({
-      where: {
-        userId: targetUserId,
-        enabled: true,
-        companyId: { in: companyIds },
-      },
-      select: { id: true },
-    });
-    if (!targetMembership) {
-      throw new CalendarServiceError(
-        "Solo puedes compartir con usuarios de tu empresa.",
-        403,
-      );
-    }
+  // Eligibility is scoped to the calendar company.
+  const access = createUserAccessService({ prisma });
+  async function assertShareableTarget(ownerId, targetUserId, companyId) {
+    if (!targetUserId || targetUserId === ownerId) throw new CalendarServiceError("Usuario destino invalido.", 400);
+    await access.assertCompanyMember(companyId, ownerId);
+    await access.assertCandidates({ companyId, userIds: [targetUserId] });
   }
 
   // companyId: the requester's server-resolved active company (never
@@ -52,7 +24,7 @@ export function createCalendarService({ prisma }) {
   // personal-only (company: null), matching the original behavior.
   async function ensureDefaultCalendar(userId, companyId = null) {
     const existing = await prisma.calendarCalendar.findFirst({
-      where: { ownerId: userId, isDefault: true, enabled: true },
+      where: { ownerId: userId, companyId, isDefault: true, enabled: true },
     });
     if (existing) return existing;
     return prisma.calendarCalendar.create({
@@ -68,9 +40,9 @@ export function createCalendarService({ prisma }) {
 
   const CALENDAR_COMPANY_SELECT = { select: { id: true, name: true } };
 
-  async function listCalendars(userId) {
+  async function listCalendars(userId, companyId) {
     const owned = await prisma.calendarCalendar.findMany({
-      where: { ownerId: userId, enabled: true },
+      where: { ownerId: userId, enabled: true, OR: [{ companyId: null }, { companyId, company: { enabled: true, memberships: { some: { userId, enabled: true } } } }] },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
       include: {
         company: CALENDAR_COMPANY_SELECT,
@@ -89,7 +61,7 @@ export function createCalendarService({ prisma }) {
       },
     });
     const shared = await prisma.calendarShare.findMany({
-      where: { userId },
+      where: { userId, calendar: { companyId, company: { enabled: true, memberships: { some: { userId, enabled: true } } } } },
       include: { calendar: { include: { company: CALENDAR_COMPANY_SELECT } } },
     });
     const sharedCalendars = shared
@@ -119,6 +91,7 @@ export function createCalendarService({ prisma }) {
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
+    if (calendar.companyId) await access.assertCompanyMember(calendar.companyId, userId);
     return prisma.calendarCalendar.update({
       where: { id: calendarId },
       data: {
@@ -135,6 +108,7 @@ export function createCalendarService({ prisma }) {
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
+    if (calendar.companyId) await access.assertCompanyMember(calendar.companyId, userId);
     if (calendar.isDefault)
       throw new CalendarServiceError(
         "No se puede eliminar el calendario por defecto.",
@@ -159,7 +133,7 @@ export function createCalendarService({ prisma }) {
     const validRoles = ["VIEWER", "EDITOR", "MANAGER"];
     if (!validRoles.includes(role))
       throw new CalendarServiceError("Rol invalido.", 400);
-    await assertShareableTarget(ownerId, userId);
+    await assertShareableTarget(ownerId, userId, calendar.companyId);
     try {
       return await prisma.calendarShare.create({
         data: { calendarId, userId, role },
@@ -180,6 +154,7 @@ export function createCalendarService({ prisma }) {
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
+    if (calendar.companyId) await access.assertCompanyMember(calendar.companyId, ownerId);
     const share = await prisma.calendarShare.findFirst({
       where: { id: shareId, calendarId },
     });
@@ -200,6 +175,7 @@ export function createCalendarService({ prisma }) {
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
+    if (calendar.companyId) await access.assertCompanyMember(calendar.companyId, ownerId);
     const share = await prisma.calendarShare.findFirst({
       where: { id: shareId, calendarId },
     });
@@ -213,6 +189,7 @@ export function createCalendarService({ prisma }) {
       where: { id: calendarId, enabled: true },
     });
     if (!calendar) return null;
+    if (calendar.companyId) await access.assertCompanyMember(calendar.companyId, userId);
     if (calendar.ownerId === userId) return "OWNER";
     const share = await prisma.calendarShare.findFirst({
       where: { calendarId, userId },

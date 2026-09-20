@@ -2,9 +2,12 @@
 
 $ErrorActionPreference = 'Stop'
 
-$sshHost = 'root@76.13.114.109'
-$localPort = 54322
-$remoteAddr = '172.22.0.3:5432'
+$sshHost = $env:RUNLY_SSH_HOST
+$localPort = if ($env:RUNLY_DB_LOCAL_PORT) { [int]$env:RUNLY_DB_LOCAL_PORT } else { 54322 }
+$remoteAddr = $env:RUNLY_DB_REMOTE_ADDR
+if (-not $sshHost -or -not $remoteAddr) {
+  throw 'Set RUNLY_SSH_HOST and RUNLY_DB_REMOTE_ADDR in your shell before starting. See docs/06_deployment_strategy.md.'
+}
 $tunnelOwned = $false
 
 function Test-TunnelPort {
@@ -28,7 +31,7 @@ function Test-TunnelPort {
 function Stop-Tunnel {
   param([int]$Port)
   $matches = Get-CimInstance Win32_Process -Filter "Name = 'ssh.exe'" |
-    Where-Object { $_.CommandLine -match "-L\s*${Port}:" }
+    Where-Object { $_.CommandLine -match "-L\s*127\.0\.0\.1:${Port}:" }
 
   foreach ($p in $matches) {
     Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
@@ -43,7 +46,8 @@ if ($existingTunnel) {
   Write-Host "Opening SSH tunnel: 127.0.0.1:$localPort -> $remoteAddr ..."
   Write-Host 'If prompted, enter your SSH password once.'
 
-  & ssh -f -N -o ServerAliveInterval=60 -o StrictHostKeyChecking=accept-new -L "${localPort}:${remoteAddr}" $sshHost
+  & ssh -f -N -o ServerAliveInterval=60 -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -L "127.0.0.1:${localPort}:${remoteAddr}" $sshHost
+  if ($LASTEXITCODE -ne 0) { throw 'SSH tunnel failed.' }
 
   Start-Sleep -Seconds 2
 

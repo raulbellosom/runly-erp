@@ -45,7 +45,7 @@ app.get('/instance/status', async (c) => {
 
 Open an SSH tunnel in a separate terminal (required for DB connection):
 ```bash
-ssh -L 54322:172.22.0.3:5432 root@76.13.114.109
+ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10
 ```
 
 Then start the API:

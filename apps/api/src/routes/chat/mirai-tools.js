@@ -235,7 +235,7 @@ export function buildToolRunners({
     const limit = Math.min(Math.max(parseInt(args?.limit, 10) || 30, 1), RECENT_MAX);
     try {
       const res = await listMessages({
-        conversationId: ctx.conversationId, authUserId: ctx.actorAuthUserId,
+        conversationId: ctx.conversationId, authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null,
         limit, before: args?.before || null,
       });
       return { messages: (res.data ?? []).map(trimMessage) };
@@ -249,7 +249,7 @@ export function buildToolRunners({
     const limit = Math.min(Math.max(parseInt(args?.limit, 10) || 30, 1), RECENT_MAX);
     try {
       const res = await listMessages({
-        conversationId: String(args.conversationId), authUserId: ctx.actorAuthUserId,
+        conversationId: String(args.conversationId), authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null,
         limit, before: args?.before || null,
       });
       return { conversationId: String(args.conversationId), messages: (res.data ?? []).map(trimMessage) };
@@ -263,7 +263,7 @@ export function buildToolRunners({
     if (!q) return { error: "Falta el texto a buscar." };
     const limit = Math.min(Math.max(parseInt(args?.limit, 10) || 15, 1), SEARCH_MAX);
     try {
-      const res = await chatSearchService.searchMessages({ authUserId: ctx.actorAuthUserId, q, conversationId: null, limit, offset: 0 });
+      const res = await chatSearchService.searchMessages({ authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null, q, conversationId: null, limit, offset: 0 });
       return {
         results: (res.data ?? []).map((r) => ({
           conversationId: r.conversationId ?? r.conversation_id,
@@ -282,7 +282,7 @@ export function buildToolRunners({
     const conversationId = String(args?.conversationId || ctx.conversationId);
     const limit = Math.min(Math.max(parseInt(args?.limit, 10) || 30, 1), FILES_MAX);
     try {
-      await listMessages({ conversationId, authUserId: ctx.actorAuthUserId, limit: 1, before: null });
+      await listMessages({ conversationId, authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null, limit: 1, before: null });
     } catch (err) {
       return { error: err?.status === 403 || err?.status === 404 ? "Sin acceso a esa conversacion." : `No se pudo acceder: ${String(err?.message ?? err).slice(0, 160)}` };
     }
@@ -318,9 +318,9 @@ export function buildToolRunners({
       WHERE a.id = ${attachmentId}::uuid
       LIMIT 1
     `;
-    if (!att) return { error: "No encontre ese adjunto." };
+    if (!att) return { error: "Sin acceso a ese adjunto." };
     try {
-      await listMessages({ conversationId: att.conversation_id, authUserId: ctx.actorAuthUserId, limit: 1, before: null });
+      await listMessages({ conversationId: att.conversation_id, authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null, limit: 1, before: null });
     } catch {
       return { error: "Sin acceso a ese adjunto." };
     }
@@ -417,7 +417,7 @@ export function buildToolRunners({
     const start = new Date();
     const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
     try {
-      const events = await calendarEventService.listEvents({ userId: c.userId, start, end });
+      const events = await calendarEventService.listEvents({ userId: c.userId, companyId: c.companyId, start, end });
       return {
         eventos: (events ?? []).slice(0, 25).map((e) => ({
           titulo: e.title ?? null,
@@ -499,6 +499,7 @@ export function buildChannelToolRunners({ prisma }) {
       WHERE m.conversation_id = ${ctx.conversationId}::uuid
         AND m.deleted_at IS NULL
         AND m.thread_root_id IS NULL
+        AND public.runly_chat_user_access(m.conversation_id, ${ctx.actorProfileId}::uuid)
       ORDER BY m.created_at DESC
       LIMIT ${limit}
     `;

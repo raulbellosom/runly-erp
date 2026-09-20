@@ -1,13 +1,16 @@
 # Runly ERP — Deployment Strategy
 
+All domains, IPs and paths below are examples. Replace them with your own private
+deployment settings; no example endpoint represents an existing Runly service.
+
 ## Two independent stacks
 
-**Supabase stack** (self-hosted on VPS, already deployed):
-- https://supabase.racoondevs.com — PostgreSQL, Auth, Storage, Realtime
-- https://studio.supabase.racoondevs.com — Studio (admin use only)
+**Supabase stack** (self-hosted VPS example):
+- https://supabase.example.com — PostgreSQL, Auth, Storage, Realtime
+- https://studio.supabase.example.com — Studio (admin use only)
 - Not managed by Runly ERP's docker-compose
 - Credentials in `.env`, never in version control
-- Config source of truth: `/opt/supabase-atlaserp/supabase/docker/.env` on the VPS
+- Config source of truth: `/path/to/supabase/docker/.env` on the VPS
 
 **Runly ERP stack** (managed here):
 - `apps/api` — Hono REST API
@@ -15,17 +18,19 @@
 - `apps/desktop` — Tauri desktop application
 - Connects to Supabase via environment variables
 
-## No local database
+## Database selection
 
-There is no local PostgreSQL, Redis, or MinIO. All development connects to the self-hosted Supabase at https://supabase.racoondevs.com via an SSH tunnel.
+This example uses an external Supabase installation. Configure your own instance
+in `.env`; the installer also supports local Supabase. Use a separate development
+database. The repository does not supply credentials or a shared production endpoint.
 
 ## Development setup (local)
 
 ### Prerequisites
 
 - Node.js 22, pnpm 9
-- SSH access to the VPS (`root@76.13.114.109`)
-- Credentials from `/opt/supabase-atlaserp/supabase/docker/.env`
+- SSH access to the VPS (`deploy@192.0.2.10`)
+- Credentials from `/path/to/supabase/docker/.env`
 
 ### Steps
 
@@ -38,15 +43,15 @@ cp .env.example .env
 pnpm install
 
 # 3. Open SSH tunnel (keep this terminal open)
-ssh -L 54322:172.22.0.3:5432 root@76.13.114.109
-# This maps localhost:54322 → supabase-db container (172.22.0.3:5432) on the VPS
+ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10
+# This maps localhost:54322 → supabase-db container (db.internal.example:5432) on the VPS
 
 # 4. First-time database setup (in a new terminal, tunnel must be open)
 pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
 
-# 5. Start dev servers (tunnel not required at runtime — only for DB commands)
+# 5. Start dev servers (keep the tunnel open while using this DATABASE_URL)
 pnpm dev           # API + Vite web preview + worker
 pnpm dev:tauri     # Native Tauri window + all servers (requires Rust)
 ```
@@ -58,19 +63,41 @@ pnpm dev:tauri     # Native Tauri window + all servers (requires Rust)
 | API | http://localhost:4010 |
 | Frontend (Vite) | http://localhost:5173 |
 | Prisma Studio | http://localhost:5555 (requires SSH tunnel) |
-| Supabase API | https://supabase.racoondevs.com |
-| Supabase Studio | https://studio.supabase.racoondevs.com |
+| Supabase API | https://supabase.example.com |
+| Supabase Studio | https://studio.supabase.example.com |
 
 ## SSH tunnel reference
 
 ```bash
-# Opens local port 54322 → supabase-db container (172.22.0.3:5432) on the VPS
-ssh -L 54322:172.22.0.3:5432 root@76.13.114.109
+# Opens local port 54322 → supabase-db container (db.internal.example:5432) on the VPS
+ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10
 ```
 
-Required before: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:studio`, `pnpm db:fresh`.
+When `DATABASE_URL` uses the tunnel, keep it open for migrations, seeds, Studio,
+and all API/worker queries. Client generation alone does not need a database connection.
 
-**Not required** for `pnpm dev` — the API connects to Supabase Auth/Storage via HTTPS, not direct PostgreSQL. However, Prisma queries from the API also need the tunnel during development unless the VPS exposes PostgreSQL on a public port (currently it does not).
+For automatic tunnel startup, export these variables in your shell before `pnpm start`.
+The startup scripts read the process environment, not `.env`:
+
+```bash
+export RUNLY_SSH_HOST='deploy@192.0.2.10' # replace with your SSH user/host
+export RUNLY_DB_REMOTE_ADDR='db.internal.example:5432' # target reachable from SSH host
+export RUNLY_DB_LOCAL_PORT=54322
+pnpm start
+```
+
+PowerShell:
+
+```powershell
+$env:RUNLY_SSH_HOST = 'deploy@192.0.2.10'
+$env:RUNLY_DB_REMOTE_ADDR = 'db.internal.example:5432'
+$env:RUNLY_DB_LOCAL_PORT = '54322'
+./scripts/start-dev.ps1
+```
+
+Resolve the database target from your deployment configuration. A container name
+works only if the SSH host can resolve it; do not assume a fixed container IP.
+Without these variables the scripts exit before attempting any connection.
 
 ## docker-compose.yml
 

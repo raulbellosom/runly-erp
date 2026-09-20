@@ -153,7 +153,7 @@ app.get('/runtime/modules', requirePermission('core.access'), async (c) => { ...
 
 ## Supabase Auth configuration (in Studio)
 
-Navigate to https://studio.supabase.racoondevs.com → Authentication:
+Navigate to https://studio.supabase.example.com → Authentication:
 - Enable Email provider (email + password)
 - JWT secret must match `JWT_SECRET` in `.env`
 - Configure SMTP for password recovery emails

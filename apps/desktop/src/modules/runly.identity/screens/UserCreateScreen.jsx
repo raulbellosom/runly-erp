@@ -36,6 +36,7 @@ export default function UserCreateScreen() {
     enabled: Boolean(token) && canReadRoles,
   });
 
+  const [invitationUrl, setInvitationUrl] = useState(null);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -58,10 +59,10 @@ export default function UserCreateScreen() {
 
   const createUserMutation = useMutation({
     mutationFn: (payload) => runly.identity.createUser(payload, token),
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       queryClient.invalidateQueries({ queryKey: ["identity-users"] });
-      toast.success("Usuario creado correctamente");
-      navigate("/app/m/runly.identity/identity/users");
+      toast.success("Invitacion preparada");
+      setInvitationUrl(new URL(data.invitationUrl, window.location.origin).href);
     },
     onError: (err) => {
       try {
@@ -98,7 +99,7 @@ export default function UserCreateScreen() {
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader
         eyebrow="Runly Identity"
-        title="Nuevo usuario"
+        title="Invitar usuario"
         actions={
           <Button variant="outline" onClick={() => navigate("/app/m/runly.identity/identity/users")}>
             <ArrowLeft className="h-4 w-4" />
@@ -116,6 +117,12 @@ export default function UserCreateScreen() {
           </CardContent>
         </Card>
       )}
+
+      {invitationUrl && <Card><CardContent className="space-y-3 pt-6">
+        <p>Comparte este enlace con la persona invitada. Debe iniciar sesión con el correo indicado y aceptar para obtener acceso. La contraseña inicial solo se aplica a cuentas nuevas.</p>
+        <TextField label="Enlace de invitación" value={invitationUrl} readOnly />
+        <Button onClick={() => navigator.clipboard.writeText(invitationUrl).then(() => toast.success('Enlace copiado')).catch(() => toast.error('Selecciona y copia el enlace'))}>Copiar enlace</Button>
+      </CardContent></Card>}
 
       {canManageUsers && (
         <Card variant="shell">
@@ -195,8 +202,8 @@ export default function UserCreateScreen() {
                 onClick={handleSubmit}
               >
                 {createUserMutation.isPending
-                  ? "Creando usuario..."
-                  : "Crear usuario"}
+                  ? "Preparando invitación..."
+                  : "Invitar usuario"}
               </Button>
             </div>
           </CardContent>

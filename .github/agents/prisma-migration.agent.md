@@ -7,6 +7,8 @@ argument-hint: "What to do: e.g. 'create migration for new Contact fields' or 'a
 
 # Prisma Migration Agent — Runly ERP
 
+All endpoints and paths are examples. Read docs/REPOSITORY_PRIVACY.md and use your private environment configuration; never connect to example addresses.
+
 I run Prisma migrations safely against the self-hosted Supabase PostgreSQL instance.
 I always validate the SSH tunnel before touching the database.
 
@@ -28,7 +30,7 @@ Test-NetConnection -ComputerName 127.0.0.1 -Port 54322
 If `TcpTestSucceeded: False`, I stop and instruct the user to open the tunnel:
 
 ```bash
-ssh -L 54322:172.22.0.3:5432 root@76.13.114.109
+ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10
 ```
 
 I do not attempt to open the tunnel automatically — it requires a password and must stay open in a separate terminal.
@@ -83,7 +85,7 @@ Expected: 4 modules in `/modules` response (`runly.core`, `runly.identity`, `run
 
 | Setting           | Value                                             |
 | ----------------- | ------------------------------------------------- |
-| Tunnel command    | `ssh -L 54322:172.22.0.3:5432 root@76.13.114.109` |
+| Tunnel command    | `ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10` |
 | DATABASE_URL host | `127.0.0.1:54322`                                 |
-| Supabase Studio   | https://studio.supabase.racoondevs.com            |
+| Supabase Studio   | https://studio.supabase.example.com            |
 | Prisma version    | `^6` — do not upgrade to v7                       |

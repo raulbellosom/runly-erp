@@ -625,7 +625,7 @@ test('rewrites a public object URL using the lqip preset (tiny width-only placeh
   const result = withImageVariant(PUBLIC_URL, 'lqip');
   assert.equal(
     result,
-    'https://supabase.racoondevs.com/storage/v1/render/image/public/runly-notes/notes/u1/n1/123-cover.jpg?width=24&quality=30',
+    'https://supabase.example.com/storage/v1/render/image/public/runly-notes/notes/u1/n1/123-cover.jpg?width=24&quality=30',
   );
 });
 ```

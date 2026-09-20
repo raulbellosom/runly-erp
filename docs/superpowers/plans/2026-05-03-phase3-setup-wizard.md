@@ -11,7 +11,7 @@
 
 **Tech Stack:** Hono, Prisma 6, @supabase/supabase-js, React 19, React Router v7, TanStack Query v5, @atlas/ui
 
-**Prerequisite:** SSH tunnel must be open (`ssh -L 54322:172.22.0.3:5432 root@76.13.114.109`) before running any Prisma command.
+**Prerequisite:** SSH tunnel must be open (`ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10`) before running any Prisma command.
 
 ---
 
@@ -952,7 +952,7 @@ In Prisma Studio (`pnpm db:studio`):
 4. Delete rows from `Company`
 5. Delete all `InstanceConfig` rows (`initialized`, `company_id`, `completed_at`)
 
-Also delete the Supabase Auth user via Supabase Studio at `https://studio.supabase.racoondevs.com` â†’ Authentication â†’ Users.
+Also delete the Supabase Auth user via Supabase Studio at `https://studio.supabase.example.com` â†’ Authentication â†’ Users.
 
 This resets the instance for Phase 4 testing.
 

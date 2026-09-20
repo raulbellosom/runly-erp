@@ -357,6 +357,7 @@ export function createNotificationService({ prisma, broadcaster = null }) {
 
     if (broadcaster && result.inAppRecipientIds.length > 0) {
       await broadcaster.broadcastToUsers(result.inAppRecipientIds, "notification.new", {
+        companyId, sourceType: parsed.sourceType, sourceId: parsed.sourceId,
         eventType: parsed.eventType,
         title: parsed.title,
         body: parsed.body ?? null,

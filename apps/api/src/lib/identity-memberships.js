@@ -14,8 +14,11 @@ export function checkMembershipRoleScope({ roleCompanyId, membershipCompanyId })
   };
 }
 
-export function checkProtectedRoleAssignment({ roleKey, protectedKeys, actorCanManageRoles }) {
+export function checkProtectedRoleAssignment({ roleKey, protectedKeys, actorCanManageRoles, isSystemAdmin = false }) {
   const normalizedKey = String(roleKey ?? "").trim().toLowerCase();
+  if (normalizedKey === 'system.admin' && !isSystemAdmin) {
+    return { ok: false, status: 403, error: 'Se requiere administración de la plataforma.' };
+  }
   const isProtected = protectedKeys instanceof Set && protectedKeys.has(normalizedKey);
   if (!isProtected || actorCanManageRoles) return { ok: true };
   return {

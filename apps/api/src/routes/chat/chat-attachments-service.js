@@ -106,6 +106,7 @@ export function createChatAttachmentsService({
       INNER JOIN chat_conversation_members ccm
         ON ccm.conversation_id = a.conversation_id AND ccm.user_id = ${profileId} AND ccm.left_at IS NULL
       WHERE a.id = ${attachmentId}
+        AND public.runly_chat_user_access(a.conversation_id, ${profileId}::uuid)
       LIMIT 1
     `;
     if (!rows.length) {

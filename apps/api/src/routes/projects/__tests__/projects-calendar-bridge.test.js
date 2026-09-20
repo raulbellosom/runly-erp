@@ -107,7 +107,7 @@ describe('createProjectsCalendarBridge', () => {
   })
 
   describe('syncTaskEvent', () => {
-    it('creates a CalendarEvent with sourceModule=atlas.projects when task has dueDate', async () => {
+    it('creates a CalendarEvent with sourceModule=runly.projects when task has dueDate', async () => {
       let created = null
       const prisma = {
         ...makeCalendarPrisma(),
@@ -119,7 +119,7 @@ describe('createProjectsCalendarBridge', () => {
       const bridge = createProjectsCalendarBridge({ prisma })
       const task = { id: 'task-1', title: 'Entrega', dueDate: new Date('2026-07-01'), startDate: null, calendarEventId: null }
       await bridge.syncTaskEvent(task, 'cal-1')
-      assert.equal(created?.sourceModule, 'atlas.projects')
+      assert.equal(created?.sourceModule, 'runly.projects')
       assert.equal(created?.sourceEntityId, 'task-1')
       assert.equal(created?.calendarId, 'cal-1')
     })

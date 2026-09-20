@@ -17,7 +17,7 @@ const PRIORITY_OPTIONS = [
 export default function TaskFormModal({ open, onOpenChange, projectId, defaultStatusId }) {
   const { data: statusesData } = useStatuses(projectId)
   const statuses = statusesData?.data ?? statusesData ?? []
-  const { data: usersData } = useWorkspaceUsers()
+  const { data: usersData } = useWorkspaceUsers(projectId)
   const users = usersData?.users ?? usersData?.data ?? usersData ?? []
   const createTask = useCreateTask(projectId)
 

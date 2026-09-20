@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js';
 import { Prisma } from "@prisma/client";
 import { signedUrlWithVariant } from "../../lib/image-variants.js";
 import { parseMentionIds, stripMentionTokens } from "../../lib/mention-utils.js";
@@ -9,11 +10,6 @@ import { assertNotMirai } from "./mirai-conversation-guard.js";
 import { createChatConversationsWriteService } from "./chat-conversations-write-service.js";
 
 export { ChatServiceError };
-
-// auth_user_id → user_profile.id never changes; cache per-process to avoid
-// one extra DB round-trip on every chat request when the pool is under load.
-const _profileIdCache = new Map();
-const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Supabase Storage signed URLs are valid for 3600s; cache them for 55 min so we
 // never hit the VPS more than once per file per hour regardless of poll frequency.
@@ -49,26 +45,21 @@ function setCachedSignedUrl(bucket, objectKey, variant, url) {
 
 // Exported so sibling chat services (chat-permissions-service.js,
 // channel-directory-service.js) can resolve auth_user_id -> user_profile.id
-// without duplicating the cache.
+// while rechecking enabled status on every request.
 export async function resolveUserProfileId(prisma, authUserId) {
-  const cached = _profileIdCache.get(authUserId);
-  if (cached && cached.expiresAt > Date.now()) return cached.profileId;
+
 
   const rows = await prisma.$queryRaw`
-    SELECT id FROM user_profile WHERE auth_user_id = ${authUserId} LIMIT 1
+    SELECT id FROM user_profile WHERE auth_user_id = ${authUserId} AND enabled = true LIMIT 1
   `;
   if (!rows.length) throw new ChatServiceError("Usuario no encontrado.", 404);
 
   const profileId = rows[0].id;
-  _profileIdCache.set(authUserId, { profileId, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
   return profileId;
 }
 
-// Test-only: clears the shared cache so unit tests with mocked prisma clients
-// don't get a cached profileId leaked from a different test's mock data.
-export function _resetProfileIdCacheForTests() {
-  _profileIdCache.clear();
-}
+// Retained for older test fixtures; identity authorization is no longer cached.
+export function _resetProfileIdCacheForTests() {}
 
 export function createChatService({ prisma, supabaseAdmin, notificationService = null, broadcaster = null, permissionsService = null, mentionsService = null, entityReferencesService = null, channelLinksService = null }) {
   // ------------------------------------------------------------------
@@ -153,6 +144,7 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
       WHERE conversation_id = ${conversationId}
         AND user_id = ${userProfileId}
         AND left_at IS NULL
+        AND public.runly_chat_user_access(conversation_id, user_id)
       LIMIT 1
     `;
     if (!rows.length) {
@@ -225,40 +217,10 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
   async function filterCompanyPeers(actingProfileId, candidateIds, companyId) {
     const ids = [...new Set((candidateIds ?? []).filter(Boolean))];
     if (ids.length === 0) return [];
-    let companyIds;
-    if (companyId) {
-      companyIds = [companyId];
-    } else {
-      const ownerMemberships = await prisma.membership.findMany({
-        where: { userId: actingProfileId.toString(), enabled: true },
-        select: { companyId: true },
-      });
-      companyIds = ownerMemberships.map((m) => m.companyId);
-    }
-    if (companyIds.length === 0) {
-      // Acting user has no active company membership — a platform admin. This
-      // guard exists to stop a COMPANY user smuggling in a foreign-company
-      // user; a company-less admin has already cleared the route permission
-      // (and, for channels/groups, the members.manage check) and can see every
-      // user in the instance. The old "self only" fallback made it impossible
-      // for such an account to ever add anyone to a channel/group ("Uno o mas
-      // usuarios no pertenecen a tu empresa." on every invite). Allow any
-      // candidate that is a real, enabled member of some company.
-      const realPeers = await prisma.membership.findMany({
-        where: { userId: { in: ids }, enabled: true },
-        select: { userId: true },
-      });
-      const allowed = new Set(realPeers.map((m) => m.userId));
-      allowed.add(actingProfileId.toString());
-      return ids.filter((id) => allowed.has(id));
-    }
-    const peers = await prisma.membership.findMany({
-      where: { userId: { in: ids }, enabled: true, companyId: { in: companyIds } },
-      select: { userId: true },
-    });
-    const allowed = new Set(peers.map((m) => m.userId));
-    allowed.add(actingProfileId.toString());
-    return ids.filter((id) => allowed.has(id));
+    if (!companyId) throw new ChatServiceError("Recurso no encontrado o no disponible.", 404);
+    const access = createUserAccessService({ prisma });
+    await access.assertCompanyMember(companyId, actingProfileId.toString(), 'chat.conversations.read');
+    return access.assertCandidates({ companyId, userIds: ids, permission: 'chat.conversations.read' });
   }
 
   async function updateConversationLastMessage(conversationId, messageId, createdAt) {
@@ -501,9 +463,13 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
   // Messages
   // ------------------------------------------------------------------
 
-  async function listMessages({ conversationId, authUserId, limit = 40, before = null }) {
+  async function listMessages({ conversationId, authUserId, limit = 40, before = null, companyId = undefined }) {
     const profileId = await getUserProfileId(authUserId);
     await assertMember(conversationId, profileId);
+    if (companyId !== undefined) {
+      const [scope] = await prisma.$queryRaw`SELECT id FROM chat_conversations WHERE id = ${conversationId}::uuid AND company_id = ${companyId}::uuid`;
+      if (!scope) throw new ChatServiceError('Recurso no disponible.', 404);
+    }
 
     const rows = await prisma.$queryRaw`
       SELECT
@@ -710,6 +676,7 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
         const senderRole = permissionsService ? await permissionsService.getMemberRole(conversationId, profileId) : null;
         mentionResult = await mentionsService.resolveMentions({ conversationId, senderProfileId: profileId, body, senderRole });
       } catch (err) {
+        if (err?.status === 404) throw err;
         // A malformed-but-regex-matching mention token (e.g. one that fails
         // Postgres's uuid parser) must never block sending the message itself —
         // degrade to "no mentions resolved" instead of failing the whole request.

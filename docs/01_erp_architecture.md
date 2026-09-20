@@ -102,8 +102,8 @@ React → GET /instance/status → { initialized: false }
 
 | Purpose | URL |
 |---|---|
-| API | https://supabase.racoondevs.com |
-| Studio | https://studio.supabase.racoondevs.com |
+| API | https://supabase.example.com |
+| Studio | https://studio.supabase.example.com |
 ## Optional Office editing
 
 Collabora CODE is an optional external editor behind a small Office provider

@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js'
 export class TaskServiceError extends Error {
   constructor(message, status = 500) {
     super(message)
@@ -29,6 +30,15 @@ export function computeRruleNextAt(rrule) {
 }
 
 export function createTasksService({ prisma }) {
+  const access = createUserAccessService({ prisma })
+  async function validateTargets(projectId, { assigneeId, parentTaskId, statusId }) {
+    const project = await prisma.project.findFirst({ where: { id: projectId }, select: { companyId: true } })
+    if (!project) throw new TaskServiceError('Recurso no encontrado.', 404)
+    if (assigneeId) await access.assertCandidates({ companyId: project.companyId, userIds: [assigneeId], permission: 'projects.project.read', projectId })
+    if (parentTaskId && !(await prisma.task.findFirst({ where: { id: parentTaskId, projectId }, select: { id: true } }))) throw new TaskServiceError('Recurso no encontrado.', 404)
+    if (statusId && !(await prisma.taskStatus.findFirst({ where: { id: statusId, projectId }, select: { id: true } }))) throw new TaskServiceError('Recurso no encontrado.', 404)
+  }
+
   async function listTasks(projectId, { statusId, assigneeId, priority, dueDateFrom, dueDateTo, parentTaskId, includeSubtasks } = {}) {
     const where = { projectId }
     if (statusId) where.statusId = statusId
@@ -110,6 +120,7 @@ export function createTasksService({ prisma }) {
   }
 
   async function createTask(projectId, createdBy, { title, description, statusId, assigneeId, priority = 'NONE', startDate, dueDate, parentTaskId }) {
+    await validateTargets(projectId, { assigneeId, parentTaskId, statusId })
     if (!title?.trim()) throw new TaskServiceError('El titulo es requerido.', 400)
     const status = await prisma.taskStatus.findFirst({ where: { id: statusId, projectId } })
     if (!status) throw new TaskServiceError('Estado no valido para este proyecto.', 400)
@@ -150,6 +161,7 @@ export function createTasksService({ prisma }) {
   async function updateTask(taskId, data) {
     const task = await prisma.task.findFirst({ where: { id: taskId } })
     if (!task) throw new TaskServiceError('Tarea no encontrada.', 404)
+    await validateTargets(task.projectId, data)
     const { title, description, assigneeId, priority, startDate, dueDate, statusId, rrule } = data
     const rruleNextAt = rrule !== undefined
       ? (rrule ? computeRruleNextAt(rrule) : null)
@@ -173,6 +185,7 @@ export function createTasksService({ prisma }) {
   async function moveTask(taskId, { statusId, position }) {
     const task = await prisma.task.findFirst({ where: { id: taskId } })
     if (!task) throw new TaskServiceError('Tarea no encontrada.', 404)
+    await validateTargets(task.projectId, { statusId })
     await prisma.task.updateMany({
       where: { projectId: task.projectId, statusId, position: { gte: position }, id: { not: taskId } },
       data: { position: { increment: 1 } },
@@ -191,6 +204,7 @@ export function createTasksService({ prisma }) {
   async function addAssignee(taskId, userId) {
     const task = await prisma.task.findFirst({ where: { id: taskId } })
     if (!task) throw new TaskServiceError('Tarea no encontrada.', 404)
+    await validateTargets(task.projectId, { assigneeId: userId })
     const existing = await prisma.projectTaskAssignee.findFirst({ where: { taskId, userId } })
     if (existing) throw new TaskServiceError('El usuario ya esta asignado a esta tarea.', 409)
     const row = await prisma.projectTaskAssignee.create({
@@ -228,6 +242,7 @@ export function createTasksService({ prisma }) {
 
   async function bulkUpdateTasks(projectId, taskIds, patch) {
     if (!taskIds?.length) throw new TaskServiceError('Se requiere al menos una tarea.', 400)
+    await validateTargets(projectId, patch)
     const { statusId, assigneeId, priority } = patch
     if (!statusId && assigneeId === undefined && !priority)
       throw new TaskServiceError('Se requiere al menos un campo para actualizar.', 400)

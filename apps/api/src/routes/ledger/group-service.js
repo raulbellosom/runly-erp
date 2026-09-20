@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js';
 // apps/api/src/routes/ledger/group-service.js
 import { createNotificationService } from '../../services/notification-service.js'
 import { firstRow, isUniqueViolation } from './service-helpers.js'
@@ -8,6 +9,10 @@ export class GroupServiceError extends Error {
     this.name = 'GroupServiceError'
     this.status = status
   }
+}
+
+function logNotificationError(err) {
+  if (process.env.NODE_ENV !== 'production') console.error('[runly.ledger/groups] notification publish failed', err)
 }
 
 export function createGroupService({ prisma }) {
@@ -54,13 +59,13 @@ export function createGroupService({ prisma }) {
     try {
       const rows = await prisma.$queryRaw`
         WITH new_group AS (
-          INSERT INTO ledger_group (id, company_id, name, created_by)
-          VALUES (gen_random_uuid(), ${companyId}::uuid, ${name}, ${actorId}::uuid)
+          INSERT INTO ledger_group (company_id, name, created_by)
+          VALUES (${companyId}::uuid, ${name}, ${actorId}::uuid)
           RETURNING *
         ),
         _member AS (
-          INSERT INTO ledger_group_member (id, group_id, user_id, role, invited_by, status)
-          SELECT gen_random_uuid(), id, ${actorId}::uuid, 'admin', ${actorId}::uuid, 'active'
+          INSERT INTO ledger_group_member (group_id, user_id, role, invited_by, status)
+          SELECT id, ${actorId}::uuid, 'admin', ${actorId}::uuid, 'active'
           FROM new_group
         )
         SELECT * FROM new_group
@@ -168,6 +173,7 @@ export function createGroupService({ prisma }) {
   async function inviteMember({ companyId, groupId, actorId, actorName, data }) {
     const group = await requireGroupAccess({ companyId, groupId, actorId, minRole: 'admin' })
     const { user_id: targetUserId, role } = data
+    await createUserAccessService({ prisma }).assertCandidates({ companyId, userIds: [targetUserId] });
 
     if (targetUserId === actorId) {
       throw new GroupServiceError('No puedes invitarte a ti mismo.', 400)
@@ -175,8 +181,8 @@ export function createGroupService({ prisma }) {
 
     try {
       await prisma.$queryRaw`
-        INSERT INTO ledger_group_member (id, group_id, user_id, role, invited_by, status)
-        VALUES (gen_random_uuid(), ${groupId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'active')
+        INSERT INTO ledger_group_member (group_id, user_id, role, invited_by, status)
+        VALUES (${groupId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'active')
         ON CONFLICT (group_id, user_id) DO UPDATE
           SET role = EXCLUDED.role, status = 'active', invited_by = EXCLUDED.invited_by, invited_at = NOW()
       `
@@ -208,7 +214,7 @@ export function createGroupService({ prisma }) {
           invited_by_name: actorName,
         },
       },
-    }).catch(() => {})
+    }).catch(logNotificationError)
 
     return { ok: true }
   }
@@ -250,7 +256,7 @@ export function createGroupService({ prisma }) {
           priority: 'low',
           metadata: { resource_type: 'group', resource_name: group.name },
         },
-      }).catch(() => {})
+      }).catch(logNotificationError)
     }
     return row
   }

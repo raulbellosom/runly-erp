@@ -73,7 +73,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
         where: { id: projectId },
         select: { id: true, companyId: true, ownerId: true },
       })
-      if (!project || (companyId && project.companyId !== companyId)) {
+      if (!project || (!companyId || project.companyId !== companyId)) {
         return c.json({ error: 'Proyecto no encontrado.' }, 404)
       }
       let role = project.ownerId === userId ? 'OWNER' : null
@@ -87,6 +87,14 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       if (!role) return c.json({ error: 'Proyecto no encontrado.' }, 404)
       if ((PROJECT_ROLE_RANK[role] ?? 0) < (PROJECT_ROLE_RANK[minRole] ?? 1)) {
         return c.json({ error: 'No tienes acceso suficiente en este proyecto.' }, 403)
+      }
+      const taskId = c.req.param('tid')
+      if (taskId && !(await prisma.task.findFirst({ where: { id: taskId, projectId }, select: { id: true } }))) {
+        return c.json({ error: 'Recurso no encontrado.' }, 404)
+      }
+      const statusId = c.req.param('sid')
+      if (statusId && !(await prisma.taskStatus.findFirst({ where: { id: statusId, projectId }, select: { id: true } }))) {
+        return c.json({ error: 'Recurso no encontrado.' }, 404)
       }
       c.set('projectRole', role)
       c.set('projectCompanyId', project.companyId)
@@ -403,7 +411,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   // --- Task Comments ---
   app.get('/projects/:id/tasks/:tid/comments', requirePermission('projects.task.read'), requireProjectAccess('VIEWER'), async (c) => {
     try {
-      const comments = await commentsSvc.listComments('Task', c.req.param('tid'))
+      const comments = await commentsSvc.listComments('Task', c.req.param('tid'), getCompanyId(c), getUserId(c))
       return c.json({ data: comments })
     } catch (err) { return handleError(c, err, 'Error al listar comentarios.') }
   })
@@ -437,14 +445,14 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.patch('/projects/:id/tasks/:tid/comments/:cid', requirePermission('projects.task.update'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       const { body } = await c.req.json()
-      const comment = await commentsSvc.updateComment(c.req.param('cid'), c.get('authUserId'), body)
+      const comment = await commentsSvc.updateComment(c.req.param('cid'), c.get('authUserId'), body, getCompanyId(c), c.req.param('tid'))
       return c.json(comment)
     } catch (err) { return handleError(c, err, 'Error al editar comentario.') }
   })
 
   app.delete('/projects/:id/tasks/:tid/comments/:cid', requirePermission('projects.task.update'), requireProjectAccess('MEMBER'), async (c) => {
     try {
-      await commentsSvc.deleteComment(c.req.param('cid'), c.get('authUserId'), getCompanyId(c))
+      await commentsSvc.deleteComment(c.req.param('cid'), c.get('authUserId'), getCompanyId(c), c.req.param('tid'))
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar comentario.') }
   })
@@ -453,7 +461,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     try {
       const { emoji } = await c.req.json()
       const commentId = c.req.param('cid')
-      const result = await commentsSvc.toggleReaction(commentId, c.get('authUserId'), emoji)
+      const result = await commentsSvc.toggleReaction(commentId, c.get('authUserId'), emoji, getCompanyId(c), c.req.param('tid'))
       if (!result.removed) {
         await notifSvc.notifyTaskReaction({
           companyId: getCompanyId(c),

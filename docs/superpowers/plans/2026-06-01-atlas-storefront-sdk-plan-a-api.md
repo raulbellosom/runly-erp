@@ -108,7 +108,7 @@ git commit -m "feat(storefront): seed storefront_client, storefront_vendor roles
 
 - [ ] **Step 1: Create the bucket via Supabase Studio**
 
-Go to https://studio.supabase.racoondevs.com → Storage → New bucket.
+Go to https://studio.supabase.example.com → Storage → New bucket.
 
 - Name: `atlas-storefront`
 - Public: **ON**

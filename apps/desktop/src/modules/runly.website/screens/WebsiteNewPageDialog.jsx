@@ -166,7 +166,7 @@ export default function WebsiteNewPageDialog({ siteId, open, onOpenChange, onCre
               <p className="text-xs text-[hsl(var(--muted-foreground))]">
                 {homepageExists
                   ? 'Ya existe una pagina de inicio para este sitio.'
-                  : 'Esta pagina se mostrara en la URL raiz de tu sitio (racoondevs.com)'}
+                  : 'Esta pagina se mostrara en la URL raiz de tu sitio (example.com)'}
               </p>
             </div>
             {homepageExists && (

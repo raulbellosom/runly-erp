@@ -58,7 +58,7 @@ for the historical record.
 cp .env.example .env
 ```
 
-Open `.env` and fill in values from the self-hosted Supabase VPS (`/opt/supabase-atlaserp/supabase/docker/.env`):
+Open `.env` and fill in values from the self-hosted Supabase VPS (`/path/to/supabase/docker/.env`):
 
 | .env variable                 | Source in VPS .env |
 | ----------------------------- | ------------------ |
@@ -162,13 +162,16 @@ also start `collabora-dev` in the Docker `runlyerp` group. See the
 
 ## Ports
 
+Supabase URLs below are examples: replace them with your own configuration.
+See [repository privacy rules and checks](docs/REPOSITORY_PRIVACY.md) before sharing changes.
+
 | Service         | URL |
 | --------------- | --- |
 | API             | http://localhost:4010 |
 | Frontend (Vite) | http://localhost:5173 |
 | Prisma Studio   | http://localhost:5555 |
-| Supabase API    | https://supabase.racoondevs.com |
-| Supabase Studio | https://studio.supabase.racoondevs.com |
+| Supabase API    | https://supabase.example.com |
+| Supabase Studio | https://studio.supabase.example.com |
 
 ## Architecture
 

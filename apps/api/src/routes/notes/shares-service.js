@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js'
 import { randomBytes } from 'node:crypto'
 import { createNotificationService } from '../../services/notification-service.js'
 
@@ -13,9 +14,9 @@ export function createSharesService({ prisma, broadcaster, notificationService }
   const notifications = notificationService ?? createNotificationService({ prisma, broadcaster })
   async function _verifyAccess(noteId, userId) {
     const rows = await prisma.$queryRaw`
-      SELECT id FROM notes
+      SELECT id, company_id FROM notes
       WHERE id = ${noteId}
-        AND deleted_at IS NULL
+        AND deleted_at IS NULL AND public.runly_note_user_access(id, ${userId}::uuid, false)
         AND (
           owner_user_id = ${userId}
           OR EXISTS (
@@ -31,40 +32,17 @@ export function createSharesService({ prisma, broadcaster, notificationService }
 
   async function _verifyOwner(noteId, userId) {
     const rows = await prisma.$queryRaw`
-      SELECT id FROM notes
-      WHERE id = ${noteId} AND owner_user_id = ${userId} AND deleted_at IS NULL
+      SELECT id, company_id FROM notes
+      WHERE id = ${noteId} AND owner_user_id = ${userId} AND deleted_at IS NULL AND public.runly_note_user_access(id, ${userId}::uuid, false)
     `
     if (!rows.length) throw new SharesServiceError('No tienes permiso para realizar esta acción', 403)
     return rows[0]
   }
 
-  // A note may only be shared with a user who belongs to (at least) one company
-  // the owner also belongs to. Blocks cross-tenant sharing and self-sharing.
-  async function _assertShareableTarget(ownerUserId, targetUserId) {
-    if (!targetUserId || typeof targetUserId !== 'string') {
-      throw new SharesServiceError('Usuario destino invalido', 400)
-    }
-    if (targetUserId === ownerUserId) {
-      throw new SharesServiceError('No puedes compartir una nota contigo mismo', 400)
-    }
-    const rows = await prisma.$queryRaw`
-      SELECT 1
-      FROM membership m_owner
-      JOIN membership m_target
-        ON m_target.company_id = m_owner.company_id
-      WHERE m_owner.user_id  = ${ownerUserId}::uuid  AND m_owner.enabled  = true
-        AND m_target.user_id = ${targetUserId}::uuid AND m_target.enabled = true
-      LIMIT 1
-    `
-    if (!rows.length) {
-      throw new SharesServiceError('Solo puedes compartir con usuarios de tu empresa', 403)
-    }
-  }
-
   async function listShares(noteId, userId) {
     await _verifyAccess(noteId, userId)
     const ownerRows = await prisma.$queryRaw`
-      SELECT id FROM notes WHERE id = ${noteId} AND owner_user_id = ${userId}
+      SELECT id, company_id FROM notes WHERE id = ${noteId} AND owner_user_id = ${userId}
     `
     const isOwner = ownerRows.length > 0
     const rows = await prisma.$queryRaw`
@@ -88,84 +66,18 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     return rows.map((r) => ({ ...r, user_email: emailById.get(r.id) ?? null }))
   }
 
-  // The target must actually be able to use the notes module: an enabled
-  // membership (in a company shared with the actor) whose role is an admin role
-  // — those get every permission — or grants `notes.notes.read`. Without this a
-  // note could be shared with a user who then can't open it at all.
-  async function _assertTargetHasNotesAccess(actorUserId, targetUserId) {
-    const rows = await prisma.$queryRaw`
-      SELECT 1
-      FROM membership m_owner
-      JOIN membership m_target
-        ON m_target.company_id = m_owner.company_id
-      JOIN role r ON r.id = m_target.role_id AND r.enabled = true
-      WHERE m_owner.user_id  = ${actorUserId}::uuid  AND m_owner.enabled  = true
-        AND m_target.user_id = ${targetUserId}::uuid AND m_target.enabled = true
-        AND (
-          r.key IN ('runly.admin', 'atlas.admin', 'system.admin')
-          OR EXISTS (
-            SELECT 1 FROM role_permission rp
-            JOIN permission p ON p.id = rp.permission_id
-            WHERE rp.role_id = r.id
-              AND p.key = 'notes.notes.read'
-              AND p.active = true
-          )
-        )
-      LIMIT 1
-    `
-    if (!rows.length) {
-      throw new SharesServiceError('Ese usuario no tiene acceso al modulo de notas', 403)
-    }
-  }
-
-  // Picker source for the share modal — same eligibility rule as
-  // _assertTargetHasNotesAccess, plus a name/email search. Gated at the route
-  // by `notes.shares.create`.
-  async function listShareableUsers(actorUserId, search) {
-    const like = search && search.trim() ? `%${search.trim()}%` : null
-    const rows = await prisma.$queryRaw`
-      SELECT DISTINCT up.id, up.display_name, up.email
-      FROM membership m_owner
-      JOIN membership m_target
-        ON m_target.company_id = m_owner.company_id
-      JOIN user_profile up ON up.id = m_target.user_id AND up.enabled = true
-      JOIN role r ON r.id = m_target.role_id AND r.enabled = true
-      WHERE m_owner.user_id = ${actorUserId}::uuid AND m_owner.enabled = true
-        AND m_target.enabled = true
-        AND m_target.user_id <> ${actorUserId}::uuid
-        AND (
-          r.key IN ('runly.admin', 'atlas.admin', 'system.admin')
-          OR EXISTS (
-            SELECT 1 FROM role_permission rp
-            JOIN permission p ON p.id = rp.permission_id
-            WHERE rp.role_id = r.id
-              AND p.key = 'notes.notes.read'
-              AND p.active = true
-          )
-        )
-        AND (
-          ${like}::text IS NULL
-          OR up.display_name ILIKE ${like}
-          OR up.email ILIKE ${like}
-        )
-      ORDER BY up.display_name ASC
-      LIMIT 20
-    `
-    return rows.map((r) => ({
-      id: r.id,
-      displayName: r.display_name,
-      email: r.email,
-      avatarUrl: null,
-    }))
+  async function listShareableUsers(actorUserId, search, companyId) {
+    const users = await createUserAccessService({ prisma }).listCandidates({ actorId: actorUserId, companyId, search, permission: 'notes.notes.read' })
+    return users.filter((u) => u.id !== actorUserId)
   }
 
   async function shareNote(noteId, userId, { targetUserId, permission }) {
-    await _verifyOwner(noteId, userId)
+    const note = await _verifyOwner(noteId, userId)
+    if (!targetUserId || targetUserId === userId) throw new SharesServiceError("Usuario destino invalido", 400)
     if (!['read', 'edit'].includes(permission)) {
       throw new SharesServiceError("El permiso debe ser 'read' o 'edit'")
     }
-    await _assertShareableTarget(userId, targetUserId)
-    await _assertTargetHasNotesAccess(userId, targetUserId)
+    await createUserAccessService({ prisma }).assertCandidates({ companyId: note.company_id, userIds: [targetUserId], permission: 'notes.notes.read' })
     const rows = await prisma.$queryRaw`
       INSERT INTO note_shares (note_id, shared_with_user_id, shared_by_user_id, permission)
       VALUES (${noteId}, ${targetUserId}, ${userId}, ${permission}::text)
@@ -177,16 +89,8 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     `
     const share = rows[0]
     try {
-      // Use a company shared by both parties, not the actor's latest membership.
       const [context] = await prisma.$queryRaw`
-        SELECT n.title, m_target.company_id
-        FROM notes n
-        JOIN membership m_owner ON m_owner.user_id = n.owner_user_id AND m_owner.enabled = true
-        JOIN membership m_target ON m_target.company_id = m_owner.company_id
-          AND m_target.user_id = ${targetUserId}::uuid AND m_target.enabled = true
-        WHERE n.id = ${noteId}
-        ORDER BY (m_target.company_id = n.company_id) DESC, m_target.created_at DESC
-        LIMIT 1
+        SELECT title, company_id FROM notes WHERE id = ${noteId}
       `
       if (context?.company_id) {
         await notifications.publish({
@@ -229,7 +133,7 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     const check = await prisma.$queryRaw`
       SELECT ns.id FROM note_shares ns
       JOIN notes ON ns.note_id = notes.id
-      WHERE ns.id = ${shareId} AND notes.owner_user_id = ${userId}
+      WHERE ns.id = ${shareId} AND notes.owner_user_id = ${userId} AND public.runly_note_user_access(notes.id, ${userId}::uuid, true)
     `
     if (!check.length) throw new SharesServiceError('No tienes permiso para realizar esta acción', 403)
     const rows = await prisma.$queryRaw`
@@ -242,7 +146,7 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     const check = await prisma.$queryRaw`
       SELECT ns.id FROM note_shares ns
       JOIN notes ON ns.note_id = notes.id
-      WHERE ns.id = ${shareId} AND notes.owner_user_id = ${userId}
+      WHERE ns.id = ${shareId} AND notes.owner_user_id = ${userId} AND public.runly_note_user_access(notes.id, ${userId}::uuid, true)
     `
     if (!check.length) throw new SharesServiceError('No tienes permiso para realizar esta acción', 403)
     await prisma.$queryRaw`
@@ -256,7 +160,7 @@ export function createSharesService({ prisma, broadcaster, notificationService }
   async function publishNote(noteId, userId) {
     const rows = await prisma.$queryRaw`
       SELECT id, is_public, public_slug FROM notes
-      WHERE id = ${noteId} AND owner_user_id = ${userId} AND deleted_at IS NULL
+      WHERE id = ${noteId} AND owner_user_id = ${userId} AND deleted_at IS NULL AND public.runly_note_user_access(id, ${userId}::uuid, false)
     `
     if (!rows.length) throw new SharesServiceError('No tienes permiso para realizar esta acción', 403)
     const existing = rows[0]
@@ -275,8 +179,8 @@ export function createSharesService({ prisma, broadcaster, notificationService }
 
   async function unpublishNote(noteId, userId) {
     const rows = await prisma.$queryRaw`
-      SELECT id FROM notes
-      WHERE id = ${noteId} AND owner_user_id = ${userId} AND deleted_at IS NULL
+      SELECT id, company_id FROM notes
+      WHERE id = ${noteId} AND owner_user_id = ${userId} AND deleted_at IS NULL AND public.runly_note_user_access(id, ${userId}::uuid, false)
     `
     if (!rows.length) throw new SharesServiceError('No tienes permiso para realizar esta acción', 403)
     await prisma.$executeRaw`
@@ -317,7 +221,7 @@ export function createSharesService({ prisma, broadcaster, notificationService }
       FROM notes
       JOIN user_profile up ON notes.owner_user_id = up.id
       WHERE notes.public_slug = ${slug}
-        AND notes.is_public = true
+        AND notes.is_public = true AND public.notes_realtime_is_public(notes.id)
         AND notes.deleted_at IS NULL
         AND notes.is_trashed = false
     `

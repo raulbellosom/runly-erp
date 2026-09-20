@@ -2,10 +2,13 @@
 
 ## Supabase instance
 
+The URLs below are reserved examples. Configure your own endpoints in `.env`.
+The SSH example also requires replacing the user, host and database destination.
+
 | Endpoint | URL |
 |---|---|
-| API | https://supabase.racoondevs.com |
-| Studio | https://studio.supabase.racoondevs.com |
+| API | https://supabase.example.com |
+| Studio | https://studio.supabase.example.com |
 
 Dedicated to Runly ERP. Not Supabase Cloud - self-hosted on a VPS.
 
@@ -33,7 +36,7 @@ PostgreSQL is not exposed publicly. Local development connects through an SSH tu
 ### Open the SSH tunnel (required before any Prisma command)
 
 ```bash
-ssh -L 54322:172.22.0.3:5432 root@76.13.114.109
+ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10
 ```
 
 Keep the terminal open. The tunnel maps local port `54322` to PostgreSQL on the VPS.

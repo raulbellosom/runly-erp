@@ -49,7 +49,7 @@ If API and CODE instead both run through the local **installer**, keep `COLLABOR
 
 ## First deployment on an existing VPS
 
-For the confirmed `atlas.racoondevs.com` / `office.racoondevs.com` installation, see the [deployment-specific Spanish walkthrough](office-racoondevs.md), including the existing 4010/5173 port mappings and Nginx certificate setup.
+See the [Spanish VPS example](office-vps-example.md) for illustrative port mappings and Nginx certificate setup. Replace all example domains and paths with your private deployment configuration.
 
 Office is disabled by default. An ordinary update does not enable it automatically. Once configured, `npm run runly:external` creates/starts the optional editor along with Runly. DNS and the Office HTTPS reverse proxy are configured separately; the installer does not provision either.
 
@@ -221,7 +221,7 @@ Audit events: `office.document.opened`, `office.document.saved`, `office.documen
 
 There is no separate collaboration switch. Both devices must open the same FileAsset in the live Office editor, with sessions routed to the same CODE document process. A file preview or downloaded copy does not join that live session. Use the same `/app/m/runly.files/files/:id/edit` path on the same deployed Runly installation for an initial check; matching filenames alone do not establish file identity.
 
-Development and production normally run separate CODE instances. A browser on `localhost:5173` with `COLLABORA_PUBLIC_URL=http://localhost:9980` does not collaborate live with a browser using the VPS's `https://office.racoondevs.com`, even when both Runly APIs share database/Storage. Reading saved versions from common storage does not synchronize their live editor processes; competing write leases can also prevent saves. To test cross-device collaboration, open the deployed Runly URL on both devices instead of mixing local development and production. Do not change only the public Office URL to combine environments: discovery routing, the canonical WOPI URL, token validation and host origins must be consistent too.
+Development and production normally run separate CODE instances. A browser on `localhost:5173` with `COLLABORA_PUBLIC_URL=http://localhost:9980` does not collaborate live with a browser using the VPS's `https://office.example.com`, even when both Runly APIs share database/Storage. Reading saved versions from common storage does not synchronize their live editor processes; competing write leases can also prevent saves. To test cross-device collaboration, open the deployed Runly URL on both devices instead of mixing local development and production. Do not change only the public Office URL to combine environments: discovery routing, the canonical WOPI URL, token validation and host origins must be consistent too.
 
 For a failure within one installation, compare the file ID, effective editor origin and decoded WOPISrc from the two session responses locally; do not share access tokens or complete capability URLs. Runly creates WOPISrc from the configured WOPI base plus FileAsset ID, without user, token or revision suffixes. Check that `/cool/` WebSockets stay connected and that any proxy with multiple CODE backends routes the same document to the same instance. Collabora documents this requirement in its [deployment guidance](https://github.com/CollaboraOnline/online/blob/main/kubernetes/helm/collabora-online/README.md). Separate logged-in users are useful for checking permissions, but using the same account on two devices does not itself disable coediting.
 

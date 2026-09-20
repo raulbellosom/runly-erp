@@ -28,7 +28,10 @@ export function LoginScreen({ returnTo = '/app' }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showForgotMessage, setShowForgotMessage] = useState(false)
+  const [showForgotForm, setShowForgotForm] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotStatus, setForgotStatus] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
   const isDark = useThemeStore((s) => s.isDark)
   const logo = isDark ? '/runly/runly-logo-dark.png' : '/runly/runly-logo-light.png'
 
@@ -57,7 +60,7 @@ export function LoginScreen({ returnTo = '/app' }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    setShowForgotMessage(false)
+    setShowForgotForm(false)
     setLoading(true)
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
@@ -74,6 +77,21 @@ export function LoginScreen({ returnTo = '/app' }) {
       setError('Sin conexión con el servidor. Intenta de nuevo.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleForgotSubmit(e) {
+    e.preventDefault()
+    if (!forgotEmail) return
+    setForgotLoading(true)
+    setForgotStatus('')
+    try {
+      await runly.auth.forgotPassword(forgotEmail)
+      setForgotStatus('Si el correo existe, enviamos un enlace para restablecer la contraseña.')
+    } catch {
+      setForgotStatus('Si el correo existe, enviamos un enlace para restablecer la contraseña.')
+    } finally {
+      setForgotLoading(false)
     }
   }
 
@@ -212,15 +230,40 @@ export function LoginScreen({ returnTo = '/app' }) {
             <div className="text-center space-y-2 mt-6">
               <button
                 type="button"
-                onClick={() => setShowForgotMessage(v => !v)}
+                onClick={() => {
+                  setForgotEmail(email)
+                  setForgotStatus('')
+                  setShowForgotForm(v => !v)
+                }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer"
               >
                 ¿Olvidaste tu contraseña?
               </button>
-              {showForgotMessage && (
-                <p className="text-xs text-muted-foreground">
-                  Contacta al administrador del sistema para restablecer tu acceso.
-                </p>
+              {showForgotForm && (
+                <form onSubmit={handleForgotSubmit} className="flex flex-col gap-2 text-left">
+                  <TextField
+                    id="forgot-email"
+                    icon={Mail}
+                    type="email"
+                    autoComplete="username"
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    placeholder="tu@empresa.com"
+                    required
+                  />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    className="w-full justify-center"
+                    disabled={forgotLoading || !forgotEmail}
+                    aria-busy={forgotLoading}
+                  >
+                    {forgotLoading ? 'Enviando...' : 'Enviar enlace de restablecimiento'}
+                  </Button>
+                  {forgotStatus && (
+                    <p className="text-xs text-muted-foreground text-center">{forgotStatus}</p>
+                  )}
+                </form>
               )}
               {isTauriRuntime() ? (
                 <button

@@ -5,13 +5,21 @@ node_modules
 # pnpm workspace artifacts
 runly-erp-starter@*
 
-# Environment — never commit real secrets
+# Environment — only sanitized templates belong in Git
 .env
-.env.local
-.env.*.local
-# .env.external --- IGNORE --- (may contain real secrets for external services)
-.env.external
-.env.local
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.dump
+*.backup
+docs/private/
+.codebase-memory/
 
 # MCP server config (may contain URLs with tokens)
 .mcp.json

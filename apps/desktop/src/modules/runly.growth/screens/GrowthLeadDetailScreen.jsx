@@ -207,7 +207,7 @@ export default function GrowthLeadDetailScreen() {
 
   const membersQuery = useQuery({
     queryKey: ['identity', 'users'],
-    queryFn: () => runly.identity.listUsers(token),
+    queryFn: () => runly.identity.listCandidates(token, { action: 'growth' }),
     enabled: Boolean(token),
     staleTime: 10 * 60 * 1000,
   });

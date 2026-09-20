@@ -6,8 +6,8 @@ test('computeLineUnitPx: desktop uses 0.9375rem * 1.72', () => {
   assert.equal(computeLineUnitPx(16, false), 0.9375 * 1.72 * 16)
 })
 
-test('computeLineUnitPx: mobile keeps the same line spacing as desktop', () => {
-  assert.equal(computeLineUnitPx(16, true), computeLineUnitPx(16, false))
+test('computeLineUnitPx: mobile follows its 0.875rem body typography', () => {
+  assert.equal(computeLineUnitPx(16, true), 0.875 * 1.72 * 16)
 })
 
 test('computePaperPhase: exact multiple of the line unit needs no shift', () => {

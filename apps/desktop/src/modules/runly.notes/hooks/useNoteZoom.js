@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { NOTE_SHEET_WIDTH } from '../components/NoteSheet.jsx'
 
-const NOTE_ZOOM_KEY = 'atlas:v1:notes-zoom'
+// Fixed-sheet fit values made mobile text tiny. Start the responsive layout
+// at its natural size, then remember explicit zoom changes separately.
+const NOTE_ZOOM_KEY = 'atlas:v2:notes-zoom'
 export const NOTE_ZOOM_MIN = 25
 export const NOTE_ZOOM_MAX = 200
 export const NOTE_ZOOM_STEP = 10
@@ -11,14 +12,10 @@ function getStoredZoom() {
     const raw = Number(localStorage.getItem(NOTE_ZOOM_KEY))
     return Number.isFinite(raw) && raw >= NOTE_ZOOM_MIN && raw <= NOTE_ZOOM_MAX
       ? raw
-      : fitNoteZoom(typeof window === 'undefined' ? NOTE_SHEET_WIDTH : window.innerWidth - 32)
+      : 100
   } catch {
     return 100
   }
-}
-
-export function fitNoteZoom(availableWidth) {
-  return Math.max(NOTE_ZOOM_MIN, Math.min(100, Math.floor(availableWidth / NOTE_SHEET_WIDTH * 100)))
 }
 
 function persistZoom(val) {

@@ -57,6 +57,7 @@ export function createCanvasService({ prisma }) {
     const [note] = await prisma.$queryRaw`
       SELECT id FROM notes
       WHERE id = ${noteId}::uuid
+        AND public.runly_note_user_access(id, ${userId}::uuid, false)
         AND deleted_at IS NULL
         AND (
           owner_user_id = ${userId}::uuid
@@ -73,6 +74,7 @@ export function createCanvasService({ prisma }) {
     const [note] = await prisma.$queryRaw`
       SELECT id FROM notes
       WHERE id = ${noteId}::uuid
+        AND public.runly_note_user_access(id, ${userId}::uuid, false)
         AND deleted_at IS NULL
         AND (
           owner_user_id = ${userId}::uuid
@@ -146,6 +148,7 @@ export function createCanvasService({ prisma }) {
       SET content_text = ${contentText}::text,
           updated_at = NOW()
       WHERE id = ${noteId}::uuid
+        AND public.runly_note_user_access(id, ${userId}::uuid, false)
     `;
 
     return { ok: true, version: row.version };
@@ -165,7 +168,7 @@ export function createCanvasService({ prisma }) {
       FROM notes n
       LEFT JOIN note_canvas_scene s ON s.note_id = n.id
       WHERE n.public_slug = ${slug}
-        AND n.is_public = true
+        AND n.is_public = true AND public.notes_realtime_is_public(n.id)
         AND n.deleted_at IS NULL
         AND n.is_trashed = false
         AND n.note_type = 'canvas'

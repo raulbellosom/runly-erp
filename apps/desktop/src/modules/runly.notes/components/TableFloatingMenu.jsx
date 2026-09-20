@@ -1,48 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useCurrentEditor } from '@tiptap/react'
-import { Table2, GripVertical } from 'lucide-react'
+import { Table2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, useCoarsePointer } from '@runly/ui'
 import { getTableMenuActions, tableMenuSections } from '../lib/tableMenuActions.js'
 import { findTableAtSelection } from '../lib/dragReorder.js'
 import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
 
-// Shared table handle. Mobile keeps the existing fixed bottom-left circular
-// button — a tap still opens the options sheet, and press-and-hold now also
-// arms a drag. Desktop gets a small grip handle positioned at the table's
-// own top-left corner instead — press-and-drag with the mouse to reorder;
-// the toolbar's existing "Tabla" dropdown (NoteToolbar.jsx) remains how
-// options are reached on desktop, unchanged.
-// See docs/superpowers/specs/2026-09-16-notes-table-drag-reorder-design.md.
+// Mobile table options. Dedicated grips beside every table are rendered by
+// TableDragHandles; this existing button also keeps its long-press gesture.
 export function TableFloatingMenu() {
   const { editor } = useCurrentEditor()
   const isCoarsePointer = useCoarsePointer()
   const [open, setOpen] = useState(false)
-  const [handleRect, setHandleRect] = useState(null)
 
   const inTable = Boolean(editor?.isActive('table'))
-
-  useEffect(() => {
-    if (!editor || isCoarsePointer || !inTable) {
-      setHandleRect(null)
-      return
-    }
-    function recompute() {
-      const info = findTableAtSelection(editor.state)
-      const dom = info ? editor.view.nodeDOM(info.pos) : null
-      setHandleRect(dom?.getBoundingClientRect ? dom.getBoundingClientRect() : null)
-    }
-    recompute()
-    editor.on('selectionUpdate', recompute)
-    editor.on('update', recompute)
-    window.addEventListener('scroll', recompute, true)
-    window.addEventListener('resize', recompute)
-    return () => {
-      editor.off('selectionUpdate', recompute)
-      editor.off('update', recompute)
-      window.removeEventListener('scroll', recompute, true)
-      window.removeEventListener('resize', recompute)
-    }
-  }, [editor, isCoarsePointer, inTable])
 
   function getTableEl() {
     const info = editor ? findTableAtSelection(editor.state) : null
@@ -58,7 +29,7 @@ export function TableFloatingMenu() {
     getFrameEl: getTableEl,
   })
 
-  if (!editor || !inTable) return null
+  if (!editor || !inTable || !isCoarsePointer) return null
 
   function openSheet() {
     if (wasDragRef.current) {
@@ -70,52 +41,30 @@ export function TableFloatingMenu() {
 
   return (
     <>
-      {isCoarsePointer ? (
-        <button
-          onClick={openSheet}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-          // A mobile browser's own long-press context menu otherwise races
-          // (and usually wins over) the press-and-hold drag timer in
-          // useBlockDragReorder — see the matching fix + comment on
-          // ImageAnnotationOverlay.jsx's boxRef.
-          onContextMenu={(e) => e.preventDefault()}
-          aria-label="Opciones de tabla"
-          title="Opciones de tabla"
-          className="fixed z-20 flex items-center justify-center w-12 h-12 rounded-full bg-amber-500 text-white shadow-lg active:scale-95 transition-transform"
-          style={{
-            left: '1rem',
-            bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
-            touchAction: 'none',
-            WebkitTouchCallout: 'none',
-            userSelect: 'none',
-          }}
-        >
-          <Table2 className="w-5 h-5" />
-        </button>
-      ) : handleRect ? (
-        <button
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-          onContextMenu={(e) => e.preventDefault()}
-          aria-label="Arrastrar para mover la tabla"
-          title="Arrastra para mover la tabla"
-          className="fixed z-20 flex items-center justify-center w-6 h-6 rounded bg-[hsl(var(--background)/0.9)] backdrop-blur-sm border border-[hsl(var(--border))] shadow-sm text-[hsl(var(--muted-foreground))] cursor-grab active:cursor-grabbing"
-          style={{
-            top: `${handleRect.top - 10}px`,
-            left: `${handleRect.left - 28}px`,
-            touchAction: 'none',
-            WebkitTouchCallout: 'none',
-            userSelect: 'none',
-          }}
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
-      ) : null}
+      <button
+        onClick={openSheet}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        // A mobile browser's own long-press context menu otherwise races
+        // (and usually wins over) the press-and-hold drag timer in
+        // useBlockDragReorder — see the matching fix + comment on
+        // ImageAnnotationOverlay.jsx's boxRef.
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label="Opciones de tabla"
+        title="Opciones de tabla"
+        className="fixed z-20 flex items-center justify-center w-12 h-12 rounded-full bg-amber-500 text-white shadow-lg active:scale-95 transition-transform"
+        style={{
+          left: '1rem',
+          bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          userSelect: 'none',
+        }}
+      >
+        <Table2 className="w-5 h-5" />
+      </button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom">
           <SheetHeader>

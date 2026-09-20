@@ -1,3 +1,4 @@
+import { createUserAccessService } from './user-access-service.js';
 import { parseMentionIds } from '../lib/mention-utils.js';
 
 export class CommentsServiceError extends Error {
@@ -9,18 +10,43 @@ export class CommentsServiceError extends Error {
 }
 
 export function createCommentsService({ prisma }) {
+  const access = createUserAccessService({ prisma });
+  function entityPermission(entityType) {
+    return { Task: 'projects.project.read', GrowthLead: 'growth.leads.read', InvItem: 'inventory.item.read' }[entityType];
+  }
+  async function assertEntity(entityType, entityId, companyId, userId) {
+    await access.assertCompanyMember(companyId, userId, entityPermission(entityType));
+    if (entityType === 'GrowthLead') {
+      if (await prisma.growthLead.findFirst({ where: { id: entityId, companyId }, select: { id: true } })) return null;
+    } else if (entityType === 'InvItem') {
+      if (await prisma.invItem.findFirst({ where: { id: entityId, companyId }, select: { id: true } })) return null;
+    } else if (entityType === 'Task') {
+      const task = await prisma.task.findFirst({ where: { id: entityId, project: { companyId } }, select: { projectId: true, project: { select: { ownerId: true } } } });
+      if (task && (task.project.ownerId === userId || await prisma.projectMember.findFirst({ where: { projectId: task.projectId, userId }, select: { id: true } }))) return task.projectId;
+    }
+    throw new CommentsServiceError('Recurso no encontrado.', 404);
+  }
+  async function assertComment(commentId, userId, companyId, entityId) {
+    if (!companyId || !entityId) throw new CommentsServiceError('Recurso no encontrado.', 404);
+    const comment = await prisma.entityComment.findFirst({ where: { id: commentId, companyId, entityId } });
+    if (!comment) throw new CommentsServiceError('Recurso no encontrado.', 404);
+    const projectId = await assertEntity(comment.entityType, comment.entityId, companyId, userId);
+    return { comment, projectId };
+  }
+
   async function resolveProfileId(authUserId) {
     if (!authUserId) return null;
     const profile = await prisma.userProfile.findFirst({
-      where: { authUserId },
+      where: { authUserId, enabled: true },
       select: { id: true },
     });
     return profile?.id ?? null;
   }
 
-  async function listComments(entityType, entityId) {
+  async function listComments(entityType, entityId, companyId, userId) {
+    await assertEntity(entityType, entityId, companyId, userId);
     return prisma.entityComment.findMany({
-      where: { entityType, entityId },
+      where: { entityType, entityId, companyId },
       include: {
         author: { select: { id: true, firstName: true, lastName: true, avatarFileId: true } },
         mentions: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
@@ -35,7 +61,9 @@ export function createCommentsService({ prisma }) {
     if (!authorId) throw new CommentsServiceError('Autor no encontrado.', 404);
     if (!body?.trim()) throw new CommentsServiceError('El comentario no puede estar vacío.', 400);
 
+    const projectId = await assertEntity(entityType, entityId, companyId, authorId);
     const mentionIds = parseMentionIds(body);
+    await access.assertCandidates({ companyId, userIds: mentionIds, projectId, permission: entityPermission(entityType) });
 
     const comment = await prisma.entityComment.create({
       data: {
@@ -58,16 +86,17 @@ export function createCommentsService({ prisma }) {
     return comment;
   }
 
-  async function updateComment(commentId, authorAuthId, body) {
+  async function updateComment(commentId, authorAuthId, body, companyId, entityId) {
     const authorId = await resolveProfileId(authorAuthId);
     if (!authorId) throw new CommentsServiceError('Autor no encontrado.', 404);
     if (!body?.trim()) throw new CommentsServiceError('El comentario no puede estar vacío.', 400);
 
-    const existing = await prisma.entityComment.findUnique({ where: { id: commentId } });
+    const { comment: existing, projectId } = await assertComment(commentId, authorId, companyId, entityId);
     if (!existing) throw new CommentsServiceError('Comentario no encontrado.', 404);
     if (existing.authorId !== authorId) throw new CommentsServiceError('No tienes permiso para editar este comentario.', 403);
 
     const mentionIds = parseMentionIds(body);
+    await access.assertCandidates({ companyId, userIds: mentionIds, projectId, permission: entityPermission(existing.entityType) });
 
     await prisma.entityCommentMention.deleteMany({ where: { commentId } });
 
@@ -90,22 +119,21 @@ export function createCommentsService({ prisma }) {
     return comment;
   }
 
-  async function deleteComment(commentId, requesterAuthId, companyId) {
+  async function deleteComment(commentId, requesterAuthId, companyId, entityId) {
     const requesterId = await resolveProfileId(requesterAuthId);
     if (!requesterId) throw new CommentsServiceError('Usuario no encontrado.', 404);
 
-    const existing = await prisma.entityComment.findFirst({
-      where: { id: commentId, companyId },
-    });
+    const { comment: existing } = await assertComment(commentId, requesterId, companyId, entityId);
     if (!existing) throw new CommentsServiceError('Comentario no encontrado.', 404);
     if (existing.authorId !== requesterId) throw new CommentsServiceError('No tienes permiso para eliminar este comentario.', 403);
 
     await prisma.entityComment.delete({ where: { id: commentId } });
   }
 
-  async function toggleReaction(commentId, userAuthId, emoji) {
+  async function toggleReaction(commentId, userAuthId, emoji, companyId, entityId) {
     const userId = await resolveProfileId(userAuthId);
     if (!userId) throw new CommentsServiceError('Usuario no encontrado.', 404);
+    await assertComment(commentId, userId, companyId, entityId);
     if (!emoji?.trim()) throw new CommentsServiceError('Emoji requerido.', 400);
 
     const existing = await prisma.entityCommentReaction.findFirst({

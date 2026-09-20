@@ -58,7 +58,7 @@ The test creates its own `postgres:18-alpine` container without networking, publ
 
 The identity instruction is present in all four chat prompts and the inventory prompt. Provider calls and shared-database checks remain pending deployment; automated fixtures do not claim to verify the live environment.
 
-Verified: 2026-09-19 (Chromium, real `MirAIIntro`, `AssistantWordmark` and `InventoryAssistantHost`; 1280×850 and 390×844, light/dark, eight screenshots). The name renders continuously as MirAI in two colors; desktop hover and mobile Sheet heading remain legible. No browser errors, external requests or horizontal overflow. Authentication/company/operational dependencies were mocked; this checks visual rendering, not live integration. Temporary server and harness were removed. Local evidence: `C:/Users/raulb/AppData/Local/Temp/runly-mirai-visual-7WYn4w/report.json` and the eight sibling PNG files.
+Verified: 2026-09-19 (Chromium, real `MirAIIntro`, `AssistantWordmark` and `InventoryAssistantHost`; 1280×850 and 390×844, light/dark, eight screenshots). The name renders continuously as MirAI in two colors; desktop hover and mobile Sheet heading remain legible. No browser errors, external requests or horizontal overflow. Authentication/company/operational dependencies were mocked; this checks visual rendering, not live integration. Temporary server and harness were removed. Local evidence: `<TEMP>/runly-mirai-visual-7WYn4w/report.json` and the eight sibling PNG files.
 
 ## Documentation and scope
 

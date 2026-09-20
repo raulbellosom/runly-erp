@@ -1,3 +1,4 @@
+import { UserAccessError } from '../../services/user-access-service.js'
 // apps/api/src/routes/ledger/collaboration-routes.js
 import { Hono } from 'hono'
 import {
@@ -9,6 +10,8 @@ import { getActivityContext } from '../../services/activity-publisher.js'
 
 function handleError(c, err, fallback) {
   if (err instanceof CollaborationServiceError) return c.json({ error: err.message }, err.status)
+  if (err instanceof UserAccessError) return c.json({ error: err.message }, err.status)
+  if (err instanceof SyntaxError) return c.json({ error: 'El cuerpo de la solicitud no es JSON valido.' }, 400)
   if (process.env.NODE_ENV !== 'production') console.error('[runly.ledger/collab]', err)
   return c.json({ error: fallback }, 500)
 }
@@ -18,9 +21,10 @@ export function createCollaborationRouter({ prisma, requirePermission }) {
   const service = createCollaborationService({ prisma })
 
   // NOTE: PATCH /ledger/accounts/:id/group is served by accounts-routes.js
-  // (mounted first). It was previously also declared here with divergent logic —
-  // that dead duplicate has been removed. The service still exposes
-  // moveAccountToGroup/moveAccountFromGroup for reuse and unit tests.
+  // (mounted first), backed by ledger-service.js's setAccountGroup. It was
+  // previously also declared here with divergent, weaker authorization —
+  // that dead duplicate (and its moveAccountToGroup/moveAccountFromGroup
+  // helpers) has been removed.
 
   // ── Account members ───────────────────────────────────────────────────────
 

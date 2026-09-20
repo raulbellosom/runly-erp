@@ -35,5 +35,10 @@ export function usePublicCanvasScene(slug) {
     enabled: Boolean(slug),
     retry: false,
     staleTime: 0,
+    // CanvasStage's `initialData` must stay referentially stable for the life
+    // of the mount (see its header comment) — a window-focus refetch would
+    // hand PublicCanvasView a new `scene` object and re-run the whole hydrate
+    // effect against an already-mounted Excalidraw instance.
+    refetchOnWindowFocus: false,
   })
 }

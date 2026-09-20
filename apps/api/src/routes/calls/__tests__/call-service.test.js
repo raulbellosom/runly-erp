@@ -36,6 +36,53 @@ describe("readLiveKitConfig", () => {
 });
 
 describe("createCallService", () => {
+  it("rechecks revoked participants after leaving and removes their screen connections", async () => {
+    const removed = [];
+    const updates = [];
+    let sql;
+    const prisma = {
+      $queryRaw: async (strings) => { sql = strings.join(''); return [
+        { id: 'participant-a', livekit_identity: CALLER_ID, livekit_room_name: 'room' },
+        { id: 'participant-b', livekit_identity: CALLEE_ID, livekit_room_name: 'room' },
+      ]; },
+      callParticipant: { updateMany: async (args) => updates.push(args) },
+    };
+    class FakeRoom {
+      async removeParticipant(room, identity) {
+        removed.push(identity);
+        if (identity === CALLER_ID) throw Object.assign(new Error('absent'), { status: 404 });
+      }
+    }
+    const service = createCallService({ prisma, env: enabledEnv(), RoomServiceClientImpl: FakeRoom });
+    await service.revokeUnauthorizedParticipants();
+    await service.revokeUnauthorizedParticipants();
+    assert.equal(sql.includes('cp.left_at IS NULL'), false);
+    assert.deepEqual(removed.slice(0, 4), [CALLER_ID, `screen:${CALLER_ID}`, CALLEE_ID, `screen:${CALLEE_ID}`]);
+    assert.equal(removed.length, 8);
+    assert.equal(updates[0].where.leftAt, null);
+  });
+
+  it("a failed removal does not prevent revoking the other participants", async () => {
+    const removed = [];
+    const prisma = {
+      $queryRaw: async () => [
+        { id: 'a', livekit_identity: CALLER_ID, livekit_room_name: 'room' },
+        { id: 'b', livekit_identity: CALLEE_ID, livekit_room_name: 'room' },
+      ],
+      callParticipant: { updateMany: async () => ({ count: 1 }) },
+    };
+    class FakeRoom {
+      async removeParticipant(room, identity) {
+        removed.push(identity);
+        if (identity === CALLER_ID) throw new Error('temporary outage');
+      }
+    }
+    const service = createCallService({ prisma, env: enabledEnv(), RoomServiceClientImpl: FakeRoom });
+    await assert.rejects(service.revokeUnauthorizedParticipants(), AggregateError);
+    assert.equal(removed.includes(CALLEE_ID), true);
+    assert.equal(removed.includes(`screen:${CALLEE_ID}`), true);
+  });
+
   it("returns 501 before touching the database when calls are disabled", async () => {
     const service = createCallService({ prisma: {}, env: {} });
     await assert.rejects(

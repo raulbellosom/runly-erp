@@ -6,6 +6,8 @@ argument-hint: "Optional: specific step to run (migrate | generate | seed)"
 
 # db-fresh — Runly ERP Database Setup
 
+All endpoints and paths are examples. Read docs/REPOSITORY_PRIVACY.md and use your private environment configuration; never connect to example addresses.
+
 Runs the full database setup sequence for Runly ERP against the self-hosted Supabase PostgreSQL instance.
 
 ## When to Use
@@ -20,7 +22,7 @@ Runs the full database setup sequence for Runly ERP against the self-hosted Supa
 PostgreSQL is not publicly exposed. All Prisma commands **require** an SSH tunnel to be open:
 
 ```bash
-ssh -L 54322:172.22.0.3:5432 root@76.13.114.109
+ssh -L 54322:db.internal.example:5432 deploy@192.0.2.10
 ```
 
 Keep this terminal open for the duration of the workflow.
@@ -77,8 +79,8 @@ Invoke-WebRequest -UseBasicParsing http://localhost:4010/modules
 | Setting           | Value                                  |
 | ----------------- | -------------------------------------- |
 | Host (via tunnel) | `127.0.0.1:54322`                      |
-| VPS               | `root@76.13.114.109`                   |
-| Container         | `172.22.0.3:5432`                      |
-| Supabase Studio   | https://studio.supabase.racoondevs.com |
+| VPS               | `deploy@192.0.2.10`                   |
+| Container         | `db.internal.example:5432`                      |
+| Supabase Studio   | https://studio.supabase.example.com |
 
 `DATABASE_URL` and `DIRECT_URL` in `.env` must point to `127.0.0.1:54322`.

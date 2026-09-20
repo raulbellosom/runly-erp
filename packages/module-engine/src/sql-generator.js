@@ -162,7 +162,7 @@ export function generateCreateTableSql(modelDef) {
     lines.push(`CREATE ${unique} IF NOT EXISTS "${idxName}" ON ${table} (${cols});`)
   }
   // Private service-owned models must never be exposed through PostgREST.
-  if (modelDef.serverOnly === true) {
+  { // Module tables are accessed through the authorized backend by default.
     lines.push(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`)
     lines.push(`REVOKE ALL ON TABLE ${table} FROM PUBLIC, anon, authenticated;`)
   }

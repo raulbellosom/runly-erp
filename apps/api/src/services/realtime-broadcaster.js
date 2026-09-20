@@ -1,7 +1,19 @@
-export function createRealtimeBroadcaster({ supabaseUrl, serviceRoleKey }) {
+import { canReceiveResourceEvent } from './notification-access.js'
+export function createRealtimeBroadcaster({ supabaseUrl, serviceRoleKey, prisma }) {
   const endpoint = `${supabaseUrl}/realtime/v1/api/broadcast`
 
-  async function _send(messages) {
+  async function _send(messages, authorize = null) {
+    await prisma.$transaction(async (tx) => {
+      const [scope] = await tx.$queryRaw`SELECT revision::text FROM realtime_authorization_revision WHERE id FOR SHARE`;
+      if (authorize && !(await authorize())) return;
+      const safe = [];
+      for (const message of messages) {
+        const match = message.topic.match(/^user:([0-9a-f-]{36}):events$/i);
+        if (!match || await canReceiveResourceEvent(tx, match[1], message.payload)) safe.push(message);
+      }
+      if (!safe.length) return;
+      messages = safe;
+      messages = messages.map((message) => ({ ...message, topic: `${message.topic}@${scope.revision}` }));
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -15,6 +27,7 @@ export function createRealtimeBroadcaster({ supabaseUrl, serviceRoleKey }) {
       const text = await res.text().catch(() => '')
       console.warn(`[realtime-broadcaster] broadcast failed status=${res.status}`, text.slice(0, 200))
     }
+    });
   }
 
   // private: true on every message sent through this service. Every topic
@@ -30,7 +43,7 @@ export function createRealtimeBroadcaster({ supabaseUrl, serviceRoleKey }) {
   // event stopped arriving in real time the moment those RLS policies went
   // live, without the subscribe-side auth ever failing or logging anything.
   async function broadcastToUser(profileId, event, payload) {
-    if (!profileId) return
+    if (!profileId || !(await canReceiveResourceEvent(prisma, profileId, payload))) return
     await _send([{
       topic: `user:${profileId}:events`,
       event,
@@ -42,7 +55,9 @@ export function createRealtimeBroadcaster({ supabaseUrl, serviceRoleKey }) {
   }
 
   async function broadcastToUsers(profileIds, event, payload) {
-    const ids = (profileIds ?? []).filter(Boolean)
+    const candidates = [...new Set((profileIds ?? []).filter(Boolean))]
+    const checks = await Promise.all(candidates.map((id) => canReceiveResourceEvent(prisma, id, payload)))
+    const ids = candidates.filter((_, i) => checks[i])
     if (!ids.length) return
     await _send(
       ids.map((id) => ({
@@ -68,14 +83,14 @@ export function createRealtimeBroadcaster({ supabaseUrl, serviceRoleKey }) {
     })
   }
 
-  async function broadcastToChannel(channelName, event, payload) {
+  async function broadcastToChannel(channelName, event, payload, { authorize } = {}) {
     if (!channelName) return
     await _send([{
       topic: channelName,
       event,
       payload: payload ?? {},
       private: true,
-    }]).catch((err) => {
+    }], authorize).catch((err) => {
       console.warn('[realtime-broadcaster] broadcastToChannel error:', err?.message)
     })
   }

@@ -48,6 +48,17 @@ function buildRouter({ project, member }) {
 }
 
 describe("requireProjectAccess", () => {
+  it('rejects a task UUID from another project even when the URL project is authorized', async () => {
+    let mutated = false;
+    const prisma = {
+      project: { findFirst: async () => ({ id: 'allowed', companyId: COMPANY, ownerId: PROFILE }) },
+      task: { findFirst: async ({ where }) => where.projectId === 'allowed' ? null : { id: 'foreign', projectId: 'other' }, update: async () => { mutated = true; } },
+    };
+    const router = createProjectsRouter({ prisma, requirePermission });
+    const response = await router.request('/projects/allowed/tasks/foreign', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Unauthorized' }) });
+    assert.equal(response.status, 404);
+    assert.equal(mutated, false);
+  });
   it("404 when the project is in a different company", async () => {
     const router = buildRouter({
       project: { id: "p1", companyId: OTHER_COMPANY, ownerId: "someone" },
@@ -114,7 +125,7 @@ describe('project routes publish notifications after successful mutations', () =
     const publications = [];
     const prisma = {
       project: { findFirst: async () => ({ id: 'project', companyId: COMPANY, ownerId: PROFILE, name: 'Equipo' }) },
-      membership: { findFirst: async () => ({ id: 'membership' }) },
+      membership: { findFirst: async () => ({ id: 'membership', role: { key: 'runly.admin' } }) },
       projectMember: { create: async ({ data }) => data },
     };
     const router = createProjectsRouter({ prisma, requirePermission, notificationService: { publish: async args => { await new Promise(resolve => setImmediate(resolve)); publications.push(args); } } });

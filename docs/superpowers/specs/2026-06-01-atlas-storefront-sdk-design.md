@@ -38,7 +38,7 @@ The package is co-located with the ERP API to keep the SDK in sync with endpoint
 import { createStorefrontClient } from '@raulbellosom/atlas-sdk'
 
 const sdk = createStorefrontClient({
-  baseUrl: 'https://erp.dimare.mx',   // required — ERP instance URL
+  baseUrl: 'https://erp.example.com',   // required — ERP instance URL
   company: 'musicfy',                  // required — company slug in the ERP
   onSessionChange: (session) => {      // optional — fires on login/logout
     if (session) {

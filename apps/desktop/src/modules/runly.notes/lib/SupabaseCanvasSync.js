@@ -1,3 +1,4 @@
+import { authorizeRealtimeClient } from '../../../lib/authorizedRealtime.js'
 import { reconcileElements } from '@excalidraw/excalidraw'
 import { diffElements, throttle } from './canvasSync.js'
 
@@ -23,7 +24,7 @@ export class SupabaseCanvasSync {
     onStatus, // (status) => void
   }) {
     this.noteId = noteId
-    this._supabase = supabase
+    this._supabase = authorizeRealtimeClient(supabase)
     this._identity = identity ?? { id: `anon-${Math.random().toString(36).slice(2)}` }
     this._readOnly = readOnly
     this._getLocalElements = getLocalElements

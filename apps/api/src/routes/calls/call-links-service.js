@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { buildCallInviteEmail, resolveAppBaseUrl } from "../../services/email-templates.js";
+import { createCompanyBrandService } from "../../services/company-brand-service.js";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // no I L O U
 const CODE_LEN = 8;
@@ -20,10 +21,11 @@ export function generateCallCode() {
   return out;
 }
 
-export function createCallLinksService({ prisma, smtpService, callService, env = process.env, now = () => new Date() }) {
+export function createCallLinksService({ prisma, smtpService, callService, supabaseAdmin = null, env = process.env, now = () => new Date() }) {
   // Public SPA origin — read from the environment (PUBLIC_APP_URL / APP_URL /
   // RUNLY_APP_URL / WEB_APP_URL, then a dev fallback). Never hardcoded.
   const publicAppUrl = String(resolveAppBaseUrl(env) ?? "").replace(/\/+$/, "");
+  const brandService = createCompanyBrandService({ prisma, supabaseAdmin });
 
   function joinUrl(token, inviteToken) {
     const base = `${publicAppUrl}/p/call/${token}`;
@@ -223,18 +225,22 @@ export function createCallLinksService({ prisma, smtpService, callService, env =
       }
     }
 
-    // For a friendlier email ("Raul te invitó en «#general»"). Best-effort.
+    // For a friendlier email ("Raul te invitó en «#general»") and the inviting
+    // company's branding. Best-effort — a lookup failure just falls back to
+    // the generic Runly wording, it never blocks sending the invite.
     let inviterName = null;
     let conversationTitle = null;
+    let brand = null;
     try {
       const [inviterRow] = await prisma.$queryRaw`
         SELECT display_name AS "displayName" FROM user_profile WHERE id = ${profileId} LIMIT 1
       `;
       inviterName = inviterRow?.displayName ?? null;
       const [convRow] = await prisma.$queryRaw`
-        SELECT title FROM chat_conversations WHERE id = ${conversationId} LIMIT 1
+        SELECT title, company_id AS "companyId" FROM chat_conversations WHERE id = ${conversationId} LIMIT 1
       `;
       conversationTitle = convRow?.title ?? null;
+      brand = await brandService.getBrandForCompany(convRow?.companyId ?? null);
     } catch { /* fall back to the generic wording */ }
 
     for (const email of normalized) {
@@ -253,10 +259,11 @@ export function createCallLinksService({ prisma, smtpService, callService, env =
       const url = joinUrl(link.token, inviteToken);
       if (smtpOk) {
         try {
-          const mail = buildCallInviteEmail({ joinUrl: url, inviterName, conversationTitle, env });
+          const mail = buildCallInviteEmail({ joinUrl: url, inviterName, conversationTitle, brand, env });
           await smtpService.sendEmail({
             to: email,
             subject: mail.subject,
+            fromName: brandService.fromNameFor(brand),
             text: mail.text,
             html: mail.html,
           });

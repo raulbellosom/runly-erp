@@ -39,7 +39,7 @@ function makePrisma(overrides = {}) {
     },
     // addMember verifies the invitee shares the project's company.
     membership: {
-      findFirst: async () => ({ id: 'membership-1' }),
+      findFirst: async () => ({ id: 'membership-1', role: { key: 'runly.admin' } }),
       ...(overrides.membership ?? {}),
     },
     // createProject writes project + statuses + owner membership atomically.
@@ -144,7 +144,7 @@ describe('createProjectsService', () => {
           create: async (args) => { created = args.data; return { id: 'mem-1', ...args.data } },
         },
       })
-      await prisma.project.create({ data: { id: 'proj-1', ownerId: 'owner-1', name: 'P' } })
+      await prisma.project.create({ data: { id: 'proj-1', companyId: 'co-1', ownerId: 'owner-1', name: 'P' } })
       const svc = createProjectsService({ prisma })
       await svc.addMember('proj-1', 'owner-1', { userId: 'new-user' })
       assert.equal(created.role, 'MEMBER')
@@ -153,7 +153,7 @@ describe('createProjectsService', () => {
 
     it('throws 400 for invalid role', async () => {
       const prisma = makePrisma()
-      await prisma.project.create({ data: { id: 'proj-1', ownerId: 'owner-1', name: 'P' } })
+      await prisma.project.create({ data: { id: 'proj-1', companyId: 'co-1', ownerId: 'owner-1', name: 'P' } })
       const svc = createProjectsService({ prisma })
       await assert.rejects(
         () => svc.addMember('proj-1', 'owner-1', { userId: 'u', role: 'SUPERADMIN' }),

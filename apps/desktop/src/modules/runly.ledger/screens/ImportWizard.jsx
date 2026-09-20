@@ -1,9 +1,9 @@
 // apps/desktop/src/modules/runly.ledger/screens/ImportWizard.jsx
 import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Badge, Button, DistDropZone, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@runly/ui'
+import { Badge, Button, DistDropZone, PageHeader, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@runly/ui'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -39,6 +39,7 @@ export default function ImportWizard() {
   const accountId = useMemo(() => wildcard?.split('/')[1] ?? null, [wildcard])
 
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { session } = useAuth()
   const token = session?.access_token ?? null
 
@@ -161,6 +162,9 @@ export default function ImportWizard() {
     },
     onSuccess: (data) => {
       toast.success(`${data.inserted} movimientos importados.`)
+      queryClient.invalidateQueries({ queryKey: ['ledger-transactions', accountId] })
+      queryClient.invalidateQueries({ queryKey: ['ledger-account', accountId] })
+      queryClient.invalidateQueries({ queryKey: ['ledger-summary', accountId] })
       navigate(`/app/m/runly.ledger/accounts/${accountId}`)
     },
     onError: (err) => toast.error(err.message),
@@ -173,30 +177,28 @@ export default function ImportWizard() {
 
       {/* ── Account context header (matches AccountScreen layout) ──────── */}
       <div className="px-6 pt-5 pb-4 border-b border-[hsl(var(--border))] shrink-0">
-        <button
-          onClick={() => navigate(`/app/m/runly.ledger/accounts/${accountId}`)}
-          className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] mb-1.5 transition-colors"
-        >
-          <ArrowLeft size={11} />
-          {account ? account.name : 'Cuenta'}
-        </button>
-        <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
-          Importar movimientos
-        </h1>
-        {account && (
-          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">
-            {account.bank}
-            <span className="mx-1.5 opacity-40">·</span>
-            {account.currency}
-            <span className="mx-1.5 opacity-40">·</span>
-            <span
-              className="font-semibold tabular-nums"
-              style={{ color: 'var(--module-accent, #16a34a)' }}
-            >
-              {fmtCurrency(account.current_balance, account.currency)}
-            </span>
-          </p>
-        )}
+        <PageHeader
+          className="pb-0"
+          onBack={() => navigate(`/app/m/runly.ledger/accounts/${accountId}`)}
+          backLabel={account ? account.name : 'Cuenta'}
+          title="Importar movimientos"
+          description={
+            account && (
+              <>
+                {account.bank}
+                <span className="mx-1.5 opacity-40">·</span>
+                {account.currency}
+                <span className="mx-1.5 opacity-40">·</span>
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{ color: 'var(--module-accent, #16a34a)' }}
+                >
+                  {fmtCurrency(account.current_balance, account.currency)}
+                </span>
+              </>
+            )
+          }
+        />
       </div>
 
       {/* ── Step indicators ────────────────────────────────────────────── */}

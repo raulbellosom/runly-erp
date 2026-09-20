@@ -393,7 +393,7 @@ setInterval(() => {
 const CHAT_EXPIRY_INTERVAL_MS = 15 * 60 * 1000
 async function runChatSessionExpiryTick() {
   try {
-    const result = await expireStaleGuestSessions(prisma)
+    const result = await expireStaleGuestSessions(prisma, { supabaseAdmin: workerSupabaseAdmin })
     if ((result.closedConversations ?? 0) > 0 || (result.closedSessions ?? 0) > 0) {
       console.log(
         `[worker] chat session expiry ${formatLogTimestamp()} conversations=${result.closedConversations} sessions=${result.closedSessions}`,

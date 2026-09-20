@@ -3,14 +3,18 @@ import { useContext, useRef, useState, useEffect } from 'react'
 import { NoteInteractionContext } from './NoteInteractionContext.js'
 import { X } from 'lucide-react'
 import { ConfirmDialog } from '@runly/ui'
+import { NoteBlockDragHandle } from './NoteBlockDragHandle.jsx'
+import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
+import { isInsideTableCell } from '../lib/tableContext.js'
 
 const COLORS = ['#1a1a1a', '#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ffffff']
 const BACKGROUNDS = ['#ffffff', '#f3f4f6', '#fef9c3', '#dbeafe', '#dcfce7', '#1a1a1a']
 const SIZES = [2, 4, 8, 14, 20]
 
-export function DrawingCanvas({ node, updateAttributes, editor, deleteNode }) {
+export function DrawingCanvas({ node, updateAttributes, editor, deleteNode, getPos: getNodePos }) {
   const { viewing } = useContext(NoteInteractionContext)
   const canvasRef = useRef(null)
+  const blockRef = useRef(null)
   const isDrawing = useRef(false)
   const currentStroke = useRef([])
   const strokesRef = useRef(JSON.parse(node.attrs.strokes || '[]'))
@@ -102,13 +106,23 @@ export function DrawingCanvas({ node, updateAttributes, editor, deleteNode }) {
     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
   }
 
-  const editable = !viewing && editor?.isEditable !== false
+  const editable = !viewing
+  const inTableCell = typeof getNodePos === 'function' && isInsideTableCell(editor.state, getNodePos())
+  const drag = useBlockDragReorder({
+    editor,
+    getPos: getNodePos,
+    getBoxEl: () => blockRef.current,
+    getFrameEl: () => blockRef.current,
+    editable: editable && !inTableCell,
+    isEditing: false,
+  })
 
   return (
     <NodeViewWrapper className="my-4 select-none">
-      <div className="border border-[hsl(var(--border))] rounded-xl overflow-hidden shadow-sm">
+      <div ref={blockRef} className="border border-[hsl(var(--border))] rounded-xl overflow-hidden shadow-sm">
         {editable && (
           <div className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))] flex-wrap">
+            {!inTableCell && <NoteBlockDragHandle label="Mover dibujo" drag={drag} />}
             <button onClick={() => setTool('pen')} className={`px-2 py-1 text-xs rounded font-medium ${tool === 'pen' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]'}`}>Lapiz</button>
             <button onClick={() => setTool('eraser')} className={`px-2 py-1 text-xs rounded font-medium ${tool === 'eraser' ? 'bg-[hsl(var(--muted-foreground)/0.2)]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]'}`}>Borrador</button>
             <div className="h-4 w-px bg-[hsl(var(--border))]" />

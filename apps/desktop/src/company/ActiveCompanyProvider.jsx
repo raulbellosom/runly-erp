@@ -1,9 +1,11 @@
+import { useChatFloatStore } from '../modules/runly.chat/store/chatFloatStore.js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthProvider'
 import { runly, setActiveCompanyId as setSdkActiveCompanyId } from '../lib/runly'
 import { pickActiveCompany } from './pickActiveCompany.js'
 import { AppLoader } from '../components/AppLoader'
+import { clearCompanyQueryCache } from './companyQueryCache.js'
 
 const STORAGE_KEY = 'runly-active-company'
 
@@ -25,7 +27,7 @@ function writeStoredCompanyId(id) {
 const ActiveCompanyContext = createContext(null)
 
 export function ActiveCompanyProvider({ children }) {
-  const { session } = useAuth()
+  const { session, refreshProfile } = useAuth()
   const token = session?.access_token
   const queryClient = useQueryClient()
 
@@ -36,24 +38,40 @@ export function ActiveCompanyProvider({ children }) {
   // closure. Kept in sync with activeCompanyId on every change below.
   const activeCompanyIdRef = useRef(null)
 
-  const { data, isLoading: membershipsLoading } = useQuery({
+  const { data, isLoading: membershipsLoading, isError: membershipsError } = useQuery({
     queryKey: ['memberships-me', token],
     queryFn: () => runly.memberships.me(token),
     enabled: Boolean(token),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   })
 
-  const memberships = Array.isArray(data) ? data : (data?.data ?? [])
+  const memberships = membershipsError ? [] : Array.isArray(data) ? data : (data?.data ?? [])
+  const revisionRef = useRef(null)
+  const revision = membershipsError ? 'unavailable' : data?.authorizationRevision
+  useEffect(() => {
+    if (!revision) return
+    if (revisionRef.current !== null && revisionRef.current !== revision) {
+      clearCompanyQueryCache(queryClient)
+      useChatFloatStore.setState({ openChats: [], isOpen: false })
+      refreshProfile(session)
+    }
+    revisionRef.current = revision
+  }, [revision, queryClient, refreshProfile, session])
   const companies = useMemo(
     () => memberships.map((m) => m.company ?? m).filter((c) => c && c.name),
     [memberships],
   )
 
   const applyActiveCompany = useCallback((id) => {
+    if (activeCompanyIdRef.current !== id) {
+      clearCompanyQueryCache(queryClient)
+      useChatFloatStore.setState({ openChats: [], isOpen: false })
+    }
     activeCompanyIdRef.current = id
     setActiveCompanyIdState(id)
     setSdkActiveCompanyId(id)
-  }, [])
+  }, [queryClient])
 
   // Resolve on load / whenever the membership list changes (a membership was
   // added/removed elsewhere). Never silently reuses a persisted id that no
@@ -73,14 +91,9 @@ export function ActiveCompanyProvider({ children }) {
     if (id === activeCompanyIdRef.current) return
     applyActiveCompany(id)
     writeStoredCompanyId(id)
-    // Deliberately clear the WHOLE cache rather than maintaining a hand-picked
-    // list of "company-scoped" query keys: switching companies is a rare,
-    // deliberate action, so a few extra refetches of user-scoped queries is a
-    // fully acceptable cost for a guarantee that we never flash a previous
-    // company's cached data. See
-    // docs/superpowers/plans/2026-09-10-multi-tenant-plan-2-frontend-integration.md
-    queryClient.clear()
-  }, [companies, applyActiveCompany, queryClient])
+    // applyActiveCompany already clears resource data while preserving the
+    // instance and membership queries needed to keep the shell mounted.
+  }, [companies, applyActiveCompany])
 
   const getActiveCompanyId = useCallback(() => activeCompanyIdRef.current, [])
 

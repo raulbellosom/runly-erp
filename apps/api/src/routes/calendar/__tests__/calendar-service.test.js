@@ -146,7 +146,7 @@ describe('createCalendarService', () => {
 
     it('throws 400 when user tries to share with themselves', async () => {
       const prisma = makePrisma({
-        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', enabled: true }) },
+        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1', enabled: true }) },
       })
       const svc = createCalendarService({ prisma })
       await assert.rejects(
@@ -157,7 +157,7 @@ describe('createCalendarService', () => {
 
     it('throws 400 for invalid role', async () => {
       const prisma = makePrisma({
-        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', enabled: true }) },
+        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1', enabled: true }) },
       })
       const svc = createCalendarService({ prisma })
       await assert.rejects(
@@ -169,7 +169,7 @@ describe('createCalendarService', () => {
     it('creates share with valid role', async () => {
       let created = null
       const prisma = makePrisma({
-        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', enabled: true }) },
+        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1', enabled: true }) },
         calendarShare: { create: async (args) => { created = args.data; return { id: 'share-1', ...args.data } } },
       })
       const svc = createCalendarService({ prisma })
@@ -178,9 +178,9 @@ describe('createCalendarService', () => {
       assert.equal(created.userId, 'user-2')
     })
 
-    it('throws 403 when the target shares no company with the owner', async () => {
+    it('throws 404 when the target shares no company with the owner', async () => {
       const prisma = makePrisma({
-        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', enabled: true }) },
+        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1', enabled: true }) },
         membership: {
           findMany: async () => [{ companyId: 'company-1' }],
           findFirst: async () => null, // target has no membership in company-1
@@ -189,19 +189,19 @@ describe('createCalendarService', () => {
       const svc = createCalendarService({ prisma })
       await assert.rejects(
         () => svc.shareCalendar('user-1', 'cal-1', { userId: 'outsider', role: 'VIEWER' }),
-        (err) => { assert.ok(err instanceof CalendarServiceError); assert.equal(err.status, 403); return true }
+        (err) => { assert.equal(err.status, 404); return true }
       )
     })
 
-    it('throws 403 when the owner has no company membership', async () => {
+    it('throws 404 when the owner has no company membership', async () => {
       const prisma = makePrisma({
-        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', enabled: true }) },
+        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1', enabled: true }) },
         membership: { findMany: async () => [], findFirst: async () => null },
       })
       const svc = createCalendarService({ prisma })
       await assert.rejects(
         () => svc.shareCalendar('user-1', 'cal-1', { userId: 'user-2', role: 'VIEWER' }),
-        (err) => { assert.equal(err.status, 403); return true }
+        (err) => { assert.equal(err.status, 404); return true }
       )
     })
   })
@@ -209,7 +209,7 @@ describe('createCalendarService', () => {
   describe('getCalendarRole', () => {
     it('returns OWNER for calendar owner', async () => {
       const prisma = makePrisma({
-        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', enabled: true }) },
+        calendarCalendar: { findFirst: async () => ({ id: 'cal-1', ownerId: 'user-1', companyId: 'company-1', enabled: true }) },
       })
       const svc = createCalendarService({ prisma })
       const role = await svc.getCalendarRole('user-1', 'cal-1')

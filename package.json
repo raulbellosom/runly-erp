@@ -5,6 +5,8 @@
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
+    "check:privacy": "node scripts/check-repository-privacy.mjs",
+    "check:secrets": "node scripts/check-repository-privacy.mjs --secrets",
     "start": "bash scripts/start-dev.sh",
     "dev": "node scripts/start-office-dev.mjs && concurrently --kill-others-on-fail -n api,web,worker -c cyan,magenta,yellow \"pnpm dev:api\" \"pnpm dev:frontend\" \"pnpm dev:worker\"",
     "dev:api": "pnpm --filter @runly/api dev",
@@ -43,7 +45,9 @@
     "module:checksums": "node scripts/check-module-manifest-migrations.mjs",
     "module:checksums:fleet": "node scripts/check-module-manifest-migrations.mjs modules/official/runly.fleet",
     "module:checksums:write": "node scripts/check-module-manifest-migrations.mjs modules/official/runly.fleet --write",
-    "db:advisor-equivalent": "node scripts/check-supabase-advisor-equivalent.mjs"
+    "db:advisor-equivalent": "node scripts/check-supabase-advisor-equivalent.mjs",
+    "test:isolation": "node --test apps/api/src/services/__tests__/user-isolation.integration.test.js",
+    "test:isolation:fresh": "node scripts/verify-user-isolation.mjs"
   },
   "dependencies": {
     "@runly/module-engine": "workspace:*",
@@ -64,13 +68,13 @@
     "@runly/ui": "workspace:*",
     "@atlas/ui": "workspace:@runly/ui@*",
     "@runly/offline": "workspace:*",
-    "@atlas/offline": "workspace:@runly/offline@*"
+    "@atlas/offline": "workspace:@runly/offline@*",
+    "prisma": "^7.8.0",
+    "@prisma/client": "^7.8.0"
   },
   "devDependencies": {
-    "@prisma/client": "^7.8.0",
     "concurrently": "latest",
-    "eslint": "^9",
-    "prisma": "^7.8.0"
+    "eslint": "^9"
   },
   "pnpm": {
     "overrides": {

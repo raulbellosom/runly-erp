@@ -79,7 +79,11 @@ export function createSmtpService({ prisma }) {
     }
   }
 
-  async function sendEmail({ to, subject, html, text }) {
+  // `fromName` lets a caller show e.g. "Acme Inc. via Runly ERP" for a
+  // company-branded transactional email — the from-EMAIL always stays the
+  // SMTP-authenticated address (config.fromEmail), never the override, so
+  // SPF/DKIM/DMARC alignment for that domain is never broken by branding.
+  async function sendEmail({ to, subject, html, text, fromName }) {
     const config = await getConfig()
     if (!config) throw new Error('SMTP no configurado')
 
@@ -93,8 +97,12 @@ export function createSmtpService({ prisma }) {
       auth:   { user: config.user, pass: config.pass },
     })
 
+    // Strip header-injection characters from a caller-supplied display name
+    // (ultimately sourced from Company.name, admin-editable text).
+    const safeFromName = String(fromName ?? config.fromName).replace(/[\r\n]/g, ' ').trim()
+
     await transporter.sendMail({
-      from:    `"${config.fromName}" <${config.fromEmail}>`,
+      from:    `"${safeFromName}" <${config.fromEmail}>`,
       to,
       subject,
       html,

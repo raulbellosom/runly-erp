@@ -267,14 +267,13 @@ export function createMiraiService({
   // -- the mirai conversation --------------------------------------
   async function ensureMiraiConversation({ companyId, actorProfileId }) {
     if (!actorProfileId) throw new ChatServiceError("Se requiere un usuario autenticado.", 401);
-    const resolvedCompanyId = companyId
-      ?? (await prisma.membership.findFirst({ where: { userId: String(actorProfileId), enabled: true }, orderBy: { createdAt: "desc" }, select: { companyId: true } }))?.companyId
-      ?? null;
+    if (!companyId) throw new ChatServiceError("Empresa activa requerida.", 400);
+    const resolvedCompanyId = companyId;
 
     const existing = await prisma.$queryRaw`
       SELECT c.id
       FROM chat_conversations c
-      WHERE c.type = 'mirai'
+      WHERE c.type = 'mirai' AND c.company_id = ${resolvedCompanyId}::uuid
         AND c.deleted_at IS NULL
         AND EXISTS (SELECT 1 FROM chat_conversation_members m WHERE m.conversation_id = c.id AND m.user_id = ${actorProfileId}::uuid AND m.left_at IS NULL)
       LIMIT 1
@@ -288,14 +287,14 @@ export function createMiraiService({
     const convRows = await prisma.$queryRaw`
       INSERT INTO chat_conversations (type, title, created_by_user_id, company_id, is_public)
       VALUES ('mirai', 'MirAI', ${actorProfileId}::uuid, ${resolvedCompanyId}, false)
-      ON CONFLICT ("created_by_user_id") WHERE type = 'mirai' AND deleted_at IS NULL DO NOTHING
+      ON CONFLICT ("created_by_user_id", "company_id") WHERE type = 'mirai' AND deleted_at IS NULL DO NOTHING
       RETURNING id
     `;
     if (!convRows.length) {
       const raced = await prisma.$queryRaw`
         SELECT c.id
         FROM chat_conversations c
-        WHERE c.type = 'mirai'
+        WHERE c.type = 'mirai' AND c.company_id = ${resolvedCompanyId}::uuid
           AND c.deleted_at IS NULL
           AND EXISTS (SELECT 1 FROM chat_conversation_members m WHERE m.conversation_id = c.id AND m.user_id = ${actorProfileId}::uuid AND m.left_at IS NULL)
         LIMIT 1

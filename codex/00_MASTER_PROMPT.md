@@ -10,8 +10,8 @@ Runly ERP es un ERP modular desktop-first construido con React + Vite + Tauri. A
 
 Runly ERP usa una instancia dedicada de Supabase self-hosted:
 
-- API: https://supabase.racoondevs.com
-- Studio: https://studio.supabase.racoondevs.com (solo administración)
+- API: https://supabase.example.com
+- Studio: https://studio.supabase.example.com (solo administración)
 
 Esta instancia es exclusiva de Runly ERP. No se comparte con otros proyectos.
 
@@ -24,7 +24,7 @@ Esta instancia es exclusiva de Runly ERP. No se comparte con otros proyectos.
 - State: Zustand cuando sea necesario
 - API: Node.js + Hono
 - ORM: Prisma (pinned a ^6)
-- DB: Supabase PostgreSQL (https://supabase.racoondevs.com)
+- DB: Supabase PostgreSQL (https://supabase.example.com)
 - Auth: Supabase Auth self-hosted
 - Storage: Supabase Storage self-hosted
 - Realtime: futuro

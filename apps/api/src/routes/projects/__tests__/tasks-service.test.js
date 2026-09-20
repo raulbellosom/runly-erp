@@ -27,10 +27,11 @@ function makePrisma(overrides = {}) {
     },
     taskStatus: {
       findFirst: async ({ where }) =>
-        where?.id === 'status-1' ? { id: 'status-1', projectId: 'proj-1' } : null,
+        ['status-1', 'status-2'].includes(where?.id) ? { id: 'status-1', projectId: 'proj-1' } : null,
     },
     // createTask bumps the project's taskCounter inside a transaction.
     project: {
+      findFirst: async () => ({ companyId: 'co-1' }),
       update: async () => ({ taskCounter: 1 }),
     },
     $transaction: async (fn) => fn(makePrisma(overrides)),
@@ -59,11 +60,11 @@ describe('createTasksService', () => {
       )
     })
 
-    it('throws 400 when status does not belong to project', async () => {
+    it('throws 404 when status does not belong to project', async () => {
       const svc = createTasksService({ prisma: makePrisma() })
       await assert.rejects(
         () => svc.createTask('proj-1', 'user-1', { title: 'T', statusId: 'wrong-status' }),
-        (err) => { assert.equal(err.status, 400); return true }
+        (err) => { assert.equal(err.status, 404); return true }
       )
     })
 

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { CommentsServiceError } from '../../services/comments-service.js';
 
 function handleError(c, err) {
-  if (err instanceof CommentsServiceError) {
+  if (err instanceof CommentsServiceError || err?.status === 404) {
     return c.json({ error: err.message }, err.status);
   }
   console.error('[runly.growth] comments error', err);
@@ -14,7 +14,7 @@ export function createGrowthCommentRoutes({ service, requirePermission }) {
 
   app.get('/growth/leads/:id/comments', requirePermission('growth.leads.read'), async (c) => {
     try {
-      const comments = await service.listComments('GrowthLead', c.req.param('id'));
+      const comments = await service.listComments('GrowthLead', c.req.param('id'), c.get('companyId'), c.get('userContext')?.profile?.id ?? c.get('userId'));
       return c.json({ data: comments });
     } catch (err) { return handleError(c, err); }
   });
@@ -33,7 +33,7 @@ export function createGrowthCommentRoutes({ service, requirePermission }) {
     try {
       const authUserId = c.get('authUserId');
       const { body }   = await c.req.json();
-      const comment    = await service.updateComment(c.req.param('cid'), authUserId, body);
+      const comment    = await service.updateComment(c.req.param('cid'), authUserId, body, c.get('companyId'), c.req.param('id'));
       return c.json({ data: comment });
     } catch (err) { return handleError(c, err); }
   });
@@ -42,7 +42,7 @@ export function createGrowthCommentRoutes({ service, requirePermission }) {
     try {
       const companyId  = c.get('companyId');
       const authUserId = c.get('authUserId');
-      await service.deleteComment(c.req.param('cid'), authUserId, companyId);
+      await service.deleteComment(c.req.param('cid'), authUserId, companyId, c.req.param('id'));
       return c.json({ success: true });
     } catch (err) { return handleError(c, err); }
   });
@@ -51,7 +51,7 @@ export function createGrowthCommentRoutes({ service, requirePermission }) {
     try {
       const authUserId = c.get('authUserId');
       const { emoji }  = await c.req.json();
-      const result     = await service.toggleReaction(c.req.param('cid'), authUserId, emoji);
+      const result     = await service.toggleReaction(c.req.param('cid'), authUserId, emoji, c.get('companyId'), c.req.param('id'));
       return c.json({ data: result });
     } catch (err) { return handleError(c, err); }
   });

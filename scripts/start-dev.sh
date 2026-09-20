@@ -3,9 +3,13 @@
 # Opens the SSH tunnel to the VPS Postgres container, then starts all dev servers.
 # Runs automatically via: pnpm start
 
-SSH_HOST="root@76.13.114.109"
-LOCAL_PORT=54322
-REMOTE_ADDR="172.22.0.3:5432"
+SSH_HOST="${RUNLY_SSH_HOST:-}"
+LOCAL_PORT="${RUNLY_DB_LOCAL_PORT:-54322}"
+REMOTE_ADDR="${RUNLY_DB_REMOTE_ADDR:-}"
+if [ -z "$SSH_HOST" ] || [ -z "$REMOTE_ADDR" ]; then
+  echo "Set RUNLY_SSH_HOST and RUNLY_DB_REMOTE_ADDR in your shell before pnpm start. See docs/06_deployment_strategy.md." >&2
+  exit 1
+fi
 TUNNEL_OWNED=0
 
 check_port() {
@@ -19,7 +23,8 @@ else
   ssh -f -N \
     -o ServerAliveInterval=60 \
     -o StrictHostKeyChecking=accept-new \
-    -L "${LOCAL_PORT}:${REMOTE_ADDR}" \
+    -o ExitOnForwardFailure=yes \
+    -L "127.0.0.1:${LOCAL_PORT}:${REMOTE_ADDR}" \
     "$SSH_HOST"
 
   sleep 2

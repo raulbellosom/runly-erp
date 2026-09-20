@@ -60,7 +60,7 @@ export function NoteCoverBanner({ coverUrl, editable, noteId, token, onChange, o
 
   if (!coverUrl) {
     return (
-      <div className="px-8 pt-4">
+      <div className="note-sheet-inset pt-4">
         {isCoarsePointer ? (
           <button
             type="button"

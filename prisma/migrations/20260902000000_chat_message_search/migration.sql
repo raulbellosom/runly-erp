@@ -16,6 +16,7 @@ CREATE OR REPLACE FUNCTION atlas_unaccent(text)
   RETURNS text
   LANGUAGE sql
   IMMUTABLE PARALLEL SAFE STRICT
+  SET search_path = public, extensions
   AS $$ SELECT unaccent('unaccent'::regdictionary, $1) $$;
 
 -- Normalised body: lower-cased, accent-stripped. STORED (not an expression

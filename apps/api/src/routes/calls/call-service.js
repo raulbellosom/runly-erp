@@ -58,7 +58,7 @@ export function createCallService({
 
   async function resolveProfile(authUserId) {
     const profile = await prisma.userProfile.findUnique({
-      where: { authUserId },
+      where: { authUserId, enabled: true },
       select: { id: true, displayName: true, avatarFileId: true },
     });
     if (!profile) throw new CallServiceError("Perfil de usuario no encontrado.", 404);
@@ -74,6 +74,7 @@ export function createCallService({
       WHERE m.conversation_id = ${conversationId}
         AND m.user_id IS NOT NULL
         AND m.left_at IS NULL
+        AND public.runly_chat_user_access(m.conversation_id, m.user_id)
         AND c.deleted_at IS NULL
     `;
   }
@@ -126,6 +127,7 @@ export function createCallService({
       WHERE m.conversation_id = ${conversationId}
         AND m.user_id = ${userProfileId}
         AND m.left_at IS NULL
+        AND public.runly_chat_user_access(m.conversation_id, m.user_id)
         AND c.deleted_at IS NULL
       LIMIT 1
     `;
@@ -185,6 +187,7 @@ export function createCallService({
       WHERE m.conversation_id = ${conversationId}
         AND m.user_id = ${profileId}
         AND m.left_at IS NULL
+        AND public.runly_chat_user_access(m.conversation_id, m.user_id)
       LIMIT 1
     `;
     const role = roleRows[0];
@@ -198,7 +201,7 @@ export function createCallService({
       identity: profile.id,
       name: profile.displayName,
       metadata: JSON.stringify({ callId: call.id }),
-      ttl: "10m",
+      ttl: "1m",
     });
     token.addGrant({
       room: call.livekitRoomName,
@@ -882,10 +885,34 @@ export function createCallService({
     return { notified: targetIds, addedMembers, addedParticipants };
   }
 
+  async function revokeUnauthorizedParticipants() {
+    const config = getConfig();
+    if (!config.enabled) return;
+    const rows = await prisma.$queryRaw`SELECT cp.id, cp.livekit_identity, c.livekit_room_name
+      FROM call_participant cp JOIN call c ON c.id = cp.call_id
+      WHERE c.status IN ('RINGING', 'ACTIVE')
+        AND NOT public.runly_chat_user_access(c.conversation_id, cp.user_id)`;
+    const rooms = new RoomServiceClientImpl(config.internalUrl, config.apiKey, config.apiSecret);
+    // Keep checking LEFT participants: self-hosted LiveKit does not revoke old
+    // tokens, so a reconnect must be removed again, including screen publishers.
+    const failures = [];
+    for (const row of rows) {
+      for (const identity of row.livekit_identity ? [row.livekit_identity, `screen:${row.livekit_identity}`] : []) {
+        try {
+          await rooms.removeParticipant(row.livekit_room_name, identity);
+        } catch (error) {
+          if (error?.status !== 404 && error?.code !== 'not_found') failures.push(error);
+        }
+      }
+      await prisma.callParticipant.updateMany({ where: { id: row.id, leftAt: null }, data: { leftAt: now(), status: 'LEFT' } });
+    }
+    if (failures.length) throw new AggregateError(failures, 'No se pudo revocar el acceso a todas las conexiones de llamada.');
+  }
+
   function startExpirySweeper() {
     if (!getConfig().enabled) return () => {};
     const timer = setInterval(() => {
-      expireStaleCalls().catch((error) => {
+      Promise.all([expireStaleCalls(), revokeUnauthorizedParticipants()]).catch((error) => {
         console.error("[atlas.calls] Error expirando llamadas:", error?.message ?? error);
       });
     }, 15_000);
@@ -906,6 +933,7 @@ export function createCallService({
     endCall,
     expireStaleCalls,
     startExpirySweeper,
+    revokeUnauthorizedParticipants,
     assertCanManageCall,
     inviteMembersToLiveCall,
     postSystemMessage,

@@ -78,6 +78,7 @@ function buildPrismaMock() {
   };
 
   const prisma = {
+    $queryRaw: async () => [{ allowed: true }],
     _notifications: notifications,
     _deliveries: deliveries,
     userProfile: {
@@ -469,6 +470,16 @@ describe('important notification channels', () => {
     assert.equal(a.sent + b.sent, 1);
     assert.equal(emails.length, 1);
     assert.equal(prisma._deliveries.filter((d) => d.channel === 'email' && d.status === 'sent').length, 1);
+  });
+
+  it('does not deliver an already queued email after resource access is revoked', async () => {
+    const prisma = buildPrismaMock();
+    await createNotificationService({ prisma }).publish({ companyId: COMPANY_ID, input: input('notes.note.shared') });
+    prisma.$queryRaw = async () => [{ allowed: false }];
+    const worker = createNotificationDeliveryWorker({ prisma, smtpService: { sendEmail: async () => assert.fail('revoked recipient must not receive content') } });
+    const result = await worker.processPendingNotificationDeliveries({ channel: 'email' });
+    assert.equal(result.sent, 0);
+    assert.equal(result.failed, 1);
   });
 
   it('requeues a stuck sending row and then delivers it', async () => {

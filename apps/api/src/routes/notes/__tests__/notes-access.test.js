@@ -17,6 +17,7 @@ import { createTagsService, TagsServiceError } from "../tags-service.js";
 
 const OWNER = "01900000-0000-7000-8000-000000000001";
 const OTHER = "01900000-0000-7000-8000-000000000002";
+const COMPANY = "01900000-0000-7000-8000-0000000000cc";
 const NOTE = "01900000-0000-7000-8000-0000000000aa";
 
 function sql(strings) {
@@ -24,7 +25,7 @@ function sql(strings) {
 }
 
 // Build a prisma stub from a list of [substringMatcher, rowsOrFn] rules.
-function fakePrisma(rules) {
+function fakePrisma(rules, { member = true, permission = true } = {}) {
   const run = (strings, ...values) => {
     const text = sql(strings);
     for (const [needle, out] of rules) {
@@ -34,7 +35,12 @@ function fakePrisma(rules) {
     }
     return Promise.resolve([]);
   };
-  return { $queryRaw: run, $executeRaw: run };
+  return { $queryRaw: run, $executeRaw: run,
+    membership: { findFirst: async ({ where }) => {
+      assert.equal(where.companyId, COMPANY);
+      return member ? { role: { key: permission ? 'runly.admin' : 'restricted', permissions: [] } } : null;
+    } }, userPermissionGrant: { findFirst: async () => null },
+  };
 }
 
 describe("notes-service — read/write require access", () => {
@@ -72,7 +78,7 @@ describe("notes-service — read/write require access", () => {
 
   it("trashNote is owner-only", async () => {
     const prisma = fakePrisma([
-      ["select id, owner_user_id from notes", [{ id: NOTE, owner_user_id: OWNER }]],
+      ["select id, owner_user_id from notes", [{ id: NOTE, owner_user_id: OWNER, company_id: COMPANY }]],
     ]);
     const svc = createNotesService({ prisma });
     await assert.rejects(
@@ -184,7 +190,7 @@ describe("notes-service — updateNote contentText", () => {
 
 describe("shares-service — shareNote target validation", () => {
   const base = [
-    ["from notes where id = ? and owner_user_id", [{ id: NOTE }]], // _verifyOwner ok
+    ["from notes where id = ? and owner_user_id", [{ id: NOTE, company_id: COMPANY }]], // _verifyOwner ok
   ];
 
   it("rejects sharing with yourself", async () => {
@@ -199,11 +205,11 @@ describe("shares-service — shareNote target validation", () => {
     const prisma = fakePrisma([
       ...base,
       ["from membership m_owner", []], // no shared company
-    ]);
+    ], { member: false });
     const svc = createSharesService({ prisma, broadcaster: null });
     await assert.rejects(
       () => svc.shareNote(NOTE, OWNER, { targetUserId: OTHER, permission: "read" }),
-      (e) => e instanceof SharesServiceError && e.status === 403,
+      (e) => e.status === 404,
     );
   });
 
@@ -224,32 +230,33 @@ describe("shares-service — shareNote target validation", () => {
       ...base,
       ["p.key = 'notes.notes.read'", []],               // no notes-granting / admin role
       ["from membership m_owner", [{ "?column?": 1 }]],  // same company, though
-    ]);
+    ], { permission: false });
     const svc = createSharesService({ prisma, broadcaster: null });
     await assert.rejects(
       () => svc.shareNote(NOTE, OWNER, { targetUserId: OTHER, permission: "read" }),
-      (e) => e instanceof SharesServiceError && e.status === 403,
+      (e) => e.status === 404,
     );
   });
 });
 
-describe("shares-service — listShareableUsers", () => {
-  it("restricts to notes-module users, excludes self, maps the shape", async () => {
-    let captured = "";
+describe("shares-service - listShareableUsers", () => {
+  it("uses the active company and filters module eligibility before returning a projection", async () => {
+    let where;
     const prisma = {
-      $queryRaw: (strings) => {
-        captured = sql(strings).toLowerCase();
-        return Promise.resolve([{ id: OTHER, display_name: "Dana", email: "d@x.com" }]);
+      membership: {
+        findFirst: async () => ({ role: { key: 'runly.admin' } }),
+        findMany: async (query) => { where = query.where; return [{ user: { id: OTHER, displayName: 'Dana' } }]; },
       },
-      $executeRaw: () => Promise.resolve([]),
+      $queryRaw: async (_strings, companyId, permission) => {
+        assert.equal(companyId, COMPANY);
+        assert.equal(permission, 'notes.notes.read');
+        return [{ user_id: OTHER }];
+      },
     };
-    const svc = createSharesService({ prisma, broadcaster: null });
-    const users = await svc.listShareableUsers(OWNER, null);
-
-    assert.deepEqual(users, [{ id: OTHER, displayName: "Dana", email: "d@x.com", avatarUrl: null }]);
-    assert.match(captured, /p\.key = 'notes\.notes\.read'/);
-    assert.match(captured, /r\.key in \('runly\.admin', 'atlas\.admin', 'system\.admin'\)/);
-    assert.match(captured, /m_target\.user_id <> /);
+    const users = await createSharesService({ prisma, broadcaster: null }).listShareableUsers(OWNER, null, COMPANY);
+    assert.deepEqual(users, [{ id: OTHER, displayName: 'Dana' }]);
+    assert.equal(where.companyId, COMPANY);
+    assert.deepEqual(where.userId.in, [OTHER]);
   });
 });
 
@@ -309,7 +316,7 @@ describe("ydoc-service — write guards", () => {
 describe("tags-service — setNoteTags ownership", () => {
   it("rejects tag ids the acting user does not own", async () => {
     const prisma = fakePrisma([
-      ["select id from notes where id = ?::uuid and deleted_at is null and ( owner_user_id", [{ id: NOTE }]],
+      ["select id from notes where id = ?::uuid and deleted_at is null and ( owner_user_id", [{ id: NOTE, company_id: COMPANY }]],
       ["from note_tags where owner_user_id", []], // none of the requested tags are owned
     ]);
     const svc = createTagsService({ prisma });
@@ -325,7 +332,7 @@ describe('shared note notifications', () => {
   it('publishes all three channels using the shared company and note deep link', async () => {
     const published = [];
     const prisma = fakePrisma([
-      ['from notes where id', [{ id: NOTE }]],
+      ['from notes where id', [{ id: NOTE, company_id: COMPANY }]],
       ['from membership m_owner', [{ allowed: 1 }]],
       ['insert into note_shares', [{ id: 'share' }]],
       ['select n.title, m_target.company_id', [{ title: 'Plan', company_id: 'shared-company' }]],
@@ -334,15 +341,15 @@ describe('shared note notifications', () => {
     const result = await svc.shareNote(NOTE, OWNER, { targetUserId: OTHER, permission: 'edit' });
     assert.equal(result.id, 'share');
     assert.equal(published.length, 1);
-    assert.equal(published[0].companyId, 'shared-company');
+    assert.equal(published[0].companyId, COMPANY);
     assert.deepEqual(published[0].input.recipients.userIds, [OTHER]);
     assert.deepEqual(published[0].input.channels, ['in_app', 'email', 'web_push']);
     assert.equal(published[0].input.link, `/app/m/runly.notes?note=${NOTE}`);
   });
   it('never publishes for a rejected share', async () => {
-    const prisma = fakePrisma([['from notes where id', [{ id: NOTE }]]]);
+    const prisma = fakePrisma([['from notes where id', [{ id: NOTE, company_id: COMPANY }]]], { member: false });
     const svc = createSharesService({ prisma, notificationService: { publish: async () => assert.fail('must not publish') } });
-    await assert.rejects(svc.shareNote(NOTE, OWNER, { targetUserId: OTHER, permission: 'edit' }), { status: 403 });
+    await assert.rejects(svc.shareNote(NOTE, OWNER, { targetUserId: OTHER, permission: 'edit' }), { status: 404 });
   });
 });
 

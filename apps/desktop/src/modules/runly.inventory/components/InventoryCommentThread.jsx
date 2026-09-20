@@ -24,7 +24,7 @@ export function InventoryCommentThread({ itemId }) {
 
   const membersQuery = useQuery({
     queryKey: ['identity', 'users'],
-    queryFn: () => runly.identity.listUsers(token),
+    queryFn: () => runly.identity.listCandidates(token, { action: 'inventory' }),
     enabled: Boolean(token),
     staleTime: 10 * 60 * 1000,
   })

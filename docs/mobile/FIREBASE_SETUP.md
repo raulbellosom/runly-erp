@@ -13,7 +13,7 @@ En la descripción general del proyecto, elegir **Agregar app > Android**. Usar 
 Descargar `google-services.json` y guardarlo en:
 
 ```text
-D:/RacoonDevs/atlaserp-v2/.secrets/firebase/google-services.json
+D:/path/to/runly/.secrets/firebase/google-services.json
 ```
 
 La variable `RUNLY_ANDROID_GOOGLE_SERVICES_JSON` del `.env` local apunta a esa ubicación. Este archivo contiene identificadores de configuración de Android, no la clave privada del servidor. El wrapper Android lee esta variable de `process.env`, con respaldo en el `.env` raíz, valida el paquete y el proyecto, rechaza claves privadas y copia el JSON al módulo Android antes de configurar/compilar. No exporta las credenciales del `.env` a Gradle. No copiar la credencial del siguiente paso a Android.
@@ -27,7 +27,7 @@ Referencia: [Registrar Android y configurar el SDK](https://firebase.google.com/
 En **Configuración del proyecto > Cuentas de servicio > Firebase Admin SDK**, elegir **Generar nueva clave privada** y guardar el JSON descargado, renombrándolo a:
 
 ```text
-D:/RacoonDevs/atlaserp-v2/.secrets/firebase/service-account.json
+D:/path/to/runly/.secrets/firebase/service-account.json
 ```
 
 `GOOGLE_APPLICATION_CREDENTIALS` ya apunta a esa ubicación en el `.env` local. El JSON debe pertenecer al mismo proyecto que la configuración Android. No pegar su contenido en el chat ni incluirlo en el APK o en variables `VITE_`.
@@ -45,8 +45,8 @@ El bloque local queda así, sustituyendo únicamente el ID:
 ```dotenv
 RUNLY_FCM_ENABLED=false
 FIREBASE_PROJECT_ID=tu-id-real-del-proyecto
-GOOGLE_APPLICATION_CREDENTIALS=D:/RacoonDevs/atlaserp-v2/.secrets/firebase/service-account.json
-RUNLY_ANDROID_GOOGLE_SERVICES_JSON=D:/RacoonDevs/atlaserp-v2/.secrets/firebase/google-services.json
+GOOGLE_APPLICATION_CREDENTIALS=D:/path/to/runly/.secrets/firebase/service-account.json
+RUNLY_ANDROID_GOOGLE_SERVICES_JSON=D:/path/to/runly/.secrets/firebase/google-services.json
 ```
 
 Mantener `RUNLY_FCM_ENABLED=false` durante esta preparación. El interruptor todavía no tiene consumidor implementado. No hay que migrar la autenticación, los datos ni las llamadas de Runly a Firebase para usar FCM.

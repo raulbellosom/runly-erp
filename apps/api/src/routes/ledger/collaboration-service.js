@@ -1,3 +1,4 @@
+import { createUserAccessService } from '../../services/user-access-service.js';
 // apps/api/src/routes/ledger/collaboration-service.js
 import { createNotificationService } from '../../services/notification-service.js'
 import { firstRow } from './service-helpers.js'
@@ -10,6 +11,10 @@ export class CollaborationServiceError extends Error {
   }
 }
 
+function logNotificationError(err) {
+  if (process.env.NODE_ENV !== 'production') console.error('[runly.ledger/collab] notification publish failed', err)
+}
+
 export function createCollaborationService({ prisma }) {
   const notifService = createNotificationService({ prisma })
 
@@ -19,73 +24,20 @@ export function createCollaborationService({ prisma }) {
     const rows = await prisma.$queryRaw`
       SELECT * FROM ledger_account
       WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid AND owner_id = ${actorId}::uuid
+        AND enabled = true
     `
     const row = firstRow(rows)
     if (!row) throw new CollaborationServiceError('Cuenta no encontrada o no eres el propietario.', 404)
     return row
   }
 
-  async function isGroupAdmin({ groupId, actorId }) {
-    const rows = await prisma.$queryRaw`
-      SELECT 1 FROM ledger_group_member
-      WHERE group_id = ${groupId}::uuid AND user_id = ${actorId}::uuid
-        AND status = 'active' AND role = 'admin'
-      UNION
-      SELECT 1 FROM ledger_group WHERE id = ${groupId}::uuid AND created_by = ${actorId}::uuid
-    `
-    return rows.length > 0
-  }
-
-  // ── Move account ──────────────────────────────────────────────────────────
-
-  async function moveAccountToGroup({ companyId, accountId, actorId, groupId }) {
-    await getAccountOwned({ companyId, accountId, actorId })
-
-    // Validate the group exists and belongs to same company
-    const groupRows = await prisma.$queryRaw`
-      SELECT id FROM ledger_group
-      WHERE id = ${groupId}::uuid AND company_id = ${companyId}::uuid AND enabled = true
-    `
-    if (!firstRow(groupRows)) throw new CollaborationServiceError('Grupo no encontrado.', 404)
-
-    // When moving to a group, delete all personal members (access switches to group)
-    await prisma.$queryRaw`
-      DELETE FROM ledger_account_member WHERE account_id = ${accountId}::uuid
-    `
-
-    const rows = await prisma.$queryRaw`
-      UPDATE ledger_account SET group_id = ${groupId}::uuid, updated_at = NOW()
-      WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid
-      RETURNING *
-    `
-    return firstRow(rows)
-  }
-
-  async function moveAccountFromGroup({ companyId, accountId, actorId }) {
-    // Owner OR group admin can move account out of group
-    const accRows = await prisma.$queryRaw`
-      SELECT * FROM ledger_account
-      WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid AND group_id IS NOT NULL
-    `
-    const account = firstRow(accRows)
-    if (!account) throw new CollaborationServiceError('Cuenta no encontrada o no pertenece a un grupo.', 404)
-
-    const isOwner = account.owner_id === actorId
-    const adminAccess = account.group_id ? await isGroupAdmin({ groupId: account.group_id, actorId }) : false
-
-    if (!isOwner && !adminAccess) {
-      throw new CollaborationServiceError('No tienes permisos para mover esta cuenta.', 403)
-    }
-
-    const rows = await prisma.$queryRaw`
-      UPDATE ledger_account SET group_id = NULL, updated_at = NOW()
-      WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid
-      RETURNING *
-    `
-    return firstRow(rows)
-  }
-
   // ── Account members (personal accounts only) ──────────────────────────────
+  // NOTE: moving an account into/out of a group is handled exclusively by
+  // ledger-service.js's setAccountGroup (owner OR editor/admin), wired to
+  // PATCH /ledger/accounts/:id/group in accounts-routes.js. This file used to
+  // carry its own moveAccountToGroup/moveAccountFromGroup with a stricter,
+  // divergent (owner-only) authorization rule; they were unreachable dead
+  // code and a landmine if ever wired up by mistake, so they were removed.
 
   async function listAccountMembers({ companyId, accountId, actorId }) {
     // Verify the actor has access to this account before listing members
@@ -118,14 +70,15 @@ export function createCollaborationService({ prisma }) {
       throw new CollaborationServiceError('Esta cuenta pertenece a un grupo. Gestiona el acceso desde el grupo.', 400)
     }
     const { user_id: targetUserId, role } = data
+    await createUserAccessService({ prisma }).assertCandidates({ companyId, userIds: [targetUserId] });
     if (targetUserId === actorId) {
       throw new CollaborationServiceError('No puedes invitarte a ti mismo.', 400)
     }
 
     try {
       await prisma.$queryRaw`
-        INSERT INTO ledger_account_member (id, account_id, user_id, role, invited_by, status)
-        VALUES (gen_random_uuid(), ${accountId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'active')
+        INSERT INTO ledger_account_member (account_id, user_id, role, invited_by, status)
+        VALUES (${accountId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'active')
         ON CONFLICT (account_id, user_id) DO UPDATE
           SET role = EXCLUDED.role, status = 'active', invited_by = EXCLUDED.invited_by, invited_at = NOW()
       `
@@ -157,7 +110,7 @@ export function createCollaborationService({ prisma }) {
           invited_by_name: actorName,
         },
       },
-    }).catch(() => {})
+    }).catch(logNotificationError)
 
     return { ok: true }
   }
@@ -199,7 +152,7 @@ export function createCollaborationService({ prisma }) {
           priority: 'low',
           metadata: { resource_type: 'account', resource_name: account.name },
         },
-      }).catch(() => {})
+      }).catch(logNotificationError)
     }
     return row
   }
@@ -210,7 +163,7 @@ export function createCollaborationService({ prisma }) {
     const [groups, accounts] = await Promise.all([
       prisma.$queryRaw`
         SELECT g.id, g.name, gm.role, gm.invited_at,
-          COUNT(DISTINCT gm2.user_id) FILTER (WHERE gm2.status = 'active') AS member_count
+          COUNT(DISTINCT gm2.user_id) FILTER (WHERE gm2.status = 'active')::int4 AS member_count
         FROM ledger_group_member gm
         JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
         LEFT JOIN ledger_group_member gm2 ON gm2.group_id = g.id
@@ -289,8 +242,6 @@ export function createCollaborationService({ prisma }) {
   }
 
   return {
-    moveAccountToGroup,
-    moveAccountFromGroup,
     listAccountMembers,
     inviteAccountMember,
     updateAccountMemberRole,

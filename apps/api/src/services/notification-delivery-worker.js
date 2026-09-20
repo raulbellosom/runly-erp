@@ -1,3 +1,4 @@
+import { canReceiveResourceEvent } from './notification-access.js';
 import { createSmtpService } from "./smtp-service.js";
 import { createWebPushService } from "./web-push-service.js";
 
@@ -494,6 +495,11 @@ export function createNotificationDeliveryWorker({
       processed += 1;
       // attempts was already incremented by the claim above.
       const attempts = delivery.attempts ?? 1;
+      if (!(await canReceiveResourceEvent(prisma, delivery.notification?.userId, delivery.notification))) {
+        await prisma.notificationDelivery.update({ where: { id: delivery.id }, data: { status: 'failed', lastError: 'Acceso revocado.' } });
+        failed += 1;
+        continue;
+      }
       const recipientEmail = delivery.notification?.user?.email ?? null;
 
       try {

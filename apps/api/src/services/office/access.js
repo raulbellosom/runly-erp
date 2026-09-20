@@ -95,6 +95,7 @@ export function createOfficeAccess({ prisma }) {
       WHERE conversation_id = ${att.conversation_id}::uuid
         AND user_id = ${profile.id}::uuid
         AND left_at IS NULL
+        AND public.runly_chat_user_access(conversation_id, user_id)
       LIMIT 1
     `;
     const role = memberRows[0]?.role;

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Follow the public repository privacy rules in `AGENTS.md` and
+`docs/REPOSITORY_PRIVACY.md`. Never copy private infrastructure or personal data
+into plans, documentation, fixtures or verification notes. All URLs here are examples.
+
 ## Commands
 
 ```bash
@@ -9,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cp .env.example .env
 # Fill in SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL, DIRECT_URL, JWT_SECRET
 # GROQ_API_KEY is optional (runly.pfm receipt OCR + the runly.pfm assistant sidebar + the runly.chat MirAI assistant); without it receipt OCR degrades to manual entry, the PFM assistant sidebar is disabled, and MirAI is disabled (its conversation still lists; the composer shows "no configurado"). With the key, MirAI also answers general-knowledge questions; a short per-turn classifier picks chat/general/live. Live/internet questions ("cuánto está el dólar hoy") need TAVILY_API_KEY (Tavily free tier) — MirAI searches Tavily then phrases the answer; without it the live route says it can't reach the internet. CHAT_MIRAI_WEB=false disables live entirely. PFM_ASSISTANT_MODEL / CHAT_MIRAI_MODEL / CHAT_MIRAI_ROUTER_MODEL / CHAT_MIRAI_WEB_MODEL (Groq compound fallback, paid plan) optionally override the models.
-# Get connection strings from https://studio.supabase.racoondevs.com
+# Get connection strings from https://studio.supabase.example.com
 
 pnpm install          # install all dependencies
 pnpm db:generate      # generate Prisma client
@@ -97,8 +101,8 @@ No direct database access from the frontend. The API is the authority for all bu
 
 All development uses the dedicated self-hosted Supabase instance:
 
-- API: https://supabase.racoondevs.com
-- Studio: https://studio.supabase.racoondevs.com (admin use only)
+- API: https://supabase.example.com
+- Studio: https://studio.supabase.example.com (admin use only)
 
 ### Module system (packages/core + RME3 manifests)
 

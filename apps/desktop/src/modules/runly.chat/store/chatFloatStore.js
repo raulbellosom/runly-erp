@@ -46,7 +46,9 @@ export const useChatFloatStore = create(
     }),
     {
       name: "runly-chat-float",
-      partialize: (s) => ({ edge: s.edge, yPx: s.yPx, hidden: s.hidden, openChats: s.openChats }),
+      version: 1,
+      migrate: (state) => ({ edge: state.edge, yPx: state.yPx, hidden: state.hidden }),
+      partialize: (s) => ({ edge: s.edge, yPx: s.yPx, hidden: s.hidden }),
     },
   ),
 );

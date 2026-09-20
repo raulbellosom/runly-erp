@@ -7,7 +7,6 @@ const COMPANY_ID = '01900000-0000-7000-8000-000000000001'
 const ACTOR_ID   = '01900000-0000-7000-8000-000000000002'
 const ACCOUNT_ID = '01900000-0000-7000-8000-000000000003'
 const GROUP_ID   = '01900000-0000-7000-8000-000000000004'
-const OTHER_ID   = '01900000-0000-7000-8000-000000000005'
 const TARGET_ID  = '01900000-0000-7000-8000-000000000006'
 
 /**
@@ -29,8 +28,12 @@ function buildPrismaMock(queryRawHandler) {
     userProfile: {
       findUnique: async () => null,
     },
+    // Default: any invited user is treated as an active company member (assertCandidates,
+    // called by inviteAccountMember before the SQL insert) so happy-path tests don't need
+    // to separately stub it; tests that specifically exercise non-member rejection can
+    // override this per-call.
     membership: {
-      findFirst: async () => null,
+      findFirst: async () => ({ id: 'membership-1', companyId: COMPANY_ID, enabled: true, role: null }),
       findMany: async () => [],
     },
     notification: {
@@ -131,43 +134,6 @@ describe('collaboration-service', () => {
       (err) => {
         assert.ok(err instanceof CollaborationServiceError, 'should be CollaborationServiceError')
         assert.equal(err.status, 400)
-        return true
-      },
-    )
-  })
-
-  it('moveAccountFromGroup throws 403 when actor is not owner and not group admin', async () => {
-    // Account belongs to a group but actor is not the owner
-    const accountRow = {
-      id: ACCOUNT_ID,
-      name: 'Cuenta Test',
-      company_id: COMPANY_ID,
-      owner_id: OTHER_ID,
-      group_id: GROUP_ID,
-      enabled: true,
-    }
-
-    let callCount = 0
-    const prisma = buildPrismaMock(async (strings, ...values) => {
-      callCount += 1
-      // First call: SELECT from ledger_account (group_id IS NOT NULL check)
-      if (callCount === 1) {
-        return [accountRow]
-      }
-      // Second call: isGroupAdmin — actor is not a group admin
-      return []
-    })
-
-    const service = createCollaborationService({ prisma })
-    await assert.rejects(
-      () => service.moveAccountFromGroup({
-        companyId: COMPANY_ID,
-        accountId: ACCOUNT_ID,
-        actorId: ACTOR_ID,
-      }),
-      (err) => {
-        assert.ok(err instanceof CollaborationServiceError, 'should be CollaborationServiceError')
-        assert.equal(err.status, 403)
         return true
       },
     )

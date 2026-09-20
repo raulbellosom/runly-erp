@@ -962,7 +962,7 @@ describe("createCallGuestService.joinAsGuest", () => {
     };
     const svc = createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService() });
     await assert.rejects(
-      svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "1.2.3.4" }),
+      svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "192.0.2.1" }),
       (e) => e instanceof CallGuestError && e.status === 429,
     );
   });
@@ -976,7 +976,7 @@ describe("createCallGuestService.joinAsGuest", () => {
       callLink: { update: async () => ({}) },
     };
     const svc = createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService() });
-    const out = await svc.joinAsGuest({ token: "t", displayName: "  Ana  ", ip: "1.2.3.4" });
+    const out = await svc.joinAsGuest({ token: "t", displayName: "  Ana  ", ip: "192.0.2.1" });
     assert.equal(out.status, "LOBBY");
     assert.equal(createData.status, "LOBBY");
     assert.equal(createData.displayName, "Ana");
@@ -993,7 +993,7 @@ describe("createCallGuestService.joinAsGuest", () => {
     };
     const links = baseLinksService({ id: "l1", conversationId: CONV, requireLobby: false, useCount: 0 });
     const svc = createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: links });
-    const out = await svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "1.2.3.4" });
+    const out = await svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "192.0.2.1" });
     assert.equal(out.status, "ADMITTED");
   });
 
@@ -1003,7 +1003,7 @@ describe("createCallGuestService.joinAsGuest", () => {
       $queryRaw: async () => [],
     };
     const svc = createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService() });
-    const out = await svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "1.2.3.4" });
+    const out = await svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "192.0.2.1" });
     assert.equal(out.status, "waiting");
   });
 
@@ -1015,7 +1015,7 @@ describe("createCallGuestService.joinAsGuest", () => {
     };
     const svc = createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService() });
     await assert.rejects(
-      svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "1.2.3.4" }),
+      svc.joinAsGuest({ token: "t", displayName: "Ana", ip: "192.0.2.1" }),
       (e) => e instanceof CallGuestError && e.status === 409,
     );
   });

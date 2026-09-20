@@ -10,6 +10,9 @@ function makePrisma(overrides = {}) {
   const comments = {}
 
   return {
+    project: { findFirst: async () => ({ companyId: 'co-1' }) },
+    membership: { findFirst: async () => ({ role: { key: 'runly.admin' } }) },
+    projectMember: { findFirst: async () => ({ id: 'member' }) },
     task: {
       create: async (args) => {
         const t = { id: 'new-task', createdAt: new Date(), updatedAt: new Date(), ...args.data }

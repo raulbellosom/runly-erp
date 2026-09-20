@@ -66,7 +66,7 @@ export default function GroupScreen() {
   const [accForm, setAccForm]         = useState(EMPTY_ACCOUNT)
   const [accSaving, setAccSaving]     = useState(false)
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-group', groupId],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/ledger/groups/${groupId}`, { headers })
@@ -237,7 +237,7 @@ export default function GroupScreen() {
     )
   }
 
-  if (isError || !group) return <ErrorState message="No se pudo cargar el grupo." />
+  if (isError || !group) return <ErrorState description="No se pudo cargar el grupo." onRetry={refetch} />
 
   const canWrite = myRole === 'editor' || myRole === 'admin'
 

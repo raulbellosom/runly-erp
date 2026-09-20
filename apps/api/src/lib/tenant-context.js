@@ -88,7 +88,7 @@ export function computeScopedPermissions({
   if (activeMembership) {
     for (const rolePermission of activeMembership.role?.permissions ?? []) {
       const key = rolePermission?.permission?.key;
-      if (key) permissionSet.add(key);
+      if (key && rolePermission?.permission?.active !== false) permissionSet.add(key);
     }
     for (const key of grantKeysForCompany) {
       if (key) permissionSet.add(key);
@@ -106,7 +106,7 @@ export function computeScopedPermissions({
 // system.admin — deliberately NOT scoped to activeCompanyId, since system
 // admin is an instance-wide platform role by design (spec §5.3/§9).
 export function isSystemAdminMembership(memberships) {
-  return (memberships ?? []).some((m) => SYSTEM_ADMIN_ROLE_KEYS.has(m?.role?.key));
+  return (memberships ?? []).some((m) => SYSTEM_ADMIN_ROLE_KEYS.has(m?.role?.key) && m.role.companyId == null);
 }
 
 // The one function here that touches Prisma/cache: a cached lookup of every
