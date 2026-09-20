@@ -9,7 +9,7 @@ import {
   TextField, NumberField, SelectField,
 } from '@runly/ui'
 import { useOfflineStatus } from '@runly/offline'
-import { Plus, Landmark, Users, FolderOpen, Pencil } from 'lucide-react'
+import { Plus, Landmark, Users, FolderOpen, Pencil, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -56,7 +56,7 @@ export default function AccountsScreen() {
   const [renameGroupSaving, setRenameGroupSaving] = useState(false)
 
   const headers = { Authorization: `Bearer ${token}` }
-  const { data: allData, isLoading: allLoading, isError: allError } = useAccountList()
+  const { data: allData, isLoading: allLoading, isError: allError, refetch: refetchAccounts } = useAccountList()
 
   const { data: membershipData, isLoading: mbLoading } = useQuery({
     queryKey: ['ledger-memberships', token],
@@ -228,7 +228,7 @@ export default function AccountsScreen() {
   }
 
   if (allError) {
-    return <ErrorState title="No se pudieron cargar las cuentas." />
+    return <ErrorState title="No se pudieron cargar las cuentas." onRetry={refetchAccounts} />
   }
 
   return (
@@ -243,9 +243,14 @@ export default function AccountsScreen() {
               ? null
               : effectiveTab !== 'groups'
                 ? (
-                    <Button variant="primary" size="sm" onClick={() => setNewAccOpen(true)}>
-                      <Plus size={14} className="mr-1" /> Nueva cuenta
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate('/app/m/runly.ledger/import-ai')}>
+                        <Sparkles size={14} className="mr-1" /> Importar con IA
+                      </Button>
+                      <Button variant="primary" size="sm" onClick={() => setNewAccOpen(true)}>
+                        <Plus size={14} className="mr-1" /> Nueva cuenta
+                      </Button>
+                    </div>
                   )
                 : (
                     <Button variant="primary" size="sm" onClick={() => setNewGrpOpen(true)}>

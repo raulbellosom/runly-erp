@@ -86,6 +86,7 @@ export function resolveScreen(screenMap, requestedModuleKey, subPath, blueprintS
     return null;
   }
   if (moduleKey === "runly.ledger") {
+    if (subPath === "/import-ai") return screenMap["runly.ledger:/import-ai"] ?? null;
     if (subPath === "/accounts" || subPath === "/accounts/new") return screenMap["runly.ledger:/accounts"] ?? null;
     if (subPath.endsWith("/import")) return screenMap["runly.ledger:/accounts/:id/import"] ?? null;
     if (subPath.startsWith("/accounts/") && !subPath.endsWith("/new")) return screenMap["runly.ledger:/accounts/:id"] ?? null;

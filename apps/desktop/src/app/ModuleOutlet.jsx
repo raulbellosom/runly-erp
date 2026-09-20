@@ -113,6 +113,9 @@ const SCREEN_MAP = {
   "runly.ledger:/accounts/:id/import": lazy(
     () => import("../modules/runly.ledger/screens/ImportWizard.jsx"),
   ),
+  "runly.ledger:/import-ai": lazy(
+    () => import("../modules/runly.ledger/screens/AiImportScreen.jsx"),
+  ),
   "runly.ledger:/groups": lazy(
     () => import("../modules/runly.ledger/screens/GroupsScreen.jsx"),
   ),
