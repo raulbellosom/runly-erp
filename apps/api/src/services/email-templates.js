@@ -230,3 +230,72 @@ export function buildChatGuestExpiryEmail({ resumeUrl, guestName = null, brand =
 
   return { subject: `Tu conversación con ${orgName} ha expirado`, html, text };
 }
+
+// Sent when an admin invites someone to join a company in Runly — the other
+// email in the app that used to be a raw unstyled <p> with no Runly branding
+// and no text alternative. `brand` — optional `{ name, logoUrl, primaryColor }`
+// — comes from the same BrandingConfig lookup as the other templates here.
+export function buildCompanyInvitationEmail({ invitationUrl, brand = null, env = process.env }) {
+  const orgName = brand?.name ? brand.name : "Runly ERP";
+  const heading = "Te invitaron a una empresa";
+
+  const bodyHtml = `
+        <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#334155">
+          Te invitaron a unirte a <strong>${escapeHtml(orgName)}</strong> en Runly ERP.
+        </p>
+        <p style="margin:0 0 16px 0;font-size:13px;line-height:1.6;color:#64748b">
+          Inicia sesión y acepta la invitación. Si el botón no funciona, copia este enlace en tu navegador:<br />
+          <span style="word-break:break-all;color:#334155">${escapeHtml(invitationUrl)}</span>
+        </p>`;
+
+  const html = renderAtlasEmailLayout({
+    kicker: "Invitación",
+    heading,
+    bodyHtml,
+    cta: { label: "Aceptar invitación", url: invitationUrl },
+    footnote: `Recibiste este correo porque te invitaron a unirte a ${orgName} en Runly ERP.`,
+    brand,
+    env,
+  });
+
+  const text = [
+    orgName,
+    "",
+    `Te invitaron a unirte a ${orgName} en Runly ERP.`,
+    "",
+    `Aceptar invitación: ${invitationUrl}`,
+  ].join("\n");
+
+  return { subject: `Te invitaron a ${orgName}`, html, text };
+}
+
+// The "Enviar prueba" button in Ajustes -> SMTP — an admin sending this to
+// themselves to confirm delivery. Branded like every other template here so
+// the same click also previews what the company's branding looks like in a
+// real inbox, instead of a bare unstyled <p>.
+export function buildSmtpTestEmail({ brand = null, env = process.env }) {
+  const orgName = brand?.name ? brand.name : "Runly ERP";
+  const heading = "La configuración SMTP funciona";
+
+  const bodyHtml = `
+        <p style="margin:0;font-size:15px;line-height:1.6;color:#334155">
+          Este es un correo de prueba. Si lo estás viendo, la configuración SMTP de <strong>${escapeHtml(orgName)}</strong> puede enviar correo correctamente.
+        </p>`;
+
+  const html = renderAtlasEmailLayout({
+    kicker: "Prueba de SMTP",
+    heading,
+    bodyHtml,
+    footnote: `Enviado como prueba de la configuración SMTP de ${orgName} en Runly ERP.`,
+    brand,
+    env,
+  });
+
+  const text = [
+    orgName,
+    "",
+    "La configuración SMTP funciona correctamente.",
+  ].join("\n");
+
+  return { subject: "Runly ERP — Prueba de SMTP", html, text };
+}

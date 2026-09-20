@@ -3,9 +3,9 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { LoginScreen } from "../auth/LoginScreen";
 import { ApiErrorScreen } from "../components/ApiErrorScreen";
-import { AppLoader } from "../components/AppLoader";
 import { runly } from "../lib/runly";
 import { SetupWizard } from "../setup/SetupWizard";
+import { useBootLoader } from "../stores/bootLoader";
 
 function useInstanceStatus() {
   return useQuery({
@@ -21,9 +21,11 @@ export function AppRouteGuard({ mode }) {
   const { session, loading: authLoading } = useAuth();
   const location = useLocation();
   const { data, isPending, isError, error, refetch } = useInstanceStatus();
+  const verifying = isPending || authLoading;
+  useBootLoader("instance", verifying, "Verificando instancia...");
 
-  if (isPending || authLoading) {
-    return <AppLoader message="Verificando instancia..." />;
+  if (verifying) {
+    return null;
   }
 
   if (isError) {

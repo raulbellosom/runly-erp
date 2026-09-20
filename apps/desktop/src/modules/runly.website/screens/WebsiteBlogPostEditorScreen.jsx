@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LoadingState } from "@runly/ui";
@@ -15,7 +16,7 @@ import { getApiUrl } from "../../../lib/runtimeConfig.js";
 import { toast } from "sonner";
 
 async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -62,7 +63,7 @@ function createAssetSource(token) {
       form.append("file", file);
       form.append("visibility", "PUBLIC");
       form.append("moduleKey", "runly.website");
-      const res = await fetch(`${apiUrl}/files/upload`, {
+      const res = await companyFetch(`${apiUrl}/files/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,

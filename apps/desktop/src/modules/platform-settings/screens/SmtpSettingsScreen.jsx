@@ -1,25 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
-import { getApiUrl } from '../../../lib/runtimeConfig.js'
-import { Button, Label, PageHeader, Skeleton, Switch, TextField } from '@runly/ui'
+import { runly } from "../../../lib/runly.js";
+import { useActiveCompany } from "../../../company/ActiveCompanyProvider.jsx";
+import { Button, Label, PageHeader, Skeleton, PasswordField, ErrorState, Switch, TextField } from '@runly/ui'
 import { toast } from 'sonner'
-
-async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...options,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers },
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
-}
 
 const EMPTY = { host: '', port: '587', user: '', pass: '', from_name: '', from_email: '', tls: false }
 
 export default function SmtpSettingsScreen() {
+  const { activeCompanyId } = useActiveCompany();
+  const dirtyRef = useRef(false);
   const { session } = useAuth()
   const token = session?.access_token
 
@@ -27,14 +18,14 @@ export default function SmtpSettingsScreen() {
   const [passChanged, setPassChanged] = useState(false)
 
   const configQuery = useQuery({
-    queryKey: ['smtp-settings', token],
-    queryFn: () => apiFetch('/settings/smtp', token),
-    enabled: Boolean(token),
+    queryKey: ['smtp-settings', activeCompanyId],
+    queryFn: () => runly.settings.getSmtp(token),
+    enabled: Boolean(token && activeCompanyId),
   })
 
   useEffect(() => {
     const data = configQuery.data?.data
-    if (!data) return
+    if (!data || dirtyRef.current) return
     setForm({
       host:       data.host,
       port:       String(data.port),
@@ -47,17 +38,19 @@ export default function SmtpSettingsScreen() {
   }, [configQuery.data])
 
   const saveMutation = useMutation({
-    mutationFn: (data) => apiFetch('/settings/smtp', token, { method: 'POST', body: JSON.stringify(data) }),
+    mutationFn: (data) => runly.settings.saveSmtp(data, token),
     onSuccess: () => {
+      dirtyRef.current = false;
       toast.success('Configuracion SMTP guardada')
       setPassChanged(false)
+      setForm((current) => ({ ...current, pass: '' }))
       configQuery.refetch()
     },
     onError: (err) => toast.error(err.message),
   })
 
   const testMutation = useMutation({
-    mutationFn: () => apiFetch('/settings/smtp/test', token, { method: 'POST' }),
+    mutationFn: () => runly.settings.testSmtp(token),
     onSuccess: () => toast.success('Email de prueba enviado correctamente'),
     onError: (err) => toast.error(`Error: ${err.message}`),
   })
@@ -93,7 +86,7 @@ export default function SmtpSettingsScreen() {
         <PageHeader
           eyebrow="Configuracion"
           title="SMTP"
-          description="Credenciales para el envio de emails desde la plataforma."
+          description="Configura el correo de la empresa activa."
         />
 
         {configured && (
@@ -115,7 +108,9 @@ export default function SmtpSettingsScreen() {
           </div>
         )}
 
-        {configQuery.isPending ? (
+        {configQuery.isError && !configQuery.data ? (
+              <ErrorState description="No se pudo cargar la configuración." onRetry={() => configQuery.refetch()} />
+            ) : configQuery.isPending ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Skeleton className="h-11 col-span-1 rounded-lg" />
@@ -127,7 +122,7 @@ export default function SmtpSettingsScreen() {
             <Skeleton className="h-11 w-full rounded-lg" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onChangeCapture={() => { dirtyRef.current = true; }} onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <TextField
@@ -156,10 +151,9 @@ export default function SmtpSettingsScreen() {
               required
             />
 
-            <TextField
+            <PasswordField
               label="Contrasena"
-              type="password"
-              description={configured && !passChanged ? "(dejar en blanco para mantener)" : undefined}
+              hint={configured && !passChanged ? "(dejar en blanco para mantener)" : undefined}
               placeholder={configured ? '••••••••' : ''}
               value={form.pass}
               onChange={(e) => { setForm((f) => ({ ...f, pass: e.target.value })); setPassChanged(true) }}
@@ -180,7 +174,7 @@ export default function SmtpSettingsScreen() {
             />
 
             <div className="flex items-center gap-2">
-              <Switch id="smtp-tls" checked={Number(form.port) === 465 || form.tls} disabled={Number(form.port) === 465} onCheckedChange={(v) => setForm((f) => ({ ...f, tls: v }))} />
+              <Switch id="smtp-tls" checked={Number(form.port) === 465 || form.tls} disabled={Number(form.port) === 465} onCheckedChange={(v) => { dirtyRef.current = true; setForm((f) => ({ ...f, tls: v })); }} />
               <Label htmlFor="smtp-tls">{[25, 587].includes(Number(form.port)) ? 'Exigir STARTTLS' : 'Usar TLS directo (SSL)'}</Label>
             </div>
             <p className="text-sm text-[hsl(var(--muted-foreground))]">
@@ -190,7 +184,7 @@ export default function SmtpSettingsScreen() {
             </p>
 
             <div className="flex gap-2 pt-2 border-t border-[hsl(var(--border))]">
-              <Button type="submit" disabled={saveMutation.isPending} className="flex-1">
+              <Button type="submit" disabled={saveMutation.isPending || !activeCompanyId} className="flex-1">
                 {saveMutation.isPending ? 'Guardando...' : 'Guardar configuracion'}
               </Button>
               {canTest && (

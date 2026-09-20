@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef } from 'react'
 import { onlineManager } from '@tanstack/react-query'
 import { RunlyOfflineDatabase } from './db.js'
 import { OnlineDetector } from './online-detector.js'
-import { SessionVault } from './session-vault.js'
+import { offlineDatabaseName } from './offline-scope.js'
 import { SyncEngine } from './sync-engine.js'
 import { createOfflineTransport } from './offline-transport.js'
 import { useOfflineStore } from './offline-store.js'
@@ -16,7 +16,11 @@ const LEDGER_MODULE_KEY = 'runly.ledger'
 
 const OfflineContext = createContext(null)
 
-export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
+export function OfflineProvider({ children, apiBaseUrl, onTransportReady, session }) {
+  const sessionRef = useRef(session)
+  useEffect(() => { sessionRef.current = session }, [session])
+  const companyId = session?.companyId
+  const userId = session?.userProfile?.id
   const detectorRef = useRef(null)
   const dbRef = useRef(null)
   const engineRef = useRef(null)
@@ -30,7 +34,9 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
   const setPendingCount = useOfflineStore((s) => s.setPendingCount)
 
   useEffect(() => {
-    const database = new RunlyOfflineDatabase()
+    const databaseName = offlineDatabaseName({ apiBaseUrl, userId, companyId })
+    if (!databaseName) return
+    const database = new RunlyOfflineDatabase(databaseName)
     dbRef.current = database
     const lifecycle = createDatabaseLifecycle(database, (err) => {
       console.warn('[runly/offline] IndexedDB failed to open - offline features unavailable', err)
@@ -38,17 +44,22 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
     let ledgerStore = null
     let ledgerSyncAdapter = null
 
-    const vault = new SessionVault(database)
+    const getSession = async () => {
+      const current = sessionRef.current
+      return lifecycle.isActive() && current?.companyId === companyId && current?.userProfile?.id === userId ? current : null
+    }
+    const getToken = async () => (await getSession())?.accessToken ?? null
     const engine = new SyncEngine({
       db: database,
       apiBaseUrl,
-      getToken: () => vault.load().then((session) => session?.accessToken ?? null),
+      getToken,
+      companyId,
     })
     engineRef.current = engine
 
     const transport = createOfflineTransport({
       db: database,
-      getSession: () => vault.load(),
+      getSession,
     })
 
     if (onTransportReady) {
@@ -78,7 +89,7 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
     async function ensureLedgerRuntime() {
       if (!isTauriAvailable()) return null
 
-      const session = await vault.load()
+      const session = await getSession()
       if (!lifecycle.isActive()) return null
       const companyId = session?.companyId ?? null
 
@@ -94,14 +105,15 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
       await disposeLedgerRuntime()
 
       if (!lifecycle.isActive()) return null
-      ledgerStore = new LedgerSQLiteStore({ companyId })
+      ledgerStore = new LedgerSQLiteStore({ companyId, userId })
       await ledgerStore.open()
       if (!lifecycle.isActive()) return null
 
       ledgerSyncAdapter = new LedgerSyncAdapter({
         db: database,
         apiBaseUrl,
-        getToken: () => vault.load().then((currentSession) => currentSession?.accessToken ?? null),
+        getToken,
+        companyId,
         ledgerStore,
       })
 
@@ -180,7 +192,7 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady }) {
         console.warn('[runly/offline] Cleanup failed', err?.message ?? err)
       })
     }
-  }, [apiBaseUrl, setOnline, setLastSyncAt, setSyncing, setPendingCount, onTransportReady])
+  }, [apiBaseUrl, companyId, userId, setOnline, setLastSyncAt, setSyncing, setPendingCount, onTransportReady])
 
   return (
     <OfflineContext.Provider value={{ dbRef, engineRef, ledgerStoreRef, ledgerSyncAdapterRef }}>

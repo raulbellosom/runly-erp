@@ -8,7 +8,7 @@ function makePrisma() {
   const floors = new Map();
   const tables = new Map();
   const stations = new Map();
-  const outlets = new Map();
+  const outlets = new Map([['outlet-1', { id: 'outlet-1', companyId: 'company-1' }]]);
   const orders = new Map();
   const lines = new Map();
   const configs = new Map();

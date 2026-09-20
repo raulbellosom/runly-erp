@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/MembershipsScreen.jsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -23,7 +24,7 @@ export default function MembershipsScreen() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-memberships', token],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/memberships`, { headers })
+      const res = await companyFetch(`${API_BASE}/ledger/memberships`, { headers })
       if (!res.ok) throw new Error('No se pudieron cargar las membresias.')
       return res.json()
     },
@@ -34,7 +35,7 @@ export default function MembershipsScreen() {
   const accounts = data?.data?.accounts ?? []
 
   async function confirmLeaveGroup() {
-    const res = await fetch(`${API_BASE}/ledger/memberships/groups/${leaveGroup.id}`, {
+    const res = await companyFetch(`${API_BASE}/ledger/memberships/groups/${leaveGroup.id}`, {
       method: 'DELETE', headers,
     })
     if (!res.ok) { toast.error('No se pudo salir del grupo.'); return }
@@ -45,7 +46,7 @@ export default function MembershipsScreen() {
   }
 
   async function confirmLeaveAccount() {
-    const res = await fetch(`${API_BASE}/ledger/memberships/accounts/${leaveAccount.id}`, {
+    const res = await companyFetch(`${API_BASE}/ledger/memberships/accounts/${leaveAccount.id}`, {
       method: 'DELETE', headers,
     })
     if (!res.ok) { toast.error('No se pudo salir de la cuenta compartida.'); return }

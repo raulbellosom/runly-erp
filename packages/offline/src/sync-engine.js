@@ -4,14 +4,16 @@ export class SyncEngine {
   #db
   #apiBaseUrl
   #getToken
+  #companyId
   #fetchImpl
   #pulling = false
   #pushing = false
   #mutationQueue
 
-  constructor({ db, apiBaseUrl, getToken, fetchImpl }) {
+  constructor({ db, apiBaseUrl, getToken, companyId, fetchImpl }) {
     this.#db = db
     this.#getToken = getToken
+    this.#companyId = companyId
     // fetchImpl is injected for testing; in production globalThis.fetch is used
     this.#fetchImpl = fetchImpl ?? ((...args) => globalThis.fetch(...args))
     this.#apiBaseUrl = (apiBaseUrl ?? '').replace(/\/$/, '')
@@ -23,7 +25,7 @@ export class SyncEngine {
     this.#pulling = true
     try {
     const token = await this.#getToken()
-    if (!token) return { pulled: 0, nextCursor: null }
+    if (!token || !this.#companyId) return { pulled: 0, nextCursor: null }
 
     // Find the oldest stored cursor across requested modules so we don't
     // miss records changed before a newer module's cursor.
@@ -40,7 +42,7 @@ export class SyncEngine {
     if (oldestCursor) url.searchParams.set('cursor', oldestCursor)
 
     const response = await this.#fetchImpl(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Runly-Company-Id': this.#companyId },
     })
     if (!response.ok) {
       throw new Error(`Pull failed: ${response.status}`)
@@ -102,7 +104,7 @@ export class SyncEngine {
     this.#pushing = true
     try {
       const token = await this.#getToken()
-      if (!token) return { pushed: 0, failed: 0 }
+      if (!token || !this.#companyId) return { pushed: 0, failed: 0 }
 
       const pending = await this.#mutationQueue.getPending({ limit: 50 })
       if (pending.length === 0) return { pushed: 0, failed: 0 }
@@ -126,6 +128,7 @@ export class SyncEngine {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
+          'X-Runly-Company-Id': this.#companyId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ mutations }),

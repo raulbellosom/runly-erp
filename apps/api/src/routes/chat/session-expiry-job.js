@@ -16,6 +16,7 @@ async function sendExpiryEmail(smtp, brandService, { guestEmail, guestName, comp
   const brand = await brandService.getBrandForCompany(companyId);
   const mail = buildChatGuestExpiryEmail({ resumeUrl, guestName, brand });
   await smtp.sendEmail({
+    companyId,
     to: guestEmail,
     subject: mail.subject,
     html: mail.html,
@@ -47,7 +48,6 @@ export async function expireStaleGuestSessions(prisma, { supabaseAdmin = null } 
   if (expiringWithEmail.length > 0) {
     const smtp = createSmtpService({ prisma });
     const brandService = createCompanyBrandService({ prisma, supabaseAdmin });
-    const isSmtpReady = await smtp.isConfigured().catch(() => false);
 
     for (const row of expiringWithEmail) {
       try {
@@ -64,7 +64,7 @@ export async function expireStaleGuestSessions(prisma, { supabaseAdmin = null } 
           WHERE id = ${row.id}
         `;
 
-        if (isSmtpReady && row.domain) {
+        if (row.company_id && row.domain && await smtp.isConfigured(row.company_id)) {
           const siteUrl = `https://${row.domain.replace(/^https?:\/\//, "")}`;
           const resumeUrl = `${siteUrl.replace(/\/$/, "")}?chat_resume=${resumeToken}`;
           await sendExpiryEmail(smtp, brandService, {

@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button, Card, PageHeader, Skeleton, TextField } from "@runly/ui";
+import { Button, Card, PageHeader, Skeleton, PasswordField, ErrorState, TextField } from "@runly/ui";
 import { BellRing, Mail, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider.jsx";
-import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { runly } from "../../../lib/runly.js";
+import { useActiveCompany } from "../../../company/ActiveCompanyProvider.jsx";
 
 function SettingsTabs() {
   const base = "px-4 py-2 text-sm font-medium rounded-lg transition-colors";
@@ -29,39 +30,25 @@ function SettingsTabs() {
   );
 }
 
-async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
 const EMPTY = { subject: "mailto:admin@example.com", publicKey: "", privateKey: "" };
 
 export default function WebPushSettingsScreen() {
+  const { activeCompanyId } = useActiveCompany();
+  const dirtyRef = useRef(false);
   const { session } = useAuth();
   const token = session?.access_token;
   const [form, setForm] = useState(EMPTY);
   const [privateKeyChanged, setPrivateKeyChanged] = useState(false);
 
   const configQuery = useQuery({
-    queryKey: ["webpush-settings"],
-    queryFn: () => apiFetch("/settings/notifications/webpush", token),
-    enabled: Boolean(token),
+    queryKey: ["webpush-settings", activeCompanyId],
+    queryFn: () => runly.settings.getWebPush(token),
+    enabled: Boolean(token && activeCompanyId),
   });
 
   useEffect(() => {
     const data = configQuery.data?.data;
-    if (!data) return;
+    if (!data || dirtyRef.current) return;
     setForm({
       subject: data.subject || "mailto:admin@example.com",
       publicKey: data.publicKey || "",
@@ -71,8 +58,9 @@ export default function WebPushSettingsScreen() {
   }, [configQuery.data]);
 
   const generateMutation = useMutation({
-    mutationFn: () => apiFetch("/settings/notifications/webpush/generate", token, { method: "POST" }),
+    mutationFn: () => runly.settings.generateWebPush(token),
     onSuccess: (response) => {
+      dirtyRef.current = true;
       const data = response?.data ?? {};
       setForm((prev) => ({
         ...prev,
@@ -87,11 +75,9 @@ export default function WebPushSettingsScreen() {
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
-      apiFetch("/settings/notifications/webpush", token, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }),
+      runly.settings.saveWebPush(payload, token),
     onSuccess: () => {
+      dirtyRef.current = false;
       toast.success("Configuracion Web Push guardada.");
       configQuery.refetch();
     },
@@ -100,10 +86,9 @@ export default function WebPushSettingsScreen() {
 
   const clearMutation = useMutation({
     mutationFn: () =>
-      apiFetch("/settings/notifications/webpush", token, {
-        method: "DELETE",
-      }),
+      runly.settings.clearWebPush(token),
     onSuccess: () => {
+      dirtyRef.current = false;
       toast.success("Configuracion Web Push eliminada.");
       setForm(EMPTY);
       setPrivateKeyChanged(false);
@@ -151,14 +136,16 @@ export default function WebPushSettingsScreen() {
             )}
           </div>
           <div className="p-4 space-y-4">
-            {configQuery.isPending ? (
+            {configQuery.isError && !configQuery.data ? (
+              <ErrorState description={configQuery.error?.message || "No se pudo cargar la configuración."} onRetry={() => configQuery.refetch()} />
+            ) : configQuery.isPending ? (
               <>
                 <Skeleton className="h-11 w-full rounded-lg" />
                 <Skeleton className="h-20 w-full rounded-lg" />
                 <Skeleton className="h-20 w-full rounded-lg" />
               </>
             ) : (
-              <form onSubmit={handleSave} className="space-y-4">
+              <form onChangeCapture={() => { dirtyRef.current = true; }} onSubmit={handleSave} className="space-y-4">
                 <TextField
                   label="VAPID Subject"
                   value={form.subject}
@@ -173,10 +160,9 @@ export default function WebPushSettingsScreen() {
                   placeholder="BEl...."
                   required
                 />
-                <TextField
+                <PasswordField
                   label="Llave privada"
-                  type="password"
-                  description={configured && !privateKeyChanged ? "(captura de nuevo para actualizar)" : undefined}
+                  hint={configured && !privateKeyChanged ? "(captura de nuevo para actualizar)" : undefined}
                   value={form.privateKey}
                   onChange={(e) => {
                     setForm((prev) => ({ ...prev, privateKey: e.target.value }));
@@ -194,7 +180,7 @@ export default function WebPushSettingsScreen() {
                   >
                     {generateMutation.isPending ? "Generando..." : "Generar llaves"}
                   </Button>
-                  <Button type="submit" disabled={saveMutation.isPending}>
+                  <Button type="submit" disabled={saveMutation.isPending || !activeCompanyId}>
                     {saveMutation.isPending ? "Guardando..." : "Guardar configuracion"}
                   </Button>
                   {configured && (

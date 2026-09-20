@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/GroupScreen.jsx
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -69,7 +70,7 @@ export default function GroupScreen() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-group', groupId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/groups/${groupId}`, { headers })
+      const res = await companyFetch(`${API_BASE}/ledger/groups/${groupId}`, { headers })
       if (!res.ok) throw new Error('No se pudo cargar el grupo.')
       return res.json()
     },
@@ -80,7 +81,7 @@ export default function GroupScreen() {
   const { data: allAccountsData } = useQuery({
     queryKey: ['ledger-accounts', token],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/accounts`, { headers })
+      const res = await companyFetch(`${API_BASE}/ledger/accounts`, { headers })
       if (!res.ok) return { data: [] }
       return res.json()
     },
@@ -98,7 +99,7 @@ export default function GroupScreen() {
   )
 
   async function handleInvite(userId, role) {
-    const res = await fetch(`${API_BASE}/ledger/groups/${groupId}/members`, {
+    const res = await companyFetch(`${API_BASE}/ledger/groups/${groupId}/members`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, role }),
@@ -113,7 +114,7 @@ export default function GroupScreen() {
   }
 
   async function handleRemoveMember(targetUserId) {
-    const res = await fetch(`${API_BASE}/ledger/groups/${groupId}/members/${targetUserId}`, {
+    const res = await companyFetch(`${API_BASE}/ledger/groups/${groupId}/members/${targetUserId}`, {
       method: 'DELETE',
       headers,
     })
@@ -127,7 +128,7 @@ export default function GroupScreen() {
     if (!assignTarget) return
     setAssigning(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/accounts/${assignTarget.id}/group`, {
+      const res = await companyFetch(`${API_BASE}/ledger/accounts/${assignTarget.id}/group`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ group_id: groupId }),
@@ -149,7 +150,7 @@ export default function GroupScreen() {
   }
 
   async function handleUnassignAccount(account) {
-    const res = await fetch(`${API_BASE}/ledger/accounts/${account.id}/group`, {
+    const res = await companyFetch(`${API_BASE}/ledger/accounts/${account.id}/group`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ group_id: null }),
@@ -171,7 +172,7 @@ export default function GroupScreen() {
     if (!accForm.name.trim() || !accForm.bank.trim()) return
     setAccSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/accounts`, {
+      const res = await companyFetch(`${API_BASE}/ledger/accounts`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +190,7 @@ export default function GroupScreen() {
       }
       const created = await res.json()
       // Assign to this group immediately
-      await fetch(`${API_BASE}/ledger/accounts/${created.data.id}/group`, {
+      await companyFetch(`${API_BASE}/ledger/accounts/${created.data.id}/group`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ group_id: groupId }),
@@ -210,7 +211,7 @@ export default function GroupScreen() {
     if (!renameValue.trim()) return
     setRenameSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/groups/${groupId}`, {
+      const res = await companyFetch(`${API_BASE}/ledger/groups/${groupId}`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: renameValue.trim() }),

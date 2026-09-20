@@ -85,7 +85,7 @@ describe("createCallLinksService.sendInvites", () => {
       $queryRaw: async (strings) => {
         const sql = Array.isArray(strings) ? strings.join("?") : String(strings);
         if (sql.includes("membership")) return [{ userId: "u-match", email: "match@x.com" }];
-        return [{ id: "member" }];
+        return [{ id: "member", companyId: "company-a" }];
       },
       callLink: { findFirst: async () => ({ id: "l1", conversationId: CONV, token: "tok", code: "C", revokedAt: null }) },
       callInvite: { create: async ({ data }) => ({ id: `inv-${data.emailNormalized}`, ...data }) },
@@ -111,6 +111,7 @@ describe("createCallLinksService.sendInvites", () => {
     assert.equal(out.pendingManual.length, 0);
     assert.deepEqual(sent.map((m) => m.to), ["outsider@y.com"]);
     // Uses the branded template, not a raw <p> blob.
+    assert.equal(sent[0].companyId, "company-a");
     assert.equal(sent[0].subject, "Te invitaron a una llamada");
     assert.match(sent[0].html, /href="https:\/\/app\.test\/p\/call\/tok\?i=/);
     assert.match(sent[0].text, /https:\/\/app\.test\/p\/call\/tok\?i=/);
@@ -118,7 +119,7 @@ describe("createCallLinksService.sendInvites", () => {
 
   it("returns pendingManual with a copyable URL when SMTP is not configured", async () => {
     const prisma = {
-      $queryRaw: async (s) => (String(Array.isArray(s) ? s.join("?") : s).includes("membership") ? [] : [{ id: "member" }]),
+      $queryRaw: async (s) => (String(Array.isArray(s) ? s.join("?") : s).includes("membership") ? [] : [{ id: "member", companyId: "company-a" }]),
       callLink: { findFirst: async () => ({ id: "l1", conversationId: CONV, token: "tok", code: "C", revokedAt: null }) },
       callInvite: { create: async ({ data }) => ({ id: "inv", ...data }) },
     };
@@ -132,7 +133,7 @@ describe("createCallLinksService.sendInvites", () => {
 
   it("marks pendingManual as smtp_error and surfaces the message when SMTP is saved but unusable", async () => {
     const prisma = {
-      $queryRaw: async (s) => (String(Array.isArray(s) ? s.join("?") : s).includes("membership") ? [] : [{ id: "member" }]),
+      $queryRaw: async (s) => (String(Array.isArray(s) ? s.join("?") : s).includes("membership") ? [] : [{ id: "member", companyId: "company-a" }]),
       callLink: { findFirst: async () => ({ id: "l1", conversationId: CONV, token: "tok", code: "C", revokedAt: null }) },
       callInvite: { create: async ({ data }) => ({ id: "inv", ...data }) },
     };

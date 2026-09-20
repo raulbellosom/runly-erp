@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { runly } from '../lib/runly'
 import { getApiUrl } from '../lib/runtimeConfig.js'
@@ -6,7 +6,7 @@ import { RunlyOfflineDatabase, SessionVault } from '@runly/offline'
 import { isSessionFresh } from './sessionFreshness.js'
 import { useQueryClient } from '@tanstack/react-query'
 import { useChatFloatStore } from '../modules/runly.chat/store/chatFloatStore.js'
-import { setActiveCompanyId } from '../lib/runly'
+import { setActiveCompanyId, getActiveCompanyId } from '../lib/runly'
 
 const _vaultDb = new RunlyOfflineDatabase()
 const _sessionVault = new SessionVault(_vaultDb)
@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const currentIdentityRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -27,6 +28,7 @@ export function AuthProvider({ children }) {
     function changeIdentity(nextId) {
       if (currentAuthId === nextId) return
       currentAuthId = nextId
+      currentIdentityRef.current = nextId
       queryClient.cancelQueries()
       queryClient.clear()
       setUserProfile(null)
@@ -108,9 +110,10 @@ export function AuthProvider({ children }) {
             apiBaseUrl: getApiUrl(),
           }).catch(() => {})
 
+          const requestedCompanyId = getActiveCompanyId()
           runly.auth.me(currentSession.access_token)
             .then(profile => {
-              if (!mounted || currentAuthId !== currentSession?.user?.id) return
+              if (!mounted || currentAuthId !== currentSession?.user?.id || requestedCompanyId !== getActiveCompanyId()) return
               setUserProfile(profile)
               profileLoadedForAuthUserId = currentSession?.user?.id ?? null
               _sessionVault.update({
@@ -158,9 +161,10 @@ export function AuthProvider({ children }) {
         if (eventName === 'TOKEN_REFRESHED' && authUserId && profileLoadedForAuthUserId === authUserId) {
           return
         }
+        const requestedCompanyId = getActiveCompanyId()
         runly.auth.me(session.access_token)
           .then(profile => {
-            if (!mounted || currentAuthId !== authUserId) return
+            if (!mounted || currentAuthId !== authUserId || requestedCompanyId !== getActiveCompanyId()) return
             setUserProfile(profile)
             profileLoadedForAuthUserId = authUserId
           })
@@ -199,8 +203,10 @@ export function AuthProvider({ children }) {
 
   async function refreshProfile(activeSession = session) {
     if (!activeSession?.access_token) return null
+    const requestedCompanyId = getActiveCompanyId()
     try {
       const profile = await runly.auth.me(activeSession.access_token)
+      if (currentIdentityRef.current !== activeSession.user?.id || requestedCompanyId !== getActiveCompanyId()) return null
       setUserProfile(profile)
       return profile
     } catch {

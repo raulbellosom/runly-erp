@@ -34,6 +34,7 @@ describe('assertUserLinkEligibility (via createEmployee) — company scoping', (
 
     await service.createEmployee({
       authUserId: 'auth-1',
+      companyId: 'company-b',
       payload: {
         firstName: 'Ana',
         lastName: 'Lopez',

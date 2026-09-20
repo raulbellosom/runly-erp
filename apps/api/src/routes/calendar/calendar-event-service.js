@@ -185,8 +185,8 @@ export function createCalendarEventService({ prisma }) {
     return result.sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
   }
 
-  async function getEvent(userId, eventId) {
-    const accessibleIds = await getAccessibleCalendarIds(userId)
+  async function getEvent(userId, eventId, companyId) {
+    const accessibleIds = await getAccessibleCalendarIds(userId, companyId)
     const event = await prisma.calendarEvent.findFirst({
       where: { id: eventId, calendarId: { in: accessibleIds }, enabled: true },
       include: {
@@ -204,7 +204,7 @@ export function createCalendarEventService({ prisma }) {
     return event
   }
 
-  async function createEvent(userId, data) {
+  async function createEvent(userId, data, companyId) {
     const {
       calendarId, title, description, startAt, endAt, allDay,
       location, videoUrl, color, recurrenceRule,
@@ -216,7 +216,7 @@ export function createCalendarEventService({ prisma }) {
     if (!startAt) throw new CalendarServiceError('La fecha de inicio es requerida.', 400)
     if (!calendarId) throw new CalendarServiceError('El calendario es requerido.', 400)
 
-    const accessible = await getAccessibleCalendarIds(userId)
+    const accessible = await getAccessibleCalendarIds(userId, companyId)
     if (!accessible.includes(calendarId)) throw new CalendarServiceError('No tienes acceso a ese calendario.', 403)
 
     const calendar = await prisma.calendarCalendar.findFirst({ where: { id: calendarId, enabled: true }, select: { ownerId: true } })
@@ -261,11 +261,11 @@ export function createCalendarEventService({ prisma }) {
       return created
     })
 
-    return getEvent(userId, event.id)
+    return getEvent(userId, event.id, companyId)
   }
 
-  async function updateEvent(userId, eventId, data) {
-    const accessible = await getAccessibleCalendarIds(userId)
+  async function updateEvent(userId, eventId, data, companyId) {
+    const accessible = await getAccessibleCalendarIds(userId, companyId)
     const event = await prisma.calendarEvent.findFirst({
       where: { id: eventId, calendarId: { in: accessible }, enabled: true },
       include: { calendar: true },
@@ -324,11 +324,11 @@ export function createCalendarEventService({ prisma }) {
       })
     }
 
-    return getEvent(userId, eventId)
+    return getEvent(userId, eventId, companyId)
   }
 
-  async function deleteEvent(userId, eventId) {
-    const accessible = await getAccessibleCalendarIds(userId)
+  async function deleteEvent(userId, eventId, companyId) {
+    const accessible = await getAccessibleCalendarIds(userId, companyId)
     const event = await prisma.calendarEvent.findFirst({
       where: { id: eventId, calendarId: { in: accessible }, enabled: true },
       include: { calendar: true },
@@ -343,8 +343,8 @@ export function createCalendarEventService({ prisma }) {
     await prisma.calendarEvent.update({ where: { id: eventId }, data: { enabled: false } })
   }
 
-  async function addAttendee(userId, eventId, attendeeUserId) {
-    const accessible = await getAccessibleCalendarIds(userId)
+  async function addAttendee(userId, eventId, attendeeUserId, companyId) {
+    const accessible = await getAccessibleCalendarIds(userId, companyId)
     const event = await prisma.calendarEvent.findFirst({
       where: { id: eventId, calendarId: { in: accessible }, enabled: true },
       include: { calendar: true },
@@ -370,7 +370,8 @@ export function createCalendarEventService({ prisma }) {
     }
   }
 
-  async function updateAttendeeStatus(userId, eventId, attendeeId, status) {
+  async function updateAttendeeStatus(userId, eventId, attendeeId, status, companyId) {
+    await getEvent(userId, eventId, companyId)
     const validStatuses = ['ACCEPTED', 'DECLINED', 'PENDING']
     if (!validStatuses.includes(status)) throw new CalendarServiceError('Estado invalido.', 400)
 
@@ -381,7 +382,8 @@ export function createCalendarEventService({ prisma }) {
     return prisma.calendarEventAttendee.update({ where: { id: attendeeId }, data: { status } })
   }
 
-  async function addReminder(userId, eventId, minutesBefore) {
+  async function addReminder(userId, eventId, minutesBefore, companyId) {
+    await getEvent(userId, eventId, companyId)
     if (!Number.isFinite(minutesBefore) || minutesBefore < 0) {
       throw new CalendarServiceError('minutesBefore debe ser un numero positivo.', 400)
     }
@@ -393,7 +395,8 @@ export function createCalendarEventService({ prisma }) {
     }
   }
 
-  async function deleteReminder(userId, eventId, reminderId) {
+  async function deleteReminder(userId, eventId, reminderId, companyId) {
+    await getEvent(userId, eventId, companyId)
     const reminder = await prisma.calendarReminder.findFirst({ where: { id: reminderId, eventId, userId } })
     if (!reminder) throw new CalendarServiceError('Recordatorio no encontrado.', 404)
     await prisma.calendarReminder.delete({ where: { id: reminderId } })

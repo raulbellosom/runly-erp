@@ -6,6 +6,7 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "check:privacy": "node scripts/check-repository-privacy.mjs",
+    "check:company-scope": "node scripts/check-company-scope.mjs",
     "check:secrets": "node scripts/check-repository-privacy.mjs --secrets",
     "start": "bash scripts/start-dev.sh",
     "dev": "node scripts/start-office-dev.mjs && concurrently --kill-others-on-fail -n api,web,worker -c cyan,magenta,yellow \"pnpm dev:api\" \"pnpm dev:frontend\" \"pnpm dev:worker\"",

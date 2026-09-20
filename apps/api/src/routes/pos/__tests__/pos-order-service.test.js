@@ -166,6 +166,7 @@ function makePrisma() {
       },
     },
     posGuestSeat: {
+      findFirst: async ({ where }) => [...guests.values()].find(row => row.id === where.id && row.orderId === where.orderId && orders.get(row.orderId)?.companyId === where.order.companyId) ?? null,
       createMany: async ({ data }) => {
         for (const item of data) {
           const row = { id: `guest-${guests.size + 1}`, ...item };

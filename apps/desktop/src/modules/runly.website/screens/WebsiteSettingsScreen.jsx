@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { companyFetch } from '../../../lib/companyFetch.js'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -23,16 +24,20 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { runly, getActiveCompanyId } from '../../../lib/runly.js'
+import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
 import { WebsiteSourceSelector } from '../components/WebsiteSourceSelector.jsx'
 import { DistUploadPanel } from '../components/DistUploadPanel.jsx'
 
 async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const companyId = getActiveCompanyId()
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...options.headers,
+      ...(companyId ? { 'X-Runly-Company-Id': companyId } : {}),
     },
   })
   if (!res.ok) {
@@ -43,11 +48,13 @@ async function apiFetch(path, token, options = {}) {
 }
 
 async function apiFetchForm(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const companyId = getActiveCompanyId()
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
       ...options.headers,
+      ...(companyId ? { 'X-Runly-Company-Id': companyId } : {}),
     },
   })
   if (!res.ok) {
@@ -70,6 +77,8 @@ const ANALYTICS_MODE_OPTIONS = [
 ]
 
 export default function WebsiteSettingsScreen() {
+  const { activeCompanyId } = useActiveCompany()
+  const smtpDirtyRef = useRef(false)
   const { session } = useAuth()
   const token = session?.access_token
   const navigate = useNavigate()
@@ -109,14 +118,14 @@ export default function WebsiteSettingsScreen() {
 
   // --- SMTP config query ---
   const configQuery = useQuery({
-    queryKey: ['website-smtp-settings'],
-    queryFn: () => apiFetch('/website/settings/smtp', token),
-    enabled: Boolean(token),
+    queryKey: ['website-smtp-settings', activeCompanyId],
+    queryFn: () => runly.settings.getWebsiteSmtp(token),
+    enabled: Boolean(token && activeCompanyId),
   })
 
   useEffect(() => {
     const data = configQuery.data?.data
-    if (!data) return
+    if (!data || smtpDirtyRef.current) return
     setSmtpForm({
       host:       data.host,
       port:       data.port,
@@ -130,19 +139,21 @@ export default function WebsiteSettingsScreen() {
 
   const smtpSaveMutation = useMutation({
     mutationFn: (data) =>
-      apiFetch('/website/settings/smtp', token, { method: 'POST', body: JSON.stringify(data) }),
+      runly.settings.saveWebsiteSmtp(data, token),
     onSuccess: () => {
+      smtpDirtyRef.current = false
       toast.success('Configuracion SMTP del website guardada')
       setPassChanged(false)
+      setSmtpForm((current) => ({ ...current, pass: '' }))
       configQuery.refetch()
     },
     onError: (err) => toast.error(err.message),
   })
 
   const smtpTestMutation = useMutation({
-    mutationFn: () => apiFetch('/website/settings/smtp/test', token, { method: 'POST' }),
+    mutationFn: () => runly.settings.testWebsiteSmtp(token),
     onSuccess: (res) => {
-      const label = res.source === 'website' ? 'SMTP propio del website' : 'SMTP de plataforma (fallback)'
+      const label = res.source === 'website' ? 'SMTP propio del sitio' : 'SMTP de la empresa'
       toast.success(`Email de prueba enviado via ${label}`)
     },
     onError: (err) => toast.error(`Error: ${err.message}`),
@@ -345,7 +356,7 @@ export default function WebsiteSettingsScreen() {
                 <div>
                   <p className="text-sm font-semibold">Correo electronico (SMTP)</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Credenciales propias del sitio. Si no se configuran, se usa el SMTP de la plataforma como respaldo.
+                    Credenciales propias del sitio. Si no se configuran, se usa el SMTP de esta empresa como respaldo.
                   </p>
                 </div>
                 {smtpConfigured && (
@@ -369,7 +380,7 @@ export default function WebsiteSettingsScreen() {
                     <Skeleton className="h-11 w-full rounded-lg" />
                   </div>
                 ) : (
-                  <form onSubmit={handleSmtpSubmit} className="space-y-4">
+                  <form onChangeCapture={() => { smtpDirtyRef.current = true }} onSubmit={handleSmtpSubmit} className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <TextField
                         label="Servidor (host)"
@@ -428,7 +439,7 @@ export default function WebsiteSettingsScreen() {
                       label={[25, 587].includes(Number(smtpForm.port)) ? 'Exigir STARTTLS' : 'Usar TLS directo (SSL)'}
                       checked={Number(smtpForm.port) === 465 || smtpForm.tls}
                       disabled={Number(smtpForm.port) === 465}
-                      onChange={(checked) => setSmtpForm((f) => ({ ...f, tls: checked }))}
+                      onChange={(checked) => { smtpDirtyRef.current = true; setSmtpForm((f) => ({ ...f, tls: checked })) }}
                     />
 
                     <p className="text-sm text-muted-foreground">

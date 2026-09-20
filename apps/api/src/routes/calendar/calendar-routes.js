@@ -239,6 +239,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           userId,
           c.req.param("id"),
           body,
+          getCompanyId(c),
         );
         return c.json(calendar);
       } catch (err) {
@@ -254,7 +255,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
       try {
         const userId = getUserId(c);
         const calendarId = c.req.param("id");
-        await svc.deleteCalendar(userId, calendarId);
+        await svc.deleteCalendar(userId, calendarId, getCompanyId(c));
         const { actorName } = getActivityContext(c);
         await publishActivityFromContext(prisma, c, {
           type: "calendar.calendar.delete",
@@ -277,7 +278,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
       try {
         const userId = getUserId(c);
         const body = await c.req.json();
-        const share = await svc.shareCalendar(userId, c.req.param("id"), body);
+        const share = await svc.shareCalendar(userId, c.req.param("id"), body, getCompanyId(c));
         return c.json(share, 201);
       } catch (err) {
         return handleError(c, err, "No se pudo compartir el calendario.");
@@ -297,6 +298,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           c.req.param("id"),
           c.req.param("shareId"),
           body,
+          getCompanyId(c),
         );
         return c.json(share);
       } catch (err) {
@@ -315,6 +317,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           userId,
           c.req.param("id"),
           c.req.param("shareId"),
+          getCompanyId(c),
         );
         return c.json({ ok: true });
       } catch (err) {
@@ -634,7 +637,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
       try {
         const userId = getUserId(c);
         const body = await c.req.json();
-        const event = await eventSvc.createEvent(userId, body);
+        const event = await eventSvc.createEvent(userId, body, getCompanyId(c));
         const { actorName } = getActivityContext(c);
         await publishActivityFromContext(prisma, c, {
           type: "calendar.event.create",
@@ -685,7 +688,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
     async (c) => {
       try {
         const userId = getUserId(c);
-        const event = await eventSvc.getEvent(userId, c.req.param("id"));
+        const event = await eventSvc.getEvent(userId, c.req.param("id"), getCompanyId(c));
         return c.json(event);
       } catch (err) {
         return handleError(c, err, "No se pudo obtener el evento.");
@@ -701,10 +704,10 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
         const userId = getUserId(c);
         const eventId = c.req.param("id");
         const before = await eventSvc
-          .getEvent(userId, eventId)
+          .getEvent(userId, eventId, getCompanyId(c))
           .catch(() => null);
         const body = await c.req.json();
-        const event = await eventSvc.updateEvent(userId, eventId, body);
+        const event = await eventSvc.updateEvent(userId, eventId, body, getCompanyId(c));
         const { actorName } = getActivityContext(c);
         const trackedFields = [
           "title",
@@ -786,9 +789,9 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
         const userId = getUserId(c);
         const eventId = c.req.param("id");
         const before = await eventSvc
-          .getEvent(userId, eventId)
+          .getEvent(userId, eventId, getCompanyId(c))
           .catch(() => null);
-        await eventSvc.deleteEvent(userId, eventId);
+        await eventSvc.deleteEvent(userId, eventId, getCompanyId(c));
         const { actorName } = getActivityContext(c);
         const title = before?.title ?? "";
         await publishActivityFromContext(prisma, c, {
@@ -848,8 +851,9 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           userId,
           c.req.param("id"),
           user_id,
+          getCompanyId(c),
         );
-        const event = await eventSvc.getEvent(userId, c.req.param("id"));
+        const event = await eventSvc.getEvent(userId, c.req.param("id"), getCompanyId(c));
         const { actorName } = getActivityContext(c);
         await publishNotificationFromContext(prisma, c, {
           eventType: "calendar.event.invite",
@@ -886,6 +890,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           c.req.param("id"),
           c.req.param("attendeeId"),
           status,
+          getCompanyId(c),
         );
         return c.json(attendee);
       } catch (err) {
@@ -905,6 +910,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           userId,
           c.req.param("id"),
           minutes_before,
+          getCompanyId(c),
         );
         return c.json(reminder, 201);
       } catch (err) {
@@ -923,6 +929,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
           userId,
           c.req.param("id"),
           c.req.param("reminderId"),
+          getCompanyId(c),
         );
         return c.json({ ok: true });
       } catch (err) {

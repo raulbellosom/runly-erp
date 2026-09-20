@@ -253,11 +253,22 @@ html {
      comes last, silently dropping the standard property in the prod build and
      killing the blur in engines that don't honor `-webkit-backdrop-filter`
      (Firefox, some webviews). Keep this a single declaration. */
+  /* transform + isolation force each blurred surface onto its own stable
+     GPU compositing layer instead of one that gets torn down and rebuilt on
+     every repaint. Without this, a descendant's opacity animation (e.g.
+     Skeleton's animate-pulse shown while a query is loading) or a scroll
+     reflow invalidates the shared layer, and Chromium/WebView2 briefly
+     recomposites the backdrop blur per-tile — visible as a flashing
+     two-tone seam that clears mid-scroll and returns once idle. See the
+     "glassic flicker" bug report: cards flashed specifically while requests
+     were loading (Skeleton pulsing inside) and on/after scroll. */
   .glass {
     backdrop-filter: blur(var(--glass-blur));
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
+    transform: translateZ(0);
+    isolation: isolate;
   }
 
   .glass-strong {
@@ -265,6 +276,8 @@ html {
     background: var(--glass-bg-strong);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
+    transform: translateZ(0);
+    isolation: isolate;
   }
 
   .glass-shell {
@@ -272,6 +285,8 @@ html {
     background: var(--glass-bg-shell);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
+    transform: translateZ(0);
+    isolation: isolate;
     /* Nested .glass/.glass-subtle surfaces (form fields, grouped panels)
        need to read as a visibly distinct layer from this shell. Plain alpha
        stacking can't do that here: in light mode both this shell and its
@@ -296,6 +311,8 @@ html {
     background: var(--glass-tint);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
+    transform: translateZ(0);
+    isolation: isolate;
   }
 
   .glass-tinted-brand {
@@ -303,10 +320,24 @@ html {
     background: var(--glass-tint-brand);
     border: 1px solid var(--glass-glow-brand);
     box-shadow: var(--glass-shadow);
+    transform: translateZ(0);
+    isolation: isolate;
   }
 
+  /* No backdrop-filter here, unlike the other .glass* variants — every
+     .glass-subtle consumer (Input, Select, Textarea, form-field-base,
+     SearchInput, Tabs — i.e. every form field) is itself nested inside an
+     ancestor .glass/.glass-shell/.glass-strong Card, which already blurs
+     the real page content behind it. Blurring AGAIN here means blurring an
+     already-blurred layer: a form with a dozen fields becomes a dozen
+     *nested* backdrop-filter layers stacked inside one outer blur layer,
+     which is exactly the pattern Chromium/WebView2's tiled blur compositor
+     handles worst — this is what kept producing the flicker/seam artifacts
+     even after the .glass fixes above (isolation/translateZ stabilizes a
+     layer's own compositing, it doesn't fix the cost of nesting N more
+     blurred layers inside it). The translucent background/border alone
+     still reads as "glass" against the already-blurred Card behind it. */
   .glass-subtle {
-    backdrop-filter: blur(calc(var(--glass-blur) * 0.5));
     background: var(--glass-bg);
     border: 1px solid var(--glass-border-subtle);
   }

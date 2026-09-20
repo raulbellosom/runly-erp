@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/hooks/use-ai-import.js
 import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../../../auth/AuthProvider'
@@ -13,7 +14,7 @@ export function useAiImportMutations() {
     mutationFn: async (file) => {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`${API_BASE}/ledger/imports/recognize`, {
+      const res = await companyFetch(`${API_BASE}/ledger/imports/recognize`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -26,7 +27,7 @@ export function useAiImportMutations() {
 
   const commit = useMutation({
     mutationFn: async (payload) => {
-      const res = await fetch(`${API_BASE}/ledger/imports/commit`, {
+      const res = await companyFetch(`${API_BASE}/ledger/imports/commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),

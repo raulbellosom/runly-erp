@@ -330,7 +330,7 @@ route. All list queries filter `enabled = true`.
 app.patch('/crm/contacts/:id/enabled',
   requirePermission('crm.contact.delete'),
   async (c) => {
-    const companyId = c.get('userContext')?.memberships?.[0]?.companyId
+    const companyId = c.get('companyId') // validated by requirePermission
     const actorId   = c.get('userContext')?.profile?.id
     const body   = await c.req.json()
     const parsed = enabledSchema.safeParse(body)

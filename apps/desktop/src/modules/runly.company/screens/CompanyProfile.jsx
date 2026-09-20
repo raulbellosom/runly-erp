@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -130,6 +130,7 @@ const COMPANY_SIZE_ALIASES = {
 };
 
 export default function CompanyProfile() {
+  const dirtyRef = useRef(false);
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const queryClient = useQueryClient();
@@ -142,6 +143,11 @@ export default function CompanyProfile() {
     queryKey: ["company-profile"],
     queryFn: () => runly.company.getProfile(token),
     enabled: Boolean(token),
+    // The app-wide default staleTime is 5 minutes, so remounting this screen
+    // shortly after another screen already fetched "company-profile" served
+    // that cached snapshot with no new request — stale companyType/companySize
+    // kept showing as unselected even after a successful save elsewhere.
+    staleTime: 0,
   });
 
   const [form, setForm] = useState({
@@ -159,7 +165,7 @@ export default function CompanyProfile() {
   });
 
   useEffect(() => {
-    if (data?.data) {
+    if (data?.data && !dirtyRef.current) {
       const nextCompanyType = normalizeOptionValue(
         data.data.companyType,
         COMPANY_TYPES,
@@ -193,6 +199,7 @@ export default function CompanyProfile() {
   const saveMutation = useMutation({
     mutationFn: (payload) => runly.company.updateProfile(payload, token),
     onSuccess: () => {
+      dirtyRef.current = false;
       queryClient.invalidateQueries({ queryKey: ["company-profile"] });
       toast.success("Perfil de empresa actualizado.");
     },
@@ -202,6 +209,7 @@ export default function CompanyProfile() {
   });
 
   function handleChange(key, value) {
+    dirtyRef.current = true;
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -240,7 +248,7 @@ export default function CompanyProfile() {
           />
 
           {!canManage && (
-            <ErrorState message="Necesitas permiso company.profile.update para editar el perfil de la empresa." />
+            <ErrorState title="Perfil en modo lectura" description="Tu rol en esta empresa no permite editar el perfil." />
           )}
 
           <form

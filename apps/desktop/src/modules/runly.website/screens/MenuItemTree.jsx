@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import {
   DndContext,
@@ -115,7 +116,7 @@ export default function MenuItemTree({ menuId, items = [], onReorder, onRefresh 
 
   const reorderMutation = useMutation({
     mutationFn: async (reordered) => {
-      const res = await fetch(`${getApiUrl()}/website/menus/${menuId}/items/reorder`, {
+      const res = await companyFetch(`${getApiUrl()}/website/menus/${menuId}/items/reorder`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +130,7 @@ export default function MenuItemTree({ menuId, items = [], onReorder, onRefresh 
 
   const deleteMutation = useMutation({
     mutationFn: async (itemId) => {
-      const res = await fetch(`${getApiUrl()}/website/menu-items/${itemId}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/menu-items/${itemId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

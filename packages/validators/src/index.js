@@ -482,6 +482,14 @@ export const updateMembershipSchema = z
     message: "Debes enviar roleId o enabled.",
   });
 
+// For POST /company/members — unlike createMembershipSchema, companyId is
+// never accepted from the client; the server always uses the caller's active
+// company (tenant.companyId).
+export const createCompanyMemberSchema = z.object({
+  userId: z.string().uuid("Usuario inválido."),
+  roleId: z.string().uuid("Rol inválido.").nullable().optional(),
+});
+
 export const fileBulkDownloadSchema = z.object({
   fileIds: z
     .array(

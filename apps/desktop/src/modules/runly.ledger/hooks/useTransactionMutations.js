@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/hooks/useTransactionMutations.js
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -19,7 +20,7 @@ export function useTransactionMutations({ accountId, token, queryKey, canEdit, o
       const url = isNew
         ? `${API_BASE}/ledger/accounts/${accountId}/transactions`
         : `${API_BASE}/ledger/accounts/${accountId}/transactions/${id}`
-      const res = await fetch(url, {
+      const res = await companyFetch(url, {
         method: isNew ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
@@ -68,7 +69,7 @@ export function useTransactionMutations({ accountId, token, queryKey, canEdit, o
 
   const deleteMutation = useMutation({
     mutationFn: async (txId) => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${API_BASE}/ledger/accounts/${accountId}/transactions/${txId}/enabled`,
         {
           method: 'PATCH',

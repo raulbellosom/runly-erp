@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -33,7 +34,7 @@ const ALL_BLOCKS = [
 ]
 
 async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers },
   })

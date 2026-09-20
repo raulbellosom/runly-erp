@@ -47,9 +47,8 @@ export function createCompanyBrandService({ prisma, supabaseAdmin }) {
     }
   }
 
-  // Same lookup, keyed by a recipient's email via their first active
-  // membership — for flows that only know the address (e.g. the public
-  // forgot-password endpoint, before any company context exists).
+  // Identity-only flows have no selected company. Brand only an unambiguous
+  // membership; multi-company identities receive neutral Runly branding.
   async function getBrandForEmail(email) {
     const normalized = String(email ?? "").trim().toLowerCase();
     if (!normalized) return null;
@@ -58,14 +57,14 @@ export function createCompanyBrandService({ prisma, supabaseAdmin }) {
         where: { email: normalized },
         select: {
           memberships: {
-            where: { enabled: true },
+            where: { enabled: true, company: { enabled: true }, role: { enabled: true } },
             orderBy: { createdAt: "asc" },
-            take: 1,
+            take: 2,
             select: { companyId: true },
           },
         },
       });
-      const companyId = user?.memberships?.[0]?.companyId ?? null;
+      const companyId = user?.memberships?.length === 1 ? user.memberships[0].companyId : null;
       return companyId ? getBrandForCompany(companyId) : null;
     } catch {
       return null;

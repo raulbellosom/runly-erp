@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -21,7 +22,7 @@ import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 
 async function apiGet(path, token) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -29,7 +30,7 @@ async function apiGet(path, token) {
 }
 
 async function apiPatch(path, token, body) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

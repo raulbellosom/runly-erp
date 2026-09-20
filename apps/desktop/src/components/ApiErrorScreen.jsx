@@ -18,34 +18,6 @@ import {
 } from "lucide-react";
 import { classifyError } from "../lib/classifyError.js";
 
-// ─── Runly isotype (official mark, theme-aware) ──────────────────────────────
-function AtlasIsotype({ size = 40, muted = false }) {
-  return (
-    <>
-      <img
-        src="/runly/runly-isotipo-light.png"
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        width={size}
-        height={size}
-        className="dark:hidden"
-        style={{ opacity: muted ? 0.45 : 1, objectFit: "contain" }}
-      />
-      <img
-        src="/runly/runly-isotipo-dark.png"
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        width={size}
-        height={size}
-        className="hidden dark:block"
-        style={{ opacity: muted ? 0.45 : 1, objectFit: "contain" }}
-      />
-    </>
-  );
-}
-
 // ─── Per-type config ──────────────────────────────────────────────────────────
 const ERROR_CONFIG = {
   network: {
@@ -289,6 +261,27 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, com
       className={wrapperClass}
       style={{ background: "hsl(var(--background))" }}
     >
+      {/* Full-brightness wordmark, pinned to a corner instead of buried
+          inline above the icon — the muted centered version there was easy
+          to miss entirely against the animated glow. Only makes sense
+          fixed-to-viewport when this screen actually owns the viewport. */}
+      {fullScreen && (
+        <div className="fixed left-5 top-5 z-10 sm:left-7 sm:top-7">
+          <img
+            src="/runly/runly-logo-light.png"
+            alt="Runly ERP"
+            draggable={false}
+            className="h-6 w-auto object-contain dark:hidden sm:h-7"
+          />
+          <img
+            src="/runly/runly-logo-dark.png"
+            alt="Runly ERP"
+            draggable={false}
+            className="hidden h-6 w-auto object-contain dark:block sm:h-7"
+          />
+        </div>
+      )}
+
       {/* ── Ambient background ────────────────────────────────── */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -311,17 +304,6 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, com
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* Brand header */}
-        <div className="flex items-center gap-2 opacity-60">
-          <AtlasIsotype size={22} muted />
-          <span
-            className="text-xs font-semibold tracking-widest uppercase"
-            style={{ color: "hsl(var(--muted-foreground))" }}
-          >
-            Runly ERP
-          </span>
-        </div>
-
         {/* Animated icon */}
         <AnimatedErrorIcon
           Icon={Icon}

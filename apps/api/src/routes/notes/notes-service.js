@@ -1,3 +1,5 @@
+import { createFoldersService } from './folders-service.js';
+
 export class NotesServiceError extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -7,6 +9,7 @@ export class NotesServiceError extends Error {
 }
 
 export function createNotesService({ prisma, broadcaster = null }) {
+  const folders = createFoldersService({ prisma });
   // ------------------------------------------------------------------
   // Internal helpers
   // ------------------------------------------------------------------
@@ -22,6 +25,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
       SELECT
         n.id,
         n.owner_user_id,
+        n.company_id,
         ns.permission AS share_permission
       FROM notes n
       LEFT JOIN note_shares ns
@@ -52,7 +56,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
       }
     }
 
-    return { isOwner, sharePermission };
+    return { isOwner, sharePermission, companyId: row.company_id, ownerId: row.owner_user_id };
   }
 
   // ------------------------------------------------------------------
@@ -60,6 +64,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
   // ------------------------------------------------------------------
 
   async function createNote({ userId, companyId, folderId, title, content, icon, backgroundColor, noteType }) {
+    await folders.assertFolder({ folderId, userId, companyId });
     const type = noteType === 'canvas' ? 'canvas' : 'document';
     const rows = await prisma.$queryRaw`
       INSERT INTO notes (
@@ -128,6 +133,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
         ON nta.note_id = n.id
       LEFT JOIN note_tags nt
         ON nt.id = nta.tag_id
+        AND nt.company_id IS NOT DISTINCT FROM n.company_id
       LEFT JOIN note_shares ns
         ON ns.note_id = n.id
       LEFT JOIN user_profile sup
@@ -205,6 +211,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
         ON nta.note_id = a.id
       LEFT JOIN note_tags nt
         ON nt.id = nta.tag_id
+        AND nt.company_id IS NOT DISTINCT FROM a.company_id
       WHERE (
         ${folderId ?? null}::uuid IS NULL
         OR a.folder_id = ${folderId ?? null}::uuid
@@ -213,6 +220,8 @@ export function createNotesService({ prisma, broadcaster = null }) {
         ${tagId ?? null}::uuid IS NULL
         OR EXISTS (
           SELECT 1 FROM note_tag_assignments x
+          JOIN note_tags scoped_tag ON scoped_tag.id = x.tag_id
+            AND scoped_tag.company_id IS NOT DISTINCT FROM a.company_id
           WHERE x.note_id = a.id
             AND x.tag_id = ${tagId ?? null}::uuid
         )
@@ -225,12 +234,14 @@ export function createNotesService({ prisma, broadcaster = null }) {
         OR EXISTS (
           SELECT 1 FROM note_tag_assignments nta_q
           JOIN note_tags nt_q ON nt_q.id = nta_q.tag_id
+            AND nt_q.company_id IS NOT DISTINCT FROM a.company_id
           WHERE nta_q.note_id = a.id
             AND nt_q.name ILIKE '%' || ${q ?? null}::text || '%'
         )
         OR EXISTS (
           SELECT 1 FROM note_folders nf_q
           WHERE nf_q.id = a.folder_id
+            AND nf_q.company_id IS NOT DISTINCT FROM a.company_id
             AND nf_q.name ILIKE '%' || ${q ?? null}::text || '%'
         )
       )
@@ -286,7 +297,11 @@ export function createNotesService({ prisma, broadcaster = null }) {
   // ------------------------------------------------------------------
 
   async function updateNote(noteId, userId, data) {
-    await assertAccess(noteId, userId, "edit");
+    const access = await assertAccess(noteId, userId, "edit");
+    if (data.folderId !== undefined) {
+      if (!access.isOwner) throw new NotesServiceError("Solo el propietario puede mover la nota.", 403);
+      await folders.assertFolder({ folderId: data.folderId, userId, companyId: access.companyId });
+    }
     if (data.showPublicCollaborators !== undefined && typeof data.showPublicCollaborators !== 'boolean') {
       throw new NotesServiceError('Mostrar colaboradores debe ser verdadero o falso.', 400);
     }

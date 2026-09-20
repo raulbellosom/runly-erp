@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.website/screens/WebsiteTemplateDetailScreen.jsx
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -10,7 +11,7 @@ import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { toast } from 'sonner'
 
 async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers },
   })

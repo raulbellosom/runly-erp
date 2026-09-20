@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { getApiUrl } from '../lib/runtimeConfig.js'
 import { useQuery } from '@tanstack/react-query'
+import { PasswordField } from '@runly/ui'
 
 function useSiteName() {
   return useQuery({
@@ -120,20 +121,14 @@ export function PublicClientLogin() {
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="login-password" className="text-sm font-medium text-[hsl(var(--foreground))]">
-              Contrasena
-            </label>
-            <input
-              id="login-password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
-            />
-          </div>
+          <PasswordField
+            id="login-password"
+            label="Contraseña"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">

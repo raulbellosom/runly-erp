@@ -7,6 +7,15 @@ export class FoldersServiceError extends Error {
 }
 
 export function createFoldersService({ prisma }) {
+  async function assertFolder({ folderId, userId, companyId }) {
+    if (!folderId) return;
+    const [folder] = await prisma.$queryRaw`
+      SELECT id FROM note_folders WHERE id = ${folderId}::uuid
+        AND owner_user_id = ${userId}::uuid
+        AND company_id IS NOT DISTINCT FROM ${companyId ?? null}::uuid
+    `;
+    if (!folder) throw new FoldersServiceError("Carpeta no encontrada.", 404);
+  }
   // ------------------------------------------------------------------
   // List
   // ------------------------------------------------------------------
@@ -16,6 +25,7 @@ export function createFoldersService({ prisma }) {
       SELECT *
       FROM note_folders
       WHERE owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       ORDER BY sort_order ASC, name ASC
     `;
     return rows;
@@ -26,6 +36,7 @@ export function createFoldersService({ prisma }) {
   // ------------------------------------------------------------------
 
   async function createFolder({ userId, companyId, name, color, icon, parentFolderId, sortOrder }) {
+    await assertFolder({ folderId: parentFolderId, userId, companyId });
     const rows = await prisma.$queryRaw`
       INSERT INTO note_folders (
         owner_user_id,
@@ -54,18 +65,22 @@ export function createFoldersService({ prisma }) {
   // Update
   // ------------------------------------------------------------------
 
-  async function updateFolder(folderId, userId, data) {
+  async function updateFolder(folderId, userId, data, companyId) {
     const existing = await prisma.$queryRaw`
-      SELECT id
+      SELECT id, company_id
       FROM note_folders
       WHERE id = ${folderId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       LIMIT 1
     `;
 
     if (!existing.length) {
       throw new FoldersServiceError("Carpeta no encontrada.", 404);
     }
+
+    await assertFolder({ folderId: data.parentFolderId, userId, companyId: existing[0].company_id });
+    if (data.parentFolderId === folderId) throw new FoldersServiceError("Una carpeta no puede contenerse a si misma.", 400);
 
     const rows = await prisma.$queryRaw`
       UPDATE note_folders
@@ -90,6 +105,7 @@ export function createFoldersService({ prisma }) {
         updated_at       = NOW()
       WHERE id = ${folderId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       RETURNING *
     `;
 
@@ -104,12 +120,13 @@ export function createFoldersService({ prisma }) {
   // Delete
   // ------------------------------------------------------------------
 
-  async function deleteFolder(folderId, userId) {
+  async function deleteFolder(folderId, userId, companyId) {
     const existing = await prisma.$queryRaw`
       SELECT id
       FROM note_folders
       WHERE id = ${folderId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       LIMIT 1
     `;
 
@@ -121,6 +138,7 @@ export function createFoldersService({ prisma }) {
       DELETE FROM note_folders
       WHERE id = ${folderId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
     `;
 
     return { ok: true };
@@ -130,5 +148,5 @@ export function createFoldersService({ prisma }) {
   // Public API
   // ------------------------------------------------------------------
 
-  return { listFolders, createFolder, updateFolder, deleteFolder };
+  return { listFolders, createFolder, updateFolder, deleteFolder, assertFolder };
 }

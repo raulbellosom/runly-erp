@@ -58,6 +58,17 @@ independiente conserva sus propios permisos. Las invitaciones de empresa se crea
 desde «Invitar usuario»; los nuevos usuarios reciben identidad, pero no membresía
 hasta aceptar. SMTP es opcional: el administrador también puede copiar el enlace.
 
+SMTP se configura por empresa: lectura, guardado y prueba usan la empresa validada
+por el servidor. Sus claves cifradas se guardan en `instance_config` bajo
+`company:<id>:smtp.*`; el SMTP del sitio usa `company:<id>:website.smtp.*` y solo
+puede recurrir al SMTP de esa misma empresa. Notificaciones e invitaciones pasan
+la empresa del recurso al servicio de correo, incluidos los trabajos en segundo plano.
+Las claves históricas globales quedan reservadas a correos de identidad de instancia;
+no se copian ni se usan como respaldo de las empresas. Cada empresa debe guardar
+su configuración una vez después de actualizar. No se requiere una migración de esquema.
+Los formularios SMTP utilizan el SDK con empresa activa y mantienen borradores
+durante consultas en segundo plano. Las credenciales nunca se encolan para envío offline.
+
 ## Revocación y tiempo real
 
 Las funciones SQL `runly_member_active`, `runly_chat_user_access` y
@@ -86,10 +97,25 @@ instantánea del transporte multimedia. Véase la
 [documentación de tokens de LiveKit](https://docs.livekit.io/frontends/reference/tokens-grants/).
 
 Cambiar de cuenta/empresa elimina consultas y chats flotantes. El cliente revisa
-membresías y revisión cada 15 segundos. No persiste consultas autenticadas en el
+membresías cada 15 segundos. Cada membresía incluye una huella de sus permisos:
+solo un cambio de acceso en la empresa activa retira su caché. La revisión global
+de Realtime no reinicia pantallas por cambios de otros usuarios. Renovar el token
+conserva la consulta de membresías de la misma identidad; un fallo temporal de red
+conserva el último resultado mientras el servidor sigue autorizando cada operación.
+Los formularios de perfil y dirección conservan sus ediciones durante refetches.
+Cambiar de empresa sí reinicia el formulario para evitar mezclar borradores.
+No persiste consultas autenticadas en el
 almacén compartido de React Query. Las descargas ya entregadas no se pueden borrar
 del dispositivo: las URL firmadas de Storage conservan su vencimiento y el contenido
 ya descargado conserva las propiedades de cualquier copia local.
+
+La sincronización offline envía `X-Runly-Company-Id` en pull/push y espera a tener
+usuario y empresa resueltos. Sus bases IndexedDB se separan por servidor, usuario
+y empresa; SQLite de Ledger también separa usuario y empresa. Los cursores y las
+colas del antiguo almacén compartido no se reutilizan ni se asignan por heurística:
+las nuevas cachés se reconstruyen desde la API. No se reproducen automáticamente
+mutaciones pendientes del almacén anterior. Consultar `/user/me` también incluye
+la empresa activa y descarta respuestas tardías de otra empresa o identidad.
 
 ## Instalación y actualización
 

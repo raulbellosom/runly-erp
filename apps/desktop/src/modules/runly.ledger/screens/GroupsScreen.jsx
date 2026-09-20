@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/GroupsScreen.jsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -22,7 +23,7 @@ export default function GroupsScreen() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-groups', token],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/groups`, {
+      const res = await companyFetch(`${API_BASE}/ledger/groups`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('No se pudieron cargar los grupos.')
@@ -34,7 +35,7 @@ export default function GroupsScreen() {
   async function handleCreate(e) {
     e.preventDefault()
     if (!newName.trim()) return
-    const res = await fetch(`${API_BASE}/ledger/groups`, {
+    const res = await companyFetch(`${API_BASE}/ledger/groups`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName.trim() }),

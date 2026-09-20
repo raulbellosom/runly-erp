@@ -1,4 +1,5 @@
 import { createUserAccessService } from '../../services/user-access-service.js'
+import { createProjectFilesService } from './project-files.js'
 export class TaskServiceError extends Error {
   constructor(message, status = 500) {
     super(message)
@@ -31,6 +32,7 @@ export function computeRruleNextAt(rrule) {
 
 export function createTasksService({ prisma }) {
   const access = createUserAccessService({ prisma })
+  const files = createProjectFilesService({ prisma })
   async function validateTargets(projectId, { assigneeId, parentTaskId, statusId }) {
     const project = await prisma.project.findFirst({ where: { id: projectId }, select: { companyId: true } })
     if (!project) throw new TaskServiceError('Recurso no encontrado.', 404)
@@ -39,7 +41,7 @@ export function createTasksService({ prisma }) {
     if (statusId && !(await prisma.taskStatus.findFirst({ where: { id: statusId, projectId }, select: { id: true } }))) throw new TaskServiceError('Recurso no encontrado.', 404)
   }
 
-  async function listTasks(projectId, { statusId, assigneeId, priority, dueDateFrom, dueDateTo, parentTaskId, includeSubtasks } = {}) {
+  async function listTasks(projectId, { companyId, actorId, statusId, assigneeId, priority, dueDateFrom, dueDateTo, parentTaskId, includeSubtasks } = {}) {
     const where = { projectId }
     if (statusId) where.statusId = statusId
     if (assigneeId) where.assigneeId = assigneeId
@@ -69,18 +71,19 @@ export function createTasksService({ prisma }) {
 
     if (tasks.length === 0) return tasks
     const taskIds = tasks.map(t => t.id)
-    const attachmentCounts = await prisma.fileAsset.groupBy({
-      by: ['entityId'],
-      where: { entityType: 'Task', entityId: { in: taskIds }, enabled: true },
-      _count: { id: true },
-    })
-    const countById = Object.fromEntries(attachmentCounts.map(r => [r.entityId, r._count.id]))
+    const attachments = await files.list({ companyId, taskIds, actorId })
+    const countById = {}
+    for (const file of attachments) {
+      const id = file.entityId === companyId ? file.metadata?.sourceEntityId : file.entityId
+      countById[id] = (countById[id] ?? 0) + 1
+    }
     return tasks.map(t => ({ ...t, _count: { ...t._count, attachments: countById[t.id] ?? 0 } }))
   }
 
-  async function getTask(taskId) {
+  async function getTask(taskId, { projectId, companyId, actorId }) {
+    if (!projectId || !companyId) throw new TaskServiceError('Tarea no encontrada.', 404)
     const task = await prisma.task.findFirst({
-      where: { id: taskId },
+      where: { id: taskId, projectId, project: { companyId } },
       include: {
         assignee: { select: { id: true, firstName: true, lastName: true, avatarFileId: true } },
         assignees: {
@@ -100,10 +103,12 @@ export function createTasksService({ prisma }) {
         parent: { select: { id: true, title: true } },
         fieldValues: { include: { field: true }, orderBy: { field: { position: 'asc' } } },
         blockedBy: {
+          where: { blocker: { projectId } },
           include: { blocker: { select: { id: true, title: true, taskNumber: true, statusId: true } } },
           orderBy: { createdAt: 'asc' },
         },
         blocking: {
+          where: { blocked: { projectId } },
           include: { blocked: { select: { id: true, title: true, taskNumber: true, statusId: true } } },
           orderBy: { createdAt: 'asc' },
         },
@@ -111,10 +116,7 @@ export function createTasksService({ prisma }) {
     })
     if (!task) throw new TaskServiceError('Tarea no encontrada.', 404)
 
-    const attachments = await prisma.fileAsset.findMany({
-      where: { entityType: 'Task', entityId: taskId, enabled: true },
-      orderBy: { createdAt: 'asc' },
-    })
+    const attachments = await files.list({ companyId, taskIds: [taskId], actorId })
 
     return { ...task, attachments }
   }

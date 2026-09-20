@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/AccountsScreen.jsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -61,7 +62,7 @@ export default function AccountsScreen() {
   const { data: membershipData, isLoading: mbLoading } = useQuery({
     queryKey: ['ledger-memberships', token],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/memberships`, { headers })
+      const res = await companyFetch(`${API_BASE}/ledger/memberships`, { headers })
       if (!res.ok) return { data: { groups: [], accounts: [] } }
       return res.json()
     },
@@ -71,7 +72,7 @@ export default function AccountsScreen() {
   const { data: groupsData, isLoading: grpLoading } = useQuery({
     queryKey: ['ledger-groups', token],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/groups`, { headers })
+      const res = await companyFetch(`${API_BASE}/ledger/groups`, { headers })
       if (!res.ok) return { data: [] }
       return res.json()
     },
@@ -97,7 +98,7 @@ export default function AccountsScreen() {
 
     setAccSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/accounts`, {
+      const res = await companyFetch(`${API_BASE}/ledger/accounts`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +131,7 @@ export default function AccountsScreen() {
 
     setGrpSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/groups`, {
+      const res = await companyFetch(`${API_BASE}/ledger/groups`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newGrpName.trim() }),
@@ -161,7 +162,7 @@ export default function AccountsScreen() {
     if (!renameGroupValue.trim()) return
     setRenameGroupSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/groups/${renameGroup.id}`, {
+      const res = await companyFetch(`${API_BASE}/ledger/groups/${renameGroup.id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: renameGroupValue.trim() }),
@@ -194,7 +195,7 @@ export default function AccountsScreen() {
     if (!editForm.name.trim() || !editForm.bank.trim()) return
     setEditSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/ledger/accounts/${editAccount.id}`, {
+      const res = await companyFetch(`${API_BASE}/ledger/accounts/${editAccount.id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

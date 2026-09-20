@@ -3,6 +3,7 @@ import {
   requireCompanyId,
   writeAudit,
 } from "./service-helpers.js";
+import { createPosScopeService } from './pos-scope-service.js';
 
 export function createPosReservationService({ prisma }) {
   async function listReservations({ companyId, outletId, date, status }) {
@@ -36,12 +37,11 @@ export function createPosReservationService({ prisma }) {
 
   async function createReservation({ companyId, actorId, data }) {
     const scopedCompanyId = requireCompanyId(companyId);
+    const scope = createPosScopeService({ prisma });
+    await scope.outlet(scopedCompanyId, data.outletId);
 
     if (data.tableId) {
-      const table = await prisma.posTable.findFirst({
-        where: { id: data.tableId, companyId: scopedCompanyId },
-      });
-      if (!table) throw new PosServiceError("Mesa no encontrada.", 404);
+      const table = await scope.table(scopedCompanyId, data.outletId, data.tableId);
       if (table.status === "OCCUPIED" || table.status === "RESERVED")
         throw new PosServiceError("La mesa ya está ocupada o reservada.", 409);
     }
@@ -163,6 +163,7 @@ export function createPosReservationService({ prisma }) {
     while (attempt < 3) {
       try {
         order = await prisma.$transaction(async (tx) => {
+          await createPosScopeService({ prisma: tx }).order(scopedCompanyId, { ...reservation, sessionId });
           const last = await tx.posOrder.findFirst({
             where: { companyId: scopedCompanyId },
             orderBy: { orderNumber: "desc" },

@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/AccountScreen.jsx
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -88,7 +89,7 @@ export default function AccountScreen() {
   const { data: membersData, refetch: refetchMembers } = useQuery({
     queryKey: ["ledger-account-members", accountId],
     queryFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${API_BASE}/ledger/accounts/${accountId}/members`,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -125,7 +126,7 @@ export default function AccountScreen() {
 
     const url = `${API_BASE}/ledger/accounts/${accountId}/export/${format}?${params}`;
     try {
-      const res = await fetch(url, {
+      const res = await companyFetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -146,7 +147,7 @@ export default function AccountScreen() {
   }
 
   async function handleInvite(userId, role) {
-    const res = await fetch(
+    const res = await companyFetch(
       `${API_BASE}/ledger/accounts/${accountId}/members`,
       {
         method: "POST",
@@ -167,7 +168,7 @@ export default function AccountScreen() {
   }
 
   async function handleRevoke(targetUserId) {
-    const res = await fetch(
+    const res = await companyFetch(
       `${API_BASE}/ledger/accounts/${accountId}/members/${targetUserId}`,
       {
         method: "DELETE",
@@ -198,7 +199,7 @@ export default function AccountScreen() {
     if (!editForm.name.trim() || !editForm.bank.trim()) return;
     setEditSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/ledger/accounts/${accountId}`, {
+      const res = await companyFetch(`${API_BASE}/ledger/accounts/${accountId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -228,7 +229,7 @@ export default function AccountScreen() {
   }
 
   async function handleMoveGroup(groupId) {
-    const res = await fetch(`${API_BASE}/ledger/accounts/${accountId}/group`, {
+    const res = await companyFetch(`${API_BASE}/ledger/accounts/${accountId}/group`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,

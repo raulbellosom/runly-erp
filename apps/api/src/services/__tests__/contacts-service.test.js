@@ -30,7 +30,7 @@ describe("contacts-service — getById", () => {
       contact,
     });
     const service = createContactsService({ prisma });
-    const result = await service.getById({ authUserId: "auth-1", id: "contact-1" });
+    const result = await service.getById({ authUserId: "auth-1", companyId: "company-1", id: "contact-1" });
     assert.deepEqual(result, contact);
   });
 
@@ -43,7 +43,7 @@ describe("contacts-service — getById", () => {
     });
     const service = createContactsService({ prisma });
     await assert.rejects(
-      () => service.getById({ authUserId: "auth-1", id: "contact-1" }),
+      () => service.getById({ authUserId: "auth-1", companyId: "company-1", id: "contact-1" }),
       (err) => err instanceof ContactsServiceError && err.status === 404,
     );
   });
@@ -56,7 +56,7 @@ describe("contacts-service — getById", () => {
     });
     const service = createContactsService({ prisma });
     await assert.rejects(
-      () => service.getById({ authUserId: "auth-1", id: "does-not-exist" }),
+      () => service.getById({ authUserId: "auth-1", companyId: "company-1", id: "does-not-exist" }),
       (err) => err instanceof ContactsServiceError && err.status === 404,
     );
   });

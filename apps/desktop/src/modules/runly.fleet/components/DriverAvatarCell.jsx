@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useEffect, useMemo, useState } from "react";
 import { FileViewer } from "@runly/ui";
 
@@ -16,7 +17,7 @@ function toInitials(name) {
 
 async function resolveSignedUrl({ apiBaseUrl, token, fileAssetId }) {
   if (!fileAssetId) return null;
-  const response = await fetch(`${getBaseUrl(apiBaseUrl)}/files/${encodeURIComponent(fileAssetId)}/signed-url`, {
+  const response = await companyFetch(`${getBaseUrl(apiBaseUrl)}/files/${encodeURIComponent(fileAssetId)}/signed-url`, {
     method: "GET",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

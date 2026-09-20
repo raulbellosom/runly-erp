@@ -25,7 +25,7 @@ describe('LedgerSyncAdapter', () => {
   })
 
   it('pulls runly.ledger records and groups them by entity type', async () => {
-    const adapter = new LedgerSyncAdapter({
+    const adapter = new LedgerSyncAdapter({ companyId: 'company-a',
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -90,7 +90,7 @@ describe('LedgerSyncAdapter', () => {
   })
 
   it('stores nextCursor in sync_state for seen entity types', async () => {
-    const adapter = new LedgerSyncAdapter({
+    const adapter = new LedgerSyncAdapter({ companyId: 'company-a',
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -130,7 +130,7 @@ describe('LedgerSyncAdapter', () => {
     })
 
     let capturedUrl = null
-    const adapter = new LedgerSyncAdapter({
+    const adapter = new LedgerSyncAdapter({ companyId: 'company-a',
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -149,7 +149,7 @@ describe('LedgerSyncAdapter', () => {
 
   it('skips the network call when no token is available', async () => {
     let fetchCalled = false
-    const adapter = new LedgerSyncAdapter({
+    const adapter = new LedgerSyncAdapter({ companyId: 'company-a',
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => null,
@@ -167,7 +167,7 @@ describe('LedgerSyncAdapter', () => {
   })
 
   it('passes deleted records through to the sqlite store', async () => {
-    const adapter = new LedgerSyncAdapter({
+    const adapter = new LedgerSyncAdapter({ companyId: 'company-a',
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',

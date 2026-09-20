@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, ConfirmDialog, DistDropZone, LoadingState } from "@runly/ui";
@@ -185,7 +186,7 @@ export function DistUploadPanel({
   const buildsQuery = useQuery({
     queryKey: ["website-builds", siteId],
     queryFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${getApiUrl()}/website/sites/${siteId}/dist/builds`,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -364,7 +365,7 @@ const sdk = createStorefrontClient({
 
   async function handleDeleteBuildFromHistory(build) {
     try {
-      const res = await fetch(
+      const res = await companyFetch(
         `${getApiUrl()}/website/sites/${siteId}/dist/builds/${encodeURIComponent(build.name)}`,
         { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
       );

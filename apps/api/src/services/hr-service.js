@@ -117,12 +117,10 @@ export function createHrService({ prisma, activityBridge }) {
   // API's tenant middleware (c.get("companyId"), see
   // docs/superpowers/specs/2026-09-10-multi-tenant-architecture-design.md
   // §5) and threaded down from each route handler. When provided, THIS is
-  // the company every HR operation runs against — never re-derived. Without
-  // it (any caller that hasn't been updated to pass it yet), falls back to
-  // the pre-existing "most recently created membership" heuristic, which is
-  // wrong for a multi-company user but preserves behavior for anything not
-  // yet migrated.
+  // the company every HR operation runs against. Missing scope is an error;
+  // membership ordering must never decide where an operation is performed.
   async function getUserContext(authUserId, activeCompanyId) {
+    if (!activeCompanyId) throw new HrServiceError("Selecciona una empresa activa para RH.", 400);
     const profile = await prisma.userProfile.findUnique({
       where: { authUserId },
       select: { id: true },
@@ -131,30 +129,14 @@ export function createHrService({ prisma, activityBridge }) {
       throw new HrServiceError("Perfil de usuario no encontrado.", 404);
     }
 
-    if (activeCompanyId) {
-      const membership = await prisma.membership.findFirst({
-        where: { userId: profile.id, companyId: activeCompanyId, enabled: true },
-        select: { companyId: true },
-      });
-      if (!membership?.companyId) {
-        throw new HrServiceError("No tienes acceso a esta empresa.", 403);
-      }
-      return { actorId: profile.id, companyId: membership.companyId };
-    }
-
     const membership = await prisma.membership.findFirst({
-      where: { userId: profile.id, enabled: true },
-      orderBy: { createdAt: "desc" },
+      where: { userId: profile.id, companyId: activeCompanyId, enabled: true },
       select: { companyId: true },
     });
     if (!membership?.companyId) {
-      throw new HrServiceError("No tienes una empresa activa para RH.", 403);
+      throw new HrServiceError("No tienes acceso a esta empresa.", 403);
     }
-
-    return {
-      actorId: profile.id,
-      companyId: membership.companyId,
-    };
+    return { actorId: profile.id, companyId: membership.companyId };
   }
 
   async function assertEmployee({ id, companyId }) {

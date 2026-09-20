@@ -209,8 +209,9 @@ export class LedgerSQLiteStore {
   #dbLoader
   #openPromise
 
-  constructor({ companyId, dbLoader } = {}) {
+  constructor({ companyId, userId, dbLoader } = {}) {
     this.companyId = companyId
+    this.userId = userId
     this.db = null
     this.#dbLoader = dbLoader ?? loadTauriDatabase
     this.#openPromise = null
@@ -223,7 +224,7 @@ export class LedgerSQLiteStore {
     }
     if (!this.#openPromise) {
       this.#openPromise = (async () => {
-        const path = normalizePath(`sqlite:runly-erp/ledger-${this.companyId}.db`)
+        const path = normalizePath(`sqlite:runly-erp/ledger-${this.companyId}${this.userId ? `-${encodeURIComponent(this.userId)}` : ''}.db`)
         const database = await this.#dbLoader(path)
         this.db = database
         await this._migrate()

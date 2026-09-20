@@ -29,7 +29,7 @@ function getService(prisma) {
 function resolveContext(c) {
   const ctx = c?.get?.("userContext") ?? null;
   const companyId =
-    c?.get?.("companyId") ?? ctx?.memberships?.[0]?.companyId ?? null;
+    c?.get?.("companyId") ?? null;
   const actorId = ctx?.profile?.id ?? null;
   const actorProfile = ctx?.profile ?? null;
   return { companyId, actorId, actorProfile };

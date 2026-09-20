@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
 import { createCatalogPublicService } from './catalog/catalog-public-service.js'
+import { createDistServeService } from '../services/dist-serve-service.js'
 
 const ERP_PREFIXES = ['runly.', 'atlas.', 'website.', 'contacts.', 'hr.', 'finance.', 'fleet.']
 
 export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
   const app = new Hono()
+  const siteResolver = createDistServeService({ prisma, supabaseAdmin })
 
   app.get('/desktop/config', async (c) => {
     return c.json({
@@ -26,10 +28,8 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
 
       const routePath = c.req.query('path') || '/'
 
-      const company = await prisma.company.findFirst({
-        where: { enabled: true },
-        orderBy: { createdAt: 'asc' },
-      })
+      const resolvedSite = await siteResolver.resolveSiteForRequest(c)
+      const company = resolvedSite ? { id: resolvedSite.company_id, slug: resolvedSite.company_slug } : null
       if (!company) {
         return c.json({ initialized: true, site: null, page: null, theme: null, menus: [] })
       }
@@ -39,6 +39,7 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
                analytics_mode, turnstile_site_key
         FROM website_site
         WHERE company_id = ${company.id}
+          AND id = ${resolvedSite.id}::uuid
           AND enabled = true
         ORDER BY created_at ASC
         LIMIT 1
@@ -55,6 +56,7 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
           AND site_id = ${site.id}
           AND route_path = ${routePath}
           AND status = 'published'
+          AND visibility = 'public'
           AND enabled = true
         LIMIT 1
       `
@@ -65,7 +67,7 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
         const themes = await prisma.$queryRaw`
           SELECT tokens, typography, layout, custom_css
           FROM website_theme
-          WHERE id = ${site.theme_id} AND enabled = true
+          WHERE id = ${site.theme_id} AND company_id = ${company.id} AND enabled = true
           LIMIT 1
         `
         theme = themes[0] ?? null
@@ -90,7 +92,7 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
           ) AS items
         FROM website_menu m
         LEFT JOIN website_menu_item mi
-          ON mi.menu_id = m.id AND mi.enabled = true
+          ON mi.menu_id = m.id AND mi.company_id = m.company_id AND mi.enabled = true
         WHERE m.company_id = ${company.id}
           AND m.site_id = ${site.id}
           AND m.enabled = true
@@ -141,6 +143,10 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
         SELECT id, title, slug, excerpt, cover_asset_id, updated_at
         FROM website_page
         WHERE site_id   = ${siteId}::uuid
+          AND visibility = 'public'
+          AND EXISTS (SELECT 1 FROM website_site ws JOIN company co ON co.id = ws.company_id
+                      WHERE ws.id = website_page.site_id AND ws.company_id = website_page.company_id
+                        AND ws.enabled = true AND co.enabled = true)
           AND page_type = 'blog_post'
           AND status    = 'published'
           AND enabled   = true
@@ -200,19 +206,16 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
 export function createPublicCatalogRouter({ prisma }) {
   const app = new Hono()
   const publicSvc = createCatalogPublicService({ prisma })
+  const siteResolver = createDistServeService({ prisma })
 
-  async function getActiveCompanyId() {
-    const company = await prisma.company.findFirst({
-      where: { enabled: true },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-    })
-    return company?.id ?? null
+  async function getActiveCompanyId(c) {
+    const site = await siteResolver.resolveSiteForRequest(c)
+    return site?.company_id ?? null
   }
 
   app.get('/categories', async (c) => {
     try {
-      const companyId = await getActiveCompanyId()
+      const companyId = await getActiveCompanyId(c)
       if (!companyId) return c.json({ data: [] })
       const data = await publicSvc.listPublicCategories({ companyId })
       return c.json({ data })
@@ -224,7 +227,7 @@ export function createPublicCatalogRouter({ prisma }) {
 
   app.get('/products', async (c) => {
     try {
-      const companyId = await getActiveCompanyId()
+      const companyId = await getActiveCompanyId(c)
       if (!companyId) return c.json({ data: [], total: 0 })
       const { categorySlug, search, limit, offset } = c.req.query()
       const result = await publicSvc.listPublicProducts({
@@ -243,7 +246,7 @@ export function createPublicCatalogRouter({ prisma }) {
 
   app.get('/products/:slug', async (c) => {
     try {
-      const companyId = await getActiveCompanyId()
+      const companyId = await getActiveCompanyId(c)
       if (!companyId) return c.json({ error: 'Not found' }, 404)
       const data = await publicSvc.getPublicProductBySlug({ companyId, slug: c.req.param('slug') })
       if (!data) return c.json({ error: 'Not found' }, 404)

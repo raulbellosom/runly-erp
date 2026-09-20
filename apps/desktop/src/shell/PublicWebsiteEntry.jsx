@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthProvider.jsx'
 import { getApiUrl } from '../lib/runtimeConfig.js'
 import { runly } from '../lib/runly.js'
+import { companyFetch } from '../lib/companyFetch.js'
 import { PublicPageLoader, storePublicSiteHint } from '../components/PublicPageLoader.jsx'
 import { PublicWebsite404 } from './PublicWebsite404.jsx'
 import { WebsitePageRenderer } from '../website/WebsitePageRenderer.jsx'
@@ -25,7 +26,7 @@ function titleToSlug(title) {
 }
 
 async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers },
   })
@@ -45,7 +46,7 @@ async function fetchWebsiteResolve(pathname) {
 }
 
 async function fetchEditorCheck(token) {
-  const res = await fetch(`${getApiUrl()}/website/site`, {
+  const res = await companyFetch(`${getApiUrl()}/website/site`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) return null

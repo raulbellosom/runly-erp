@@ -2,6 +2,44 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createChatEntityReferencesService } from "../chat-entity-references-service.js";
 
+// Existing projection tests run as a member of the explicitly selected company.
+function withActor(prisma = {}) {
+  const membership = prisma.membership?.findFirst ?? (async () => ({ companyId: 'company-1' }));
+  return {
+    userProfile: { findUnique: async () => ({ id: 'profile-1' }) },
+    project: { findFirst: async () => ({ id: 'proj-1', companyId: 'company-1' }) },
+    task: { findFirst: async () => ({ projectId: 'proj-1' }) },
+    ...prisma,
+    membership: { findFirst: async args => {
+      const row = await membership(args);
+      return row ? { role: { key: 'runly.admin' }, ...row } : null;
+    } },
+  };
+}
+
+describe('explicit reference scope and permissions', () => {
+  it('does not access any module without a company or its read permission', async () => {
+    let accessed = false;
+    const prisma = withActor();
+    prisma.membership.findFirst = async () => ({ role: { key: 'restricted', permissions: [] } });
+    prisma.userPermissionGrant = { findFirst: async () => null };
+    const service = createChatEntityReferencesService({ prisma, contactsService: { getById: async () => { accessed = true; } } });
+    const entityRefs = [{ entityType: 'contact', recordId: 'contact' }];
+    assert.deepEqual(await service.resolveEntityRefs({ authUserId: 'test', entityRefs }), []);
+    assert.deepEqual(await service.resolveEntityRefs({ authUserId: 'test', companyId: 'company-1', entityRefs }), []);
+    assert.equal(accessed, false);
+  });
+  it('threads the conversation company through file and calendar authorization', async () => {
+    const seen = [];
+    const service = createChatEntityReferencesService({ prisma: withActor(),
+      filesService: { getById: async ({ activeContext }) => { seen.push(activeContext.companyId); return { originalName: 'Example' }; } },
+      calendarEventService: { getEvent: async (_user, _id, companyId) => { seen.push(companyId); return { title: 'Example', startAt: new Date() }; } },
+    });
+    await service.resolveEntityRefs({ authUserId: 'test', companyId: 'selected-company', entityRefs: [{ entityType: 'file', recordId: 'file' }, { entityType: 'calendar_event', recordId: 'event' }] });
+    assert.deepEqual(seen, ['selected-company', 'selected-company']);
+  });
+});
+
 describe("chat-entity-references-service — resolveEntityRefs", () => {
   it("resolves a contact reference via contactsService.getById", async () => {
     const deps = {
@@ -12,9 +50,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       } },
       filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "contact", recordId: "contact-1" }],
     });
     assert.deepEqual(result, [{
@@ -28,9 +66,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       contactsService: { getById: async () => ({ id: "contact-1", name: "Ada Lovelace", phone: "555-0100", email: "ada@example.com" }) },
       filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "contact", recordId: "contact-1" }],
     });
     assert.equal(result[0].subtitle, "555-0100");
@@ -41,9 +79,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       contactsService: { getById: async () => ({ id: "contact-1", name: "Ada Lovelace", email: "ada@example.com" }) },
       filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "contact", recordId: "contact-1" }],
     });
     assert.equal(result[0].subtitle, "ada@example.com");
@@ -54,9 +92,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       filesService: { getById: async () => ({ id: "file-1", originalName: "contrato.pdf", mimeType: "application/pdf", sizeBytes: 12345 }) },
       contactsService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "file", recordId: "file-1" }],
     });
     assert.deepEqual(result[0], {
@@ -70,9 +108,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       filesService: { getById: async () => ({ id: "file-1", originalName: "data.csv" }) },
       contactsService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "file", recordId: "file-1" }],
     });
     assert.deepEqual(result[0], {
@@ -86,9 +124,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       hrService: { getEmployee: async () => ({ id: "emp-1", firstName: "Grace", lastName: "Hopper" }) },
       contactsService: {}, filesService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "hr_employee", recordId: "emp-1" }],
     });
     assert.equal(result[0].title, "Grace Hopper");
@@ -108,9 +146,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       }) },
       contactsService: {}, filesService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "hr_employee", recordId: "emp-1" }],
     });
     // Prefers jobTitleRef over the plain department, and the employee's own
@@ -128,9 +166,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       }) },
       contactsService: {}, filesService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "hr_employee", recordId: "emp-1" }],
     });
     assert.equal(result[0].subtitle, "Ingenieria");
@@ -150,9 +188,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       } },
       contactsService: {}, filesService: {}, hrService: {}, prisma,
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "ledger_account", recordId: "acct-1" }],
     });
     assert.deepEqual(capturedArgs, { companyId: "company-1", accountId: "acct-1", actorId: "profile-1" });
@@ -175,9 +213,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       }) },
       contactsService: {}, filesService: {}, hrService: {}, prisma,
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "ledger_account", recordId: "acct-1" }],
     });
     assert.equal(result[0].subtitle, "BBVA · ····6789");
@@ -190,9 +228,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       contactsService: { getById: async () => { const e = new Error("no"); e.status = 404; throw e; } },
       filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "contact", recordId: "contact-1" }],
     });
     assert.deepEqual(result, []);
@@ -200,9 +238,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
 
   it("drops an unknown entityType without throwing", async () => {
     const deps = { contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma: {} };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "totally_unknown", recordId: "x" }],
     });
     assert.deepEqual(result, []);
@@ -215,9 +253,9 @@ describe("chat-entity-references-service — resolveEntityRefs", () => {
       filesService: { getById: async () => { order.push("file-start"); order.push("file-end"); return { id: "f1", originalName: "F" }; } },
       hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "contact", recordId: "c1" }, { entityType: "file", recordId: "f1" }],
     });
     // If sequential, file wouldn't start until contact fully finished — this
@@ -237,9 +275,9 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
       projectsService: { getProject: async (id, userId) => { capturedArgs = { id, userId }; return { id: "proj-1", name: "Relanzamiento web", color: "#6366f1", icon: "Rocket" }; } },
       tasksService: {}, calendarEventService: {}, contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma,
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "project", recordId: "proj-1" }],
     });
     assert.deepEqual(capturedArgs, { id: "proj-1", userId: "profile-1" });
@@ -258,9 +296,9 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
       projectsService: { getProject: async () => { throw new Error("Proyecto no encontrado."); } },
       tasksService: {}, calendarEventService: {}, contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma,
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "project", recordId: "proj-1" }],
     });
     assert.deepEqual(result, []);
@@ -271,9 +309,9 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
       tasksService: { getTask: async (id) => { assert.equal(id, "task-1"); return { id: "task-1", title: "Diseñar landing", status: { name: "En progreso" } }; } },
       projectsService: {}, calendarEventService: {}, contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "task", recordId: "task-1" }],
     });
     assert.deepEqual(result, [{
@@ -292,9 +330,9 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
       calendarEventService: { getEvent: async (userId, id) => { capturedArgs = { userId, id }; return { id: "evt-1", title: "Reunion de seguimiento", startAt: "2026-09-01T15:00:00.000Z" }; } },
       projectsService: {}, tasksService: {}, contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma,
     };
-    const service = createChatEntityReferencesService(deps);
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
     const result = await service.resolveEntityRefs({
-      authUserId: "auth-1",
+      authUserId: "auth-1", companyId: "company-1",
       entityRefs: [{ entityType: "calendar_event", recordId: "evt-1" }],
     });
     assert.deepEqual(capturedArgs, { userId: "profile-1", id: "evt-1" });

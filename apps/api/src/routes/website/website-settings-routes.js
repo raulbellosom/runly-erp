@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import { encryptPassword, createWebsiteSmtpService } from '../../services/smtp-service.js'
+import { createSmtpConfigStore, encryptPassword, createWebsiteSmtpService } from '../../services/smtp-service.js'
 
 const smtpSchema = z.object({
   host:       z.string().min(1),
@@ -17,7 +17,7 @@ export function createWebsiteSettingsRouter({ prisma, requirePermission }) {
   const app = new Hono()
 
   app.get('/website/settings/smtp', requirePermission('website.site.update'), async (c) => {
-    const smtpSvc = createWebsiteSmtpService({ prisma })
+    const smtpSvc = createWebsiteSmtpService({ prisma, companyId: c.get("companyId") })
     const data = await smtpSvc.getWebsiteOnlyConfig()
     return c.json({ data })
   })
@@ -42,22 +42,14 @@ export function createWebsiteSettingsRouter({ prisma, requirePermission }) {
         entries.push({ key: 'website.smtp.pass', value: encryptPassword(data.pass) })
       }
 
-      await Promise.all(
-        entries.map((e) =>
-          prisma.instanceConfig.upsert({
-            where:  { key: e.key },
-            create: { key: e.key, value: e.value },
-            update: { value: e.value },
-          }),
-        ),
-      )
+      await createSmtpConfigStore({ prisma, companyId: c.get('companyId') }).save(entries)
 
       return c.json({ ok: true })
     },
   )
 
   app.post('/website/settings/smtp/test', requirePermission('website.site.update'), async (c) => {
-    const smtpSvc = createWebsiteSmtpService({ prisma })
+    const smtpSvc = createWebsiteSmtpService({ prisma, companyId: c.get("companyId") })
     const userId  = c.get('userId') ?? c.get('user')?.id
 
     const userProfile = await prisma.userProfile.findFirst({
@@ -72,8 +64,8 @@ export function createWebsiteSettingsRouter({ prisma, requirePermission }) {
       await smtpSvc.sendEmail({
         to:      userProfile?.email ?? 'test@example.com',
         subject: 'Runly Website — Prueba de SMTP',
-        html:    `<p>La configuracion SMTP del sitio web funciona correctamente.</p><p><small>Origen: ${config.source === 'website' ? 'SMTP propio del website' : 'SMTP de plataforma (fallback)'}</small></p>`,
-        text:    `La configuracion SMTP del sitio web funciona correctamente. Origen: ${config.source === 'website' ? 'SMTP propio del website' : 'SMTP de plataforma (fallback)'}`,
+        html:    `<p>La configuracion SMTP del sitio web funciona correctamente.</p><p><small>Origen: ${config.source === 'website' ? 'SMTP propio del sitio' : 'SMTP de la empresa'}</small></p>`,
+        text:    `La configuracion SMTP del sitio web funciona correctamente. Origen: ${config.source === 'website' ? 'SMTP propio del sitio' : 'SMTP de la empresa'}`,
       })
       return c.json({ ok: true, source: config.source })
     } catch (err) {

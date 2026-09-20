@@ -43,7 +43,7 @@ describe('SyncEngine', () => {
       version: '2026-06-06T10:00:00Z',
       deleted: false,
     }
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -68,7 +68,7 @@ describe('SyncEngine', () => {
       version: '2026-06-06T10:00:00Z',
       deleted: false,
     }
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -103,7 +103,7 @@ describe('SyncEngine', () => {
       data: null,
       version: '2026-06-06T10:00:00Z',
     }
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -127,7 +127,7 @@ describe('SyncEngine', () => {
     })
 
     let capturedUrl = null
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -143,7 +143,7 @@ describe('SyncEngine', () => {
 
   it('skips network call when getToken returns null', async () => {
     let fetchCalled = false
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => null,
@@ -156,7 +156,7 @@ describe('SyncEngine', () => {
   })
 
   it('throws on non-ok HTTP response', async () => {
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -167,7 +167,7 @@ describe('SyncEngine', () => {
   })
 
   it('getLocalCount returns 0 on empty table', async () => {
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -186,7 +186,7 @@ describe('SyncEngine', () => {
       await new Promise((resolve) => { resolveFetch = resolve })
       return { ok: true, json: async () => makeResponse([]) }
     }
-    const engine = new SyncEngine({ db, apiBaseUrl: 'http://localhost:4010', getToken: async () => 'tok', fetchImpl })
+    const engine = new SyncEngine({ companyId: COMPANY_ID, db, apiBaseUrl: 'http://localhost:4010', getToken: async () => 'tok', fetchImpl })
 
     // Start first pull — #pulling becomes true synchronously before any await
     const first = engine.pull({ modules: ['runly.contacts'] })
@@ -211,7 +211,7 @@ describe('SyncEngine', () => {
   // ─── push() tests ───────────────────────────────────────────────────────────
 
   it('push returns { pushed: 0, failed: 0 } when mutation queue is empty', async () => {
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -228,7 +228,7 @@ describe('SyncEngine', () => {
       payload: { name: 'X' }, status: 'PENDING', queuedAt: '2026-06-06T10:00:00Z',
       attempts: 0, lastError: null, companyId: COMPANY_ID, userId: 'u1',
     })
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => null,
@@ -251,7 +251,7 @@ describe('SyncEngine', () => {
       await new Promise((resolve) => { resolvePush = resolve })
       return { ok: true, json: async () => ({ results: [{ idempotencyKey: 'ik-1', status: 'OK', record: { id: 'c1', companyId: COMPANY_ID, updatedAt: '2026-06-06T10:00:00Z' } }] }) }
     }
-    const engine = new SyncEngine({ db, apiBaseUrl: 'http://localhost:4010', getToken: async () => 'tok', fetchImpl })
+    const engine = new SyncEngine({ companyId: COMPANY_ID, db, apiBaseUrl: 'http://localhost:4010', getToken: async () => 'tok', fetchImpl })
 
     const first = engine.push()
     const second = await engine.push()
@@ -273,7 +273,7 @@ describe('SyncEngine', () => {
     })
 
     const serverRecord = { id: 'srv-c1', companyId: COMPANY_ID, name: 'Ana', updatedAt: '2026-06-06T10:00:00Z' }
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -303,7 +303,7 @@ describe('SyncEngine', () => {
       attempts: 0, lastError: null, companyId: COMPANY_ID, userId: 'u1',
     })
 
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -328,7 +328,7 @@ describe('SyncEngine', () => {
       attempts: 0, lastError: null, companyId: COMPANY_ID, userId: 'u1',
     })
 
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -348,7 +348,7 @@ describe('SyncEngine', () => {
       attempts: 0, lastError: null, companyId: COMPANY_ID, userId: 'u1',
     })
 
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -378,7 +378,7 @@ describe('SyncEngine', () => {
       attempts: 0, lastError: null, companyId: COMPANY_ID, userId: 'u1',
     })
 
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',
@@ -427,7 +427,7 @@ describe('SyncEngine', () => {
 
     const serverRecord = { id: 'c1', name: 'Server Name', companyId: COMPANY_ID, updatedAt: '2026-06-06T10:30:00.000Z' }
 
-    const engine = new SyncEngine({
+    const engine = new SyncEngine({ companyId: COMPANY_ID,
       db,
       apiBaseUrl: 'http://localhost:4010',
       getToken: async () => 'tok',

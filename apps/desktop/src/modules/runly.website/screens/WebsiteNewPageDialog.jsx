@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
@@ -40,7 +41,7 @@ export default function WebsiteNewPageDialog({ siteId, open, onOpenChange, onCre
   const homepageCheckQuery = useQuery({
     queryKey: ['homepage-exists', siteId, token],
     queryFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${getApiUrl()}/website/pages/by-path?siteId=${siteId}&routePath=${encodeURIComponent('/')}`,
         { headers: { Authorization: `Bearer ${token}` } },
       )
@@ -101,7 +102,7 @@ export default function WebsiteNewPageDialog({ siteId, open, onOpenChange, onCre
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(`${getApiUrl()}/website/pages`, {
+      const res = await companyFetch(`${getApiUrl()}/website/pages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

@@ -1,4 +1,6 @@
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { getActiveCompanyId } from '../../../lib/runly.js'
+import { createCompanyFetch } from '@runly/sdk'
 
 function createHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {}
@@ -11,8 +13,8 @@ async function readJson(response, fallbackMessage) {
   return response.json()
 }
 
-export function createLedgerDataClient({ apiBaseUrl = getApiUrl(), fetchImpl } = {}) {
-  const request = fetchImpl ?? ((...args) => globalThis.fetch(...args))
+export function createLedgerDataClient({ apiBaseUrl = getApiUrl(), fetchImpl, getCompanyId = getActiveCompanyId } = {}) {
+  const request = createCompanyFetch({ getBaseUrl: () => apiBaseUrl, getCompanyId, fetchImpl })
   const baseUrl = String(apiBaseUrl ?? '').replace(/\/$/, '')
 
   return {

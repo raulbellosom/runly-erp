@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.catalog/screens/CatalogCategoriesScreen.jsx
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -123,7 +124,7 @@ export default function CatalogCategoriesScreen() {
 
   const reorderMutation = useMutation({
     mutationFn: async (items) => {
-      const res = await fetch(`${getApiUrl()}/catalog/categories/reorder`, {
+      const res = await companyFetch(`${getApiUrl()}/catalog/categories/reorder`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: items.map((c, idx) => ({ id: c.id, position: idx * 10 })) }),

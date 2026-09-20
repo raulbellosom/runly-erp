@@ -1,31 +1,27 @@
-const MAX_ENTITY_REFS = 5;
+import { createUserAccessService } from '../../services/user-access-service.js';
 
-// Deliberately duplicates the authUserId -> {profileId, companyId} lookup
-// already present, identically, in contacts-service.js/files-service.js/
-// hr-service.js — see spec Section 24 Risk 2 for why this is intentional,
-// not an oversight to "fix" by extracting a shared helper.
-async function resolveActorContext(prisma, authUserId) {
-  const profile = await prisma.userProfile.findUnique({ where: { authUserId }, select: { id: true } });
-  if (!profile) return null;
-  const membership = await prisma.membership.findFirst({
-    where: { userId: profile.id, enabled: true },
-    orderBy: { createdAt: "desc" },
-    select: { companyId: true },
-  });
-  if (!membership?.companyId) return null;
-  return { profileId: profile.id, companyId: membership.companyId };
-}
+const MAX_ENTITY_REFS = 5;
+const REFERENCE_PERMISSIONS = {
+  contact: 'contacts.contacts.read', file: 'files.assets.read',
+  hr_employee: 'hr.employee.read', project: 'projects.project.read',
+  task: 'projects.task.read', calendar_event: 'calendar.events.read',
+  ledger_account: 'ledger.accounts.read',
+};
 
 export function createChatEntityReferencesService({ prisma, contactsService, filesService, hrService, ledgerService, projectsService, tasksService, calendarEventService }) {
+  const access = createUserAccessService({ prisma });
   // Not a static registry object keyed by entityType — each type's
   // underlying call shape genuinely differs (three take authUserId+id
   // directly, ledger needs companyId/actorId derived separately), so a
   // single if/else per type is clearer here than forcing a uniform shape
   // that doesn't actually hold across all four.
-  async function resolveOne(authUserId, { entityType, recordId }) {
+  async function resolveOne(authUserId, ctx, { entityType, recordId }) {
     try {
+      const permission = REFERENCE_PERMISSIONS[entityType];
+      if (!permission || !recordId) return null;
+      await access.assertCompanyMember(ctx.companyId, ctx.profileId, permission);
       if (entityType === "contact") {
-        const row = await contactsService.getById({ authUserId, id: recordId });
+        const row = await contactsService.getById({ authUserId, companyId: ctx.companyId, id: recordId });
         if (!row) return null;
         // Contact has no photo/avatar column at all (checked the Prisma model —
         // genuinely absent, not just unread here) — phone/email is the richest
@@ -37,7 +33,7 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
         };
       }
       if (entityType === "file") {
-        const row = await filesService.getById({ authUserId, id: recordId });
+        const row = await filesService.getById({ authUserId, activeContext: { ...ctx, isAdmin: false, permissionSet: new Set([permission]) }, id: recordId });
         if (!row) return null;
         return {
           entityType, recordId, title: row.originalName, subtitle: null,
@@ -47,7 +43,7 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
         };
       }
       if (entityType === "hr_employee") {
-        const row = await hrService.getEmployee({ authUserId, id: recordId });
+        const row = await hrService.getEmployee({ authUserId, companyId: ctx.companyId, id: recordId });
         if (!row) return null;
         return {
           entityType, recordId, title: `${row.firstName} ${row.lastName}`.trim(),
@@ -60,8 +56,8 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
         };
       }
       if (entityType === "project") {
-        const ctx = await resolveActorContext(prisma, authUserId);
-        if (!ctx) return null;
+        const project = await prisma.project.findFirst({ where: { id: recordId, companyId: ctx.companyId }, select: { id: true } });
+        if (!project) return null;
         const row = await projectsService.getProject(recordId, ctx.profileId);
         return {
           entityType, recordId, title: row.name, subtitle: null,
@@ -71,7 +67,11 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
         };
       }
       if (entityType === "task") {
-        const row = await tasksService.getTask(recordId);
+        const task = await prisma.task.findFirst({ where: { id: recordId, project: { companyId: ctx.companyId,
+          OR: [{ ownerId: ctx.profileId }, { members: { some: { userId: ctx.profileId } } }],
+        } }, select: { projectId: true } });
+        if (!task) return null;
+        const row = await tasksService.getTask(recordId, { projectId: task.projectId, companyId: ctx.companyId, actorId: ctx.profileId });
         if (!row) return null;
         return {
           entityType, recordId, title: row.title,
@@ -80,9 +80,7 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
         };
       }
       if (entityType === "calendar_event") {
-        const ctx = await resolveActorContext(prisma, authUserId);
-        if (!ctx) return null;
-        const row = await calendarEventService.getEvent(ctx.profileId, recordId);
+        const row = await calendarEventService.getEvent(ctx.profileId, recordId, ctx.companyId);
         const startDate = new Date(row.startAt);
         const subtitle = Number.isNaN(startDate.getTime())
           ? null
@@ -93,8 +91,6 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
         };
       }
       if (entityType === "ledger_account") {
-        const ctx = await resolveActorContext(prisma, authUserId);
-        if (!ctx) return null;
         const row = await ledgerService.getAccount({ companyId: ctx.companyId, accountId: recordId, actorId: ctx.profileId });
         if (!row) return null;
         // getAccount is a raw $queryRaw result, not a Prisma-mapped select —
@@ -118,10 +114,13 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
     }
   }
 
-  async function resolveEntityRefs({ authUserId, entityRefs }) {
-    if (!entityRefs?.length) return [];
+  async function resolveEntityRefs({ authUserId, companyId, entityRefs }) {
+    if (!companyId || !entityRefs?.length) return [];
+    const profile = await prisma.userProfile.findUnique({ where: { authUserId }, select: { id: true } });
+    if (!profile) return [];
+    const ctx = { companyId, profileId: profile.id };
     const capped = entityRefs.slice(0, MAX_ENTITY_REFS);
-    const resolved = await Promise.all(capped.map((ref) => resolveOne(authUserId, ref)));
+    const resolved = await Promise.all(capped.map((ref) => resolveOne(authUserId, ctx, ref)));
     return resolved.filter(Boolean);
   }
 

@@ -1,4 +1,5 @@
 import { PosServiceError, requireCompanyId, writeAudit } from "./service-helpers.js";
+import { createPosScopeService } from './pos-scope-service.js';
 
 function cleanData(data = {}) {
   return Object.fromEntries(
@@ -22,6 +23,7 @@ export function createPosFloorService({ prisma }) {
 
   async function createFloor({ companyId, actorId, data }) {
     const scopedCompanyId = requireCompanyId(companyId);
+    await createPosScopeService({ prisma }).outlet(scopedCompanyId, data.outletId);
     const floor = await prisma.posFloor.create({
       data: {
         companyId: scopedCompanyId,
@@ -262,6 +264,7 @@ export function createPosFloorService({ prisma }) {
   async function createTable({ companyId, actorId, data }) {
     const scopedCompanyId = requireCompanyId(companyId);
     const floor = await getFloorById({ companyId: scopedCompanyId, id: data.floorId });
+    await createPosScopeService({ prisma }).zone(scopedCompanyId, floor.id, data.zoneId);
     const table = await prisma.posTable.create({
       data: {
         companyId: scopedCompanyId,
@@ -291,6 +294,7 @@ export function createPosFloorService({ prisma }) {
     const scopedCompanyId = requireCompanyId(companyId);
     const before = await getTableInCompany({ companyId: scopedCompanyId, tableId });
     if (data.floorId) await getFloorById({ companyId: scopedCompanyId, id: data.floorId });
+    await createPosScopeService({ prisma }).zone(scopedCompanyId, data.floorId ?? before.floorId, data.zoneId !== undefined ? data.zoneId : before.zoneId);
     const updated = await prisma.posTable.update({
       where: { id: tableId },
       data: cleanData(data),

@@ -11,15 +11,20 @@ export function createTagsService({ prisma }) {
   // List
   // ------------------------------------------------------------------
 
-  async function listTags({ userId }) {
+  async function listTags({ userId, companyId }) {
     const rows = await prisma.$queryRaw`
       SELECT
         note_tags.*,
-        COUNT(note_tag_assignments.note_id) AS note_count
+        COUNT(n.id) AS note_count
       FROM note_tags
       LEFT JOIN note_tag_assignments
         ON note_tags.id = note_tag_assignments.tag_id
+      LEFT JOIN notes n ON n.id = note_tag_assignments.note_id
+        AND n.company_id IS NOT DISTINCT FROM note_tags.company_id
+        AND n.deleted_at IS NULL
+        AND public.runly_note_user_access(n.id, ${userId}::uuid, false)
       WHERE note_tags.owner_user_id = ${userId}
+        AND (note_tags.company_id = ${companyId ?? null}::uuid OR note_tags.company_id IS NULL)
       GROUP BY note_tags.id
       ORDER BY note_tags.name ASC
     `;
@@ -58,12 +63,13 @@ export function createTagsService({ prisma }) {
   // Update
   // ------------------------------------------------------------------
 
-  async function updateTag(tagId, userId, data) {
+  async function updateTag(tagId, userId, data, companyId) {
     const existing = await prisma.$queryRaw`
       SELECT id
       FROM note_tags
       WHERE id = ${tagId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       LIMIT 1
     `;
 
@@ -75,10 +81,10 @@ export function createTagsService({ prisma }) {
       UPDATE note_tags
       SET
         name       = COALESCE(${data.name ?? null}::text, name),
-        color      = COALESCE(${data.color ?? null}::text, color),
-        updated_at = NOW()
+        color      = COALESCE(${data.color ?? null}::text, color)
       WHERE id = ${tagId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       RETURNING *
     `;
 
@@ -93,12 +99,13 @@ export function createTagsService({ prisma }) {
   // Delete
   // ------------------------------------------------------------------
 
-  async function deleteTag(tagId, userId) {
+  async function deleteTag(tagId, userId, companyId) {
     const existing = await prisma.$queryRaw`
       SELECT id
       FROM note_tags
       WHERE id = ${tagId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
       LIMIT 1
     `;
 
@@ -110,6 +117,7 @@ export function createTagsService({ prisma }) {
       DELETE FROM note_tags
       WHERE id = ${tagId}
         AND owner_user_id = ${userId}
+        AND (company_id = ${companyId ?? null}::uuid OR company_id IS NULL)
     `;
 
     return { ok: true };
@@ -122,9 +130,10 @@ export function createTagsService({ prisma }) {
   async function setNoteTags(noteId, userId, tagIds) {
     // Verify user has edit access to this note (owner OR share with edit permission)
     const access = await prisma.$queryRaw`
-      SELECT id FROM notes
+      SELECT id, company_id FROM notes
       WHERE id = ${noteId}::uuid
         AND deleted_at IS NULL
+        AND public.runly_note_user_access(id, ${userId}::uuid, true)
         AND (
           owner_user_id = ${userId}::uuid
           OR id IN (
@@ -143,6 +152,7 @@ export function createTagsService({ prisma }) {
       const owned = await prisma.$queryRaw`
         SELECT id FROM note_tags
         WHERE owner_user_id = ${userId}::uuid
+          AND company_id IS NOT DISTINCT FROM ${access[0].company_id ?? null}::uuid
           AND id = ANY(${requested}::uuid[])
       `
       ownTagIds = owned.map((r) => r.id)
@@ -173,6 +183,7 @@ export function createTagsService({ prisma }) {
       SELECT id FROM notes
       WHERE id = ${noteId}::uuid
         AND deleted_at IS NULL
+        AND public.runly_note_user_access(id, ${userId}::uuid, true)
         AND (
           owner_user_id = ${userId}::uuid
           OR id IN (

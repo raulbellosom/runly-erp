@@ -736,7 +736,8 @@ describe("chat-service — sendMessage entity references (Phase F)", () => {
   it("resolves entityRefs and round-trips them into metadata.entityRefs on the actual INSERT statement", async () => {
     const resolved = [{ entityType: "contact", recordId: "contact-1", title: "Ada", subtitle: null, url: "/app/m/runly.contacts/contacts/contact-1" }];
     const entityReferencesService = {
-      resolveEntityRefs: async ({ authUserId, entityRefs }) => {
+      resolveEntityRefs: async ({ authUserId, companyId, entityRefs }) => {
+        assert.equal(companyId, MOCK_COMPANY_ID);
         assert.equal(authUserId, "auth-1");
         assert.deepEqual(entityRefs, [{ entityType: "contact", recordId: "contact-1" }]);
         return resolved;
@@ -747,7 +748,7 @@ describe("chat-service — sendMessage entity references (Phase F)", () => {
       [{ id: "sender-profile" }],                 // resolveUserProfileId
       [{ id: "m1" }],                              // assertMember
       [{ type: "channel" }],                       // assertNotBlocked: conversation-type lookup
-      [{ type: "channel" }],                       // entityRefs: conversation-type lookup
+      [{ type: "channel", company_id: MOCK_COMPANY_ID }], // entityRefs: conversation scope
       [{ id: "msg1", conversation_id: "conv1", created_at: new Date(), metadata: {} }], // INSERT ... RETURNING *
       [{                                            // getMessageFull
         id: "msg1", conversation_id: "conv1", sender_user_id: "sender-profile", sender_guest_id: null,

@@ -72,7 +72,7 @@ export function CompanySwitcher() {
     return (
       <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium select-none text-[hsl(var(--muted-foreground))] grayscale hover:grayscale-0 hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-all duration-150">
         <Building2 size={16} className="shrink-0" />
-        <span className="max-w-30 truncate">Mi empresa</span>
+        <span className="hidden xl:inline max-w-30 truncate">Mi empresa</span>
       </div>
     );
   }
@@ -81,7 +81,12 @@ export function CompanySwitcher() {
     return (
       <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-[hsl(var(--muted))] text-xs font-medium text-[hsl(var(--foreground))] select-none">
         <CompanyLogo company={activeCompany} size={20} />
-        <span className="max-w-30 truncate">
+        {/* Name hidden below xl — with the switcher, sync status, theme
+            toggle, notifications and user menu all sharing the topbar's
+            right cluster, the logo alone is enough to identify the active
+            company at narrower widths; the full name still shows in the
+            dropdown/tooltip context once there's room. */}
+        <span className="hidden xl:inline max-w-30 truncate">
           {activeCompany?.name ?? "Mi empresa"}
         </span>
       </div>
@@ -92,9 +97,12 @@ export function CompanySwitcher() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))] text-xs font-medium text-[hsl(var(--foreground))] transition-colors duration-150 cursor-pointer outline-none">
+          <button
+            title={activeCompany?.name}
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-[hsl(var(--muted))] hover:bg-[hsl(var(--border))] text-xs font-medium text-[hsl(var(--foreground))] transition-colors duration-150 cursor-pointer outline-none"
+          >
             <CompanyLogo company={activeCompany} size={20} />
-            <span className="max-w-30 truncate">
+            <span className="hidden xl:inline max-w-30 truncate">
               {activeCompany?.name ?? (companies.length === 0 ? "Sin empresa" : "Empresa")}
             </span>
             <ChevronDown

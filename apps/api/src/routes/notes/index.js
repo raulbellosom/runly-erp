@@ -78,10 +78,10 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   // PATCH /notes/folders/:id
   internal.patch('/folders/:id', requirePermission('notes.folders.update'), async (c) => {
     try {
-      const { userId } = getAuth(c)
+      const { userId, companyId } = getAuth(c)
       const folderId = c.req.param('id')
       const body = await c.req.json()
-      const data = await folders.updateFolder(folderId, userId, body)
+      const data = await folders.updateFolder(folderId, userId, body, companyId)
       return c.json({ data })
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)
@@ -91,9 +91,9 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   // DELETE /notes/folders/:id
   internal.delete('/folders/:id', requirePermission('notes.folders.delete'), async (c) => {
     try {
-      const { userId } = getAuth(c)
+      const { userId, companyId } = getAuth(c)
       const folderId = c.req.param('id')
-      const data = await folders.deleteFolder(folderId, userId)
+      const data = await folders.deleteFolder(folderId, userId, companyId)
       return c.json(data)
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)
@@ -107,8 +107,8 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   // GET /notes/tags
   internal.get('/tags', requirePermission('notes.tags.read'), async (c) => {
     try {
-      const { userId } = getAuth(c)
-      const tags_ = await tags.listTags({ userId })
+      const { userId, companyId } = getAuth(c)
+      const tags_ = await tags.listTags({ userId, companyId })
       return c.json({ tags: tags_ })
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)
@@ -131,10 +131,10 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   // PATCH /notes/tags/:id
   internal.patch('/tags/:id', requirePermission('notes.tags.update'), async (c) => {
     try {
-      const { userId } = getAuth(c)
+      const { userId, companyId } = getAuth(c)
       const tagId = c.req.param('id')
       const body = await c.req.json()
-      const data = await tags.updateTag(tagId, userId, body)
+      const data = await tags.updateTag(tagId, userId, body, companyId)
       return c.json({ data })
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)
@@ -144,9 +144,9 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
   // DELETE /notes/tags/:id
   internal.delete('/tags/:id', requirePermission('notes.tags.delete'), async (c) => {
     try {
-      const { userId } = getAuth(c)
+      const { userId, companyId } = getAuth(c)
       const tagId = c.req.param('id')
-      const data = await tags.deleteTag(tagId, userId)
+      const data = await tags.deleteTag(tagId, userId, companyId)
       return c.json(data)
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)

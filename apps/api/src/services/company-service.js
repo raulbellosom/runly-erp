@@ -1,7 +1,21 @@
 /**
  * company-service.js
- * Business logic for Company profile, address, and branding configuration.
+ * Business logic for Company profile, address, branding configuration, and
+ * company membership management.
  */
+
+import { getCachedSignedUrls } from "../lib/signed-url-cache.js";
+import {
+  checkMembershipRoleScope,
+  checkProtectedRoleAssignment,
+  checkSelfLockout,
+  findExistingMembership,
+} from "../lib/identity-memberships.js";
+
+// Same protected-role set /identity/users/:id/memberships* guards against —
+// kept local rather than imported since it's a one-line literal, not worth a
+// shared constant module for.
+const PROTECTED_MEMBER_ROLE_KEYS = new Set(["runly.admin", "atlas.admin", "system.admin"]);
 
 export class CompanyServiceError extends Error {
   constructor(message, status = 500) {
@@ -122,6 +136,64 @@ export function createCompanyService({ prisma, supabaseAdmin }) {
       .from(fileAsset.bucket)
       .createSignedUrl(fileAsset.objectKey, 3600);
     return data?.signedUrl ?? null;
+  }
+
+  // Batch avatar signing for member/candidate lists — same cached-signing
+  // helper the /memberships/me logo fix uses, so repeatedly refetching this
+  // list (e.g. after adding a member) doesn't churn a fresh signature per
+  // avatar per poll.
+  async function buildAvatarUrlMap(fileIds) {
+    const map = new Map();
+    const ids = [...new Set(fileIds.filter(Boolean))];
+    if (!ids.length) return map;
+    const assets = await prisma.fileAsset.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, bucket: true, objectKey: true },
+    });
+    const byBucket = new Map();
+    for (const asset of assets) {
+      if (!byBucket.has(asset.bucket)) byBucket.set(asset.bucket, []);
+      byBucket.get(asset.bucket).push(asset);
+    }
+    await Promise.all(
+      [...byBucket.entries()].map(async ([bucket, bucketAssets]) => {
+        const paths = bucketAssets.map((a) => a.objectKey);
+        const signedByPath = await getCachedSignedUrls(supabaseAdmin, bucket, paths, 3600);
+        for (const asset of bucketAssets) {
+          map.set(asset.id, signedByPath.get(asset.objectKey) ?? null);
+        }
+      }),
+    );
+    return map;
+  }
+
+  function serializeMember(membership, avatarUrl) {
+    return {
+      membershipId: membership.id,
+      userId: membership.userId,
+      displayName: membership.user?.displayName ?? "",
+      email: membership.user?.email ?? "",
+      avatarUrl,
+      roleId: membership.roleId,
+      roleName: membership.role?.name ?? null,
+      enabled: membership.enabled,
+    };
+  }
+
+  function assertRoleAssignable({ targetRole, companyId, actorContext }) {
+    const scopeCheck = checkMembershipRoleScope({
+      roleCompanyId: targetRole.companyId,
+      membershipCompanyId: companyId,
+    });
+    if (!scopeCheck.ok) throw new CompanyServiceError(scopeCheck.error, scopeCheck.status);
+
+    const protectedCheck = checkProtectedRoleAssignment({
+      roleKey: targetRole.key,
+      protectedKeys: PROTECTED_MEMBER_ROLE_KEYS,
+      isSystemAdmin: actorContext.isSystemAdmin,
+      actorCanManageRoles: actorContext.canManageRoles,
+    });
+    if (!protectedCheck.ok) throw new CompanyServiceError(protectedCheck.error, protectedCheck.status);
   }
 
   return {
@@ -285,6 +357,150 @@ export function createCompanyService({ prisma, supabaseAdmin }) {
 
       const logoUrl = await getSignedLogoUrl(logoFileId);
       return { companyId, primaryColor, logoFileId, logoUrl };
+    },
+
+    // ── Members ──────────────────────────────────────────────────────────────
+    // Lightweight membership management scoped to a single company — the
+    // company-centric counterpart to /identity/users/:id/memberships*, which
+    // manages one user's companies from the other direction. Reuses the same
+    // pure role-scope/self-lockout helpers so both entry points enforce
+    // identical rules. See docs/superpowers/specs/2026-09-20-company-members-design.md.
+
+    async listMembers(activeCompanyId) {
+      const companyId = await resolveCompanyId(activeCompanyId);
+      const memberships = await prisma.membership.findMany({
+        where: { companyId },
+        include: {
+          user: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
+          role: { select: { id: true, name: true } },
+        },
+        orderBy: { user: { displayName: "asc" } },
+      });
+      const avatarUrlMap = await buildAvatarUrlMap(memberships.map((m) => m.user?.avatarFileId));
+      return memberships.map((m) =>
+        serializeMember(m, m.user?.avatarFileId ? (avatarUrlMap.get(m.user.avatarFileId) ?? null) : null),
+      );
+    },
+
+    async searchMemberCandidates(query, activeCompanyId) {
+      const companyId = await resolveCompanyId(activeCompanyId);
+      const q = String(query ?? "").trim();
+      if (q.length < 2) {
+        throw new CompanyServiceError("Escribe al menos 2 caracteres para buscar.", 400);
+      }
+      const candidates = await prisma.userProfile.findMany({
+        where: {
+          enabled: true,
+          OR: [
+            { displayName: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+          ],
+          NOT: { memberships: { some: { companyId, enabled: true } } },
+        },
+        select: { id: true, displayName: true, email: true, avatarFileId: true },
+        orderBy: { displayName: "asc" },
+        take: 20,
+      });
+      const avatarUrlMap = await buildAvatarUrlMap(candidates.map((u) => u.avatarFileId));
+      return candidates.map((u) => ({
+        userId: u.id,
+        displayName: u.displayName ?? "",
+        email: u.email ?? "",
+        avatarUrl: u.avatarFileId ? (avatarUrlMap.get(u.avatarFileId) ?? null) : null,
+      }));
+    },
+
+    async listMemberRoles(activeCompanyId) {
+      const companyId = await resolveCompanyId(activeCompanyId);
+      return prisma.role.findMany({
+        where: { enabled: true, OR: [{ companyId: null }, { companyId }] },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+    },
+
+    async addMember({ userId, roleId, actorContext }, activeCompanyId) {
+      const companyId = await resolveCompanyId(activeCompanyId);
+      const user = await prisma.userProfile.findUnique({
+        where: { id: userId },
+        select: { id: true, displayName: true, email: true, avatarFileId: true },
+      });
+      if (!user) throw new CompanyServiceError("Usuario no encontrado.", 404);
+
+      if (roleId) {
+        const targetRole = await prisma.role.findUnique({
+          where: { id: roleId },
+          select: { key: true, companyId: true },
+        });
+        if (!targetRole) throw new CompanyServiceError("Rol no encontrado.", 404);
+        assertRoleAssignable({ targetRole, companyId, actorContext });
+      }
+
+      const existingMemberships = await prisma.membership.findMany({ where: { userId, companyId } });
+      const existing = findExistingMembership({ memberships: existingMemberships, companyId });
+      if (existing?.enabled) {
+        throw new CompanyServiceError("El usuario ya es miembro de esta empresa.", 400);
+      }
+
+      const membership = existing
+        ? await prisma.membership.update({
+            where: { id: existing.id },
+            data: { enabled: true, roleId: roleId !== undefined ? roleId : existing.roleId },
+            include: { role: { select: { id: true, name: true } } },
+          })
+        : await prisma.membership.create({
+            data: { userId, companyId, roleId: roleId ?? null },
+            include: { role: { select: { id: true, name: true } } },
+          });
+
+      const avatarUrl = await getSignedLogoUrl(user.avatarFileId);
+      return serializeMember({ ...membership, user }, avatarUrl);
+    },
+
+    async updateMember(membershipId, patch, activeCompanyId, actorContext) {
+      const companyId = await resolveCompanyId(activeCompanyId);
+      const membership = await prisma.membership.findUnique({ where: { id: membershipId } });
+      if (!membership || membership.companyId !== companyId) {
+        throw new CompanyServiceError("Membresia no encontrada.", 404);
+      }
+
+      if (patch.roleId !== undefined && patch.roleId !== null) {
+        const targetRole = await prisma.role.findUnique({
+          where: { id: patch.roleId },
+          select: { key: true, companyId: true },
+        });
+        if (!targetRole) throw new CompanyServiceError("Rol no encontrado.", 404);
+        assertRoleAssignable({ targetRole, companyId, actorContext });
+      }
+
+      if (patch.enabled === false) {
+        const enabledMemberships = await prisma.membership.findMany({
+          where: { userId: membership.userId, enabled: true },
+          select: { id: true },
+        });
+        const lockoutCheck = checkSelfLockout({
+          isActingOnSelf: membership.userId === actorContext.actingUserId,
+          enabledMembershipIds: enabledMemberships.map((m) => m.id),
+          membershipId,
+          disabling: true,
+        });
+        if (!lockoutCheck.ok) throw new CompanyServiceError(lockoutCheck.error, lockoutCheck.status);
+      }
+
+      const updated = await prisma.membership.update({
+        where: { id: membershipId },
+        data: {
+          ...(patch.roleId !== undefined ? { roleId: patch.roleId } : {}),
+          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        },
+        include: {
+          role: { select: { id: true, name: true } },
+          user: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
+        },
+      });
+
+      const avatarUrl = await getSignedLogoUrl(updated.user?.avatarFileId ?? null);
+      return serializeMember(updated, avatarUrl);
     },
   };
 }

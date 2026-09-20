@@ -163,6 +163,7 @@ export default function CompanyOverview() {
     queryKey: ["company-profile"],
     queryFn: () => runly.company.getProfile(token),
     enabled: Boolean(token),
+    staleTime: 0,
   });
   const addressQuery = useQuery({
     queryKey: ["company-address"],

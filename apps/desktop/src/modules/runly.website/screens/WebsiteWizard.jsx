@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.website/screens/WebsiteWizard.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +19,7 @@ import { WizardStepIdentity } from "./wizard/WizardStepIdentity.jsx";
 import { WizardStepTemplate } from "./wizard/WizardStepTemplate.jsx";
 
 async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -143,7 +144,7 @@ export default function WebsiteWizard() {
         formData.append("file", finalData.identity.logoFile);
         formData.append("moduleKey", "runly.website");
         formData.append("entityType", "WebsiteSite");
-        const uploadRes = await fetch(`${getApiUrl()}/files/upload`, {
+        const uploadRes = await companyFetch(`${getApiUrl()}/files/upload`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: formData,

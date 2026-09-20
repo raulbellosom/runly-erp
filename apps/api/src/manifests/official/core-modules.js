@@ -360,6 +360,13 @@ export const companyMap = createModuleManifest({
       layout: "main",
       permissionKey: "company.branding.read",
     },
+    {
+      label: "Miembros",
+      path: "/company/members",
+      icon: "Users",
+      layout: "main",
+      permissionKey: "company.members.read",
+    },
   ],
   permissions: [
     { key: "company.access", name: "Access Company" },
@@ -375,6 +382,8 @@ export const companyMap = createModuleManifest({
     { key: "company.branding.create", name: "Create Company Branding" },
     { key: "company.branding.update", name: "Update Company Branding" },
     { key: "company.branding.delete", name: "Delete Company Branding" },
+    { key: "company.members.read", name: "Read Company Members" },
+    { key: "company.members.manage", name: "Manage Company Members" },
   ],
   acl: {
     module: "company.access",
@@ -385,6 +394,8 @@ export const companyMap = createModuleManifest({
       "company.address.update": "company.address.update",
       "company.branding.read": "company.branding.read",
       "company.branding.update": "company.branding.update",
+      "company.members.read": "company.members.read",
+      "company.members.manage": "company.members.manage",
     },
     models: {
       Company: {

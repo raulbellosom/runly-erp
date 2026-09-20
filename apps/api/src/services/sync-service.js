@@ -53,8 +53,8 @@ const SYNC_MODULE_REGISTRY = {
     handlers: [
       {
         entityType: 'calendar',
-        async fetch({ prisma, userId, cursor, limit }) {
-          const where = { ownerId: userId, enabled: true }
+        async fetch({ prisma, companyId, userId, cursor, limit }) {
+          const where = { companyId, ownerId: userId, enabled: true }
           if (cursor) where.updatedAt = { gt: new Date(cursor) }
           return prisma.calendarCalendar.findMany({
             where,
@@ -68,9 +68,9 @@ const SYNC_MODULE_REGISTRY = {
       },
       {
         entityType: 'event',
-        async fetch({ prisma, userId, cursor, limit }) {
+        async fetch({ prisma, companyId, userId, cursor, limit }) {
           const owned = await prisma.calendarCalendar.findMany({
-            where: { ownerId: userId, enabled: true },
+            where: { companyId, ownerId: userId, enabled: true },
             select: { id: true },
           })
           const calendarIds = owned.map((c) => c.id)

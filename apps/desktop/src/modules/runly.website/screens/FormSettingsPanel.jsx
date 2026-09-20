@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -25,7 +26,7 @@ export default function FormSettingsPanel({ form, token, assignees, turnstileCon
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiUrl()}/website/forms/${form.id}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/forms/${form.id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

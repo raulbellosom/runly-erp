@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -22,7 +23,7 @@ import { toast } from "sonner";
 import WebsiteNewBlogPostDialog from "./WebsiteNewBlogPostDialog.jsx";
 
 async function apiGet(path, token) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -81,7 +82,7 @@ export default function WebsiteBlogScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: async (postId) => {
-      const res = await fetch(`${getApiUrl()}/website/blog/posts/${postId}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/blog/posts/${postId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

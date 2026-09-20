@@ -1,3 +1,5 @@
+import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -183,6 +185,7 @@ function AssigneeAdder({ currentAssigneeIds, onAdd, members }) {
 }
 
 export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask }) {
+  const { activeCompanyId } = useActiveCompany();
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const userId = userProfile?.id ?? session?.user?.id;
@@ -228,7 +231,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
   const { data: taskFilesData } = useQuery({
     queryKey: ['projects', projectId, 'tasks', taskId, 'attachments'],
     queryFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${API_BASE_URL}/projects/${projectId}/tasks/${taskId}/attachments`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -813,6 +816,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
                     Archivos
                   </label>
                   <AttachmentsPanel
+                    companyId={activeCompanyId}
                     apiBaseUrl={API_BASE_URL}
                     token={token}
                     recordId={task.id}

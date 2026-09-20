@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -18,7 +19,7 @@ import FormPreview from './FormPreview.jsx'
 import FormApiPanel from './FormApiPanel.jsx'
 
 async function apiGet(path, token) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -234,7 +235,7 @@ function NewFormDialog({ open, onOpenChange, siteId, token, assignees, turnstile
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiUrl()}/website/forms`, {
+      const res = await companyFetch(`${getApiUrl()}/website/forms`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -408,7 +409,7 @@ export default function WebsiteFormsScreen() {
   // ── Delete mutation ────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: async (formId) => {
-      const res = await fetch(`${getApiUrl()}/website/forms/${formId}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/forms/${formId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

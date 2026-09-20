@@ -34,10 +34,6 @@
     0%, 100% { opacity: 0.22; transform: scale(0.9); }
     62%      { opacity: 0.6; transform: scale(1.06); }
   }
-  @keyframes rl3-dot {
-    0%, 100% { opacity: 0.25; transform: translateY(0px); }
-    40%      { opacity: 1; transform: translateY(-4px); }
-  }
   @keyframes rl3-bar {
     0%   { transform: translateX(-105%) scaleX(0.32); }
     55%  { transform: translateX(55%) scaleX(0.52); }
@@ -99,11 +95,6 @@
     <div style="display:flex;flex-direction:column;align-items:center;gap:22px;animation:rl3-rise 0.8s cubic-bezier(0.16,1,0.3,1) 0.4s both">
       <div style="display:flex;align-items:baseline;gap:8px">
         <span id="rl3-msg" style="font-size:17px;font-weight:500;color:#0F2E69">Cargando tu espacio de trabajo</span>
-        <span style="display:flex;gap:4px;padding-bottom:3px">
-          <span style="width:4px;height:4px;border-radius:50%;background:#F5411E;animation:rl3-dot 1.2s ease-in-out infinite"></span>
-          <span style="width:4px;height:4px;border-radius:50%;background:#F5411E;animation:rl3-dot 1.2s ease-in-out 0.15s infinite"></span>
-          <span style="width:4px;height:4px;border-radius:50%;background:#F5411E;animation:rl3-dot 1.2s ease-in-out 0.3s infinite"></span>
-        </span>
       </div>
 
       <div style="position:relative;width:256px;height:3px;border-radius:99px;background:rgba(15,46,105,0.1);overflow:hidden">

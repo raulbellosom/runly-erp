@@ -148,7 +148,7 @@ export function createDistRoutes({ prisma, supabaseAdmin, requirePermission }) {
           SELECT ws.id, ws.company_id as "companyId", c.slug as company_slug
           FROM website_site ws
           JOIN company c ON c.id = ws.company_id
-          WHERE ws.id = ${siteId}::uuid AND ws.enabled = true
+          WHERE ws.id = ${siteId}::uuid AND ws.company_id = ${c.get("companyId")}::uuid AND ws.enabled = true
           LIMIT 1
         `
         if (!site[0]) return c.json({ error: 'Sitio no encontrado' }, 404)
@@ -180,7 +180,7 @@ export function createDistRoutes({ prisma, supabaseAdmin, requirePermission }) {
           SELECT ws.id, ws.company_id as "companyId", c.slug as company_slug
           FROM website_site ws
           JOIN company c ON c.id = ws.company_id
-          WHERE ws.id = ${siteId}::uuid AND ws.enabled = true
+          WHERE ws.id = ${siteId}::uuid AND ws.company_id = ${c.get("companyId")}::uuid AND ws.enabled = true
           LIMIT 1
         `
         if (!site[0]) return c.json({ error: 'Sitio no encontrado' }, 404)

@@ -208,7 +208,7 @@ describe('sync-service', () => {
       assert.equal(calRec.deleted, false)
     })
 
-    it('calendar handler uses ownerId = userId (not companyId)', async () => {
+    it('calendar handler requires both the owner and active company', async () => {
       let capturedWhere = null
       const svc = createSyncService({
         prisma: makePrisma({
@@ -221,7 +221,7 @@ describe('sync-service', () => {
       await svc.pull({ authUserId: 'auth-u1', modules: ['atlas.calendar'], cursor: null })
       assert.equal(capturedWhere?.ownerId, USER_ID)
       assert.equal(capturedWhere?.enabled, true)
-      assert.equal(capturedWhere?.companyId, undefined, 'calendar must NOT filter by companyId')
+      assert.equal(capturedWhere?.companyId, COMPANY_ID, 'calendar must stay in the active company')
     })
 
     it('event handler fetches events for owned calendar IDs', async () => {

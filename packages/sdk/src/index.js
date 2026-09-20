@@ -3,6 +3,8 @@ import { createGrowthDomain } from "./domains/growth.js";
 import { createDocumentsDomain } from "./domains/documents.js";
 import { createChatDomain } from "./domains/chat.js";
 import { createCallsDomain } from "./domains/calls.js";
+import { createSettingsDomain } from "./domains/settings.js";
+export { createCompanyFetch } from "./company-fetch.js";
 
 export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
   let _offlineTransport = null;
@@ -24,6 +26,13 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     return s ? `?${s}` : "";
   }
 
+  function assertCurrentCompany(headers) {
+    const requestedCompany = new Headers(headers).get('X-Runly-Company-Id');
+    if (requestedCompany && typeof getActiveCompanyId === 'function' && requestedCompany !== getActiveCompanyId()) {
+      throw Object.assign(new Error('La empresa activa cambió. Repite la operación.'), { code: 'company_changed', status: 409 });
+    }
+  }
+
   async function requestBlob(path, options = {}) {
     const { headers, ...rest } = options;
     const response = await fetch(`${baseUrl}${path}`, {
@@ -36,7 +45,9 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       error.status = response.status;
       throw error;
     }
-    return response.blob();
+    const blob = await response.blob();
+    assertCurrentCompany(headers);
+    return blob;
   }
 
   async function request(path, options = {}) {
@@ -80,10 +91,13 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       error.details = details;
       throw error;
     }
-    return response.json();
+    const data = await response.json();
+    assertCurrentCompany(options.headers);
+    return data;
   }
 
   return {
+    settings: createSettingsDomain({ request, withAuthHeaders }),
     health: () => request("/health"),
     instance: { status: () => request("/instance/status") },
     setup: {
@@ -92,7 +106,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     },
     auth: {
       me: (token) =>
-        request("/user/me", { headers: { Authorization: `Bearer ${token}` } }),
+        request("/user/me", { headers: withAuthHeaders(token) }),
       forgotPassword: (email) =>
         request("/auth/forgot-password", {
           method: "POST",
@@ -206,6 +220,26 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           headers: withAuthHeaders(token),
           body: JSON.stringify(data),
         }),
+      listMembers: (token) =>
+        request("/company/members", { headers: withAuthHeaders(token) }),
+      listMemberRoles: (token) =>
+        request("/company/members/roles", { headers: withAuthHeaders(token) }),
+      searchMemberCandidates: (query, token) =>
+        request(`/company/members/candidates?q=${encodeURIComponent(query)}`, {
+          headers: withAuthHeaders(token),
+        }),
+      addMember: (data, token) =>
+        request("/company/members", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(data),
+        }),
+      updateMember: (membershipId, patch, token) =>
+        request(`/company/members/${membershipId}`, {
+          method: "PATCH",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(patch),
+        }),
     },
     memberships: {
       me: (token) =>
@@ -312,7 +346,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       uploadModuleZip: (key, formData, token) =>
         request(`/modules/${encodeURIComponent(key)}/upload`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: withAuthHeaders(token),
           // Do NOT set Content-Type — fetch sets the multipart boundary automatically
           body: formData,
         }),

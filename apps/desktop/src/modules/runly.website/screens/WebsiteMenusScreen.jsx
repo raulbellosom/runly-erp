@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../auth/AuthProvider.jsx";
@@ -32,7 +33,7 @@ const LOCATION_OPTIONS = [
 ];
 
 async function apiGet(path, token) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -78,7 +79,7 @@ export default function WebsiteMenusScreen() {
 
   const createMenuMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(`${getApiUrl()}/website/menus`, {
+      const res = await companyFetch(`${getApiUrl()}/website/menus`, {
         method: "POST",
         headers,
         body: JSON.stringify({ ...data, siteId }),
@@ -101,7 +102,7 @@ export default function WebsiteMenusScreen() {
 
   const deleteMenuMutation = useMutation({
     mutationFn: async (menuId) => {
-      const res = await fetch(`${getApiUrl()}/website/menus/${menuId}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/menus/${menuId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

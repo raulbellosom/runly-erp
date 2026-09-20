@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
@@ -28,7 +29,7 @@ const categorySchema = z.object({
 })
 
 async function apiRequest(method, path, token, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await companyFetch(`${API_BASE}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: body ? JSON.stringify(body) : undefined,

@@ -203,22 +203,27 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
     // difference between "SMTP not set up" and "SMTP set up but rejecting".
     let sendError = null;
 
+    const [smtpConversation] = await prisma.$queryRaw`
+      SELECT title, company_id AS "companyId" FROM chat_conversations WHERE id = ${conversationId} LIMIT 1
+    `;
+    const smtpCompanyId = smtpConversation?.companyId;
+
     // Tell apart "no SMTP configured" from "SMTP configured but unusable"
     // (e.g. the stored password can't be decrypted). getStatus() is optional on
     // the injected service — fall back to the boolean isConfigured().
     let smtpOk = false;
     let smtpFallbackReason = "smtp_not_configured";
-    if (smtpService) {
+    if (smtpService && smtpCompanyId) {
       try {
         if (typeof smtpService.getStatus === "function") {
-          const status = await smtpService.getStatus();
+          const status = await smtpService.getStatus(smtpCompanyId);
           smtpOk = Boolean(status?.configured);
           if (!smtpOk && status?.reason && status.reason !== "not_configured") {
             smtpFallbackReason = "smtp_error";
             if (status.message) sendError = status.message;
           }
         } else {
-          smtpOk = await smtpService.isConfigured().catch(() => false);
+          smtpOk = await smtpService.isConfigured(smtpCompanyId).catch(() => false);
         }
       } catch {
         smtpOk = false;
@@ -236,11 +241,8 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
         SELECT display_name AS "displayName" FROM user_profile WHERE id = ${profileId} LIMIT 1
       `;
       inviterName = inviterRow?.displayName ?? null;
-      const [convRow] = await prisma.$queryRaw`
-        SELECT title, company_id AS "companyId" FROM chat_conversations WHERE id = ${conversationId} LIMIT 1
-      `;
-      conversationTitle = convRow?.title ?? null;
-      brand = await brandService.getBrandForCompany(convRow?.companyId ?? null);
+      conversationTitle = smtpConversation?.title ?? null;
+      brand = await brandService.getBrandForCompany(smtpCompanyId ?? null);
     } catch { /* fall back to the generic wording */ }
 
     for (const email of normalized) {
@@ -261,6 +263,7 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
         try {
           const mail = buildCallInviteEmail({ joinUrl: url, inviterName, conversationTitle, brand, env });
           await smtpService.sendEmail({
+            companyId: smtpCompanyId,
             to: email,
             subject: mail.subject,
             fromName: brandService.fromNameFor(brand),

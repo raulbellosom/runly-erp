@@ -8,6 +8,8 @@ import { createProjectsNotificationService } from './projects-notification-servi
 import { publishActivityFromContext } from '../../services/activity-publisher.js'
 import { parseMentionIds } from '../../lib/mention-utils.js'
 import { createCommentsService, CommentsServiceError } from '../../services/comments-service.js'
+import { createFileAccess } from '../../services/files/access.js'
+import { taskFileScope } from './project-files.js'
 
 function getUserId(c) {
   return c.get('userContext')?.profile?.id ?? null
@@ -46,6 +48,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   const bridge = createProjectsCalendarBridge({ prisma })
   const notifSvc = createProjectsNotificationService({ prisma, notificationService })
   const commentsSvc = createCommentsService({ prisma })
+  const fileAccess = createFileAccess({ prisma })
 
   async function notifyTaskChanges(c, previous, patch) {
     if (!previous) return
@@ -249,6 +252,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     try {
       const { status_id, assignee_id, priority, due_date_from, due_date_to, parent_task_id, include_subtasks } = c.req.query()
       const tasks = await tasksSvc.listTasks(c.req.param('id'), {
+        companyId: getCompanyId(c), actorId: getUserId(c),
         statusId: status_id,
         assigneeId: assignee_id,
         priority,
@@ -300,7 +304,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
 
   app.get('/projects/:id/tasks/:tid', requirePermission('projects.task.read'), requireProjectAccess('VIEWER'), async (c) => {
     try {
-      const task = await tasksSvc.getTask(c.req.param('tid'))
+      const task = await tasksSvc.getTask(c.req.param('tid'), { projectId: c.req.param('id'), companyId: getCompanyId(c), actorId: getUserId(c) })
       return c.json(task)
     } catch (err) { return handleError(c, err, 'Error al obtener tarea.') }
   })
@@ -481,7 +485,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       const task = await prisma.task.findFirst({ where: { id: taskId, projectId } })
       if (!task) return c.json({ error: 'Tarea no encontrada.' }, 404)
       let attachments = await prisma.fileAsset.findMany({
-        where: { entityType: 'Task', entityId: taskId, enabled: true },
+        where: { enabled: true, AND: [taskFileScope(getCompanyId(c), taskId), fileAccess.readWhere({ profileId: getUserId(c), admin: false })] },
         orderBy: { createdAt: 'asc' },
       })
       if (enrichFileAssets && Array.isArray(attachments)) {
@@ -498,11 +502,18 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       const { file_asset_id } = await c.req.json()
       const task = await prisma.task.findFirst({ where: { id: taskId, projectId } })
       if (!task) return c.json({ error: 'Tarea no encontrada.' }, 404)
-      const asset = await prisma.fileAsset.findFirst({ where: { id: file_asset_id } })
+      if (!file_asset_id) return c.json({ error: 'Archivo no encontrado.' }, 404)
+      const asset = await prisma.fileAsset.findFirst({ where: { id: file_asset_id, enabled: true, OR: [
+        { entityId: getCompanyId(c), entityType: { in: ['AtlasFile', 'Task'] } },
+        { entityId: taskId, entityType: 'Task' },
+      ] } })
       if (!asset) return c.json({ error: 'Archivo no encontrado.' }, 404)
+      if (asset.metadata?.sourceEntityId && asset.metadata.sourceEntityId !== taskId) return c.json({ error: 'Archivo no encontrado.' }, 404)
+      if (asset.accessScope === 'RESTRICTED') return c.json({ error: 'Los archivos de acceso restringido no se pueden adjuntar a tareas.' }, 403)
+      await fileAccess.assertAccess(asset, { profileId: getUserId(c), admin: false }, 'write')
       const updated = await prisma.fileAsset.update({
         where: { id: file_asset_id },
-        data: { entityId: taskId, entityType: 'Task' },
+        data: { entityId: getCompanyId(c), entityType: 'Task', moduleKey: 'runly.projects', metadata: { ...asset.metadata, companyId: getCompanyId(c), sourceEntityId: taskId } },
       })
       return c.json(updated, 201)
     } catch (err) { return handleError(c, err, 'Error al adjuntar archivo.') }
@@ -514,8 +525,9 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       const taskId = c.req.param('tid')
       const task = await prisma.task.findFirst({ where: { id: taskId, projectId } })
       if (!task) return c.json({ error: 'Tarea no encontrada.' }, 404)
-      const asset = await prisma.fileAsset.findFirst({ where: { id: c.req.param('fid') } })
+      const asset = await prisma.fileAsset.findFirst({ where: { id: c.req.param('fid'), enabled: true, ...taskFileScope(getCompanyId(c), taskId) } })
       if (!asset) return c.json({ error: 'Archivo no encontrado.' }, 404)
+      await fileAccess.assertAccess(asset, { profileId: getUserId(c), admin: false }, 'write')
       await prisma.fileAsset.update({ where: { id: c.req.param('fid') }, data: { enabled: false } })
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar archivo.') }
@@ -524,14 +536,14 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   // --- Task Dependencies ---
   app.get('/projects/:id/tasks/:tid/dependencies', requirePermission('projects.task.read'), requireProjectAccess('VIEWER'), async (c) => {
     try {
-      return c.json(await depsSvc.listDependencies(c.req.param('tid')))
+      return c.json(await depsSvc.listDependencies(c.req.param('tid'), c.req.param('id')))
     } catch (err) { return handleError(c, err, 'Error al listar dependencias.') }
   })
 
   app.post('/projects/:id/tasks/:tid/dependencies', requirePermission('projects.task.update'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       const { blockerId } = await c.req.json()
-      const dep = await depsSvc.addDependency(c.req.param('tid'), blockerId)
+      const dep = await depsSvc.addDependency(c.req.param('tid'), blockerId, c.req.param('id'))
       return c.json(dep, 201)
     } catch (err) { return handleError(c, err, 'Error al agregar dependencia.') }
   })

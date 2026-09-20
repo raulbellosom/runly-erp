@@ -1,4 +1,5 @@
 import { PosServiceError, requireCompanyId, toMoney, writeAudit } from "./service-helpers.js";
+import { createPosScopeService } from './pos-scope-service.js';
 
 function cashPaymentTotal(payments = []) {
   return payments
@@ -37,6 +38,9 @@ export function createPosSessionService({ prisma }) {
 
   async function openSession({ companyId, actorId, data }) {
     const scopedCompanyId = requireCompanyId(companyId);
+    const scope = createPosScopeService({ prisma });
+    await scope.outlet(scopedCompanyId, data.outletId);
+    await scope.terminal(scopedCompanyId, data.outletId, data.terminalId);
     const existing = await getCurrentSession({
       companyId: scopedCompanyId,
       terminalId: data.terminalId,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -18,6 +18,7 @@ import { runly } from "../../../lib/runly";
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CompanyAddress() {
+  const dirtyRef = useRef(false);
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const queryClient = useQueryClient();
@@ -44,7 +45,7 @@ export default function CompanyAddress() {
   });
 
   useEffect(() => {
-    if (data?.data) {
+    if (data?.data && !dirtyRef.current) {
       setForm({
         country: data.data.country ?? "",
         state: data.data.state ?? "",
@@ -90,20 +91,24 @@ export default function CompanyAddress() {
   );
 
   function handleCountryChange(val) {
+    dirtyRef.current = true;
     setForm((prev) => ({ ...prev, country: val, state: "", city: "" }));
   }
 
   function handleStateChange(val) {
+    dirtyRef.current = true;
     setForm((prev) => ({ ...prev, state: val, city: "" }));
   }
 
   function handleChange(key, value) {
+    dirtyRef.current = true;
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   const saveMutation = useMutation({
     mutationFn: (payload) => runly.company.updateAddress(payload, token),
     onSuccess: () => {
+      dirtyRef.current = false;
       queryClient.invalidateQueries({ queryKey: ["company-address"] });
       toast.success("Direccion de empresa actualizada.");
     },
@@ -135,7 +140,7 @@ export default function CompanyAddress() {
           />
 
           {!canManage && (
-            <ErrorState message="Necesitas permiso company.address.update para editar la direccion de la empresa." />
+            <ErrorState title="Dirección en modo lectura" description="Tu rol en esta empresa no permite editar la dirección." />
           )}
 
           <form

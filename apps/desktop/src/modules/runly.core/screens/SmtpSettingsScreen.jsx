@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button, Card, Label, PageHeader, Skeleton, Switch, TextField } from "@runly/ui";
+import { Button, Card, Label, PageHeader, Skeleton, PasswordField, ErrorState, Switch, TextField } from "@runly/ui";
 import { BellRing, Mail, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider.jsx";
-import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { runly } from "../../../lib/runly.js";
+import { useActiveCompany } from "../../../company/ActiveCompanyProvider.jsx";
 
 function SettingsTabs() {
   const base = "px-4 py-2 text-sm font-medium rounded-lg transition-colors";
@@ -29,25 +30,11 @@ function SettingsTabs() {
   );
 }
 
-async function apiFetch(path, token, options = {}) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
 const EMPTY = { host: "", port: "587", user: "", pass: "", from_name: "", from_email: "", tls: false };
 
 export default function SmtpSettingsScreen() {
+  const { activeCompanyId } = useActiveCompany();
+  const dirtyRef = useRef(false);
   const { session } = useAuth();
   const token = session?.access_token;
 
@@ -55,14 +42,14 @@ export default function SmtpSettingsScreen() {
   const [passChanged, setPassChanged] = useState(false);
 
   const configQuery = useQuery({
-    queryKey: ["smtp-settings"],
-    queryFn: () => apiFetch("/settings/smtp", token),
-    enabled: Boolean(token),
+    queryKey: ["smtp-settings", activeCompanyId],
+    queryFn: () => runly.settings.getSmtp(token),
+    enabled: Boolean(token && activeCompanyId),
   });
 
   useEffect(() => {
     const data = configQuery.data?.data;
-    if (!data) return;
+    if (!data || dirtyRef.current) return;
     setForm({
       host: data.host,
       port: String(data.port),
@@ -76,17 +63,19 @@ export default function SmtpSettingsScreen() {
 
   const saveMutation = useMutation({
     mutationFn: (data) =>
-      apiFetch("/settings/smtp", token, { method: "POST", body: JSON.stringify(data) }),
+      runly.settings.saveSmtp(data, token),
     onSuccess: () => {
+      dirtyRef.current = false;
       toast.success("Configuracion SMTP guardada");
       setPassChanged(false);
+      setForm((current) => ({ ...current, pass: "" }));
       configQuery.refetch();
     },
     onError: (err) => toast.error(err.message),
   });
 
   const testMutation = useMutation({
-    mutationFn: () => apiFetch("/settings/smtp/test", token, { method: "POST" }),
+    mutationFn: () => runly.settings.testSmtp(token),
     onSuccess: () => toast.success("Email de prueba enviado correctamente"),
     onError: (err) => toast.error(`Error: ${err.message}`),
   });
@@ -121,7 +110,7 @@ export default function SmtpSettingsScreen() {
         <PageHeader
           eyebrow="Runly Core"
           title="Configuracion"
-          description="Ajusta la configuracion general y las integraciones de tu instancia."
+          description="Configura el correo de la empresa activa."
         />
         <SettingsTabs />
 
@@ -149,11 +138,13 @@ export default function SmtpSettingsScreen() {
                   {statusMessage
                     || "La configuracion SMTP guardada no se puede usar. Vuelve a escribir la contrasena y guarda."}
                   <br />
-                  Mientras tanto, ningun correo de la plataforma sale (notificaciones, calendario, invitaciones a llamadas).
+                  Los correos de esta empresa no se pueden enviar hasta corregir la configuración.
                 </span>
               </div>
             )}
-            {configQuery.isPending ? (
+            {configQuery.isError && !configQuery.data ? (
+              <ErrorState description="No se pudo cargar la configuración." onRetry={() => configQuery.refetch()} />
+            ) : configQuery.isPending ? (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <Skeleton className="h-11 col-span-1 rounded-lg" />
@@ -168,7 +159,7 @@ export default function SmtpSettingsScreen() {
                 </div>
               </>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onChangeCapture={() => { dirtyRef.current = true; }} onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2 sm:col-span-1">
                     <TextField
@@ -197,10 +188,9 @@ export default function SmtpSettingsScreen() {
                   required
                 />
 
-                <TextField
+                <PasswordField
                   label="Contrasena"
-                  type="password"
-                  description={configured && !passChanged ? "(dejar en blanco para mantener)" : undefined}
+                  hint={configured && !passChanged ? "(dejar en blanco para mantener)" : undefined}
                   placeholder={configured ? "••••••••" : ""}
                   value={form.pass}
                   onChange={(e) => {
@@ -228,7 +218,7 @@ export default function SmtpSettingsScreen() {
                     id="smtp-tls"
                     checked={Number(form.port) === 465 || form.tls}
                     disabled={Number(form.port) === 465}
-                    onCheckedChange={(v) => setForm((f) => ({ ...f, tls: v }))}
+                    onCheckedChange={(v) => { dirtyRef.current = true; setForm((f) => ({ ...f, tls: v })); }}
                   />
                   <Label htmlFor="smtp-tls">{[25, 587].includes(Number(form.port)) ? "Exigir STARTTLS" : "Usar TLS directo (SSL)"}</Label>
                 </div>
@@ -239,10 +229,10 @@ export default function SmtpSettingsScreen() {
                 </p>
 
                 <div className="flex gap-2 pt-2 border-t border-[hsl(var(--border))]">
-                  <Button type="submit" disabled={saveMutation.isPending} className="flex-1">
+                  <Button type="submit" disabled={saveMutation.isPending || !activeCompanyId} className="flex-1">
                     {saveMutation.isPending ? "Guardando..." : "Guardar configuracion"}
                   </Button>
-                  {configured && (
+                  {canTest && (
                     <Button
                       type="button"
                       variant="outline"

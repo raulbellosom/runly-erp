@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
@@ -143,7 +144,7 @@ function FieldForm({ formId, field, isEdit, onOpenChange, onSaved, wizardMode, m
       const url = isEdit
         ? `${getApiUrl()}/website/form-fields/${field.id}`
         : `${getApiUrl()}/website/forms/${formId}/fields`
-      const res = await fetch(url, {
+      const res = await companyFetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers,
         body: JSON.stringify(data),
@@ -415,7 +416,7 @@ export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizar
 
   const reorderMutation = useMutation({
     mutationFn: async (reordered) => {
-      const res = await fetch(`${getApiUrl()}/website/forms/${formId}/fields/reorder`, {
+      const res = await companyFetch(`${getApiUrl()}/website/forms/${formId}/fields/reorder`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: reordered.map((f, i) => ({ id: f.id, sortOrder: i * 10 })) }),
@@ -428,7 +429,7 @@ export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizar
 
   const deleteMutation = useMutation({
     mutationFn: async (fieldId) => {
-      const res = await fetch(`${getApiUrl()}/website/form-fields/${fieldId}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/form-fields/${fieldId}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Error al eliminar')

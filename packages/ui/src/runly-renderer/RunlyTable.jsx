@@ -358,14 +358,14 @@ export function RunlyTable({
 
   // ── Preference load ────────────────────────────────────────────────────────
   const preferenceScopeRef = useRef("");
-  const preferenceScope = `${apiBaseUrl ?? ""}::${token ?? ""}::${tableKey ?? ""}`;
+  const preferenceScope = `${apiBaseUrl ?? ""}::${companyId ?? ""}::${token ?? ""}::${tableKey ?? ""}`;
   useEffect(() => {
     if (!tableKey || !token || !apiBaseUrl) return;
     if (preferenceScopeRef.current === preferenceScope) return;
     preferenceScopeRef.current = preferenceScope;
     let cancelled = false;
     const prefUrl = `${apiBaseUrl.replace(/\/+$/, "")}/profile/me/table-preferences/${encodeURIComponent(tableKey)}`;
-    fetch(prefUrl, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(prefUrl, { headers: buildApiHeaders(token, companyId) })
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (cancelled) return;
@@ -389,6 +389,7 @@ export function RunlyTable({
     setFromConfig,
     resetToDefaults,
     preferenceScope,
+    companyId,
   ]);
 
   // ── Preference save (debounced 800ms) ─────────────────────────────────────
@@ -407,14 +408,11 @@ export function RunlyTable({
       const prefUrl = `${apiBaseUrl.replace(/\/+$/, "")}/profile/me/table-preferences/${encodeURIComponent(tableKey)}`;
       fetch(prefUrl, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: buildApiHeaders(token, companyId, { "Content-Type": "application/json" }),
         body: JSON.stringify(config),
       }).catch(() => {});
     }, 800);
-  }, [apiBaseUrl, tableKey, token, preferenceScope]);
+  }, [apiBaseUrl, tableKey, token, preferenceScope, companyId]);
 
   const handleReorderColumns = useCallback(
     (activeKey, overKey) => {
@@ -438,10 +436,10 @@ export function RunlyTable({
       const prefUrl = `${apiBaseUrl.replace(/\/+$/, "")}/profile/me/table-preferences/${encodeURIComponent(tableKey)}`;
       fetch(prefUrl, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: buildApiHeaders(token, companyId),
       }).catch(() => {});
     }
-  }, [resetToDefaults, apiBaseUrl, tableKey, token]);
+  }, [resetToDefaults, apiBaseUrl, tableKey, token, companyId]);
 
   const handlePageSizeChange = useCallback(
     (size) => {

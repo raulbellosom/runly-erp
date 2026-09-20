@@ -43,6 +43,9 @@ const SCREEN_MAP = {
   "runly.company:/company/branding": lazy(
     () => import("../modules/runly.company/screens/CompanyBranding.jsx"),
   ),
+  "runly.company:/company/members": lazy(
+    () => import("../modules/runly.company/screens/CompanyMembers.jsx"),
+  ),
   "runly.identity:/identity/users": lazy(
     () => import("../modules/runly.identity/screens/UsersScreen.jsx"),
   ),

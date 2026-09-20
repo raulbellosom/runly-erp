@@ -486,6 +486,18 @@ export const PERMISSION_CATALOG = {
     groupKey: "company",
     order: 130,
   },
+  "company.members.read": {
+    displayNameEs: "Ver miembros de empresa",
+    descriptionEs: "Permite consultar los usuarios que pertenecen a la empresa.",
+    groupKey: "company",
+    order: 140,
+  },
+  "company.members.manage": {
+    displayNameEs: "Gestionar miembros de empresa",
+    descriptionEs: "Permite agregar, quitar y cambiar el rol de los miembros de la empresa.",
+    groupKey: "company",
+    order: 150,
+  },
 
   "contacts.access": {
     displayNameEs: "Acceder a contactos",

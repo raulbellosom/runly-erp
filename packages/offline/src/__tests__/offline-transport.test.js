@@ -15,6 +15,15 @@ const SESSION = {
   accessToken: 'tok',
 }
 
+describe('offline company scope', () => {
+  it('rejects a request for another company before storing any mutation', async () => {
+    const transport = createOfflineTransport({ db: {}, getSession: async () => SESSION })
+    await assert.rejects(transport.queue('/contacts', {
+      method: 'POST', headers: { 'X-Runly-Company-Id': 'other-company' }, body: JSON.stringify({ name: 'Example' }),
+    }), /no coincide/)
+  })
+})
+
 describe('parseMutationRoute', () => {
   it('maps POST /contacts to runly.contacts CREATE', () => {
     const result = parseMutationRoute('/contacts', 'POST')

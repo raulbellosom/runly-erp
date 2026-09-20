@@ -36,7 +36,8 @@ describe("ledger-link-service", () => {
 
   it("getLinkedMovements normalizes deposito->INCOME / retiro->EXPENSE and marks rows non-editable", async () => {
     const prisma = {
-      $queryRaw: async () => [
+      $queryRaw: async (strings) => strings.join(' ').includes('FROM pfm_wallet')
+        ? [{ id: WALLET, ledger_account_id: LEDGER_ACC, kind: 'DEBIT' }] : [
         {
           id: LTX,
           fecha: new Date("2026-08-10"),
@@ -75,12 +76,15 @@ describe("ledger-link-service", () => {
     assert.equal(data[1].amount, 15000);
   });
 
-  it("enrichLedgerMovement upserts by ledgerTransactionId and never touches ledger_transaction", async () => {
+  it("enrichLedgerMovement scopes annotations by company, author, wallet and transaction", async () => {
     let upsertArgs = null;
     const prisma = {
-      $queryRaw: async () => {
-        throw new Error("no raw writes to ledger_transaction");
+      $queryRaw: async (strings) => {
+        assert.match(strings.join(' '), /SELECT/);
+        return strings.join(' ').includes('FROM pfm_wallet')
+          ? [{ id: WALLET, ledger_account_id: LEDGER_ACC, kind: 'DEBIT' }] : [{ id: LTX }];
       },
+      pfmCategory: { findFirst: async () => ({ id: 'cat9' }) },
       pfmLedgerEnrichment: {
         upsert: async (args) => ((upsertArgs = args), { id: "enr1", ...args.create }),
       },
@@ -90,11 +94,23 @@ describe("ledger-link-service", () => {
       companyId: COMPANY,
       actorId: ACTOR,
       walletId: WALLET,
+      ledgerAccountId: LEDGER_ACC,
       ledgerTransactionId: LTX,
       data: { categoryId: "cat9", note: "x", receiptId: null },
     });
-    assert.equal(upsertArgs.where.ledgerTransactionId, LTX);
+    assert.deepEqual(upsertArgs.where.companyId_ownerId_walletId_ledgerTransactionId,
+      { companyId: COMPANY, ownerId: ACTOR, walletId: WALLET, ledgerTransactionId: LTX });
     assert.equal(upsertArgs.create.walletId, WALLET);
     assert.equal(upsertArgs.create.ownerId, ACTOR);
+  });
+
+  it("rejects missing company, actor or bank account before accessing the database", async () => {
+    const service = createLedgerLinkService({ prisma: {}, ledgerService: ledgerStub() });
+    const scope = { companyId: COMPANY, actorId: ACTOR, walletId: WALLET,
+      ledgerAccountId: LEDGER_ACC, ledgerTransactionId: LTX, data: { note: 'Example' } };
+    for (const [key, status] of [['companyId', 400], ['actorId', 401], ['ledgerAccountId', 404]]) {
+      await assert.rejects(service.enrichLedgerMovement({ ...scope, [key]: undefined }),
+        e => e instanceof PfmServiceError && e.status === status);
+    }
   });
 });

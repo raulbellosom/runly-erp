@@ -3336,7 +3336,7 @@ model PfmLedgerEnrichment {
   companyId           String   @map("company_id") @db.Uuid
   ownerId             String   @map("owner_id") @db.Uuid
   walletId            String   @map("wallet_id") @db.Uuid
-  ledgerTransactionId String   @unique @map("ledger_transaction_id") @db.Uuid
+  ledgerTransactionId String   @map("ledger_transaction_id") @db.Uuid
   categoryId          String?  @map("category_id") @db.Uuid
   receiptId           String?  @map("receipt_id") @db.Uuid
   note                String?
@@ -3344,6 +3344,7 @@ model PfmLedgerEnrichment {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@index([walletId])
+  @@unique([companyId, ownerId, walletId, ledgerTransactionId], map: "pfm_enrichment_scope_key")
   @@map("pfm_ledger_enrichment")
 }
 

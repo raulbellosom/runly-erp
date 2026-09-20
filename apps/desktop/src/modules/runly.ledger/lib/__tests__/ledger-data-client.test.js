@@ -5,6 +5,7 @@ import { createLedgerDataClient } from '../ledger-data-client.js'
 test('uses ledgerStore for account list before falling back to fetch', async () => {
   let fetchCalls = 0
   const client = createLedgerDataClient({
+    getCompanyId: () => 'company-a',
     apiBaseUrl: 'http://localhost:4010',
     fetchImpl: async () => {
       fetchCalls += 1
@@ -30,6 +31,7 @@ test('uses ledgerStore for account list before falling back to fetch', async () 
 
 test('falls back to HTTP when ledgerStore is unavailable', async () => {
   const client = createLedgerDataClient({
+    getCompanyId: () => 'company-a',
     apiBaseUrl: 'http://localhost:4010',
     fetchImpl: async (url) => ({
       ok: true,

@@ -57,6 +57,11 @@ export function createOfflineTransport({ db, getSession }) {
 
     const { moduleKey, entityType, operation, recordId } = parsed
     const session = await getSession()
+    if (!session?.companyId || !session?.userProfile?.id) throw new Error('Selecciona una empresa y una sesión válida antes de guardar sin conexión.')
+    const requestedCompanyId = new Headers(options?.headers).get('X-Runly-Company-Id')
+    if (requestedCompanyId && requestedCompanyId !== session.companyId) {
+      throw new Error('La empresa de la solicitud no coincide con la sesión sin conexión.')
+    }
 
     let payload = {}
     if (options?.body) {

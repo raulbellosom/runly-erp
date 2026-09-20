@@ -53,32 +53,9 @@ export function createContactsService({ prisma }) {
   // docs/superpowers/specs/2026-09-10-multi-tenant-architecture-design.md
   // §5) and threaded down from each route handler. When provided, this is
   // the company every contacts operation runs against — never re-derived.
-  async function getCompanyContext(authUserId, activeCompanyId) {
+  async function getCompanyContext(activeCompanyId) {
     if (activeCompanyId) return activeCompanyId;
-
-    const profile = await prisma.userProfile.findUnique({
-      where: { authUserId },
-      select: { id: true },
-    });
-
-    if (!profile) {
-      throw new ContactsServiceError("Perfil de usuario no encontrado.", 404);
-    }
-
-    const membership = await prisma.membership.findFirst({
-      where: { userId: profile.id, enabled: true },
-      orderBy: { createdAt: "desc" },
-      select: { companyId: true },
-    });
-
-    if (!membership?.companyId) {
-      throw new ContactsServiceError(
-        "No tienes una empresa activa para gestionar contactos.",
-        403,
-      );
-    }
-
-    return membership.companyId;
+    throw new ContactsServiceError("Selecciona una empresa activa para gestionar contactos.", 400);
   }
 
   async function assertContactOwnership({ id, companyId }) {
@@ -93,7 +70,7 @@ export function createContactsService({ prisma }) {
 
   return {
     async list({ authUserId, companyId: activeCompanyId, search, page, pageSize, sortBy, sortDir, enabled = true }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       const parsedPage = Math.max(1, Number.parseInt(String(page ?? 1), 10) || 1);
       const parsedPageSize = Math.min(200, Math.max(1, Number.parseInt(String(pageSize ?? 20), 10) || 20));
       const where = {
@@ -119,7 +96,7 @@ export function createContactsService({ prisma }) {
     },
 
     async getById({ authUserId, companyId: activeCompanyId, id }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       const contact = await prisma.contact.findFirst({ where: { id, companyId } });
       if (!contact) {
         throw new ContactsServiceError("Contacto no encontrado.", 404);
@@ -128,7 +105,7 @@ export function createContactsService({ prisma }) {
     },
 
     async create({ authUserId, companyId: activeCompanyId, payload }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       const data = contactCreateSchema.parse(payload);
       return prisma.contact.create({
         data: {
@@ -139,7 +116,7 @@ export function createContactsService({ prisma }) {
     },
 
     async update({ authUserId, companyId: activeCompanyId, id, payload }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       await assertContactOwnership({ id, companyId });
       const data = contactCreateSchema.partial().parse(payload);
       return prisma.contact.update({
@@ -149,7 +126,7 @@ export function createContactsService({ prisma }) {
     },
 
     async setEnabled({ authUserId, companyId: activeCompanyId, id, enabled }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       await assertContactOwnership({ id, companyId });
       return prisma.contact.update({
         where: { id },
@@ -158,7 +135,7 @@ export function createContactsService({ prisma }) {
     },
 
     async delete({ authUserId, companyId: activeCompanyId, id }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       await assertContactOwnership({ id, companyId });
       await prisma.contact.delete({ where: { id } });
     },
@@ -167,7 +144,7 @@ export function createContactsService({ prisma }) {
       if (!Array.isArray(ids) || !ids.length) {
         throw new ContactsServiceError("IDs requeridos.", 400);
       }
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       await prisma.contact.updateMany({
         where: { id: { in: ids }, companyId },
         data: { enabled: Boolean(enabled) },
@@ -178,14 +155,14 @@ export function createContactsService({ prisma }) {
       if (!Array.isArray(ids) || !ids.length) {
         throw new ContactsServiceError("IDs requeridos.", 400);
       }
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       await prisma.contact.deleteMany({
         where: { id: { in: ids }, companyId },
       });
     },
 
     async getContactsForExport({ authUserId, companyId: activeCompanyId, ids }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       const where = { companyId };
       if (Array.isArray(ids) && ids.length) {
         where.id = { in: ids };
@@ -197,7 +174,7 @@ export function createContactsService({ prisma }) {
     },
 
     async picker({ authUserId, companyId: activeCompanyId, query, limit }) {
-      const companyId = await getCompanyContext(authUserId, activeCompanyId);
+      const companyId = await getCompanyContext(activeCompanyId);
       const take = normalizeLimit(limit, 12, 30);
       const contacts = await prisma.contact.findMany({
         where: {

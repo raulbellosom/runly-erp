@@ -454,6 +454,7 @@ describe('important notification channels', () => {
     assert.equal((await worker.processPendingNotificationDeliveries({ channel: 'email' })).sent, 1);
     assert.equal((await worker.processPendingNotificationDeliveries({ channel: 'web_push' })).sent, 1);
     assert.equal(emails[0].to, `${RECIPIENT_A}@example.test`);
+    assert.equal(emails[0].companyId, COMPANY_ID);
     assert.equal(pushes[0].payload.link, '/app/m/atlas.notes?note=demo');
     assert.ok(prisma._deliveries.every(d => d.status === 'sent'));
   });

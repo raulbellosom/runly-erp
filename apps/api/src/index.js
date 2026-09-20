@@ -1,4 +1,5 @@
 import { createRealtimeAccessService } from './services/realtime-access-service.js';
+import { membershipAuthorizationRevision } from './services/membership-authorization-revision.js';
 import { createCollaborationInvitationsService } from './services/collaboration-invitations-service.js';
 import { createOfficeService } from "./services/office/service.js";
 import { createUserAccessService } from "./services/user-access-service.js";
@@ -17,6 +18,7 @@ import pg from "pg";
 const { PrismaClient } = pkg;
 import { createClient } from "@supabase/supabase-js";
 import {
+  createCompanyMemberSchema,
   createMembershipSchema,
   createUserSchema,
   hrCatalogCreateSchema,
@@ -114,7 +116,7 @@ import { createNotificationDeliveryWorker } from "./services/notification-delive
 import { createNotificationService } from "./services/notification-service.js";
 import { createRealtimeBroadcaster } from "./services/realtime-broadcaster.js";
 import { createSmtpService } from "./services/smtp-service.js";
-import { buildPasswordResetEmail, resolveAppBaseUrl } from "./services/email-templates.js";
+import { buildPasswordResetEmail, buildCompanyInvitationEmail, resolveAppBaseUrl } from "./services/email-templates.js";
 import { createCompanyBrandService } from "./services/company-brand-service.js";
 import {
   get as cacheGet,
@@ -133,6 +135,7 @@ import {
   signedUrlsWithVariant,
 } from "./lib/image-variants.js";
 import { loadInstallerLiveKitDevEnv } from "./lib/livekit-dev-env.js";
+import { getCachedSignedUrls } from "./lib/signed-url-cache.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({
@@ -862,10 +865,19 @@ async function sendPasswordResetEmail(email, { requestedByAdmin = false } = {}) 
       type: "recovery",
       email: normalized,
     });
-    if (error || !data?.properties?.hashed_token) return;
+    if (error || !data?.properties?.hashed_token) {
+      // Silent to the caller by design (no account enumeration) — but log
+      // server-side, since "no such Supabase Auth user" is by far the most
+      // common reason this looks like it silently does nothing in dev.
+      console.warn("[auth] password reset: generateLink failed for", normalized, "-", error?.message ?? "no hashed_token in response");
+      return;
+    }
 
     const appBaseUrl = resolveAppBaseUrl(process.env);
-    if (!appBaseUrl) return;
+    if (!appBaseUrl) {
+      console.warn("[auth] password reset: no app base URL resolved (RUNLY_APP_URL/APP_URL/PUBLIC_APP_URL) — email not sent");
+      return;
+    }
     const resetUrl = `${appBaseUrl}/app/reset-password?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
 
     const brand = await companyBrandService.getBrandForEmail(normalized);
@@ -1836,13 +1848,17 @@ app.get("/memberships/me", authMiddleware, async (c) => {
     const memberships = await prisma.membership.findMany({
       where: { userId: profile.id, enabled: true, company: { enabled: true }, OR: [{ roleId: null }, { role: { enabled: true } }] },
       include: {
-        role: true,
+        role: { include: { permissions: { include: { permission: true } } } },
         company: {
           include: { brandingConfig: true },
         },
       },
     });
 
+    const grants = await prisma.userPermissionGrant.findMany({
+      where: { userId: profile.id, permission: { active: true } },
+      select: { companyId: true, permission: { select: { key: true, active: true } } },
+    });
     // Batch-load all logo file assets in a single query, then batch signed URLs per bucket.
     const logoFileIds = memberships
       .map((m) => m.company?.brandingConfig?.logoFileId)
@@ -1861,13 +1877,9 @@ app.get("/memberships/me", authMiddleware, async (c) => {
       await Promise.all(
         [...byBucket.entries()].map(async ([bucket, assets]) => {
           const paths = assets.map((a) => a.objectKey);
-          const { data: signedList } = await supabaseAdmin.storage
-            .from(bucket)
-            .createSignedUrls(paths, 3600);
-          if (Array.isArray(signedList)) {
-            for (let i = 0; i < assets.length; i++) {
-              logoUrlMap.set(assets[i].id, signedList[i]?.signedUrl ?? null);
-            }
+          const signedByPath = await getCachedSignedUrls(supabaseAdmin, bucket, paths, 3600);
+          for (const asset of assets) {
+            logoUrlMap.set(asset.id, signedByPath.get(asset.objectKey) ?? null);
           }
         }),
       );
@@ -1877,6 +1889,8 @@ app.get("/memberships/me", authMiddleware, async (c) => {
       const logoFileId = m.company?.brandingConfig?.logoFileId;
       return {
         ...m,
+        role: m.role ? { ...m.role, permissions: undefined } : null,
+        authorizationRevision: membershipAuthorizationRevision(m, grants),
         company: m.company
           ? {
               id: m.company.id,
@@ -2276,6 +2290,141 @@ app.put(
         { error: "No se pudo guardar la configuracion de marca." },
         500,
       );
+    }
+  },
+);
+
+// ── Company: Members ─────────────────────────────────────────────────────────
+// Company-centric membership management (the counterpart to
+// /identity/users/:id/memberships*, which manages one user's companies from
+// the other direction). See docs/superpowers/specs/2026-09-20-company-members-design.md.
+
+function companyMemberActorContext(c) {
+  const tenant = c.get("tenantContext");
+  const context = c.get("userContext");
+  return {
+    isSystemAdmin: tenant.isSystemAdmin,
+    canManageRoles: Boolean(tenant.isAdmin || tenant.permissionSet?.has("identity.roles.update")),
+    actingUserId: context?.profile?.id ?? null,
+  };
+}
+
+app.get(
+  "/company/members",
+  authMiddleware,
+  requirePermission("company.members.read"),
+  async (c) => {
+    try {
+      const data = await companyService.listMembers(c.get("companyId"));
+      return c.json({ data });
+    } catch (err) {
+      if (err instanceof CompanyServiceError)
+        return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudieron cargar los miembros de la empresa." }, 500);
+    }
+  },
+);
+
+app.get(
+  "/company/members/roles",
+  authMiddleware,
+  requirePermission("company.members.read"),
+  async (c) => {
+    try {
+      const data = await companyService.listMemberRoles(c.get("companyId"));
+      return c.json({ data });
+    } catch (err) {
+      if (err instanceof CompanyServiceError)
+        return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudieron cargar los roles." }, 500);
+    }
+  },
+);
+
+app.get(
+  "/company/members/candidates",
+  authMiddleware,
+  requirePermission("company.members.manage"),
+  async (c) => {
+    try {
+      const q = c.req.query("q");
+      const data = await companyService.searchMemberCandidates(q, c.get("companyId"));
+      return c.json({ data });
+    } catch (err) {
+      if (err instanceof CompanyServiceError)
+        return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudo realizar la busqueda." }, 500);
+    }
+  },
+);
+
+app.post(
+  "/company/members",
+  authMiddleware,
+  requirePermission("company.members.manage"),
+  async (c) => {
+    try {
+      const body = await c.req.json();
+      const fields = createCompanyMemberSchema.parse(body);
+      const data = await companyService.addMember(
+        { userId: fields.userId, roleId: fields.roleId, actorContext: companyMemberActorContext(c) },
+        c.get("companyId"),
+      );
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: "company.member.create",
+        severity: "success",
+        entityType: "Membership",
+        entityId: data.membershipId,
+        summary: `${actorName} agrego a ${data.displayName || "un usuario"} a la empresa`,
+      });
+      return c.json({ data });
+    } catch (err) {
+      if (err?.name === "ZodError") {
+        return c.json({ error: err.errors[0]?.message ?? "Datos inválidos." }, 400);
+      }
+      if (err instanceof CompanyServiceError)
+        return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudo agregar el miembro." }, 500);
+    }
+  },
+);
+
+app.patch(
+  "/company/members/:membershipId",
+  authMiddleware,
+  requirePermission("company.members.manage"),
+  async (c) => {
+    try {
+      const membershipId = c.req.param("membershipId");
+      const body = await c.req.json();
+      const fields = updateMembershipSchema.parse(body);
+      const data = await companyService.updateMember(
+        membershipId,
+        fields,
+        c.get("companyId"),
+        companyMemberActorContext(c),
+      );
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: fields.enabled === false
+          ? "company.member.disable"
+          : fields.enabled === true
+            ? "company.member.enable"
+            : "company.member.update",
+        severity: "info",
+        entityType: "Membership",
+        entityId: membershipId,
+        summary: `${actorName} actualizo la membresia de ${data.displayName || "un usuario"}`,
+      });
+      return c.json({ data });
+    } catch (err) {
+      if (err?.name === "ZodError") {
+        return c.json({ error: err.errors[0]?.message ?? "Datos inválidos." }, 400);
+      }
+      if (err instanceof CompanyServiceError)
+        return c.json({ error: err.message }, err.status);
+      return c.json({ error: "No se pudo actualizar la membresia." }, 500);
     }
   },
 );
@@ -3035,8 +3184,16 @@ app.post('/identity/users', authMiddleware, requirePermission('identity.users.cr
     // SMTP is optional on a fresh installation; the administrator can copy the
     // same link. Neither result discloses whether the email had an account.
     if (baseUrl) {
-      await createSmtpService({ prisma }).sendEmail({ to: fields.email, subject: 'Invitacion a Runly',
-        text: `Te invitaron a una empresa en Runly. Inicia sesion y acepta: ${invitationUrl}`, html: `<p>Te invitaron a una empresa en Runly.</p><p><a href="${invitationUrl}">Aceptar invitacion</a></p>` }).catch(() => {});
+      const inviteCompanyId = c.get('companyId');
+      const inviteBrand = await companyBrandService.getBrandForCompany(inviteCompanyId);
+      const inviteMail = buildCompanyInvitationEmail({ invitationUrl, brand: inviteBrand });
+      await createSmtpService({ prisma, companyId: inviteCompanyId }).sendEmail({
+        to: fields.email,
+        subject: inviteMail.subject,
+        text: inviteMail.text,
+        html: inviteMail.html,
+        fromName: companyBrandService.fromNameFor(inviteBrand),
+      }).catch(() => {});
     }
     return c.json({ data: { invitationId: invitation.id, invitationUrl, expiresAt: invitation.expiresAt } }, 201);
   } catch (err) {
@@ -3552,6 +3709,23 @@ app.post(
           429,
         );
       }
+
+      // This action is admin-initiated against a user the admin already
+      // picked — unlike the public forgot-password endpoint, there's no
+      // enumeration risk in telling the truth here, so surface a real error
+      // instead of a swallowed generic success when SMTP isn't usable.
+      const smtpStatus = await createSmtpService({ prisma }).getStatus();
+      if (!smtpStatus.configured) {
+        return c.json(
+          {
+            error:
+              smtpStatus.message ||
+              "El SMTP no está configurado. Ve a Ajustes → SMTP o define SMTP_HOST/SMTP_USER en el servidor.",
+          },
+          400,
+        );
+      }
+
       await sendPasswordResetEmail(targetUser.email, { requestedByAdmin: true });
 
       const { actorName } = getActivityContext(c);

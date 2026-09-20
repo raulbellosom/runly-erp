@@ -1,16 +1,13 @@
-import { LayoutGrid, Menu, Search, Download } from "lucide-react";
+import { LayoutGrid, Menu, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { useCommandStore } from "../stores/command";
 import { ThemeToggle } from "./ThemeToggle";
 import { CompanySwitcher } from "./CompanySwitcher";
-import { useState } from "react";
-import { ActivityBellTrigger, SyncStatusPopover } from "@runly/ui";
+import { SyncStatusPopover } from "@runly/ui";
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
-import { runly } from "../lib/runly";
-import ActivityDetailSheet from "../modules/runly.activity/ActivityDetailSheet";
 import { useOfflineStore } from "@runly/offline";
 
 export function Topbar({
@@ -40,7 +37,6 @@ export function Topbar({
     userProfile?.isAdmin ||
     (userProfile?.permissions ?? []).includes("activity.read"),
   );
-  const [selectedActivity, setSelectedActivity] = useState(null);
 
   function handleNotificationNavigate(href) {
     if (!href) return;
@@ -55,9 +51,9 @@ export function Topbar({
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-topbar safe-top glass dark:bg-[rgba(10,17,38,0.88)] border-b border-[hsl(var(--border))] flex flex-col justify-end">
-      <div className="h-14 flex items-center px-4 gap-2">
+      <div className="h-14 grid grid-cols-[auto_1fr_auto] items-center px-4 gap-2">
         {/* Left section */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           {/* Fullscreen module menu trigger — always visible on all breakpoints */}
           {onModuleMenuToggle && (
             <button
@@ -112,18 +108,26 @@ export function Topbar({
           <Breadcrumbs />
         </div>
 
-        {/* Center section: full command-palette bar — absolutely centered so it
-            never shifts. Only rendered at lg+, where the left and right
-            sections leave clear room around a 256px centred element. Below lg
-            (tablets included) it collapses to an icon that lives in the right
-            cluster (normal flow, no overlap). */}
-        <div className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center pointer-events-none">
+        {/* Center section: command-palette bar. Lives in the grid's middle
+            `1fr` column, which only ever spans the space left over between
+            the left and right clusters — unlike the old `absolute
+            left-1/2` centering (relative to the full header width, ignoring
+            both siblings), it can never overlap the right cluster when that
+            cluster gets wide (company switcher + sync status + bell icons +
+            user menu, all at once around the lg breakpoint). `min-w-0` lets
+            the column shrink below the button's own width instead of
+            forcing an overflow, and `max-w-full` on the button lets it
+            actually shrink to fit. `invisible` (not `hidden`) below lg so
+            the grid keeps 3 columns at every breakpoint — `hidden` removes
+            the element from grid auto-placement entirely, which would push
+            the right cluster into this middle column instead of column 3. */}
+        <div className="flex items-center justify-center min-w-0 px-2 invisible lg:visible">
           <button
             onClick={openCommand}
-            className="pointer-events-auto flex h-9 w-64 max-w-xs items-center gap-2 px-3 rounded-xl glass-subtle hover:brightness-105 border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] transition-all duration-150 cursor-pointer"
+            className="flex h-9 w-64 max-w-full items-center gap-2 px-3 rounded-xl glass-subtle hover:brightness-105 border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] transition-all duration-150 cursor-pointer"
           >
             <Search size={13} className="shrink-0" />
-            <span className="flex-1 text-xs text-left">
+            <span className="flex-1 min-w-0 truncate text-xs text-left">
               Buscar o ejecutar...
             </span>
             <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[hsl(var(--border))] text-[10px] font-mono text-[hsl(var(--muted-foreground))] leading-none shrink-0">
@@ -132,8 +136,8 @@ export function Topbar({
           </button>
         </div>
 
-        {/* Right section — pushed to the right */}
-        <div className="ml-auto flex items-center gap-1 shrink-0">
+        {/* Right section */}
+        <div className="flex items-center gap-1 justify-self-end min-w-0">
           {/* Command-palette trigger (icon) — below lg only; the full centred
               bar takes over at lg+. */}
           <button
@@ -161,25 +165,6 @@ export function Topbar({
           <span className="hidden sm:contents">
             <ThemeToggle />
           </span>
-          {/* ActivityBell — hidden on mobile, accessible via UserMenu */}
-          {token && canReadActivity && (
-            <span className="hidden sm:contents">
-              <ActivityBellTrigger
-                sdk={runly}
-                token={token}
-                onSelect={setSelectedActivity}
-                onSeeAll={() => navigate("/app/m/runly.activity")}
-              />
-            </span>
-          )}
-          <ActivityDetailSheet
-            activity={selectedActivity}
-            onClose={() => setSelectedActivity(null)}
-            onNavigate={(href) => {
-              setSelectedActivity(null);
-              handleNotificationNavigate(href);
-            }}
-          />
           {token && canReadNotifications && (
             <NotificationBell
               token={token}
@@ -187,16 +172,11 @@ export function Topbar({
               onSeeAll={() => navigate("/app/m/runly.notifications")}
             />
           )}
-          {canInstall && activeModuleKey && (
-            <button
-              onClick={onInstall}
-              title="Instalar como app"
-              className="h-9 w-9 flex items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors duration-150 cursor-pointer"
-              aria-label="Instalar modulo como app"
-            >
-              <Download size={16} />
-            </button>
-          )}
+          {/* Activity + "instalar modulo" live only in UserMenu now, at every
+              breakpoint — was two more always-on icons crowding this cluster
+              on top of sync/company/notifications/theme, which is what was
+              colliding with the centered search bar around the lg
+              breakpoint. See UserMenu.jsx. */}
           <UserMenu
             activeModuleKey={activeModuleKey}
             canInstall={canInstall}

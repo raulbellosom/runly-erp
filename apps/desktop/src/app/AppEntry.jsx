@@ -25,8 +25,9 @@ import { GoogleCalendarCallbackScreen } from "./GoogleCalendarCallbackScreen";
 import { runly } from "../lib/runly";
 import { applyBrandTheme } from "../lib/brandTheme";
 import { registerServiceWorker } from "../lib/webPush";
-import { AppLoader } from "../components/AppLoader";
+import { BootLoaderOverlay } from "../components/BootLoaderOverlay";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { useBootLoader } from "../stores/bootLoader";
 import { useBrandingStore } from "../stores/branding";
 import { useThemeStore } from "../stores/theme";
 import { PublicShell } from "../shell/PublicShell.jsx";
@@ -72,6 +73,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
     : !isAtlasInternalPath(window.location.pathname);
 
   useCallSoundUnlock();
+  useBootLoader('brand', !requiresServerSetup && !brandReady && !skipBrandWait);
 
   useEffect(() => {
     if (!requiresServerSetup && (brandReady || skipBrandWait)) native.ready().catch(() => {});
@@ -119,80 +121,83 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
     )
   }
 
-  if (!brandReady && !skipBrandWait) {
-    return <AppLoader />;
-  }
+  const ready = brandReady || skipBrandWait;
 
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{
-        persister: _persister,
-        maxAge: 24 * 60 * 60 * 1000,
-        buster: `isolated-v1-${import.meta.env.VITE_APP_VERSION ?? '1'}`,
-        // Authenticated data cannot be restored before identity and membership
-        // have been checked. Offline business data needs a separate scoped store.
-        dehydrateOptions: { shouldDehydrateQuery: () => false, shouldDehydrateMutation: () => false },
-      }}
-    >
-      <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <OfficeProvider>
-            <Routes>
-              <Route path="/" element={<PublicWebsiteEntry />} />
-              <Route path="/app/setup" element={<AppRouteGuard mode="setup" />} />
-              <Route path="/app/login" element={<AppRouteGuard mode="login" />} />
-              <Route path="/app/reset-password" element={<ResetPasswordScreen />} />
-              <Route path="/app/acceso" element={<PublicClientLogin />} />
-              <Route
-                path="/app/google/calendar/callback"
-                element={<GoogleCalendarCallbackScreen />}
-              />
-              {/* Public notes under /app/p/ — accessible without auth, served by same SPA */}
-              <Route path="/app/p" element={<PublicShell />}>
-                <Route path="notes/:slug" element={<PublicNoteScreen />} />
-                <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
-                <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
-              </Route>
-              <Route element={<AppRouteGuard mode="access" />}>
-                <Route path="/app/accept-invitation" element={<AcceptInvitationScreen />} />
-                <Route path="/app/shared/:resourceType/:id" element={<SharedResourceScreen />} />
-                <Route
-                  path="/app"
-                  element={
-                    <ActiveCompanyProvider>
-                      <ActiveCompanyGate>
-                        <RealtimeProvider>
-                          <CallsProvider>
-                            <RunlyApp />
-                          </CallsProvider>
-                        </RealtimeProvider>
-                      </ActiveCompanyGate>
-                    </ActiveCompanyProvider>
-                  }
-                >
-                  <Route index element={<Navigate to="home" replace />} />
-                  <Route path="home" element={<HomeScreen />} />
-                  <Route path="m/:moduleKey/*" element={<ModuleOutlet />} />
-                  <Route path="profile" element={<ProfileScreen />} />
-                  <Route path="native-host" element={<NativeHostDiagnostics />} />
-                </Route>
-              </Route>
-              <Route path="/p" element={<PublicShell />}>
-                <Route path="notes/:slug" element={<PublicNoteScreen />} />
-                <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
-                <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
-                <Route path="*" element={<PublicModuleOutlet />} />
-              </Route>
-              <Route path="*" element={<PublicWebsiteEntry />} />
-            </Routes>
-            </OfficeProvider>
-          </AuthProvider>
-          <Toaster />
-        </BrowserRouter>
-      </TooltipProvider>
-    </PersistQueryClientProvider>
+    <>
+      <BootLoaderOverlay />
+      {ready && (
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: _persister,
+            maxAge: 24 * 60 * 60 * 1000,
+            buster: `isolated-v1-${import.meta.env.VITE_APP_VERSION ?? '1'}`,
+            // Authenticated data cannot be restored before identity and membership
+            // have been checked. Offline business data needs a separate scoped store.
+            dehydrateOptions: { shouldDehydrateQuery: () => false, shouldDehydrateMutation: () => false },
+          }}
+        >
+          <TooltipProvider>
+            <BrowserRouter>
+              <AuthProvider>
+                <OfficeProvider>
+                <Routes>
+                  <Route path="/" element={<PublicWebsiteEntry />} />
+                  <Route path="/app/setup" element={<AppRouteGuard mode="setup" />} />
+                  <Route path="/app/login" element={<AppRouteGuard mode="login" />} />
+                  <Route path="/app/reset-password" element={<ResetPasswordScreen />} />
+                  <Route path="/app/acceso" element={<PublicClientLogin />} />
+                  <Route
+                    path="/app/google/calendar/callback"
+                    element={<GoogleCalendarCallbackScreen />}
+                  />
+                  {/* Public notes under /app/p/ — accessible without auth, served by same SPA */}
+                  <Route path="/app/p" element={<PublicShell />}>
+                    <Route path="notes/:slug" element={<PublicNoteScreen />} />
+                    <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
+                    <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
+                  </Route>
+                  <Route element={<AppRouteGuard mode="access" />}>
+                    <Route path="/app/accept-invitation" element={<AcceptInvitationScreen />} />
+                    <Route path="/app/shared/:resourceType/:id" element={<SharedResourceScreen />} />
+                    <Route
+                      path="/app"
+                      element={
+                        <ActiveCompanyProvider>
+                          <ActiveCompanyGate>
+                            <RealtimeProvider>
+                              <CallsProvider>
+                                <RunlyApp />
+                              </CallsProvider>
+                            </RealtimeProvider>
+                          </ActiveCompanyGate>
+                        </ActiveCompanyProvider>
+                      }
+                    >
+                      <Route index element={<Navigate to="home" replace />} />
+                      <Route path="home" element={<HomeScreen />} />
+                      <Route path="m/:moduleKey/*" element={<ModuleOutlet />} />
+                      <Route path="profile" element={<ProfileScreen />} />
+                      <Route path="native-host" element={<NativeHostDiagnostics />} />
+                    </Route>
+                  </Route>
+                  <Route path="/p" element={<PublicShell />}>
+                    <Route path="notes/:slug" element={<PublicNoteScreen />} />
+                    <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
+                    <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
+                    <Route path="*" element={<PublicModuleOutlet />} />
+                  </Route>
+                  <Route path="*" element={<PublicWebsiteEntry />} />
+                </Routes>
+                </OfficeProvider>
+              </AuthProvider>
+              <Toaster />
+            </BrowserRouter>
+          </TooltipProvider>
+        </PersistQueryClientProvider>
+      )}
+    </>
   );
 }
 

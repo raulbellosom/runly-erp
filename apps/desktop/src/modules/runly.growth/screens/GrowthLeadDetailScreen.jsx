@@ -1,3 +1,5 @@
+import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -83,6 +85,7 @@ export default function GrowthLeadDetailScreen() {
   const leadId = useMemo(() => getGrowthLeadId(wildcard), [wildcard]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const permissions = userProfile?.permissions ?? [];
@@ -192,7 +195,7 @@ export default function GrowthLeadDetailScreen() {
   const { data: filesData } = useQuery({
     queryKey: ["growth", "leads", leadId, "files"],
     queryFn: async () => {
-      const res = await fetch(`${getApiUrl()}/growth/leads/${leadId}/files`, {
+      const res = await companyFetch(`${getApiUrl()}/growth/leads/${leadId}/files`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -419,6 +422,7 @@ export default function GrowthLeadDetailScreen() {
           {canReadFiles ? (
             <Card className="p-5">
               <AttachmentsPanel
+                    companyId={activeCompanyId}
                 key={attachmentsVersion}
                 apiBaseUrl={getApiUrl()}
                 token={token}

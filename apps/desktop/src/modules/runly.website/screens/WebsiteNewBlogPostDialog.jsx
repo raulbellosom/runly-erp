@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
@@ -40,7 +41,7 @@ export default function WebsiteNewBlogPostDialog({ siteId, open, onOpenChange, o
   const catsQuery = useQuery({
     queryKey: ['blog-categories', siteId, token],
     queryFn: async () => {
-      const res = await fetch(`${getApiUrl()}/website/blog/categories?siteId=${siteId}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/blog/categories?siteId=${siteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) return { data: [] }
@@ -53,7 +54,7 @@ export default function WebsiteNewBlogPostDialog({ siteId, open, onOpenChange, o
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(`${getApiUrl()}/website/blog/posts`, {
+      const res = await companyFetch(`${getApiUrl()}/website/blog/posts`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

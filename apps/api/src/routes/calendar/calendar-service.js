@@ -85,9 +85,9 @@ export function createCalendarService({ prisma }) {
     });
   }
 
-  async function updateCalendar(userId, calendarId, { name, color, icon }) {
+  async function updateCalendar(userId, calendarId, { name, color, icon }, activeCompanyId) {
     const calendar = await prisma.calendarCalendar.findFirst({
-      where: { id: calendarId, ownerId: userId, enabled: true },
+      where: { id: calendarId, ownerId: userId, enabled: true, ...(activeCompanyId !== undefined ? { OR: [{ companyId: null }, { companyId: activeCompanyId }] } : {}) },
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
@@ -102,9 +102,9 @@ export function createCalendarService({ prisma }) {
     });
   }
 
-  async function deleteCalendar(userId, calendarId) {
+  async function deleteCalendar(userId, calendarId, activeCompanyId) {
     const calendar = await prisma.calendarCalendar.findFirst({
-      where: { id: calendarId, ownerId: userId, enabled: true },
+      where: { id: calendarId, ownerId: userId, enabled: true, ...(activeCompanyId !== undefined ? { OR: [{ companyId: null }, { companyId: activeCompanyId }] } : {}) },
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
@@ -124,9 +124,9 @@ export function createCalendarService({ prisma }) {
     });
   }
 
-  async function shareCalendar(ownerId, calendarId, { userId, role }) {
+  async function shareCalendar(ownerId, calendarId, { userId, role }, activeCompanyId) {
     const calendar = await prisma.calendarCalendar.findFirst({
-      where: { id: calendarId, ownerId, enabled: true },
+      where: { id: calendarId, ownerId, enabled: true, ...(activeCompanyId !== undefined ? { OR: [{ companyId: null }, { companyId: activeCompanyId }] } : {}) },
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
@@ -148,9 +148,9 @@ export function createCalendarService({ prisma }) {
     }
   }
 
-  async function updateShare(ownerId, calendarId, shareId, { role }) {
+  async function updateShare(ownerId, calendarId, shareId, { role }, activeCompanyId) {
     const calendar = await prisma.calendarCalendar.findFirst({
-      where: { id: calendarId, ownerId, enabled: true },
+      where: { id: calendarId, ownerId, enabled: true, ...(activeCompanyId !== undefined ? { OR: [{ companyId: null }, { companyId: activeCompanyId }] } : {}) },
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
@@ -169,9 +169,9 @@ export function createCalendarService({ prisma }) {
     });
   }
 
-  async function deleteShare(ownerId, calendarId, shareId) {
+  async function deleteShare(ownerId, calendarId, shareId, activeCompanyId) {
     const calendar = await prisma.calendarCalendar.findFirst({
-      where: { id: calendarId, ownerId, enabled: true },
+      where: { id: calendarId, ownerId, enabled: true, ...(activeCompanyId !== undefined ? { OR: [{ companyId: null }, { companyId: activeCompanyId }] } : {}) },
     });
     if (!calendar)
       throw new CalendarServiceError("Calendario no encontrado.", 404);
@@ -184,9 +184,9 @@ export function createCalendarService({ prisma }) {
     await prisma.calendarShare.delete({ where: { id: shareId } });
   }
 
-  async function getCalendarRole(userId, calendarId) {
+  async function getCalendarRole(userId, calendarId, activeCompanyId) {
     const calendar = await prisma.calendarCalendar.findFirst({
-      where: { id: calendarId, enabled: true },
+      where: { id: calendarId, enabled: true, ...(activeCompanyId !== undefined ? { OR: [{ companyId: null }, { companyId: activeCompanyId }] } : {}) },
     });
     if (!calendar) return null;
     if (calendar.companyId) await access.assertCompanyMember(calendar.companyId, userId);

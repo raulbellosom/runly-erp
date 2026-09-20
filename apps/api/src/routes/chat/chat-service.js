@@ -698,12 +698,12 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
     // a fresh conversation-type lookup rather than reusing the threadRootId
     // block's query above, since that one only runs when threadRootId is set.
     if (entityRefs?.length) {
-      const [convRow] = await prisma.$queryRaw`SELECT type FROM chat_conversations WHERE id = ${conversationId} LIMIT 1`;
+      const [convRow] = await prisma.$queryRaw`SELECT type, company_id FROM chat_conversations WHERE id = ${conversationId} LIMIT 1`;
       if (convRow?.type === "external_support") {
         throw new ChatServiceError("No se pueden adjuntar referencias en conversaciones de soporte externo.", 400);
       }
       if (entityReferencesService) {
-        const resolvedEntityRefs = await entityReferencesService.resolveEntityRefs({ authUserId, entityRefs });
+        const resolvedEntityRefs = await entityReferencesService.resolveEntityRefs({ authUserId, companyId: convRow?.company_id, entityRefs });
         if (resolvedEntityRefs.length) {
           finalMetadata = { ...finalMetadata, entityRefs: resolvedEntityRefs };
         }

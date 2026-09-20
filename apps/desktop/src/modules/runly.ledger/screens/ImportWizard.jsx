@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/ImportWizard.jsx
 import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -53,7 +54,7 @@ export default function ImportWizard() {
   const { data: accountData } = useQuery({
     queryKey: ['ledger-account', accountId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/ledger/accounts/${accountId}`, {
+      const res = await companyFetch(`${API_BASE}/ledger/accounts/${accountId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('No se pudo cargar la cuenta.')
@@ -130,7 +131,7 @@ export default function ImportWizard() {
 
   const previewMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${API_BASE}/ledger/accounts/${accountId}/import/preview`,
         {
           method: 'POST',
@@ -149,7 +150,7 @@ export default function ImportWizard() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${API_BASE}/ledger/accounts/${accountId}/import/commit`,
         {
           method: 'POST',

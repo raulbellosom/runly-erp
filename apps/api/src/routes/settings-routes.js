@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { encryptPassword, createSmtpService } from '../services/smtp-service.js'
+import { createSmtpConfigStore, encryptPassword, createSmtpService } from '../services/smtp-service.js'
 import { createWebPushService } from '../services/web-push-service.js'
+import { buildSmtpTestEmail } from '../services/email-templates.js'
+import { createCompanyBrandService } from '../services/company-brand-service.js'
 
 const smtpSchema = z.object({
   host:       z.string().min(1),
@@ -13,13 +15,23 @@ const smtpSchema = z.object({
   tls:        z.boolean().default(false),
 })
 
-export function createSettingsRouter({ prisma, requirePermission }) {
+export function createSettingsRouter({ prisma, requirePermission, supabaseAdmin = null }) {
   const app = new Hono()
   const webPushService = createWebPushService({ prisma })
+  const brandService = createCompanyBrandService({ prisma, supabaseAdmin })
+
+  // VAPID keys belong to the installation/browser origin. A company admin must
+  // not rotate or delete the keys used by every other company on that origin.
+  const requireInstanceAdmin = async (c, next) => {
+    if (!c.get('tenantContext')?.isSystemAdmin) {
+      return c.json({ error: 'Solo la administración de plataforma puede configurar Web Push.' }, 403)
+    }
+    await next()
+  }
 
   app.get('/settings/smtp', requirePermission('platform.settings.manage'), async (c) => {
     try {
-      const rows = await prisma.instanceConfig.findMany({
+      const rows = await createSmtpConfigStore({ prisma, companyId: c.get("companyId") }).findMany({
         where: {
           key: {
             in: ['smtp.host', 'smtp.port', 'smtp.user',
@@ -31,7 +43,7 @@ export function createSettingsRouter({ prisma, requirePermission }) {
       // Real status: attempts to decrypt the stored password, so a saved-but-
       // undecryptable secret (JWT_SECRET rotated) reports configured:false with
       // a reason instead of a misleading green state.
-      const status = await createSmtpService({ prisma }).getStatus()
+      const status = await createSmtpService({ prisma, companyId: c.get("companyId") }).getStatus()
       return c.json({
         data: {
           host:       cfg['smtp.host']       ?? '',
@@ -71,15 +83,7 @@ export function createSettingsRouter({ prisma, requirePermission }) {
         entries.push({ key: 'smtp.pass', value: encryptPassword(data.pass) })
       }
 
-      await Promise.all(
-        entries.map((e) =>
-          prisma.instanceConfig.upsert({
-            where:  { key: e.key },
-            create: { key: e.key, value: e.value },
-            update: { value: e.value },
-          }),
-        ),
-      )
+      await createSmtpConfigStore({ prisma, companyId: c.get('companyId') }).save(entries)
 
       return c.json({ ok: true })
     } catch (err) {
@@ -90,7 +94,8 @@ export function createSettingsRouter({ prisma, requirePermission }) {
 
   app.post('/settings/smtp/test', requirePermission('platform.settings.manage'), async (c) => {
     try {
-      const smtpSvc = createSmtpService({ prisma })
+      const companyId = c.get("companyId")
+      const smtpSvc = createSmtpService({ prisma, companyId })
       const userId  = c.get('userId') ?? c.get('user')?.id
 
       const userProfile = await prisma.userProfile.findFirst({
@@ -98,11 +103,14 @@ export function createSettingsRouter({ prisma, requirePermission }) {
         select: { email: true },
       })
 
+      const brand = await brandService.getBrandForCompany(companyId)
+      const mail = buildSmtpTestEmail({ brand })
       await smtpSvc.sendEmail({
-        to:      userProfile?.email ?? 'test@example.com',
-        subject: 'Runly ERP — Prueba de SMTP',
-        html:    '<p>La configuracion SMTP funciona correctamente.</p>',
-        text:    'La configuracion SMTP funciona correctamente.',
+        to:       userProfile?.email ?? 'test@example.com',
+        subject:  mail.subject,
+        html:     mail.html,
+        text:     mail.text,
+        fromName: brandService.fromNameFor(brand),
       })
       return c.json({ ok: true })
     } catch (err) {
@@ -110,7 +118,7 @@ export function createSettingsRouter({ prisma, requirePermission }) {
     }
   })
 
-  app.get('/settings/notifications/webpush', requirePermission('platform.settings.manage'), async (c) => {
+  app.get('/settings/notifications/webpush', requirePermission('platform.settings.manage'), requireInstanceAdmin, async (c) => {
     try {
       const data = await webPushService.getVapidConfig()
       return c.json({ data })
@@ -120,7 +128,7 @@ export function createSettingsRouter({ prisma, requirePermission }) {
     }
   })
 
-  app.post('/settings/notifications/webpush', requirePermission('platform.settings.manage'), async (c) => {
+  app.post('/settings/notifications/webpush', requirePermission('platform.settings.manage'), requireInstanceAdmin, async (c) => {
     try {
       const body = await c.req.json()
       const data = await webPushService.saveVapidConfig(body)
@@ -132,7 +140,7 @@ export function createSettingsRouter({ prisma, requirePermission }) {
     }
   })
 
-  app.post('/settings/notifications/webpush/generate', requirePermission('platform.settings.manage'), async (c) => {
+  app.post('/settings/notifications/webpush/generate', requirePermission('platform.settings.manage'), requireInstanceAdmin, async (c) => {
     try {
       const data = webPushService.generateVapidKeys()
       return c.json({ data })
@@ -142,7 +150,7 @@ export function createSettingsRouter({ prisma, requirePermission }) {
     }
   })
 
-  app.delete('/settings/notifications/webpush', requirePermission('platform.settings.manage'), async (c) => {
+  app.delete('/settings/notifications/webpush', requirePermission('platform.settings.manage'), requireInstanceAdmin, async (c) => {
     try {
       const data = await webPushService.clearVapidConfig()
       return c.json({ data })

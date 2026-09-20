@@ -513,6 +513,7 @@ export function createNotificationDeliveryWorker({
             brand: brandByCompany.get(delivery.notification?.companyId) ?? null,
           });
           await smtp.sendEmail({
+            companyId: delivery.notification?.companyId,
             to: recipientEmail,
             subject: mail.subject,
             html: mail.html,

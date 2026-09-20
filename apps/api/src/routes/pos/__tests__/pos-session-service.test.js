@@ -14,6 +14,13 @@ function makePrisma() {
     cashMovements,
     payments,
     audits,
+    posOutlet: {
+      findFirst: async ({ where }) => where.id === 'outlet-1' && where.companyId === 'company-1' ? { id: 'outlet-1', companyId: 'company-1' } : null,
+    },
+    posTerminal: {
+      findFirst: async ({ where }) => where.id === 'terminal-1' && where.companyId === 'company-1' && where.outletId === 'outlet-1'
+        ? { id: 'terminal-1', outletId: 'outlet-1', companyId: 'company-1' } : null,
+    },
     posSession: {
       findMany: async ({ where }) =>
         [...sessions.values()].filter(

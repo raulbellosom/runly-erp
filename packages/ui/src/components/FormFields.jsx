@@ -156,6 +156,8 @@ export function PasswordField({
   className,
   ...props
 }) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   const [visible, setVisible] = useState(false);
   const [localError, setLocalError] = useState("");
   const [focused, setFocused] = useState(false);
@@ -174,14 +176,14 @@ export function PasswordField({
   return (
     <FieldWrapper
       label={label}
-      labelFor={id}
+      labelFor={inputId}
       error={error}
       hint={hint}
       required={required}
     >
       <div className="relative">
         <input
-          id={id}
+          id={inputId}
           type={visible ? "text" : "password"}
           value={value}
           onChange={onChange}
@@ -189,6 +191,7 @@ export function PasswordField({
           onFocus={() => setFocused(true)}
           onBlur={handleBlur}
           autoComplete="new-password"
+          required={required}
           {...props}
         />
         <InputIcon icon={icon} />
@@ -197,7 +200,9 @@ export function PasswordField({
           onClick={() => setVisible((v) => !v)}
           className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150 z-10"
           aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-          tabIndex={-1}
+          aria-controls={inputId}
+          aria-pressed={visible}
+          disabled={props.disabled}
         >
           {visible ? <EyeOff size={15} /> : <Eye size={15} />}
         </button>

@@ -1,4 +1,5 @@
 import { createUserAccessService } from '../../services/user-access-service.js';
+import { createPosScopeService } from './pos-scope-service.js';
 import {
   PosServiceError,
   assertEditableOrder,
@@ -165,6 +166,7 @@ export function createPosOrderService({ prisma, waiterShifts, modifiers }) {
     for (let attempt = 0; attempt <= 3; attempt++) {
       try {
         return await prisma.$transaction(async (tx) => {
+          await createPosScopeService({ prisma: tx }).order(scopedCompanyId, data);
           if (data.externalProvider && data.externalOrderId) {
             const duplicate = await tx.posOrder.findFirst({
               where: {
@@ -244,6 +246,7 @@ export function createPosOrderService({ prisma, waiterShifts, modifiers }) {
     const scopedCompanyId = requireCompanyId(companyId);
     const before = await hydrateOrder(prisma, { companyId: scopedCompanyId, id });
     assertEditableOrder(before);
+    if (data.tableId) await createPosScopeService({ prisma }).table(scopedCompanyId, before.outletId, data.tableId);
     const updated = await prisma.posOrder.update({
       where: { id },
       data: cleanData(data),
@@ -408,6 +411,7 @@ export function createPosOrderService({ prisma, waiterShifts, modifiers }) {
     const scopedCompanyId = requireCompanyId(companyId);
     const before = await hydrateOrder(prisma, { companyId: scopedCompanyId, id: orderId });
     assertEditableOrder(before);
+    await createPosScopeService({ prisma }).guest(scopedCompanyId, orderId, data.guestSeatId);
     const taxRate = await getDefaultTaxRate(prisma, scopedCompanyId);
     const snapshot = await loadCatalogSnapshot(prisma, {
       companyId: scopedCompanyId,
@@ -476,6 +480,7 @@ export function createPosOrderService({ prisma, waiterShifts, modifiers }) {
     assertEditableOrder(order);
     const before = await prisma.posOrderLine.findFirst({ where: { id: lineId, orderId } });
     if (!before) throw new PosServiceError("Linea de orden no encontrada.", 404);
+    await createPosScopeService({ prisma }).guest(scopedCompanyId, orderId, data.guestSeatId);
     const next = {
       quantity: data.quantity === undefined ? Number(before.quantity) : Number(data.quantity),
       unitPrice: data.unitPrice === undefined ? Number(before.unitPrice) : toMoney(data.unitPrice),

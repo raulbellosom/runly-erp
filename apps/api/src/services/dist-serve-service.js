@@ -262,7 +262,7 @@ export function createDistServeService({ prisma, supabaseAdmin }) {
       FROM website_site ws
       JOIN company c ON c.id = ws.company_id
       WHERE ws.company_id = ${config.value}::uuid
-        AND ws.enabled = true
+        AND ws.enabled = true AND c.enabled = true
       LIMIT 1
     `
     const site = rows[0] ?? null
@@ -283,7 +283,7 @@ export function createDistServeService({ prisma, supabaseAdmin }) {
              c.slug as company_slug
       FROM website_site ws
       JOIN company c ON c.id = ws.company_id
-      WHERE ws.enabled = true AND ws.domain IS NOT NULL AND ws.domain <> ''
+      WHERE ws.enabled = true AND c.enabled = true AND ws.domain IS NOT NULL AND ws.domain <> ''
     `
     const map = new Map()
     for (const row of rows) {
@@ -400,5 +400,5 @@ export function createDistServeService({ prisma, supabaseAdmin }) {
     return c.html(final)
   }
 
-  return { serve, invalidatePrimaryCache }
+  return { serve, invalidatePrimaryCache, resolveSiteForRequest }
 }

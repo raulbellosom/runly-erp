@@ -15,6 +15,7 @@ import { ModuleBundleLoader } from '../shell/ModuleBundleLoader.jsx'
 import { getApiUrl } from "../lib/runtimeConfig.js";
 import { RUNLY_EDITION_NAME } from "../lib/appConfig.js";
 import { useAuth } from "../auth/AuthProvider";
+import { useActiveCompany } from '../company/ActiveCompanyProvider';
 import { usePwaManifest } from "../hooks/usePwaManifest.js";
 import { usePwaInstall } from "../hooks/usePwaInstall.js";
 import { usePushAutoSubscribe } from "../hooks/usePushAutoSubscribe.js";
@@ -88,7 +89,8 @@ export function RunlyApp() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, userProfile } = useAuth();
+  const { activeCompanyId } = useActiveCompany();
   const { openLauncher } = useLauncherStore();
 
   const { data: instanceConfigData } = useQuery({
@@ -190,7 +192,8 @@ export function RunlyApp() {
   }, [activeModule?.key])
 
   return (
-    <OfflineProvider apiBaseUrl={apiBaseUrl} onTransportReady={handleTransportReady}>
+    <OfflineProvider apiBaseUrl={apiBaseUrl} onTransportReady={handleTransportReady}
+      session={{ accessToken: session?.access_token, companyId: activeCompanyId, userProfile }}>
       <ModuleBundleLoader>
         {/* fixed to the top/left/right edges (pins the shell to the real PWA
             viewport on iOS/Android standalone, where a plain h-dvh block could

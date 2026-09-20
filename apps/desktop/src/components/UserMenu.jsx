@@ -273,18 +273,37 @@ export function UserMenu({
           </div>
         )}
 
-        {/* Mobile-only: activity + theme (hidden on sm+ where they live in topbar) */}
+        {/* Activity + "instalar modulo": live here at every breakpoint (used
+            to be always-on topbar icons; moved in to free up space in a
+            crowded right-hand cluster that was colliding with the centered
+            search bar around the lg breakpoint — see Topbar.jsx). */}
+        {(canReadActivity || (canInstall && activeModuleKey)) && (
+          <>
+            <DropdownMenuSeparator />
+            {canReadActivity && (
+              <DropdownMenuItem
+                onClick={onActivityOpen}
+                className="gap-2 cursor-pointer"
+              >
+                <Activity size={14} />
+                Actividad
+              </DropdownMenuItem>
+            )}
+            {canInstall && activeModuleKey && (
+              <DropdownMenuItem
+                onClick={onInstall}
+                className="gap-2 cursor-pointer"
+              >
+                <Download size={14} />
+                Instalar modulo como app
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+
+        {/* Mobile-only: theme (hidden on sm+ where ThemeToggle lives in topbar) */}
         <div className="sm:hidden">
           <DropdownMenuSeparator />
-          {canReadActivity && (
-            <DropdownMenuItem
-              onClick={onActivityOpen}
-              className="gap-2 cursor-pointer"
-            >
-              <Activity size={14} />
-              Actividad
-            </DropdownMenuItem>
-          )}
           <DropdownMenuItem
             onClick={toggleTheme}
             className="gap-2 cursor-pointer"

@@ -7,7 +7,7 @@ describe('public website capture config', () => {
   it('returns public company, analytics, and Turnstile settings', async () => {
     const prisma = {
       instanceConfig: {
-        findUnique: async () => ({ value: 'true' }),
+        findUnique: async ({ where }) => ({ value: where.key === 'initialized' ? 'true' : '01900000-0000-7000-8000-000000000001' }),
       },
       company: {
         findFirst: async () => ({
@@ -20,6 +20,8 @@ describe('public website capture config', () => {
         if (sql.includes('FROM website_site')) {
           return [{
             id: '01900000-0000-7000-8000-000000000002',
+            company_id: '01900000-0000-7000-8000-000000000001',
+            company_slug: 'acme',
             name: 'Acme',
             domain: 'https://shop.example.com',
             status: 'published',

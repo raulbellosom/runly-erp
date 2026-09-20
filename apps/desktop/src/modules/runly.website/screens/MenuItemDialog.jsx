@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
@@ -37,7 +38,7 @@ export default function MenuItemDialog({ menuId, item, open, onOpenChange, onSav
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(`${getApiUrl()}/website/menus/${menuId}/items`, {
+      const res = await companyFetch(`${getApiUrl()}/website/menus/${menuId}/items`, {
         method: 'POST', headers, body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
@@ -49,7 +50,7 @@ export default function MenuItemDialog({ menuId, item, open, onOpenChange, onSav
 
   const updateMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(`${getApiUrl()}/website/menu-items/${item.id}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/menu-items/${item.id}`, {
         method: 'PATCH', headers, body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)

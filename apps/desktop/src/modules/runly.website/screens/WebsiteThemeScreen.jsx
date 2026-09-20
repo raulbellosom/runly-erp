@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,7 +23,7 @@ import ThemeTypographyEditor from "./ThemeTypographyEditor.jsx";
 const TABS = ["Colores", "Tipografia"];
 
 async function apiGet(path, token) {
-  const res = await fetch(`${getApiUrl()}${path}`, {
+  const res = await companyFetch(`${getApiUrl()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -86,7 +87,7 @@ export default function WebsiteThemeScreen() {
 
   const createThemeMutation = useMutation({
     mutationFn: async (name) => {
-      const res = await fetch(`${getApiUrl()}/website/themes`, {
+      const res = await companyFetch(`${getApiUrl()}/website/themes`, {
         method: "POST",
         headers,
         body: JSON.stringify({ siteId, name, isDefault: themes.length === 0 }),
@@ -109,7 +110,7 @@ export default function WebsiteThemeScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${getApiUrl()}/website/themes/${activeThemeId}`,
         {
           method: "PATCH",
@@ -138,7 +139,7 @@ export default function WebsiteThemeScreen() {
 
   const useSiteThemeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiUrl()}/website/site/${site.id}`, {
+      const res = await companyFetch(`${getApiUrl()}/website/site/${site.id}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({ themeId: activeThemeId }),

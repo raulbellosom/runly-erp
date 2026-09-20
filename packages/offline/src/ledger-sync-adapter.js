@@ -4,14 +4,16 @@ export class LedgerSyncAdapter {
   #db
   #apiBaseUrl
   #getToken
+  #companyId
   #ledgerStore
   #fetchImpl
   #pulling = false
 
-  constructor({ db, apiBaseUrl, getToken, ledgerStore, fetchImpl } = {}) {
+  constructor({ db, apiBaseUrl, getToken, companyId, ledgerStore, fetchImpl } = {}) {
     this.#db = db
     this.#apiBaseUrl = (apiBaseUrl ?? '').replace(/\/$/, '')
     this.#getToken = getToken
+    this.#companyId = companyId ?? ledgerStore?.companyId
     this.#ledgerStore = ledgerStore
     this.#fetchImpl = fetchImpl ?? ((...args) => globalThis.fetch(...args))
   }
@@ -21,7 +23,7 @@ export class LedgerSyncAdapter {
     this.#pulling = true
     try {
       const token = await this.#getToken?.()
-      if (!token) return { pulled: 0, nextCursor: null }
+      if (!token || !this.#companyId) return { pulled: 0, nextCursor: null }
 
       const allStates = await this.#db.sync_state.toArray()
       const relevantStates = allStates.filter((state) => state.moduleKey === LEDGER_MODULE_KEY)
@@ -36,7 +38,7 @@ export class LedgerSyncAdapter {
       if (oldestCursor) url.searchParams.set('cursor', oldestCursor)
 
       const response = await this.#fetchImpl(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'X-Runly-Company-Id': this.#companyId },
       })
       if (!response.ok) {
         throw new Error(`Ledger pull failed: ${response.status}`)

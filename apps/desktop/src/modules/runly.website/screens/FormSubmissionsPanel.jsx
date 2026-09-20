@@ -1,3 +1,4 @@
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../auth/AuthProvider.jsx";
@@ -79,7 +80,7 @@ export default function FormSubmissionsPanel({ formId }) {
   const subsQuery = useQuery({
     queryKey: ["form-submissions", formId, page, token],
     queryFn: async () => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${getApiUrl()}/website/forms/${formId}/submissions?page=${page}&pageSize=20`,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -94,7 +95,7 @@ export default function FormSubmissionsPanel({ formId }) {
 
   const deleteMutation = useMutation({
     mutationFn: async (subId) => {
-      const res = await fetch(
+      const res = await companyFetch(
         `${getApiUrl()}/website/forms/${formId}/submissions/${subId}`,
         {
           method: "DELETE",
