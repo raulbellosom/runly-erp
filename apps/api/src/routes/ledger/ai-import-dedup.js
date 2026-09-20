@@ -1,9 +1,5 @@
 import crypto from 'node:crypto'
 
-function normalizeName(name) {
-  return String(name ?? '').trim().toUpperCase().replace(/\s+/g, ' ')
-}
-
 function normalizeAmount(row) {
   const amount = row.deposito ?? row.retiro ?? 0
   const sign = row.deposito != null ? 'D' : 'R'
@@ -13,14 +9,28 @@ function normalizeAmount(row) {
 // Fingerprint used for BOTH intra-file dedup and DB duplicate lookup, so a
 // row that matches an existing transaction and a row that matches another
 // row in the same file are detected the same way.
+//
+// Deliberately keyed on date+amount only, NOT the name/reference text. The
+// motivating real-world case (see spec) is the same movement printed twice
+// in one document under two different report formats — an official ledger
+// table with the full legal name ("AUTOPARTES SALAV ROSHFRANS SA DE CV")
+// and an app-style transaction detail with an abbreviated one ("AUTOPARTES
+// SALAV ROS"). Those never match on exact (or even normalized) name text,
+// so including the name in the fingerprint would silently miss the exact
+// case this feature exists to catch. The tradeoff is accepted deliberately:
+// two genuinely different movements that happen to share a date and an
+// exact amount will also collide here — but per spec, a fingerprint match
+// only sets a "possible duplicate" flag that always requires the user's
+// explicit confirmation before being excluded, so a false positive costs a
+// click, never a silently dropped or silently duplicated transaction.
 export function rowFingerprint(row) {
-  const raw = `${row.fecha}|${normalizeAmount(row)}|${normalizeName(row.nombre)}`
+  const raw = `${row.fecha}|${normalizeAmount(row)}`
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
 
 // Collapses rows within the same uploaded document that represent the same
-// movement (same date + amount + name), keeping the first occurrence. This
-// is deliberately strict (exact date match) — rows that only "look similar"
+// movement (same date + amount), keeping the first occurrence. This is
+// deliberately strict on date (exact match) — rows that only "look similar"
 // are left as separate rows, never guessed away.
 export function dedupeIntraFile(rows) {
   const seen = new Set()
