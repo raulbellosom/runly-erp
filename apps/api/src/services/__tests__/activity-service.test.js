@@ -118,6 +118,7 @@ describe("activity-service", () => {
     const svc = createActivityService({ prisma });
     await svc.listForEntity({
       authUserId: "auth-1",
+      companyId: COMPANY_ID,
       entityType: "HrEmployee",
       entityId: ENTITY_ID,
     });

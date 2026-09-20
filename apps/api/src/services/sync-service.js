@@ -197,18 +197,13 @@ export function createSyncService({ prisma }) {
     if (!profile) {
       throw new SyncServiceError('Perfil de usuario no encontrado.', 404, 'profile_not_found')
     }
-    if (activeCompanyId) {
-      return { companyId: activeCompanyId, userId: profile.id }
-    }
-    const membership = await prisma.membership.findFirst({
-      where: { userId: profile.id, enabled: true },
-      orderBy: { createdAt: 'desc' },
-      select: { companyId: true },
-    })
-    if (!membership?.companyId) {
+    if (!activeCompanyId) {
+      // Never guess: an unresolved active company (e.g. a system-admin
+      // request with no company header) must reject, not silently fall
+      // back to whichever membership was created first/last.
       throw new SyncServiceError('No tienes una empresa activa.', 403, 'no_active_company')
     }
-    return { companyId: membership.companyId, userId: profile.id }
+    return { companyId: activeCompanyId, userId: profile.id }
   }
 
   async function pull({ authUserId, companyId: activeCompanyId, modules, cursor }) {

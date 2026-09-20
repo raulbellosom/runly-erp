@@ -922,15 +922,20 @@ export function createInventoryService({ prisma, activityBridge }) {
     });
   }
 
-  async function updateComment(commentId, authorAuthId, body) {
+  async function updateComment(commentId, authorAuthId, body, companyId) {
+    assertCompany(companyId);
     if (!body?.trim()) throw new InventoryServiceError('El comentario no puede estar vacio.', 400);
     if (body.trim().length > 5000) throw new InventoryServiceError('El comentario no puede tener mas de 5000 caracteres.', 400);
 
     const authorProfileId = await resolveProfileId(authorAuthId);
     if (!authorProfileId) throw new InventoryServiceError('Usuario no encontrado.', 400);
 
-    const comment = await prisma.invComment.findFirst({ where: { id: commentId } });
+    const comment = await prisma.invComment.findFirst({
+      where: { id: commentId },
+      include: { item: { select: { id: true, companyId: true } } },
+    });
     if (!comment) throw new InventoryServiceError('Comment not found', 404);
+    if (comment.item?.companyId !== companyId) throw new InventoryServiceError('Comment not found', 404);
     if (comment.authorId !== authorProfileId) throw new InventoryServiceError('Solo el autor puede editar este comentario.', 403);
 
     return prisma.invComment.update({

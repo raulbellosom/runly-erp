@@ -174,6 +174,7 @@ describe("notification-delivery-worker web_push channel", () => {
     ];
     const updates = [];
     const prisma = {
+      userProfile: { findFirst: async ({ where }) => ({ id: where.id }) },
       notificationDelivery: {
         findMany: async () => deliveries,
         updateMany: async () => ({ count: 0 }),
@@ -232,6 +233,7 @@ describe("notification-delivery-worker web_push channel", () => {
     const disabled = [];
     const updates = [];
     const prisma = {
+      userProfile: { findFirst: async ({ where }) => ({ id: where.id }) },
       notificationDelivery: {
         findMany: async () => deliveries,
         updateMany: async () => ({ count: 0 }),

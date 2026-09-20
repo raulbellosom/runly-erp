@@ -229,7 +229,7 @@ export function createWebsiteSmtpService({ prisma, companyId = null }) {
     }
   }
 
-  async function sendEmail({ to, subject, html, text }) {
+  async function sendEmail({ to, subject, html, text, fromName }) {
     const config = await getConfig()
     if (!config) throw new Error('SMTP no configurado (website ni plataforma)')
 
@@ -242,8 +242,10 @@ export function createWebsiteSmtpService({ prisma, companyId = null }) {
       auth:   { user: config.user, pass: config.pass },
     })
 
+    const safeFromName = String(fromName ?? config.fromName).replace(/[\r\n]/g, ' ').trim()
+
     await transporter.sendMail({
-      from:    `"${config.fromName}" <${config.fromEmail}>`,
+      from:    `"${safeFromName}" <${config.fromEmail}>`,
       to,
       subject,
       html,

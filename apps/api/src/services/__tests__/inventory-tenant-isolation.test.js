@@ -56,6 +56,7 @@ describe("inventory-service — companyId is mandatory", () => {
     reorderBrands: () => svc.reorderBrands(undefined, []),
     listComments: () => svc.listComments("id", undefined),
     createComment: () => svc.createComment("id", "auth", "hi", undefined),
+    updateComment: () => svc.updateComment("cid", "auth", "hi", undefined),
     deleteComment: () => svc.deleteComment("cid", "auth", undefined),
     listItemFiles: () => svc.listItemFiles("id", undefined),
     addItemFile: () => svc.addItemFile("id", "file", undefined, null),

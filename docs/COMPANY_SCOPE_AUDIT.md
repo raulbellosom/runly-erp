@@ -97,6 +97,40 @@ Estas excepciones no deben convertirse en una selección implícita de otra empr
   migración; conserva las anotaciones existentes (una fila por movimiento pasa
   a pertenecer a su única billetera/empresa de origen).
 
+### Cuarta revisión: auto-selección de membresía residual
+
+`activity-service.js`, `notification-service.js` y `sync-service.js` conservaban
+el mismo patrón que ya se había retirado de Contactos y RH: si la ruta no traía
+una empresa activa resuelta (`c.get('companyId')` en `null`, posible para un
+system admin sin membresía de empresa o cuya resolución de tenant quede
+ambigua), el servicio elegía la membresía más reciente del usuario en lugar de
+rechazar. Las rutas HTTP actuales siempre pasan una empresa ya validada por
+`requirePermission`, así que no había una fuga demostrable a través de ellas,
+pero era el mismo patrón inseguro corregido en otros módulos y quedaba como
+una trampa para cualquier llamada interna futura que omitiera la empresa. Las
+tres funciones `resolveCompanyContext` ahora rechazan (403 `no_active_company`)
+en vez de auto-seleccionar. Las pruebas unitarias de los tres servicios se
+actualizaron para pasar la empresa explícitamente; las que sí verifican el
+rechazo (`no_active_company`, `profile_not_found`) se dejaron sin empresa a
+propósito.
+
+### Quinta revisión: Inventario (comentarios heredados)
+
+`inventory-service.js` conserva sus propias `createComment`/`updateComment`/
+`deleteComment`/`toggleReaction`, pero la ruta de inventario ya no las usa:
+`routes/inventory/index.js` llama al `comments-service.js` genérico (compartido
+con Proyectos y Growth), que sí exige y valida `companyId`. Las funciones de
+`inventory-service.js` quedaron como código muerto sin ninguna llamada real en
+el repositorio. Aun así, `updateComment` no recibía `companyId` en absoluto
+(a diferencia de sus hermanas) y solo comprobaba autoría, sin confirmar que el
+comentario perteneciera al ítem de la empresa activa — el mismo patrón ya
+corregido en otros módulos. Se corrigió para exigir y validar `companyId`
+igual que `deleteComment`, y se añadió al test de guardia
+`inventory-tenant-isolation.test.js`. No hay ruta HTTP que la invoque hoy, así
+que no había fuga demostrable; queda documentado por si se reconecta en el
+futuro. Pendiente de decisión aparte: si conviene eliminar del todo ese
+código muerto en `inventory-service.js`.
+
 Los escenarios H, I, J y K de PostgreSQL verifican estos cruces con un usuario que
 pertenece a dos empresas, incluyendo operaciones válidas como control. Las
 pruebas de Chat comprueban también la ausencia de permisos de lectura; las de

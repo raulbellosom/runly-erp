@@ -84,7 +84,7 @@ function makePrisma(overrides = {}) {
 describe('sync-service', () => {
   it('returns empty records when no modules requested', async () => {
     const svc = createSyncService({ prisma: makePrisma() })
-    const result = await svc.pull({ authUserId: USER_ID, modules: [], cursor: null })
+    const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: [], cursor: null })
     assert.deepEqual(result, { records: [], nextCursor: null, hasMore: false })
   })
 
@@ -109,7 +109,7 @@ describe('sync-service', () => {
   it('returns contacts for atlas.contacts module', async () => {
     const contact = { id: 'c1', companyId: COMPANY_ID, type: 'person', name: 'Ana', updatedAt: now, createdAt: past }
     const svc = createSyncService({ prisma: makePrisma({ contact: { findMany: async () => [contact] } }) })
-    const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.contacts'], cursor: null })
+    const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.contacts'], cursor: null })
     assert.equal(result.records.length, 1)
     assert.equal(result.records[0].moduleKey, 'atlas.contacts')
     assert.equal(result.records[0].entityType, 'contact')
@@ -126,7 +126,7 @@ describe('sync-service', () => {
       }),
     })
     const cursorStr = past.toISOString()
-    await svc.pull({ authUserId: USER_ID, modules: ['atlas.contacts'], cursor: cursorStr })
+    await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.contacts'], cursor: cursorStr })
     assert.ok(capturedWhere?.updatedAt?.gt instanceof Date)
     assert.equal(capturedWhere.updatedAt.gt.toISOString(), cursorStr)
   })
@@ -142,7 +142,7 @@ describe('sync-service', () => {
         hrJobTitle: { findMany: async () => [jobTitle] },
       }),
     })
-    const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.hr'], cursor: null })
+    const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.hr'], cursor: null })
     const types = result.records.map((r) => r.entityType)
     assert.ok(types.includes('employee'))
     assert.ok(types.includes('department'))
@@ -158,7 +158,7 @@ describe('sync-service', () => {
         fleetDriver: { findMany: async () => [driver] },
       }),
     })
-    const result = await svc.pull({ authUserId: USER_ID, modules: ['custom.fleet'], cursor: null })
+    const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['custom.fleet'], cursor: null })
     const types = result.records.map((r) => r.entityType)
     assert.ok(types.includes('vehicle'))
     assert.ok(types.includes('driver'))
@@ -170,13 +170,13 @@ describe('sync-service', () => {
     const c1 = { id: 'c1', companyId: COMPANY_ID, type: 'person', name: 'A', updatedAt: older, createdAt: older }
     const c2 = { id: 'c2', companyId: COMPANY_ID, type: 'person', name: 'B', updatedAt: newer, createdAt: older }
     const svc = createSyncService({ prisma: makePrisma({ contact: { findMany: async () => [c1, c2] } }) })
-    const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.contacts'], cursor: null })
+    const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.contacts'], cursor: null })
     assert.equal(result.nextCursor, newer.toISOString())
   })
 
   it('silently skips unknown module keys', async () => {
     const svc = createSyncService({ prisma: makePrisma() })
-    const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.unknown_module_xyz'], cursor: null })
+    const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.unknown_module_xyz'], cursor: null })
     assert.equal(result.records.length, 0)
     assert.equal(result.hasMore, false)
   })
@@ -184,7 +184,7 @@ describe('sync-service', () => {
   it('returns sync cursor status via getStatus()', async () => {
     const cursors = [{ moduleKey: 'atlas.contacts', entityType: 'contact', cursor: now, updatedAt: now }]
     const svc = createSyncService({ prisma: makePrisma({ syncCursor: { findMany: async () => cursors } }) })
-    const result = await svc.getStatus({ authUserId: USER_ID })
+    const result = await svc.getStatus({ authUserId: USER_ID, companyId: COMPANY_ID })
     assert.equal(result.length, 1)
     assert.equal(result[0].moduleKey, 'atlas.contacts')
     assert.equal(result[0].entityType, 'contact')
@@ -200,7 +200,7 @@ describe('sync-service', () => {
           calendarEvent: { findMany: async () => [] },
         }),
       })
-      const result = await svc.pull({ authUserId: 'auth-u1', modules: ['atlas.calendar'], cursor: null })
+      const result = await svc.pull({ authUserId: 'auth-u1', companyId: COMPANY_ID, modules: ['atlas.calendar'], cursor: null })
       const calRec = result.records.find((r) => r.entityType === 'calendar')
       assert.ok(calRec, 'calendar record must be present')
       assert.equal(calRec.id, 'cal1')
@@ -218,7 +218,7 @@ describe('sync-service', () => {
           calendarEvent: { findMany: async () => [] },
         }),
       })
-      await svc.pull({ authUserId: 'auth-u1', modules: ['atlas.calendar'], cursor: null })
+      await svc.pull({ authUserId: 'auth-u1', companyId: COMPANY_ID, modules: ['atlas.calendar'], cursor: null })
       assert.equal(capturedWhere?.ownerId, USER_ID)
       assert.equal(capturedWhere?.enabled, true)
       assert.equal(capturedWhere?.companyId, COMPANY_ID, 'calendar must stay in the active company')
@@ -238,7 +238,7 @@ describe('sync-service', () => {
           },
         }),
       })
-      const result = await svc.pull({ authUserId: 'auth-u1', modules: ['atlas.calendar'], cursor: null })
+      const result = await svc.pull({ authUserId: 'auth-u1', companyId: COMPANY_ID, modules: ['atlas.calendar'], cursor: null })
       const evRec = result.records.find((r) => r.entityType === 'event')
       assert.ok(evRec, 'event record must be present')
       assert.equal(evRec.id, 'ev1')
@@ -253,7 +253,7 @@ describe('sync-service', () => {
           calendarEvent: { findMany: async () => { eventFetchCalled = true; return [] } },
         }),
       })
-      const result = await svc.pull({ authUserId: 'auth-u1', modules: ['atlas.calendar'], cursor: null })
+      const result = await svc.pull({ authUserId: 'auth-u1', companyId: COMPANY_ID, modules: ['atlas.calendar'], cursor: null })
       assert.equal(result.records.filter((r) => r.entityType === 'event').length, 0)
       assert.equal(eventFetchCalled, false, 'event query must be skipped when no owned calendars')
     })
@@ -269,7 +269,7 @@ describe('sync-service', () => {
           catalogCategory: { findMany: async () => [category] },
         }),
       })
-      const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.catalog'], cursor: null })
+      const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.catalog'], cursor: null })
       const types = result.records.map((r) => r.entityType)
       assert.ok(types.includes('product'), 'must include product entityType')
       assert.ok(types.includes('category'), 'must include category entityType')
@@ -284,7 +284,7 @@ describe('sync-service', () => {
           catalogProduct: { findMany: async ({ where }) => { capturedWhere = where; return [] } },
         }),
       })
-      await svc.pull({ authUserId: USER_ID, modules: ['atlas.catalog'], cursor: null })
+      await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.catalog'], cursor: null })
       assert.equal(capturedWhere?.companyId, COMPANY_ID)
       assert.equal(capturedWhere?.ownerId, undefined, 'product must NOT filter by ownerId')
     })
@@ -296,7 +296,7 @@ describe('sync-service', () => {
           catalogCategory: { findMany: async ({ where }) => { capturedWhere = where; return [] } },
         }),
       })
-      await svc.pull({ authUserId: USER_ID, modules: ['atlas.catalog'], cursor: null })
+      await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.catalog'], cursor: null })
       assert.equal(capturedWhere?.companyId, COMPANY_ID)
     })
   })
@@ -331,7 +331,7 @@ describe('sync-service', () => {
           ledgerTransactionType:  { findMany: async () => [txType] },
         }),
       })
-      const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.ledger'], cursor: null })
+      const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.ledger'], cursor: null })
       const types = result.records.map((r) => r.entityType)
       assert.ok(types.includes('account'),          'must include account')
       assert.ok(types.includes('transaction'),      'must include transaction')
@@ -354,7 +354,7 @@ describe('sync-service', () => {
           },
         }),
       })
-      await svc.pull({ authUserId: USER_ID, modules: ['atlas.ledger'], cursor: null })
+      await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.ledger'], cursor: null })
       assert.equal(capturedWhere?.companyId, COMPANY_ID)
       assert.deepEqual(capturedWhere?.id, { in: ['acc-1'] }, 'must restrict to the accessible-account id set')
     })
@@ -367,7 +367,7 @@ describe('sync-service', () => {
           ledgerAccount: { findMany: async () => { findManyCalled = true; return [] } },
         }),
       })
-      const result = await svc.pull({ authUserId: USER_ID, modules: ['atlas.ledger'], cursor: null })
+      const result = await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.ledger'], cursor: null })
       assert.equal(findManyCalled, false, 'must short-circuit instead of querying the full company')
       assert.equal(result.records.filter((r) => r.entityType === 'account').length, 0)
     })
@@ -382,7 +382,7 @@ describe('sync-service', () => {
           },
         }),
       })
-      await svc.pull({ authUserId: USER_ID, modules: ['atlas.ledger'], cursor: null })
+      await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.ledger'], cursor: null })
       assert.equal(capturedWhere?.companyId, COMPANY_ID)
       assert.deepEqual(capturedWhere?.accountId, { in: ['acc-1'] })
     })
@@ -396,7 +396,7 @@ describe('sync-service', () => {
           },
         }),
       })
-      await svc.pull({ authUserId: USER_ID, modules: ['atlas.ledger'], cursor: null })
+      await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.ledger'], cursor: null })
       assert.equal(capturedWhere?.companyId, COMPANY_ID)
       assert.deepEqual(capturedWhere?.OR, [{ ownerId: null }, { ownerId: USER_ID }])
     })
@@ -410,7 +410,7 @@ describe('sync-service', () => {
           },
         }),
       })
-      await svc.pull({ authUserId: USER_ID, modules: ['atlas.ledger'], cursor: null })
+      await svc.pull({ authUserId: USER_ID, companyId: COMPANY_ID, modules: ['atlas.ledger'], cursor: null })
       assert.equal(capturedWhere?.companyId, COMPANY_ID)
     })
   })

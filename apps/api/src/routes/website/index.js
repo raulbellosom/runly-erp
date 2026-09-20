@@ -20,7 +20,7 @@ export function createWebsiteRouter({ prisma, requirePermission, supabaseAdmin }
   app.route('/website', createMenusRouter({ websiteSvc, requirePermission }))
   app.route('/website', createBlogRouter({ websiteSvc, requirePermission }))
   app.route('/website', createFormsRouter({ websiteSvc, requirePermission }))
-  app.route('/', createWebsiteSettingsRouter({ prisma, requirePermission }))
+  app.route('/', createWebsiteSettingsRouter({ prisma, requirePermission, supabaseAdmin }))
   app.route('/', createDistRoutes({ prisma, supabaseAdmin, requirePermission }))
 
   app.get('/website/site', requirePermission('website.site.read'), async (c) => {

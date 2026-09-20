@@ -62,22 +62,17 @@ export function createActivityService({ prisma }) {
         "profile_not_found",
       );
     }
-    if (activeCompanyId) {
-      return { companyId: activeCompanyId, actorProfileId: profile.id };
-    }
-    const membership = await prisma.membership.findFirst({
-      where: { userId: profile.id, enabled: true },
-      orderBy: { createdAt: "desc" },
-      select: { companyId: true },
-    });
-    if (!membership?.companyId) {
+    if (!activeCompanyId) {
+      // Never guess: an unresolved active company (e.g. a system-admin
+      // request with no company header) must reject, not silently fall
+      // back to whichever membership was created first/last.
       throw new ActivityServiceError(
         "No tienes una empresa activa.",
         403,
         "no_active_company",
       );
     }
-    return { companyId: membership.companyId, actorProfileId: profile.id };
+    return { companyId: activeCompanyId, actorProfileId: profile.id };
   }
 
   async function isDuplicate({ companyId, type, entityId, actorId }) {

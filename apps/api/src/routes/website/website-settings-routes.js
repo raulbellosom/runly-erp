@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { createSmtpConfigStore, encryptPassword, createWebsiteSmtpService } from '../../services/smtp-service.js'
+import { buildSmtpTestEmail } from '../../services/email-templates.js'
+import { createCompanyBrandService } from '../../services/company-brand-service.js'
 
 const smtpSchema = z.object({
   host:       z.string().min(1),
@@ -13,8 +15,9 @@ const smtpSchema = z.object({
   tls:        z.boolean().default(false),
 })
 
-export function createWebsiteSettingsRouter({ prisma, requirePermission }) {
+export function createWebsiteSettingsRouter({ prisma, requirePermission, supabaseAdmin = null }) {
   const app = new Hono()
+  const brandService = createCompanyBrandService({ prisma, supabaseAdmin })
 
   app.get('/website/settings/smtp', requirePermission('website.site.update'), async (c) => {
     const smtpSvc = createWebsiteSmtpService({ prisma, companyId: c.get("companyId") })
@@ -61,11 +64,14 @@ export function createWebsiteSettingsRouter({ prisma, requirePermission }) {
       const config = await smtpSvc.getConfig()
       if (!config) return c.json({ error: 'SMTP no configurado (website ni plataforma)' }, 400)
 
+      const brand = await brandService.getBrandForCompany(c.get('companyId'))
+      const mail = buildSmtpTestEmail({ brand })
       await smtpSvc.sendEmail({
-        to:      userProfile?.email ?? 'test@example.com',
-        subject: 'Runly Website — Prueba de SMTP',
-        html:    `<p>La configuracion SMTP del sitio web funciona correctamente.</p><p><small>Origen: ${config.source === 'website' ? 'SMTP propio del sitio' : 'SMTP de la empresa'}</small></p>`,
-        text:    `La configuracion SMTP del sitio web funciona correctamente. Origen: ${config.source === 'website' ? 'SMTP propio del sitio' : 'SMTP de la empresa'}`,
+        to:       userProfile?.email ?? 'test@example.com',
+        subject:  mail.subject,
+        html:     mail.html,
+        text:     mail.text,
+        fromName: brandService.fromNameFor(brand),
       })
       return c.json({ ok: true, source: config.source })
     } catch (err) {

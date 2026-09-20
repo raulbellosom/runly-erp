@@ -237,7 +237,7 @@ describe("notification-service", () => {
     const service = createNotificationService({ prisma });
 
     const result = await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "calendar.event.reminder",
         title: "Recordatorio",
@@ -258,7 +258,7 @@ describe("notification-service", () => {
     const service = createNotificationService({ prisma });
 
     await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "chat.call.incoming",
         title: "Llamada entrante",
@@ -286,11 +286,11 @@ describe("notification-service", () => {
     };
 
     const first = await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: payload,
     });
     const second = await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: payload,
     });
 
@@ -305,7 +305,7 @@ describe("notification-service", () => {
     const service = createNotificationService({ prisma });
 
     await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "system.alert",
         title: "Alerta",
@@ -319,7 +319,7 @@ describe("notification-service", () => {
       data: { readAt: new Date() },
     });
     await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "system.alert",
         title: "Alerta 2",
@@ -329,7 +329,7 @@ describe("notification-service", () => {
     });
 
     const result = await service.list({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       query: { unreadOnly: true },
     });
 
@@ -343,7 +343,7 @@ describe("notification-service", () => {
     const service = createNotificationService({ prisma });
 
     await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "calendar.event.reminder",
         title: "Evento",
@@ -353,7 +353,7 @@ describe("notification-service", () => {
 
     const target = prisma._notifications[0];
     const updated = await service.markRead({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       id: target.id,
     });
 
@@ -367,7 +367,7 @@ describe("notification-service", () => {
     const service = createNotificationService({ prisma });
 
     await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "calendar.event.reminder",
         title: "Evento A",
@@ -376,7 +376,7 @@ describe("notification-service", () => {
       },
     });
     await service.publishFromContext({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       input: {
         eventType: "calendar.event.reminder",
         title: "Evento B",
@@ -385,11 +385,11 @@ describe("notification-service", () => {
       },
     });
 
-    const result = await service.markAllRead({ authUserId: AUTH_USER_ID });
+    const result = await service.markAllRead({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID });
     assert.equal(result.updated, 2);
 
     const unread = await service.list({
-      authUserId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
       query: { unreadOnly: true },
     });
     assert.equal(unread.data.length, 0);
@@ -437,12 +437,12 @@ describe('important notification channels', () => {
       assert.deepEqual(where.AND[0], { OR: [{ deliveries: { some: { channel: 'in_app' } } }, { deliveries: { none: {} } }] });
       return [];
     };
-    await service.list({ authUserId: AUTH_USER_ID, query: {} });
+    await service.list({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, query: {} });
   });
   it('uses the last returned item as the next page cursor', async () => {
     const prisma = buildPrismaMock();
     prisma.notification.findMany = async () => [3, 2, 1].map(n => ({ id: makeUuidFromInt(n) }));
-    const result = await createNotificationService({ prisma }).list({ authUserId: AUTH_USER_ID, query: { limit: 2 } });
+    const result = await createNotificationService({ prisma }).list({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, query: { limit: 2 } });
     assert.equal(result.pageInfo.nextCursor, result.data.at(-1).id);
   });
   it('delivers queued email and push from a published event through the worker', async () => {
@@ -505,7 +505,7 @@ it('reports unread notifications beyond the current page', async () => {
   for (let i = 0; i < 25; i++) {
     await service.publish({ companyId: COMPANY_ID, input: { eventType: 'system.alert', title: `Aviso ${i}`, sourceId: String(i), recipients: { userIds: [PROFILE_ID] } } });
   }
-  const result = await service.list({ authUserId: AUTH_USER_ID, query: { limit: 10 } });
+  const result = await service.list({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, query: { limit: 10 } });
   assert.equal(result.data.length, 10);
   assert.equal(result.unreadCount, 25);
 });
@@ -589,6 +589,7 @@ describe('subscribeWebPush preserves independent installations', () => {
 
   const sub = (endpoint, ua, label) => ({
     authUserId: AUTH_USER_ID,
+    companyId: COMPANY_ID,
     userAgent: ua,
     input: { endpoint, keys: { p256dh: 'p', auth: 'a' }, deviceLabel: label },
   });
@@ -616,8 +617,8 @@ describe('subscribeWebPush preserves independent installations', () => {
     const prisma = buildPrismaMock();
     const store = withPushStore(prisma);
     const service = createNotificationService({ prisma });
-    await service.subscribeWebPush({ authUserId: AUTH_USER_ID, userAgent: null, input: { endpoint: 'https://push/a', keys: { p256dh: 'p', auth: 'a' } } });
-    await service.subscribeWebPush({ authUserId: AUTH_USER_ID, userAgent: null, input: { endpoint: 'https://push/b', keys: { p256dh: 'p', auth: 'a' } } });
+    await service.subscribeWebPush({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, userAgent: null, input: { endpoint: 'https://push/a', keys: { p256dh: 'p', auth: 'a' } } });
+    await service.subscribeWebPush({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, userAgent: null, input: { endpoint: 'https://push/b', keys: { p256dh: 'p', auth: 'a' } } });
     assert.equal(store.filter((s) => s.enabled).length, 2);
   });
 });

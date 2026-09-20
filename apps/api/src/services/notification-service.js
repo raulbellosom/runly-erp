@@ -97,16 +97,10 @@ export function createNotificationService({ prisma, broadcaster = null }) {
       );
     }
 
-    if (activeCompanyId) {
-      return { profileId: profile.id, companyId: activeCompanyId };
-    }
-
-    const membership = await prisma.membership.findFirst({
-      where: { userId: profile.id, enabled: true },
-      orderBy: { createdAt: "desc" },
-      select: { companyId: true },
-    });
-    if (!membership?.companyId) {
+    if (!activeCompanyId) {
+      // Never guess: an unresolved active company (e.g. a system-admin
+      // request with no company header) must reject, not silently fall
+      // back to whichever membership was created first/last.
       throw new NotificationServiceError(
         "No tienes una empresa activa.",
         403,
@@ -114,10 +108,7 @@ export function createNotificationService({ prisma, broadcaster = null }) {
       );
     }
 
-    return {
-      profileId: profile.id,
-      companyId: membership.companyId,
-    };
+    return { profileId: profile.id, companyId: activeCompanyId };
   }
 
   async function list({ authUserId, companyId: activeCompanyId, query }) {

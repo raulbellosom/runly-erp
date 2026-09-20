@@ -5825,7 +5825,7 @@ function mountWithAuth(baseApp, router) {
   baseApp.route("/", secured);
 }
 
-mountWithAuth(app, createSettingsRouter({ prisma, requirePermission }));
+mountWithAuth(app, createSettingsRouter({ prisma, requirePermission, supabaseAdmin }));
 mountWithAuth(app, createWebsiteRouter({ prisma, requirePermission, supabaseAdmin }));
 mountWithAuth(app, createLedgerRouter({ prisma, requirePermission, requireAnyPermission }));
 mountWithAuth(app, createPfmRouter({ prisma, requirePermission, requireAnyPermission, supabaseAdmin, filesService, notificationService }));

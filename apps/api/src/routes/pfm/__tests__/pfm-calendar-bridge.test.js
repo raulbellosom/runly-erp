@@ -65,7 +65,7 @@ describe("pfm-calendar-bridge", () => {
     await bridge.syncRuleEvent(baseRule());
     assert.equal(state.calendars.length, 1);
     assert.equal(state.events.length, 1);
-    assert.equal(state.events[0].sourceModule, "atlas.pfm");
+    assert.equal(state.events[0].sourceModule, "runly.pfm");
     assert.equal(state.events[0].sourceEntityId, RULE);
     assert.ok(state.events[0].recurrenceRule);
   });
@@ -133,7 +133,7 @@ describe("pfm-calendar-bridge", () => {
       creditReminderEventId: null,
     });
     assert.equal(state.events.length, 1);
-    assert.equal(state.events[0].sourceModule, "atlas.pfm");
+    assert.equal(state.events[0].sourceModule, "runly.pfm");
     assert.equal(state.events[0].recurrenceRule.byMonthDay, 25);
     assert.match(state.events[0].title, /Fecha limite de pago/);
     assert.equal(state.walletPatch.creditReminderEventId, "evtC");
