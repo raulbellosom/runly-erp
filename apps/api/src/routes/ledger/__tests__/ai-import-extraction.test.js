@@ -53,8 +53,8 @@ describe('extractRowsFromText', () => {
 describe('extractStatementRows', () => {
   it('runs empty-text pages through vision and text pages through the text extractor, then merges', async () => {
     const pages = [
-      { page: 1, text: 'FECHA NOMBRE SALDO\n260327 ACEITE 21,342.67 79,094.35', empty: false },
-      { page: 2, text: '', empty: true },
+      { page: 1, text: 'FECHA NOMBRE SALDO\n260327 ACEITE 21,342.67 79,094.35', empty: false, imageBase64: null },
+      { page: 2, text: '', empty: true, imageBase64: 'ZmFrZQ==' },
     ]
     const textCalls = []
     const visionCalls = []
@@ -62,10 +62,23 @@ describe('extractStatementRows', () => {
       pages,
       extractText: async (args) => { textCalls.push(args); return { rows: [{ fecha: '2026-03-27', nombre: 'ACEITE', deposito: null, retiro: 21342.67 }] } },
       extractVisionPage: async (args) => { visionCalls.push(args); return { parsed: { rows: [{ fecha: '2026-03-26', nombre: 'CAPTURA', deposito: 100, retiro: null }] } } },
-      renderPageImage: async () => ({ imageBase64: 'ZmFrZQ==', mimeType: 'image/png' }),
     })
     assert.equal(textCalls.length, 1)
     assert.equal(visionCalls.length, 1)
     assert.equal(result.rows.length, 2)
+  })
+
+  describe('extractStatementRows with embedded page images', () => {
+    it('uses the page.imageBase64 already extracted by the worker, no separate render step', async () => {
+      const pages = [{ page: 1, text: '', empty: true, imageBase64: 'ZmFrZQ==' }]
+      const visionCalls = []
+      const result = await extractStatementRows({
+        pages,
+        extractText: async () => ({ rows: [] }),
+        extractVisionPage: async (args) => { visionCalls.push(args); return { parsed: { rows: [{ fecha: '2026-03-26', nombre: 'FOTO', deposito: 10, retiro: null }] } } },
+      })
+      assert.equal(visionCalls[0].imageBase64, 'ZmFrZQ==')
+      assert.equal(result.rows.length, 1)
+    })
   })
 })

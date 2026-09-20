@@ -125,7 +125,7 @@ export async function extractRowsFromText({ text, env = process.env, fetchImpl }
 // or photographed) go through vision, page by page. Dependencies are
 // injected so this stays unit-testable without a real Groq call or a real
 // PDF renderer.
-export async function extractStatementRows({ pages, extractText, extractVisionPage, renderPageImage }) {
+export async function extractStatementRows({ pages, extractText, extractVisionPage }) {
   const textPages = pages.filter((p) => !p.empty)
   const imagePages = pages.filter((p) => p.empty)
 
@@ -136,8 +136,8 @@ export async function extractStatementRows({ pages, extractText, extractVisionPa
     chunks.push(rows)
   }
   for (const page of imagePages) {
-    const { imageBase64, mimeType } = await renderPageImage(page.page)
-    const { parsed } = await extractVisionPage({ imageBase64, mimeType })
+    if (!page.imageBase64) continue // no embedded image found — surfaced as a warning by the caller
+    const { parsed } = await extractVisionPage({ imageBase64: page.imageBase64, mimeType: 'image/jpeg' })
     chunks.push(parsed.rows ?? [])
   }
 
