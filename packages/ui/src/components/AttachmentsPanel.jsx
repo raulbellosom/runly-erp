@@ -625,16 +625,22 @@ export function AttachmentsPanel({
 
   const viewerFiles = useMemo(
     () =>
-      controller.associatedItems.map((item) => ({
-        ...item,
-        id: item.fileAssetId ?? item.id,
-        originalName: item.fileName ?? "Archivo",
-        signedUrl:
-          item.signedUrl ??
-          (item.fileAssetId
-            ? (thumbUrlsByAssetId[item.fileAssetId] ?? null)
-            : null),
-      })),
+      controller.associatedItems.map((item) => {
+        const preResolved = item.fileAssetId
+          ? (thumbUrlsByAssetId[item.fileAssetId] ?? null)
+          : null;
+        return {
+          ...item,
+          id: item.fileAssetId ?? item.id,
+          originalName: item.fileName ?? "Archivo",
+          signedUrl: item.signedUrl ?? preResolved,
+          // AdvancedFileViewer's filmstrip uses thumbnailUrl directly, with no
+          // +/-3-file window limit — the loadThumbs effect above already
+          // resolves every image's thumbnail up front, so reuse it instead of
+          // letting the viewer re-fetch (and only within its own window).
+          thumbnailUrl: preResolved,
+        };
+      }),
     [controller.associatedItems, thumbUrlsByAssetId],
   );
 

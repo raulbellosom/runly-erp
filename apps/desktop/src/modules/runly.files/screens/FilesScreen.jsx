@@ -413,6 +413,19 @@ export default function FilesScreen() {
       });
   }, [explorer.filteredFiles, token]);
 
+  // AdvancedFileViewer's filmstrip uses thumbnailUrl directly (no +/-3-file
+  // window limit) — reuse the previewMap this screen already resolves for
+  // its own grid/card/table thumbnails instead of leaving the viewer to
+  // re-fetch each one through its own narrower window.
+  const viewerFiles = useMemo(
+    () =>
+      explorer.filteredFiles.map((file) => ({
+        ...file,
+        thumbnailUrl: previewMap.get(file.id) ?? null,
+      })),
+    [explorer.filteredFiles, previewMap],
+  );
+
   useEffect(() => {
     if (routeQuery.data?.data) {
       setDetailFile(routeQuery.data.data);
@@ -878,7 +891,7 @@ export default function FilesScreen() {
       <AdvancedFileViewer
         open={viewerOpen}
         onOpenChange={setViewerOpen}
-        files={explorer.filteredFiles}
+        files={viewerFiles}
         activeIndex={explorer.activeIndex}
         onIndexChange={explorer.setActiveIndex}
         onResolveSignedUrl={resolveSignedUrl}

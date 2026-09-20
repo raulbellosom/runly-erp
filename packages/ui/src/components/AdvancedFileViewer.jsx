@@ -18,6 +18,7 @@ import {
   RefreshCw,
   RotateCcw,
   RotateCw,
+  Share2,
   X,
 } from "lucide-react";
 import {
@@ -666,6 +667,38 @@ export function AdvancedFileViewer({
     }
   }
 
+  // Web Share API — mainly useful on mobile (native share sheet). Tries to
+  // share the actual file first (so e.g. WhatsApp/Mail get a real
+  // attachment); falls back to sharing the link when the browser can't share
+  // files or the fetch is slow enough to risk losing the user-activation
+  // window `share()` requires.
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  async function shareCurrentFile() {
+    if (!signedUrl || !file || !canShare) return;
+    const filename = file.originalName ?? file.name ?? "archivo";
+    try {
+      const res = await fetch(signedUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        const shareFile = new File([blob], filename, { type: blob.type });
+        if (navigator.canShare?.({ files: [shareFile] })) {
+          await navigator.share({ files: [shareFile], title: filename });
+          return;
+        }
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      console.warn("[files] share as file failed, falling back to link", err);
+    }
+    try {
+      await navigator.share({ url: signedUrl, title: filename });
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      console.warn("[files] share link failed", err);
+      toast.error("No se pudo compartir el archivo");
+    }
+  }
+
   const gestureActive = dragging || pinching;
 
   // scale() is the fit-relative effective scale, so the image renders at its
@@ -790,6 +823,17 @@ export function AdvancedFileViewer({
               >
                 <Download className="h-3.5 w-3.5" />
               </button>
+              {canShare && (
+                <button
+                  onClick={shareCurrentFile}
+                  disabled={!signedUrl}
+                  aria-label="Compartir archivo"
+                  title="Compartir"
+                  className="h-7 w-7 rounded-lg flex items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </button>
+              )}
               <div className="w-px h-3.5 bg-[hsl(var(--border))] mx-1" />
               <DialogPrimitive.Close
                 aria-label="Cerrar visor"
@@ -963,6 +1007,15 @@ export function AdvancedFileViewer({
                       <ExternalLink className="h-3.5 w-3.5" />
                       Abrir
                     </button>
+                    {canShare && (
+                      <button
+                        onClick={shareCurrentFile}
+                        className="flex-1 h-8 rounded-lg flex items-center justify-center gap-1.5 text-xs text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted-foreground))]/20 transition-colors duration-150"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                        Compartir
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1108,6 +1161,12 @@ export function AdvancedFileViewer({
                 <Download />
                 Descargar
               </ContextMenuItem>
+              {canShare && (
+                <ContextMenuItem onSelect={shareCurrentFile} disabled={!signedUrl}>
+                  <Share2 />
+                  Compartir
+                </ContextMenuItem>
+              )}
               <ContextMenuItem onSelect={copyCurrentLink} disabled={!signedUrl}>
                 <Link2 />
                 Copiar enlace
