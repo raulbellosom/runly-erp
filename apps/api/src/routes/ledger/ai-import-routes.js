@@ -89,6 +89,14 @@ export function createAiImportRouter({ prisma, requirePermission }) {
         if (rawHeaderRows.length === 0) return c.json({ error: 'El archivo no tiene datos.' }, 422)
         const headers = Object.keys(rawHeaderRows[0])
         const mapping = await suggestColumnMapping({ headers })
+        // nombre is required downstream (validateImportRows rejects rows without
+        // it), but many real bank exports have no dedicated counterparty column,
+        // only a general "Concepto"/"Descripcion" one — confirmed against a live
+        // mapping call during manual testing, where the model correctly left
+        // nombre unmapped rather than inventing a column, which would otherwise
+        // silently reject every row. Fall back to reusing concepto as nombre
+        // rather than relying on prompt wording to always avoid this.
+        if (!mapping.nombre && mapping.concepto) mapping.nombre = mapping.concepto
         const { valid: rawRows } = validateImportRows(rawHeaderRows, mapping)
         return c.json({ data: await finishRecognize({ rawRows, documentText: '', companyId, actorId, service }) })
       }
