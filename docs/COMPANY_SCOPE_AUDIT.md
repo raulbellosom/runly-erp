@@ -127,9 +127,25 @@ comentario perteneciera al ítem de la empresa activa — el mismo patrón ya
 corregido en otros módulos. Se corrigió para exigir y validar `companyId`
 igual que `deleteComment`, y se añadió al test de guardia
 `inventory-tenant-isolation.test.js`. No hay ruta HTTP que la invoque hoy, así
-que no había fuga demostrable; queda documentado por si se reconecta en el
-futuro. Pendiente de decisión aparte: si conviene eliminar del todo ese
-código muerto en `inventory-service.js`.
+que no había fuga demostrable. A pedido del usuario, ese código muerto
+(`listComments`/`createComment`/`updateComment`/`deleteComment`/`toggleReaction`
+en `inventory-service.js`, el import no usado de `parseMentionIds`, y las
+pruebas/mocks que solo ellas ejercían) se eliminó por completo — la ruta real
+sigue usando el `comments-service.js` genérico sin cambios.
+
+### Sexta revisión: Documentos
+
+`runly.documents` (plantillas, versiones, generación de PDF y su proveedor
+`growth.lead`) se revisó completo: rutas, servicios y el `document-provider-registry`.
+Cada lectura/escritura filtra por `companyId` (plantilla, versión via
+`template: { companyId }`, documento generado, lead/contacto/envíos del
+proveedor), el registro de proveedores exige el permiso del proveedor antes de
+cargar datos de origen, y las pruebas existentes ya cubren el cruce entre
+empresas (`growth.lead provider rejects a source from another company`,
+`rejects generated documents outside the active company`). No se encontraron
+fallas ni se modificó código; ronda de solo verificación.
+
+Con esto quedan revisados los 21 módulos oficiales sembrados en la instancia.
 
 Los escenarios H, I, J y K de PostgreSQL verifican estos cruces con un usuario que
 pertenece a dos empresas, incluyendo operaciones válidas como control. Las

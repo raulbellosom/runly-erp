@@ -1,5 +1,4 @@
 // inventory-service.js — business logic layer for runly.inventory module
-import { parseMentionIds } from '../lib/mention-utils.js'
 import { createActivityService } from './activity-service.js';
 import { createActivityBridge } from './activity-bridge.js';
 import { buildInventoryWhere } from './inventory-query.js';
@@ -871,115 +870,6 @@ export function createInventoryService({ prisma, activityBridge }) {
   const reorderLocations = (companyId, items) => reorderCatalog('invLocation', companyId, items);
   const reorderCustomFields = (companyId, items) => reorderCatalog('invCustomField', companyId, items);
 
-  // ── Comments ───────────────────────────────────────────────────────────────
-
-  async function listComments(itemId, companyId) {
-    assertCompany(companyId);
-    const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true } });
-    if (!item) throw new InventoryServiceError('Item not found', 404);
-
-    return prisma.invComment.findMany({
-      where: { itemId },
-      include: {
-        author: { select: { id: true, firstName: true, lastName: true, avatarFileId: true } },
-        mentions: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
-        reactions: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-  }
-
-  async function createComment(itemId, authorAuthId, body, companyId) {
-    assertCompany(companyId);
-    const authorProfileId = await resolveProfileId(authorAuthId);
-    if (!authorProfileId) throw new InventoryServiceError('Usuario no encontrado.', 400);
-    const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true } });
-    if (!item) throw new InventoryServiceError('Item not found', 404);
-
-    if (!body?.trim()) throw new InventoryServiceError('El comentario no puede estar vacio.', 400);
-    if (body.trim().length > 5000) throw new InventoryServiceError('El comentario no puede tener mas de 5000 caracteres.', 400);
-
-    const trimmedBody = body.trim();
-    const mentionIds = parseMentionIds(trimmedBody);
-
-    return prisma.$transaction(async (tx) => {
-      const comment = await tx.invComment.create({
-        data: { itemId, authorId: authorProfileId, body: trimmedBody },
-        include: {
-          author: { select: { id: true, firstName: true, lastName: true, avatarFileId: true } },
-        },
-      });
-
-      for (const userId of mentionIds) {
-        try {
-          await tx.invMention.create({ data: { commentId: comment.id, userId } });
-        } catch (err) {
-          if (err.code !== 'P2003' && err.code !== 'P2002') throw err;
-        }
-      }
-
-      return { comment, mentionIds };
-    });
-  }
-
-  async function updateComment(commentId, authorAuthId, body, companyId) {
-    assertCompany(companyId);
-    if (!body?.trim()) throw new InventoryServiceError('El comentario no puede estar vacio.', 400);
-    if (body.trim().length > 5000) throw new InventoryServiceError('El comentario no puede tener mas de 5000 caracteres.', 400);
-
-    const authorProfileId = await resolveProfileId(authorAuthId);
-    if (!authorProfileId) throw new InventoryServiceError('Usuario no encontrado.', 400);
-
-    const comment = await prisma.invComment.findFirst({
-      where: { id: commentId },
-      include: { item: { select: { id: true, companyId: true } } },
-    });
-    if (!comment) throw new InventoryServiceError('Comment not found', 404);
-    if (comment.item?.companyId !== companyId) throw new InventoryServiceError('Comment not found', 404);
-    if (comment.authorId !== authorProfileId) throw new InventoryServiceError('Solo el autor puede editar este comentario.', 403);
-
-    return prisma.invComment.update({
-      where: { id: commentId },
-      data: { body: body.trim(), editedAt: new Date() },
-      include: {
-        author: { select: { id: true, firstName: true, lastName: true, avatarFileId: true } },
-      },
-    });
-  }
-
-  async function deleteComment(commentId, requesterAuthId, companyId) {
-    assertCompany(companyId);
-    const requesterProfileId = await resolveProfileId(requesterAuthId);
-    if (!requesterProfileId) throw new InventoryServiceError('Usuario no encontrado.', 400);
-    const comment = await prisma.invComment.findFirst({
-      where: { id: commentId },
-      include: { item: { select: { id: true, companyId: true } } },
-    });
-    if (!comment) throw new InventoryServiceError('Comment not found', 404);
-    if (comment.item?.companyId !== companyId) throw new InventoryServiceError('Comment not found', 404);
-    if (comment.authorId !== requesterProfileId) throw new InventoryServiceError('No tienes permiso para eliminar este comentario.', 403);
-
-    await prisma.invComment.delete({ where: { id: commentId } });
-  }
-
-  async function toggleReaction(commentId, userAuthId, emoji) {
-    const userProfileId = await resolveProfileId(userAuthId);
-    if (!userProfileId) throw new InventoryServiceError('Usuario no encontrado.', 400);
-    const existing = await prisma.invCommentReaction.findUnique({
-      where: { commentId_userId_emoji: { commentId, userId: userProfileId, emoji } },
-    });
-
-    if (existing) {
-      await prisma.invCommentReaction.delete({
-        where: { commentId_userId_emoji: { commentId, userId: userProfileId, emoji } },
-      });
-      return { action: 'removed' };
-    }
-
-    await prisma.invCommentReaction.create({ data: { commentId, userId: userProfileId, emoji } });
-    return { action: 'added' };
-  }
-
   async function listItemFiles(itemId, companyId) {
     assertCompany(companyId);
     const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true }, select: { id: true } });
@@ -1093,11 +983,5 @@ export function createInventoryService({ prisma, activityBridge }) {
     reorderBrands,
     reorderLocations,
     reorderCustomFields,
-    // Comments
-    listComments,
-    createComment,
-    updateComment,
-    deleteComment,
-    toggleReaction,
   };
 }

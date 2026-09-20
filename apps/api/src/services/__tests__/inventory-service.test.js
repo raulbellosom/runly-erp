@@ -7,7 +7,6 @@ const COMPANY_ID  = '01900000-0000-7000-8000-000000000001'
 const USER_ID     = '01900000-0000-7000-8000-000000000002'
 const ITEM_ID     = '01900000-0000-7000-8000-000000000003'
 const EMPLOYEE_ID = '01900000-0000-7000-8000-000000000004'
-const COMMENT_ID  = '01900000-0000-7000-8000-000000000005'
 
 // ---------------------------------------------------------------------------
 // Prisma mock builder
@@ -27,16 +26,6 @@ function buildPrismaMock(overrides = {}) {
       update: async (args) => ({ id: args.where.id, ...args.data }),
     },
     invCustomFieldValue: {
-      create: async (args) => ({ ...args.data }),
-    },
-    invComment: {
-      create: async (args) => ({
-        id: COMMENT_ID,
-        ...args.data,
-        author: { id: USER_ID, firstName: 'Test', lastName: 'User', avatarFileId: null },
-      }),
-    },
-    invMention: {
       create: async (args) => ({ ...args.data }),
     },
     ...extra,
@@ -89,24 +78,6 @@ function buildPrismaMock(overrides = {}) {
       findFirst: async () => null,
       update: async (args) => ({ id: args.where.id, ...args.data }),
       ...(overrides.invAssignment ?? {}),
-    },
-    invCommentReaction: {
-      findUnique: async () => null,
-      create: async (args) => ({ ...args.data }),
-      delete: async (args) => ({ ...args.where }),
-      ...(overrides.invCommentReaction ?? {}),
-    },
-    invComment: {
-      create: async (args) => ({
-        id: COMMENT_ID,
-        ...args.data,
-        author: { id: USER_ID, firstName: 'Test', lastName: 'User', avatarFileId: null },
-      }),
-      ...(overrides.invComment ?? {}),
-    },
-    invMention: {
-      create: async (args) => ({ ...args.data }),
-      ...(overrides.invMention ?? {}),
     },
     invItemFile: {
       findFirst: async () => null,
@@ -368,223 +339,6 @@ describe('returnItem', () => {
         return true
       },
     )
-  })
-})
-
-// ---------------------------------------------------------------------------
-// toggleReaction
-// ---------------------------------------------------------------------------
-
-describe('toggleReaction', () => {
-  it('adds reaction when it does not exist', async () => {
-    const prisma = buildPrismaMock({
-      invCommentReaction: {
-        findUnique: async () => null,
-        create: async () => ({ commentId: COMMENT_ID, userId: USER_ID, emoji: '👍' }),
-        delete: async () => {},
-      },
-    })
-    const svc = createInventoryService({ prisma })
-    const result = await svc.toggleReaction(COMMENT_ID, USER_ID, '👍')
-
-    assert.equal(result.action, 'added')
-  })
-
-  it('removes reaction when it already exists', async () => {
-    let deleteCalled = false
-    const prisma = buildPrismaMock({
-      invCommentReaction: {
-        findUnique: async () => ({ commentId: COMMENT_ID, userId: USER_ID, emoji: '👍' }),
-        delete: async () => { deleteCalled = true },
-        create: async () => { throw new Error('should not create') },
-      },
-    })
-    const svc = createInventoryService({ prisma })
-    const result = await svc.toggleReaction(COMMENT_ID, USER_ID, '👍')
-
-    assert.equal(result.action, 'removed')
-    assert.ok(deleteCalled, 'delete was called')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// createComment
-// ---------------------------------------------------------------------------
-
-describe('createComment', () => {
-  it('creates a comment successfully', async () => {
-    const prisma = buildPrismaMock({
-      invItem: {
-        findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }),
-      },
-      _root: {
-        userProfile: { findFirst: async () => ({ id: USER_ID }) },
-      },
-      _tx: {
-        invComment: {
-          create: async (args) => ({
-            id: COMMENT_ID,
-            ...args.data,
-            author: { id: USER_ID, firstName: 'Test', lastName: 'User', avatarFileId: null },
-          }),
-        },
-        invMention: {
-          create: async () => ({}),
-        },
-      },
-    })
-    const svc = createInventoryService({ prisma })
-    const result = await svc.createComment(ITEM_ID, USER_ID, 'Hello world', COMPANY_ID)
-
-    const { comment } = result
-    assert.equal(comment.body, 'Hello world')
-    assert.ok(comment.author, 'author is included')
-  })
-
-  it('parses @mentions from body and creates InvMention rows', async () => {
-    const mentionedId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-    const mentionedId2 = 'b2c3d4e5-f6a7-8901-bcde-f12345678901'
-    const mentionsCaptured = []
-
-    const prisma = buildPrismaMock({
-      invItem: {
-        findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }),
-      },
-      _root: {
-        userProfile: { findFirst: async () => ({ id: USER_ID }) },
-      },
-      _tx: {
-        invComment: {
-          create: async (args) => ({
-            id: COMMENT_ID,
-            ...args.data,
-            author: { id: USER_ID, firstName: 'Test', lastName: 'User', avatarFileId: null },
-          }),
-        },
-        invMention: {
-          create: async (args) => { mentionsCaptured.push(args.data.userId); return {} },
-        },
-      },
-    })
-    const svc = createInventoryService({ prisma })
-    const body = `Hello @[${mentionedId}:Juan Perez] and @[${mentionedId2}:Ana Lopez]`
-    await svc.createComment(ITEM_ID, USER_ID, body, COMPANY_ID)
-
-    assert.equal(mentionsCaptured.length, 2)
-    assert.ok(mentionsCaptured.includes(mentionedId))
-    assert.ok(mentionsCaptured.includes(mentionedId2))
-  })
-
-  it('ignores P2002/P2003 errors when creating mentions', async () => {
-    const mentionedId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-
-    const prisma = buildPrismaMock({
-      invItem: {
-        findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }),
-      },
-      _root: {
-        userProfile: { findFirst: async () => ({ id: USER_ID }) },
-      },
-      _tx: {
-        invComment: {
-          create: async (args) => ({
-            id: COMMENT_ID,
-            ...args.data,
-            author: { id: USER_ID, firstName: 'Test', lastName: 'User', avatarFileId: null },
-          }),
-        },
-        invMention: {
-          create: async () => {
-            const err = new Error('Foreign key constraint')
-            err.code = 'P2003'
-            throw err
-          },
-        },
-      },
-    })
-    const svc = createInventoryService({ prisma })
-    const body = `@[${mentionedId}:Someone]`
-    // Should resolve without throwing despite mention P2003
-    const result = await svc.createComment(ITEM_ID, USER_ID, body, COMPANY_ID)
-    assert.ok(result, 'comment was created despite mention error')
-  })
-
-  it('throws 404 when item does not exist', async () => {
-    const prisma = buildPrismaMock({
-      invItem: { findFirst: async () => null },
-      _root: {
-        userProfile: { findFirst: async () => ({ id: USER_ID }) },
-      },
-    })
-    const svc = createInventoryService({ prisma })
-
-    await assert.rejects(
-      () => svc.createComment(ITEM_ID, USER_ID, 'Hello', COMPANY_ID),
-      (err) => {
-        assert.ok(err instanceof InventoryServiceError)
-        assert.equal(err.status, 404)
-        return true
-      },
-    )
-  })
-
-  it('throws 400 when body is empty', async () => {
-    const prisma = buildPrismaMock({
-      invItem: {
-        findFirst: async () => ({ id: ITEM_ID, companyId: COMPANY_ID, enabled: true }),
-      },
-      _root: {
-        userProfile: { findFirst: async () => ({ id: USER_ID }) },
-      },
-    })
-    const svc = createInventoryService({ prisma })
-
-    await assert.rejects(
-      () => svc.createComment(ITEM_ID, USER_ID, '   ', COMPANY_ID),
-      (err) => {
-        assert.ok(err instanceof InventoryServiceError)
-        assert.equal(err.status, 400)
-        return true
-      },
-    )
-  })
-})
-
-// ---------------------------------------------------------------------------
-// createComment return shape
-// ---------------------------------------------------------------------------
-
-describe('createComment return shape', () => {
-  const COMMENT_ID = '01900000-0000-7000-8000-000000000005'
-  const USER_ID    = '01900000-0000-7000-8000-000000000002'
-  const ITEM_ID    = '01900000-0000-7000-8000-000000000003'
-  const COMPANY_ID = '01900000-0000-7000-8000-000000000001'
-
-  it('returns { comment, mentionIds } with empty mentionIds when body has no mentions', async () => {
-    const prisma = buildPrismaMock({
-      invItem: { findFirst: async () => ({ id: ITEM_ID }) },
-      _root: { userProfile: { findFirst: async () => ({ id: USER_ID }) } },
-    })
-    const svc = createInventoryService({ prisma })
-    const result = await svc.createComment(ITEM_ID, 'auth-user-id', 'plain comment', COMPANY_ID)
-
-    assert.ok(result.comment, 'has comment property')
-    assert.deepEqual(result.mentionIds, [], 'mentionIds is empty array')
-    assert.equal(result.comment.id, COMMENT_ID)
-  })
-
-  it('returns mentionIds extracted from comment body', async () => {
-    const MENTION_ID = '01900000-0000-7000-8000-000000000099'
-    const prisma = buildPrismaMock({
-      invItem: { findFirst: async () => ({ id: ITEM_ID }) },
-      _root: { userProfile: { findFirst: async () => ({ id: USER_ID }) } },
-    })
-    const svc = createInventoryService({ prisma })
-    const body = `Hello @[${MENTION_ID}:Someone]`
-    const result = await svc.createComment(ITEM_ID, 'auth-user-id', body, COMPANY_ID)
-
-    assert.ok(result.comment, 'has comment property')
-    assert.deepEqual(result.mentionIds, [MENTION_ID])
   })
 })
 
