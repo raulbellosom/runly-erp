@@ -47,7 +47,37 @@ function ToolbarBtn({ children, title, onClick, disabled, active }) {
   );
 }
 
+// Desktop Chromium/Firefox/Safari register a PDF plugin and expose it here —
+// their native viewer has full search/print/thumbnails/pinch-zoom, far beyond
+// what's worth rebuilding. Most mobile webviews (notably Android WebView)
+// never register one, which is exactly when the CustomPdfViewer fallback
+// below is worth its cost.
+function supportsNativePdfViewer() {
+  if (typeof navigator === "undefined") return false;
+  try {
+    return Boolean(navigator.mimeTypes && navigator.mimeTypes["application/pdf"]);
+  } catch {
+    return false;
+  }
+}
+
+function NativePdfViewer({ url }) {
+  return (
+    <iframe
+      src={url}
+      title="Documento PDF"
+      className="h-full w-full border-0 bg-[hsl(var(--muted))]/20"
+    />
+  );
+}
+
 export function PDFViewer({ url }) {
+  const [useNative] = useState(supportsNativePdfViewer);
+  if (useNative) return <NativePdfViewer url={url} />;
+  return <CustomPdfViewer url={url} />;
+}
+
+function CustomPdfViewer({ url }) {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [containerWidth, setContainerWidth] = useState(null);
@@ -74,7 +104,10 @@ export function PDFViewer({ url }) {
   const measure = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    const next = Math.floor(el.clientWidth) - 32;
+    // 85% of the available width, not 100% — the page reads as a floating
+    // document with visible margin at rest, with room left to zoom into
+    // rather than already touching both edges.
+    const next = Math.floor(el.clientWidth * 0.85) - 32;
     if (next > 0 && Math.abs(next - widthRef.current) > 1) {
       widthRef.current = next;
       setContainerWidth(next);
