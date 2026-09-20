@@ -28,6 +28,7 @@
     "nodemailer": "^8.0.10",
     "pdfjs-dist": "5.4.296",
     "pdfkit": "^0.18.0",
+    "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest",
     "sharp": "^0.35.4",
