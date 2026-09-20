@@ -120,3 +120,24 @@ export const userSearchQuerySchema = z.object({
   q:     z.string().trim().min(2).max(100),
   limit: z.coerce.number().int().min(1).max(20).default(10),
 })
+
+// ── AI statement import ──────────────────────────────────────────────────────
+
+export const aiImportCommitSchema = z.object({
+  proofToken: z.string().min(1),
+  accountId:  z.string().uuid(),
+  batchKey:   z.string().uuid(),
+  rows: z.array(z.object({
+    tempId:          z.string(),
+    fecha:           z.string(),
+    nombre:          z.string().min(1),
+    referencia:      z.string().nullish(),
+    concepto:        z.string().nullish(),
+    numero:          z.string().nullish(),
+    deposito:        z.number().nullish(),
+    retiro:          z.number().nullish(),
+    categoryId:      z.string().uuid().nullish(),
+    tipoId:          z.string().uuid().nullish(),
+    includeDuplicate: z.boolean().default(false),
+  })).min(1),
+})

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { mergeChunkedRows, extractRowsFromText, extractStatementRows } from '../ai-import-extraction.js'
+import { mergeChunkedRows, extractRowsFromText, extractStatementRows, suggestColumnMapping } from '../ai-import-extraction.js'
 
 describe('ai-import-extraction', () => {
   it('mergeChunkedRows concatenates rows from multiple chunks in order', () => {
@@ -47,6 +47,37 @@ describe('extractRowsFromText', () => {
       () => extractRowsFromText({ text: 'x', env: {}, fetchImpl: async () => { throw new Error('should not be called') } }),
       (err) => { assert.equal(err.status, 503); return true },
     )
+  })
+})
+
+describe('suggestColumnMapping', () => {
+  it('sends the CSV/XLSX headers to Groq and parses the mapping JSON', async () => {
+    const fetchImpl = async (url, opts) => {
+      const body = JSON.parse(opts.body)
+      assert.ok(url.includes('/openai/v1/chat/completions'))
+      assert.ok(body.messages[1].content.includes('Fecha'))
+      assert.ok(body.messages[1].content.includes('Deposito'))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: 'test-model',
+          choices: [{ message: { content: JSON.stringify({
+            fecha: 'Fecha', nombre: 'Descripcion', deposito: 'Deposito', retiro: 'Retiro',
+            referencia: null, concepto: null, numero: null,
+          }) } }],
+        }),
+      }
+    }
+    const mapping = await suggestColumnMapping({
+      headers: ['Fecha', 'Descripcion', 'Deposito', 'Retiro'],
+      env: { GROQ_API_KEY: 'test-key' },
+      fetchImpl,
+    })
+    assert.equal(mapping.fecha, 'Fecha')
+    assert.equal(mapping.nombre, 'Descripcion')
+    assert.equal(mapping.deposito, 'Deposito')
+    assert.equal(mapping.retiro, 'Retiro')
   })
 })
 

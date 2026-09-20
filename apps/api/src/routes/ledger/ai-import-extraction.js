@@ -73,13 +73,14 @@ function extractJsonObject(text) {
   try { return JSON.parse(candidate.slice(start, end + 1)) } catch { return null }
 }
 
-// Text-only sibling of vision-service.js's Groq adapter — same transport,
-// retries and reasoning-model handling, but no image content block.
-export async function extractRowsFromText({ text, env = process.env, fetchImpl }) {
+// Shared Groq text-completion transport — retries, reasoning-model handling
+// and JSON-object parsing — used by both extractRowsFromText (statement row
+// extraction) and suggestColumnMapping (CSV/XLSX header mapping) so neither
+// duplicates the HTTP/retry plumbing.
+async function callGroqText({ systemPrompt, userContent, env = process.env, fetchImpl }) {
   const apiKey = env.GROQ_API_KEY
   if (!apiKey) {
-    const err = new ExtractionError('Importacion con IA no configurada (falta GROQ_API_KEY).', 503)
-    throw err
+    throw new ExtractionError('Importacion con IA no configurada (falta GROQ_API_KEY).', 503)
   }
   const baseUrl = (env.LEDGER_IMPORT_BASE_URL || env.GROQ_BASE_URL || 'https://api.groq.com').replace(/\/$/, '')
   const model = env.LEDGER_IMPORT_MODEL || 'openai/gpt-oss-120b'
@@ -91,8 +92,8 @@ export async function extractRowsFromText({ text, env = process.env, fetchImpl }
     max_completion_tokens: 8000,
     ...(isReasoningModel(model) ? { reasoning_format: 'hidden', reasoning_effort: 'low' } : {}),
     messages: [
-      { role: 'system', content: STATEMENT_SYSTEM_PROMPT },
-      { role: 'user', content: text.slice(0, 60000) },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent.slice(0, 60000) },
     ],
   }
 
@@ -121,10 +122,32 @@ export async function extractRowsFromText({ text, env = process.env, fetchImpl }
     const payload = await res.json()
     const content = payload?.choices?.[0]?.message?.content
     const obj = extractJsonObject(content)
-    if (!obj?.rows) throw new ExtractionError('El servicio de IA no devolvio un JSON legible.')
-    return { rows: obj.rows, model: payload.model ?? model }
+    if (!obj) throw new ExtractionError('El servicio de IA no devolvio un JSON legible.')
+    return { obj, model: payload.model ?? model }
   }
   throw lastErr
+}
+
+// Text-only sibling of vision-service.js's Groq adapter — same transport,
+// retries and reasoning-model handling, but no image content block.
+export async function extractRowsFromText({ text, env = process.env, fetchImpl }) {
+  const { obj, model } = await callGroqText({ systemPrompt: STATEMENT_SYSTEM_PROMPT, userContent: text, env, fetchImpl })
+  if (!obj.rows) throw new ExtractionError('El servicio de IA no devolvio un JSON legible.')
+  return { rows: obj.rows, model }
+}
+
+const COLUMN_MAPPING_SYSTEM_PROMPT = [
+  'Recibes los encabezados de columna de un archivo CSV/Excel de movimientos bancarios en español (México).',
+  'Devuelve UNICAMENTE un JSON con esta forma, usando EXACTAMENTE el texto del encabezado que corresponde a cada campo, o null si no existe: {"fecha": string|null, "nombre": string|null, "deposito": string|null, "retiro": string|null, "referencia": string|null, "concepto": string|null, "numero": string|null}.',
+  'fecha es la columna de fecha del movimiento. nombre es la contraparte/descripcion principal. deposito es abono/entrada/ingreso. retiro es cargo/salida/egreso. numero es folio o numero de referencia corto. concepto es una nota o descripcion adicional.',
+].join(' ')
+
+// Asks the model to map a CSV/XLSX header row onto the fixed statement-row
+// field names, so the caller can feed the result straight into the existing
+// validateImportRows(rawRows, mapping) — no separate parsing/transport path.
+export async function suggestColumnMapping({ headers, env = process.env, fetchImpl }) {
+  const { obj } = await callGroqText({ systemPrompt: COLUMN_MAPPING_SYSTEM_PROMPT, userContent: headers.join(', '), env, fetchImpl })
+  return obj
 }
 
 // Orchestrates extraction across all pages of a document: text pages go

@@ -5,6 +5,7 @@ import { createTypesRouter }          from './types-routes.js'
 import { createCategoriesRouter }     from './categories-routes.js'
 import { createGroupsRouter }         from './groups-routes.js'
 import { createCollaborationRouter }  from './collaboration-routes.js'
+import { createAiImportRouter }       from './ai-import-routes.js'
 
 export function createLedgerRouter({ prisma, requirePermission, requireAnyPermission }) {
   const app = new Hono()
@@ -21,6 +22,7 @@ export function createLedgerRouter({ prisma, requirePermission, requireAnyPermis
   app.route('/', createCategoriesRouter({ prisma, requirePermission, requireAnyPermission: anyPermission }))
   app.route('/', createGroupsRouter({ prisma, requirePermission }))
   app.route('/', createCollaborationRouter({ prisma, requirePermission }))
+  app.route('/', createAiImportRouter({ prisma, requirePermission }))
 
   return app
 }
