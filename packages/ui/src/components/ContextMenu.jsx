@@ -91,7 +91,8 @@ const ContextMenuItem = forwardRef(function ContextMenuItem(
     <ContextMenuPrimitive.Item
       ref={ref}
       className={cn(
-        'relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors',
+        'relative flex cursor-default select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] outline-none transition-colors',
+        'hover:bg-[hsl(var(--muted))] active:bg-[hsl(var(--muted))]',
         'focus:bg-[hsl(var(--muted))] focus:text-[hsl(var(--foreground))]',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         '[&>svg]:size-4 [&>svg]:shrink-0',
@@ -111,8 +112,8 @@ const ContextMenuCheckboxItem = forwardRef(function ContextMenuCheckboxItem(
     <ContextMenuPrimitive.CheckboxItem
       ref={ref}
       className={cn(
-        'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-sm outline-none transition-colors',
-        'focus:bg-[hsl(var(--muted))]',
+        'relative flex cursor-default select-none items-center rounded-lg py-2.5 pl-8 pr-3 text-[13px] outline-none transition-colors',
+        'hover:bg-[hsl(var(--muted))] active:bg-[hsl(var(--muted))] focus:bg-[hsl(var(--muted))]',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className
       )}
@@ -137,8 +138,8 @@ const ContextMenuRadioItem = forwardRef(function ContextMenuRadioItem(
     <ContextMenuPrimitive.RadioItem
       ref={ref}
       className={cn(
-        'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-sm outline-none transition-colors',
-        'focus:bg-[hsl(var(--muted))]',
+        'relative flex cursor-default select-none items-center rounded-lg py-2.5 pl-8 pr-3 text-[13px] outline-none transition-colors',
+        'hover:bg-[hsl(var(--muted))] active:bg-[hsl(var(--muted))] focus:bg-[hsl(var(--muted))]',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className
       )}

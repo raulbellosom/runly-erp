@@ -151,6 +151,12 @@ export function AdvancedFileViewer({
   const pinchRef = useRef(null); // { dist, zoom, pan, center } | null
   const panRef = useRef(null);   // { point, pan } | null
   const lastTapRef = useRef(0);
+  // Set when the manual touch double-tap handler below fires, so the mouse
+  // dblclick handler (handleImageDoubleClick) can ignore the synthetic
+  // dblclick some mobile browsers fire right after two touchend events —
+  // that MouseEvent has no usable pointerType, so it slips past this
+  // handler's own touch guard and would otherwise instantly undo the zoom.
+  const suppressDblClickRef = useRef(0);
 
   const file = files?.[activeIndex] ?? null;
   const kind = useMemo(() => getFileKind(file), [file]);
@@ -188,6 +194,14 @@ export function AdvancedFileViewer({
     };
   }, [file?.id]);
 
+  // Only the current file's own cached URL, not the whole mediaThumbUrls map,
+  // so this doesn't get invalidated (see effect below) every time some other
+  // file's filmstrip thumbnail resolves in the background — that thrashing
+  // used to cancel-and-restart the active file's own fetch on every
+  // unrelated thumbnail resolution, which with many files could keep it from
+  // ever finishing.
+  const cachedActiveUrl = file?.id ? (mediaThumbUrls[file.id] ?? null) : null;
+
   useEffect(() => {
     let active = true;
     if (!open || !file?.id) {
@@ -202,9 +216,8 @@ export function AdvancedFileViewer({
     // user has been browsing — reuse it instead of re-fetching, so paging to
     // an adjacent file (the common case) swaps instantly with no spinner
     // flash instead of re-running the whole async round trip on every click.
-    const cached = mediaThumbUrls[file.id];
-    if (cached) {
-      setSignedUrl(cached);
+    if (cachedActiveUrl) {
+      setSignedUrl(cachedActiveUrl);
       setLoading(false);
       return () => {
         active = false;
@@ -226,7 +239,7 @@ export function AdvancedFileViewer({
     return () => {
       active = false;
     };
-  }, [open, file?.id, onResolveSignedUrl, mediaThumbUrls]);
+  }, [open, file?.id, onResolveSignedUrl, cachedActiveUrl]);
 
   useEffect(() => {
     if (zoom <= 1) {
@@ -255,6 +268,11 @@ export function AdvancedFileViewer({
       if (!f) continue;
       const fKind = getFileKind(f);
       if (fKind !== "video" && fKind !== "image") continue;
+      // Images that already carry a pre-built thumbnailUrl (e.g. the chat
+      // gallery's small "card" variant) never need this network round trip —
+      // using it directly below works instantly for every file in a large
+      // gallery, not just the +/-THUMB_WINDOW currently in view.
+      if (fKind === "image" && f.thumbnailUrl) continue;
       if (mediaThumbUrls[f.id] || mediaThumbFetching.current.has(f.id)) continue;
       mediaThumbFetching.current.add(f.id);
       // onResolveSignedUrl may be sync (a blob-URL resolver) or async — normalise
@@ -382,7 +400,9 @@ export function AdvancedFileViewer({
         // double-tap -> toggle fit / 2x, anchored at the tap
         const now = Date.now();
         if (now - lastTapRef.current < 280) {
+          e.preventDefault();
           lastTapRef.current = 0;
+          suppressDblClickRef.current = now;
           const c = centerAbs();
           setZoom((z) => {
             const zoomingIn = z <= 1;
@@ -557,6 +577,7 @@ export function AdvancedFileViewer({
 
   function handleImageDoubleClick(event) {
     if (kind !== "image" || event.pointerType === "touch") return;
+    if (Date.now() - suppressDblClickRef.current < 500) return;
     event.preventDefault();
     const isZoomed = zoom > 1;
     const nextZoom = isZoomed ? 1 : 2;
@@ -682,8 +703,8 @@ export function AdvancedFileViewer({
             if (gestureRef.current.mode !== null) e.preventDefault();
           }}
           className={[
-            "fixed inset-safe flex flex-col rounded-2xl overflow-hidden",
-            "glass-strong shadow-2xl",
+            "fixed inset-0 flex flex-col overflow-hidden",
+            "glass-strong",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -691,7 +712,7 @@ export function AdvancedFileViewer({
           ].join(" ")}
         >
           {/* ── TOP BAR ─────────────────────────────────── */}
-          <div className="flex items-center gap-2 px-3 h-12 shrink-0 border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]/60">
+          <div className="flex items-center gap-2 px-3 h-12 safe-top shrink-0 border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]/60">
             {/* File info */}
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <FileVisual
@@ -1033,7 +1054,7 @@ export function AdvancedFileViewer({
                             ) : (
                               <FileVisual
                                 file={f}
-                                previewUrl={fKind === "image" ? mediaThumbUrl : null}
+                                previewUrl={fKind === "image" ? (f.thumbnailUrl ?? mediaThumbUrl) : null}
                                 className="h-12 w-12 object-cover"
                               />
                             )}
