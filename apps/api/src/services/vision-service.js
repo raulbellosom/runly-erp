@@ -272,5 +272,18 @@ export function createVisionService({ env = process.env, fetchImpl } = {}) {
         normalize: (value) => value,
       });
     },
+    async extractLedgerStatementPage({ imageBase64, mimeType }) {
+      return adapter.call({
+        imageBase64, mimeType, maxTokens: 3500, allowTextFallback: false,
+        question: 'Lee esta pagina de un estado de cuenta bancario o una captura de movimientos.',
+        systemPrompt: [
+          'Eres un extractor de movimientos bancarios en español (México), leyendo una imagen de una pagina de estado de cuenta o una captura de una app bancaria.',
+          'Devuelve UNICAMENTE: {"rows": [{"fecha": "YYYY-MM-DD", "nombre": string, "referencia": string|null, "concepto": string|null, "numero": string|null, "deposito": number|null, "retiro": number|null}]}.',
+          'Usa el saldo corriente visible para inferir si un monto es deposito (saldo sube) o retiro (saldo baja) cuando la columna no sea clara.',
+          'exactamente un valor de deposito o retiro no-nulo por fila. fecha en ISO. Si algo no es legible, usa null y no inventes.',
+        ].join(' '),
+        normalize: (value) => value,
+      })
+    },
   };
 }

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { mergeChunkedRows, extractRowsFromText } from '../ai-import-extraction.js'
+import { mergeChunkedRows, extractRowsFromText, extractStatementRows } from '../ai-import-extraction.js'
 
 describe('ai-import-extraction', () => {
   it('mergeChunkedRows concatenates rows from multiple chunks in order', () => {
@@ -47,5 +47,25 @@ describe('extractRowsFromText', () => {
       () => extractRowsFromText({ text: 'x', env: {}, fetchImpl: async () => { throw new Error('should not be called') } }),
       (err) => { assert.equal(err.status, 503); return true },
     )
+  })
+})
+
+describe('extractStatementRows', () => {
+  it('runs empty-text pages through vision and text pages through the text extractor, then merges', async () => {
+    const pages = [
+      { page: 1, text: 'FECHA NOMBRE SALDO\n260327 ACEITE 21,342.67 79,094.35', empty: false },
+      { page: 2, text: '', empty: true },
+    ]
+    const textCalls = []
+    const visionCalls = []
+    const result = await extractStatementRows({
+      pages,
+      extractText: async (args) => { textCalls.push(args); return { rows: [{ fecha: '2026-03-27', nombre: 'ACEITE', deposito: null, retiro: 21342.67 }] } },
+      extractVisionPage: async (args) => { visionCalls.push(args); return { parsed: { rows: [{ fecha: '2026-03-26', nombre: 'CAPTURA', deposito: 100, retiro: null }] } } },
+      renderPageImage: async () => ({ imageBase64: 'ZmFrZQ==', mimeType: 'image/png' }),
+    })
+    assert.equal(textCalls.length, 1)
+    assert.equal(visionCalls.length, 1)
+    assert.equal(result.rows.length, 2)
   })
 })

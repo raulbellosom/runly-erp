@@ -119,3 +119,27 @@ export async function extractRowsFromText({ text, env = process.env, fetchImpl }
   }
   throw lastErr
 }
+
+// Orchestrates extraction across all pages of a document: text pages go
+// through the cheap text extractor, pages with no extractable text (scanned
+// or photographed) go through vision, page by page. Dependencies are
+// injected so this stays unit-testable without a real Groq call or a real
+// PDF renderer.
+export async function extractStatementRows({ pages, extractText, extractVisionPage, renderPageImage }) {
+  const textPages = pages.filter((p) => !p.empty)
+  const imagePages = pages.filter((p) => p.empty)
+
+  const chunks = []
+  if (textPages.length > 0) {
+    const combinedText = textPages.map((p) => `\nPagina ${p.page}:\n${p.text}`).join('\n')
+    const { rows } = await extractText({ text: combinedText })
+    chunks.push(rows)
+  }
+  for (const page of imagePages) {
+    const { imageBase64, mimeType } = await renderPageImage(page.page)
+    const { parsed } = await extractVisionPage({ imageBase64, mimeType })
+    chunks.push(parsed.rows ?? [])
+  }
+
+  return { rows: mergeChunkedRows(chunks) }
+}
