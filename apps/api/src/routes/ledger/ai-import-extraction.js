@@ -36,12 +36,19 @@ export function extractPdfPages(buffer) {
 
 // Combines rows extracted from multiple text chunks (or multiple vision
 // pages) into one ordered list, dropping rows the model returned with no
-// usable identity (no date and no name — extraction noise, not a real row).
+// usable identity (no date and no name — extraction noise, not a real row)
+// or an invalid amount (both deposito and retiro set, or neither — the
+// prompts ask for exactly one, but a model can still violate its own
+// instructions on noisy statement text, so this is a defensive check, not
+// a trust exercise).
 export function mergeChunkedRows(chunks) {
   const merged = []
   for (const chunk of chunks) {
     for (const row of chunk) {
       if (!row.fecha && !row.nombre) continue
+      const hasDeposito = row.deposito != null
+      const hasRetiro = row.retiro != null
+      if (hasDeposito === hasRetiro) continue // both set or neither set — invalid
       merged.push(row)
     }
   }

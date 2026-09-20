@@ -280,6 +280,7 @@ export function createVisionService({ env = process.env, fetchImpl } = {}) {
           'Eres un extractor de movimientos bancarios en español (México), leyendo una imagen de una pagina de estado de cuenta o una captura de una app bancaria.',
           'Devuelve UNICAMENTE: {"rows": [{"fecha": "YYYY-MM-DD", "nombre": string, "referencia": string|null, "concepto": string|null, "numero": string|null, "deposito": number|null, "retiro": number|null}]}.',
           'Usa el saldo corriente visible para inferir si un monto es deposito (saldo sube) o retiro (saldo baja) cuando la columna no sea clara.',
+          'Un mismo movimiento puede aparecer representado dos veces en el documento (p. ej. una tabla oficial y despues un detalle o captura de la misma cuenta). Si detectas con alta confianza que dos filas son el mismo movimiento (misma fecha, mismo monto, mismo tercero), devuelve una sola fila.',
           'exactamente un valor de deposito o retiro no-nulo por fila. fecha en ISO. Si algo no es legible, usa null y no inventes.',
         ].join(' '),
         normalize: (value) => value,

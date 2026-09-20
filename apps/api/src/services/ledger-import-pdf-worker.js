@@ -1,6 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 // Parse untrusted PDFs away from the API event loop. Unlike
 // inventory-chat-pdf-worker.js (which truncates aggressively for chat
@@ -25,7 +25,6 @@ try {
     if (text.length < 10) {
       const pdfPage = await pdf.getPage(page)
       const opList = await pdfPage.getOperatorList()
-      const { OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs')
       const imgIndex = opList.fnArray.findIndex((fn) => fn === OPS.paintImageXObject)
       if (imgIndex !== -1) {
         const objId = opList.argsArray[imgIndex][0]
