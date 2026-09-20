@@ -6,6 +6,18 @@ function normalizeAmount(row) {
   return `${sign}${Number(amount).toFixed(2)}`
 }
 
+// Freshly-extracted rows carry fecha as an ISO string ("2026-03-27"). Rows
+// read back from the DB via $queryRaw (ledger_transaction.fecha is
+// @db.Date) come back as a JS Date instead — without normalizing both to
+// the same string shape, markDbDuplicates would compare an ISO string
+// against a Date's default toString() and never match, silently defeating
+// duplicate detection against existing transactions. Same pattern already
+// used in summary-service.js for the same @db.Date column.
+function normalizeFecha(fecha) {
+  // eslint-disable-next-line no-restricted-syntax -- deliberate UTC: @db.Date row value
+  return fecha instanceof Date ? fecha.toISOString().slice(0, 10) : String(fecha).slice(0, 10)
+}
+
 // Fingerprint used for BOTH intra-file dedup and DB duplicate lookup, so a
 // row that matches an existing transaction and a row that matches another
 // row in the same file are detected the same way.
@@ -24,18 +36,35 @@ function normalizeAmount(row) {
 // explicit confirmation before being excluded, so a false positive costs a
 // click, never a silently dropped or silently duplicated transaction.
 export function rowFingerprint(row) {
-  const raw = `${row.fecha}|${normalizeAmount(row)}`
+  const raw = `${normalizeFecha(row.fecha)}|${normalizeAmount(row)}`
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
 
-// Collapses rows within the same uploaded document that represent the same
-// movement (same date + amount), keeping the first occurrence. This is
-// deliberately strict on date (exact match) — rows that only "look similar"
-// are left as separate rows, never guessed away.
+// A row is only usable if it has SOME identity (a date or a name — anything
+// else is extraction noise, not a real movement) and exactly one of
+// deposito/retiro set (the extraction prompts all ask for exactly one, but
+// a model — or a CSV row that happens to map into both columns — can still
+// violate that, so this is a defensive check applied uniformly to every
+// ingestion path: PDF, direct image upload, and CSV/XLSX, since all three
+// funnel through dedupeIntraFile as the first step of the shared recognize
+// pipeline).
+export function isValidRow(row) {
+  if (!row.fecha && !row.nombre) return false
+  const hasDeposito = row.deposito != null
+  const hasRetiro = row.retiro != null
+  return hasDeposito !== hasRetiro // exactly one set, never both, never neither
+}
+
+// Drops invalid rows (see isValidRow), then collapses rows within the same
+// uploaded document that represent the same movement (same date + amount),
+// keeping the first occurrence. This is deliberately strict on date (exact
+// match) — rows that only "look similar" are left as separate rows, never
+// guessed away.
 export function dedupeIntraFile(rows) {
   const seen = new Set()
   const result = []
   for (const row of rows) {
+    if (!isValidRow(row)) continue
     const fp = rowFingerprint(row)
     if (seen.has(fp)) continue
     seen.add(fp)

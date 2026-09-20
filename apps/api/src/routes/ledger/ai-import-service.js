@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { markDbDuplicates, findAccountCandidates } from './ai-import-dedup.js'
 import { signImportProof, verifyImportProof } from './ai-import-token.js'
 import { createVisionService } from '../../services/vision-service.js'
+import { createLedgerService } from './ledger-service.js'
 
 export class AiImportServiceError extends Error {
   constructor(message, status = 500) {
@@ -17,6 +18,7 @@ function fingerprintRows(rows) {
 
 export function createAiImportService({ prisma, env = process.env }) {
   const vision = createVisionService({ env })
+  const ledger = createLedgerService({ prisma })
 
   async function recognize({ companyId, documentText }) {
     const accounts = await prisma.$queryRaw`
@@ -36,6 +38,18 @@ export function createAiImportService({ prisma, env = process.env }) {
   }
 
   async function commit({ companyId, actorId, accountId, batchKey, rows, __testFingerprint }) {
+    // The proof token only proves "this actor's company called recognize" — it
+    // says nothing about the specific accountId, which the client picks
+    // afterward from a role-agnostic account list. Without this check a
+    // viewer-only member of a shared account could import into it, and a
+    // caller could target an accountId belonging to another company entirely
+    // (the INSERT below writes company_id from the caller's own token, so a
+    // mismatched accountId would silently corrupt cross-tenant data). Every
+    // other ledger write path already gates on this same check.
+    if (!(await ledger.canWriteAccount({ companyId, accountId, actorId }))) {
+      throw new AiImportServiceError('No tienes permisos para importar movimientos en esta cuenta.', 403)
+    }
+
     const fingerprint = __testFingerprint ?? fingerprintRows(rows)
     // Filtered by metadata.key at the query level (not just fetched-then-compared
     // in JS): an actor who has committed other import batches before would
