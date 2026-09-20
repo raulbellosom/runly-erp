@@ -50,4 +50,13 @@ describe('ai-import-service commit idempotency', () => {
       (err) => { assert.equal(err.status, 409); return true },
     )
   })
+
+  it('filters the idempotency lookup by metadata.key so an unrelated prior import batch is never mistaken for this one', async () => {
+    let capturedWhere
+    const prisma = buildPrismaMock()
+    prisma.auditLog.findFirst = async ({ where }) => { capturedWhere = where; return null }
+    const service = createAiImportService({ prisma })
+    await service.commit({ companyId: COMPANY_ID, actorId: ACTOR_ID, accountId: ACCOUNT_ID, batchKey: 'batch-2', rows: [], __testFingerprint: 'fp' })
+    assert.deepEqual(capturedWhere.metadata, { path: ['key'], equals: 'batch-2' })
+  })
 })

@@ -37,10 +37,18 @@ export function createAiImportService({ prisma, env = process.env }) {
 
   async function commit({ companyId, actorId, accountId, batchKey, rows, __testFingerprint }) {
     const fingerprint = __testFingerprint ?? fingerprintRows(rows)
+    // Filtered by metadata.key at the query level (not just fetched-then-compared
+    // in JS): an actor who has committed other import batches before would
+    // otherwise get an unrelated audit-log row back from a plain findFirst,
+    // making this idempotency check silently miss the real duplicate-commit
+    // case — see review note on this task.
     const previous = await prisma.auditLog.findFirst({
-      where: { companyId, actorId, moduleKey: 'runly.ledger', action: 'ledger.import.committed' },
+      where: {
+        companyId, actorId, moduleKey: 'runly.ledger', action: 'ledger.import.committed',
+        metadata: { path: ['key'], equals: batchKey },
+      },
     })
-    if (previous?.metadata?.key === batchKey) {
+    if (previous) {
       if (previous.metadata.fingerprint !== fingerprint) {
         throw new AiImportServiceError('Este lote ya se importo con otros datos. Vuelve a analizar el archivo.', 409)
       }
