@@ -911,6 +911,90 @@ export const growthPropertyUpdateSchema = z
     message: "No hay cambios para aplicar.",
   });
 
+const FORM_FIELD_TYPES = [
+  "text", "email", "phone", "tel", "textarea", "select", "radio",
+  "checkbox", "number", "date", "chip_multi", "card_select",
+];
+
+const formFieldOptions = z
+  .array(
+    z.union([
+      z.string(),
+      z.object({
+        value: z.string(),
+        label: z.string(),
+        description: z.string().optional(),
+      }),
+    ]),
+  )
+  .optional()
+  .nullable();
+
+export const createFormSchema = z.object({
+  siteId: z.string().uuid(),
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  submitLabel: z.string().optional(),
+  successMessage: z.string().optional(),
+  notifyEmail: z.string().email().optional().nullable(),
+  createsLead: z.boolean().default(true),
+  defaultAssigneeUserId: z.string().uuid().optional().nullable(),
+  honeypotEnabled: z.boolean().default(true),
+  turnstileRequired: z.boolean().default(false),
+  wizardMode: z.boolean().default(false),
+});
+
+export const growthFormCreateSchema = createFormSchema
+  .omit({ siteId: true })
+  .extend({ propertyId: z.string().uuid() });
+
+export const updateFormSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().optional(),
+  submitLabel: z.string().optional(),
+  successMessage: z.string().optional(),
+  notifyEmail: z.string().email().optional().nullable(),
+  createsLead: z.boolean().optional(),
+  defaultAssigneeUserId: z.string().uuid().optional().nullable(),
+  honeypotEnabled: z.boolean().optional(),
+  turnstileRequired: z.boolean().optional(),
+  wizardMode: z.boolean().optional(),
+});
+
+export const createFormFieldSchema = z.object({
+  label: z.string().min(1).max(255),
+  name: z.string().min(1).max(100).regex(/^[a-z_][a-z0-9_]*$/),
+  fieldType: z.enum(FORM_FIELD_TYPES).default("text"),
+  semanticKey: z
+    .enum(["name", "email", "phone", "company", "message", "custom"])
+    .default("custom"),
+  placeholder: z.string().optional(),
+  required: z.boolean().default(false),
+  options: formFieldOptions,
+  sortOrder: z.number().int().default(0),
+  stepNumber: z.number().int().min(1).default(1),
+  stepTitle: z.string().optional().nullable(),
+});
+
+export const updateFormFieldSchema = z.object({
+  label: z.string().min(1).max(255).optional(),
+  name: z.string().min(1).max(100).regex(/^[a-z_][a-z0-9_]*$/).optional(),
+  fieldType: z.enum(FORM_FIELD_TYPES).optional(),
+  semanticKey: z
+    .enum(["name", "email", "phone", "company", "message", "custom"])
+    .optional(),
+  placeholder: z.string().optional(),
+  required: z.boolean().optional(),
+  options: formFieldOptions,
+  sortOrder: z.number().int().optional(),
+  stepNumber: z.number().int().min(1).optional(),
+  stepTitle: z.string().optional().nullable(),
+});
+
+export const reorderFieldsSchema = z.object({
+  items: z.array(z.object({ id: z.string().uuid(), sortOrder: z.number().int() })),
+});
+
 const documentBlockIdSchema = z.string().trim().min(1).max(100);
 const documentPathSchema = z
   .string()
