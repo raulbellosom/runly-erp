@@ -26,6 +26,9 @@ describe("atlas SDK - growth domain", () => {
       "addLeadNote",
       "convertLead",
       "createLead",
+      "createLeadComment",
+      "createProperty",
+      "deleteLeadComment",
       "exportAnalyticsCsv",
       "getAnalyticsAcquisition",
       "getAnalyticsContent",
@@ -36,9 +39,15 @@ describe("atlas SDK - growth domain", () => {
       "getLeadSummary",
       "listAnalyticsSites",
       "listLeadAssignees",
+      "listLeadComments",
       "listLeads",
+      "listProperties",
       "setLeadEnabled",
+      "toggleLeadCommentReaction",
       "updateLead",
+      "updateLeadComment",
+      "updateProperty",
+      "verifyProperty",
     ]);
   });
 
@@ -84,6 +93,10 @@ describe("atlas SDK - growth domain", () => {
       ...analyticsQuery,
       report: "overview",
     });
+    await client.growth.listProperties(token);
+    await client.growth.createProperty({ name: "runly.mx", domain: "runly.mx" }, token);
+    await client.growth.updateProperty("prop-1", { name: "Sitio" }, token);
+    await client.growth.verifyProperty("prop-1", token);
 
     const calls = fetchMock.mock.calls.map((call) => call.arguments);
     assert.equal(
@@ -133,6 +146,17 @@ describe("atlas SDK - growth domain", () => {
       calls[15][0],
       "http://api/growth/analytics/export.csv?from=2026-06-01&to=2026-06-14&compare=true&report=overview",
     );
+    assert.equal(calls[16][0], "http://api/growth/properties");
+    assert.equal(calls[17][0], "http://api/growth/properties");
+    assert.equal(calls[17][1].method, "POST");
+    assert.deepEqual(JSON.parse(calls[17][1].body), {
+      name: "runly.mx",
+      domain: "runly.mx",
+    });
+    assert.equal(calls[18][0], "http://api/growth/properties/prop-1");
+    assert.equal(calls[18][1].method, "PATCH");
+    assert.equal(calls[19][0], "http://api/growth/properties/prop-1/verify");
+    assert.equal(calls[19][1].method, "POST");
     for (const [, options] of calls) {
       assert.equal(options.headers.Authorization, "Bearer tok");
     }

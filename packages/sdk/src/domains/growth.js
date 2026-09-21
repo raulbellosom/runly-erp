@@ -16,6 +16,31 @@ export function createGrowthDomain({
         headers: withAuthHeaders(token),
       }),
 
+    listProperties: (token) =>
+      request("/growth/properties", {
+        headers: withAuthHeaders(token),
+      }),
+
+    createProperty: (payload, token) =>
+      request("/growth/properties", {
+        method: "POST",
+        headers: withAuthHeaders(token),
+        body: JSON.stringify(payload),
+      }),
+
+    updateProperty: (propertyId, payload, token) =>
+      request(`/growth/properties/${encodeURIComponent(propertyId)}`, {
+        method: "PATCH",
+        headers: withAuthHeaders(token),
+        body: JSON.stringify(payload),
+      }),
+
+    verifyProperty: (propertyId, token) =>
+      request(`/growth/properties/${encodeURIComponent(propertyId)}/verify`, {
+        method: "POST",
+        headers: withAuthHeaders(token),
+      }),
+
     getAnalyticsOverview: (token, query = {}) =>
       analyticsReport("overview", token, query),
 
