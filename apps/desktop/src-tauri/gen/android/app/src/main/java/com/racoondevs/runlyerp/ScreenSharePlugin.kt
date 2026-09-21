@@ -56,6 +56,11 @@ class ScreenSharePlugin(private val activity: Activity) : Plugin(activity) {
   fun notify(invoke: Invoke) { HostNotifications.show(activity, invoke) }
 
   @Command
+  fun currentToken(invoke: Invoke) {
+    invoke.resolve(JSObject().apply { put("token", RunlyMessagingService.currentToken(activity)) })
+  }
+
+  @Command
   fun start(invoke: Invoke) {
     if (!activity.hasWindowFocus()) { invoke.reject("Abre Runly para compartir pantalla."); return }
     if (pending != null || room != null) { invoke.reject("Ya hay una solicitud de pantalla activa."); return }
