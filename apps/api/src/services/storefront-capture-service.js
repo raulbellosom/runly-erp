@@ -5,6 +5,8 @@ import {
   storefrontEventBatchSchema,
 } from "../routes/storefront/storefront-capture-validators.js";
 import { createGrowthPropertyService } from "../routes/growth/growth-property-service.js";
+import { createSmtpService } from "./smtp-service.js";
+import { buildFormSubmissionEmail } from "./email-templates.js";
 
 const CLIENT_CLOCK_TOLERANCE_MS = 24 * 60 * 60 * 1000;
 const OPEN_LEAD_STATUSES = ["new", "follow_up", "qualified"];
@@ -67,6 +69,7 @@ export function createStorefrontCaptureService({
   notificationService = null,
   now = () => new Date(),
   growthPropertyService = createGrowthPropertyService({ prisma, now }),
+  smtpService = createSmtpService({ prisma }),
 }) {
   function hashOpaqueId(siteId, value) {
     return createHash("sha256")
@@ -772,6 +775,24 @@ export function createStorefrontCaptureService({
             "[growth.lead.created]",
             error?.message ?? error,
           );
+        }
+      }
+      if (form.notifyEmail) {
+        try {
+          const { subject, html, text } = buildFormSubmissionEmail({
+            formName: form.name,
+            values: cleanValues,
+            fields: form.fields,
+          });
+          await smtpService.sendEmail({
+            to: form.notifyEmail,
+            subject,
+            html,
+            text,
+            companyId: company.id,
+          });
+        } catch (error) {
+          console.error("[website.form.notifyEmail]", error?.message ?? error);
         }
       }
       const { notifyAssignee: _notifyAssignee, ...result } =

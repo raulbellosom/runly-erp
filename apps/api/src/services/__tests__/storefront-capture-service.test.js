@@ -19,7 +19,7 @@ const SUBMISSION_ID = "01900000-0000-7000-8000-000000000006";
 const LEAD_ID = "01900000-0000-7000-8000-000000000007";
 const NOW = new Date("2026-06-14T18:00:00.000Z");
 
-function buildPrisma(overrides = {}) {
+function buildPrisma({ formOverrides = {}, ...overrides } = {}) {
   const state = {
     visitors: [],
     sessions: [],
@@ -89,6 +89,7 @@ function buildPrisma(overrides = {}) {
         enabled: true,
       },
     ],
+    ...formOverrides,
   };
 
   function applyData(row, data) {
@@ -332,6 +333,7 @@ function createService(prisma, options = {}) {
     now: () => NOW,
     verifyTurnstile: options.verifyTurnstile ?? (async () => true),
     notificationService: options.notificationService,
+    smtpService: options.smtpService,
   });
 }
 
@@ -800,5 +802,46 @@ describe("createStorefrontCaptureService", () => {
       "01900000-0000-7000-8000-000000000009",
     ]);
     assert.equal(published[0].input.sourceId, LEAD_ID);
+  });
+
+  it("sends an SMTP notification when the form has notifyEmail set", async () => {
+    const sentEmails = [];
+    const service = createService(
+      buildPrisma({ formOverrides: { notifyEmail: "owner@example.com" } }),
+      { smtpService: { sendEmail: async (args) => { sentEmails.push(args); } } },
+    );
+
+    await service.submitForm({
+      ...requestScope,
+      formId: FORM_ID,
+      idempotencyKey: "submission-notify-1",
+      payload: {
+        values: { full_name: "Ana", email: "ana@example.com" },
+        honeypot: "",
+      },
+    });
+
+    assert.equal(sentEmails.length, 1);
+    assert.equal(sentEmails[0].to, "owner@example.com");
+    assert.equal(sentEmails[0].companyId, COMPANY_ID);
+  });
+
+  it("does not fail the submission when SMTP is unconfigured", async () => {
+    const service = createService(
+      buildPrisma({ formOverrides: { notifyEmail: "owner@example.com" } }),
+      { smtpService: { sendEmail: async () => { throw new Error("SMTP no configurado"); } } },
+    );
+
+    const result = await service.submitForm({
+      ...requestScope,
+      formId: FORM_ID,
+      idempotencyKey: "submission-notify-2",
+      payload: {
+        values: { full_name: "Ana", email: "ana@example.com" },
+        honeypot: "",
+      },
+    });
+
+    assert.ok(result.submissionId);
   });
 });

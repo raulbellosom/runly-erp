@@ -269,6 +269,81 @@ export function buildCompanyInvitationEmail({ invitationUrl, brand = null, env =
   return { subject: `Te invitaron a ${orgName}`, html, text };
 }
 
+// Sent only when the admin opts in (notifyByEmail) after directly creating
+// and activating a user — the account already works, so this is informational,
+// not an invitation the recipient must accept.
+export function buildUserWelcomeEmail({ loginUrl, email, brand = null, env = process.env }) {
+  const orgName = brand?.name ? brand.name : "Runly ERP";
+  const heading = "Tu cuenta ya está activa";
+
+  const bodyHtml = `
+        <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#334155">
+          Un administrador creó tu cuenta en <strong>${escapeHtml(orgName)}</strong> en Runly ERP.
+          Ya puedes iniciar sesión con tu correo <strong>${escapeHtml(email)}</strong> y la contraseña que te compartieron.
+        </p>
+        <p style="margin:0 0 16px 0;font-size:13px;line-height:1.6;color:#64748b">
+          Si el botón no funciona, copia este enlace en tu navegador:<br />
+          <span style="word-break:break-all;color:#334155">${escapeHtml(loginUrl)}</span>
+        </p>`;
+
+  const html = renderAtlasEmailLayout({
+    kicker: "Cuenta activa",
+    heading,
+    bodyHtml,
+    cta: { label: "Iniciar sesión", url: loginUrl },
+    footnote: `Recibiste este correo porque un administrador creó tu cuenta en ${orgName} en Runly ERP.`,
+    brand,
+    env,
+  });
+
+  const text = [
+    orgName,
+    "",
+    `Un administrador creó tu cuenta en ${orgName} en Runly ERP.`,
+    `Correo: ${email}`,
+    "",
+    `Iniciar sesión: ${loginUrl}`,
+  ].join("\n");
+
+  return { subject: `Tu cuenta en ${orgName} ya está activa`, html, text };
+}
+
+export function buildFormSubmissionEmail({ formName, values, fields = [], brand = null, env = process.env }) {
+  const labelByName = new Map(fields.map((f) => [f.name, f.label]));
+  const rows = Object.entries(values ?? {})
+    .map(
+      ([key, value]) => `
+        <tr>
+          <td style="padding:4px 12px 4px 0;font-size:13px;color:#64748b;white-space:nowrap;vertical-align:top">${escapeHtml(labelByName.get(key) ?? key)}</td>
+          <td style="padding:4px 0;font-size:13px;color:#334155">${escapeHtml(String(value))}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const bodyHtml = `
+        <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#334155">
+          Nuevo envio en <strong>${escapeHtml(formName)}</strong>.
+        </p>
+        <table style="border-collapse:collapse;width:100%">${rows}</table>`;
+
+  const html = renderAtlasEmailLayout({
+    kicker: "Formulario",
+    heading: "Nuevo envio de formulario",
+    bodyHtml,
+    footnote: `Recibiste este correo porque configuraste notificaciones para el formulario "${formName}" en Runly ERP.`,
+    brand,
+    env,
+  });
+
+  const text = [
+    `Nuevo envio en ${formName}`,
+    "",
+    ...Object.entries(values ?? {}).map(([key, value]) => `${labelByName.get(key) ?? key}: ${value}`),
+  ].join("\n");
+
+  return { subject: `Nuevo envio: ${formName}`, html, text };
+}
+
 // The "Enviar prueba" button in Ajustes -> SMTP — an admin sending this to
 // themselves to confirm delivery. Branded like every other template here so
 // the same click also previews what the company's branding looks like in a
