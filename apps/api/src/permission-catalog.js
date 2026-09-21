@@ -1107,6 +1107,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "growth",
     order: 21,
   },
+  "growth.properties.manage": {
+    displayNameEs: "Gestionar sitios conectados",
+    descriptionEs: "Permite conectar, renombrar y desactivar sitios rastreados por Growth.",
+    groupKey: "growth",
+    order: 22,
+  },
 
   "documents.access": {
     displayNameEs: "Acceder a Documentos",

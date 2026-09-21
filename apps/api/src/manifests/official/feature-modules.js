@@ -380,7 +380,7 @@ export const runlyGrowthManifest = createModuleManifest({
   summary: "Analitica de storefront y captura de oportunidades.",
   dependencies: [
     { key: "runly.core" },
-    { key: "runly.website" },
+    { key: "runly.website", optional: true },
     { key: "runly.contacts" },
   ],
   lifecycle: {
@@ -396,6 +396,7 @@ export const runlyGrowthManifest = createModuleManifest({
       "GrowthLead",
       "GrowthLeadActivity",
       "GrowthDailyMetric",
+      "GrowthProperty",
     ],
     ownedTables: [
       "growth_visitor",
@@ -404,6 +405,7 @@ export const runlyGrowthManifest = createModuleManifest({
       "growth_lead",
       "growth_lead_activity",
       "growth_daily_metric",
+      "growth_property",
     ],
     sharedEntities: [
       "Company",
@@ -429,6 +431,13 @@ export const runlyGrowthManifest = createModuleManifest({
       layout: "main",
       permissionKey: "growth.leads.read",
     },
+    {
+      label: "Sitios conectados",
+      path: "/sites",
+      icon: "Globe",
+      layout: "main",
+      permissionKey: "growth.access",
+    },
   ],
   permissions: [
     { key: "growth.access", name: "Acceder a Growth" },
@@ -440,6 +449,7 @@ export const runlyGrowthManifest = createModuleManifest({
     { key: "growth.leads.convert", name: "Convertir leads" },
     { key: "growth.analytics.read", name: "Ver analitica web" },
     { key: "growth.analytics.export", name: "Exportar analitica web" },
+    { key: "growth.properties.manage", name: "Gestionar sitios conectados" },
   ],
   acl: {
     module: "growth.access",
