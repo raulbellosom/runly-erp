@@ -12,12 +12,34 @@ import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { getSupabaseClient } from "../../../lib/supabase.js";
 
+// Mirrors injectRunlyConfig's payload shape (dist-serve-service.js) so a
+// manually-connected external site gets the exact same window.RUNLY_CONFIG
+// an ERP-published dist site would have auto-injected for it. Without
+// apiUrl the embeddable script defaults to same-origin ('/'), which is
+// wrong for any site that isn't served by this ERP instance itself.
 function buildSnippet({ companySlug, propertyId }) {
-  const sdkUrl = `${getApiUrl()}/public/site/runly-sdk.js`;
+  const apiUrl = getApiUrl();
+  const supabase = getSupabaseClient();
+  const supabaseUrl = supabase.supabaseUrl;
+  const supabaseAnonKey = supabase.supabaseKey;
+  const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+  const storageKey = `sb-${projectRef}-auth-token`;
+  const sdkUrl = `${apiUrl}/public/site/runly-sdk.js`;
+
+  const config = {
+    company: companySlug,
+    siteId: propertyId,
+    apiUrl,
+    supabaseUrl,
+    supabaseAnonKey,
+    storageKey,
+  };
+
   return [
     "<script>",
-    `  window.RUNLY_CONFIG = { company: "${companySlug}", siteId: "${propertyId}" };`,
+    `  window.RUNLY_CONFIG = ${JSON.stringify(config, null, 2).replace(/\n/g, "\n  ")};`,
     "</script>",
     `<script src="${sdkUrl}" async></script>`,
   ].join("\n");
