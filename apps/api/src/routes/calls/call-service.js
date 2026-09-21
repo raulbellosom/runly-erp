@@ -489,17 +489,19 @@ export function createCallService({
           });
 
           // A ringing call can't wait for the background delivery worker's
-          // ~30s poll — push THIS notification's web_push deliveries out now,
-          // scoped by notificationId so we don't drain everyone else's queue.
+          // ~30s poll — push THIS notification's web_push/fcm deliveries out
+          // now, scoped by notificationId so we don't drain everyone else's queue.
           const notificationIds = (published?.data ?? [])
             .map((n) => n?.id)
             .filter(Boolean);
           if (deliveryWorker?.processPendingNotificationDeliveries && notificationIds.length) {
-            deliveryWorker
-              .processPendingNotificationDeliveries({ channel: "web_push", notificationIds, limit: notificationIds.length })
-              .catch((error) => {
-                console.warn("[atlas.calls] Entrega inmediata de push fallo; el worker lo reintentara:", error?.message ?? error);
-              });
+            for (const channel of ["web_push", "fcm"]) {
+              deliveryWorker
+                .processPendingNotificationDeliveries({ channel, notificationIds, limit: notificationIds.length })
+                .catch((error) => {
+                  console.warn("[atlas.calls] Entrega inmediata de push fallo; el worker lo reintentara:", error?.message ?? error);
+                });
+            }
           }
         } catch (error) {
           console.warn("[atlas.calls] No se pudo publicar el aviso de llamada:", error?.message ?? error);
@@ -865,21 +867,23 @@ export function createCallService({
         .catch(() => {});
     }
 
-    // 6. Push out THIS alert's web_push deliveries now — don't wait for the
-    //    ~30s worker poll — scoped by notificationId so we don't drain the queue.
+    // 6. Push out THIS alert's web_push/fcm deliveries now — don't wait for
+    //    the ~30s worker poll — scoped by notificationId so we don't drain the queue.
     if (deliveryWorker?.processPendingNotificationDeliveries && publishedIds.length) {
-      deliveryWorker
-        .processPendingNotificationDeliveries({
-          channel: "web_push",
-          notificationIds: publishedIds,
-          limit: publishedIds.length,
-        })
-        .catch((error) => {
-          console.warn(
-            "[atlas.calls] Entrega inmediata de push a invitados fallo:",
-            error?.message ?? error,
-          );
-        });
+      for (const channel of ["web_push", "fcm"]) {
+        deliveryWorker
+          .processPendingNotificationDeliveries({
+            channel,
+            notificationIds: publishedIds,
+            limit: publishedIds.length,
+          })
+          .catch((error) => {
+            console.warn(
+              "[atlas.calls] Entrega inmediata de push a invitados fallo:",
+              error?.message ?? error,
+            );
+          });
+      }
     }
 
     return { notified: targetIds, addedMembers, addedParticipants };

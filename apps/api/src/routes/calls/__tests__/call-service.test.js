@@ -855,7 +855,10 @@ describe("createCallService.inviteMembersToLiveCall", () => {
 
     assert.ok(broadcasts.some((b) => b.event === "chat.call.incoming" && b.ids.includes(GUEST)));
     assert.ok(broadcasts.some((b) => b.event === "chat.conversation.new" && b.ids.includes(GUEST)));
-    assert.deepEqual(flushed, [{ channel: "web_push", notificationIds: ["n1"], limit: 1 }]);
+    assert.deepEqual(flushed, [
+      { channel: "web_push", notificationIds: ["n1"], limit: 1 },
+      { channel: "fcm", notificationIds: ["n1"], limit: 1 },
+    ]);
   });
 
   it("skips the member insert for someone already in the conversation", async () => {

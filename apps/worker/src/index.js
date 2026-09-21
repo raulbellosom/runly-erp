@@ -183,7 +183,7 @@ async function runDeliveryTick() {
   if (tickRunning.delivery) return
   tickRunning.delivery = true
   try {
-    const channels = ['email', 'web_push']
+    const channels = ['email', 'web_push', 'fcm']
     for (const channel of channels) {
       const result = await deliveryWorker.processPendingNotificationDeliveries({
         channel,
