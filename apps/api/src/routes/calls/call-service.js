@@ -499,7 +499,10 @@ export function createCallService({
               deliveryWorker
                 .processPendingNotificationDeliveries({ channel, notificationIds, limit: notificationIds.length })
                 .catch((error) => {
-                  console.warn("[atlas.calls] Entrega inmediata de push fallo; el worker lo reintentara:", error?.message ?? error);
+                  console.warn(
+                    `[atlas.calls] Entrega inmediata de push (${channel}) fallo; el worker lo reintentara:`,
+                    error?.message ?? error,
+                  );
                 });
             }
           }
@@ -879,7 +882,7 @@ export function createCallService({
           })
           .catch((error) => {
             console.warn(
-              "[atlas.calls] Entrega inmediata de push a invitados fallo:",
+              `[atlas.calls] Entrega inmediata de push a invitados (${channel}) fallo:`,
               error?.message ?? error,
             );
           });
