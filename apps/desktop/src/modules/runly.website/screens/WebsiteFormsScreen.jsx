@@ -12,11 +12,11 @@ import {
   LoadingState, ErrorState, SwitchField,
 } from '@runly/ui'
 import { toast } from 'sonner'
-import FormFieldBuilder from './FormFieldBuilder.jsx'
-import FormSubmissionsPanel from './FormSubmissionsPanel.jsx'
-import FormSettingsPanel from './FormSettingsPanel.jsx'
-import FormPreview from './FormPreview.jsx'
-import FormApiPanel from './FormApiPanel.jsx'
+import FormFieldBuilder from '../../../components/forms/FormFieldBuilder.jsx'
+import FormSubmissionsPanel from '../../../components/forms/FormSubmissionsPanel.jsx'
+import FormSettingsPanel from '../../../components/forms/FormSettingsPanel.jsx'
+import FormPreview from '../../../components/forms/FormPreview.jsx'
+import FormApiPanel from '../../../components/forms/FormApiPanel.jsx'
 
 async function apiGet(path, token) {
   const res = await companyFetch(`${getApiUrl()}${path}`, {

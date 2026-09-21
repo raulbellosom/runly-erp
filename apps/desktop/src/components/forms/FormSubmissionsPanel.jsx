@@ -1,8 +1,8 @@
-import { companyFetch } from '../../../lib/companyFetch.js'
+import { companyFetch } from '../../lib/companyFetch.js'
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../../auth/AuthProvider.jsx";
-import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { useAuth } from "../../auth/AuthProvider.jsx";
+import { getApiUrl } from "../../lib/runtimeConfig.js";
 import { Button, ConfirmDialog, LoadingState } from "@runly/ui";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
@@ -70,7 +70,7 @@ function SubmissionRow({ sub, onDelete }) {
   );
 }
 
-export default function FormSubmissionsPanel({ formId }) {
+export default function FormSubmissionsPanel({ formId, basePath = '/website' }) {
   const { session } = useAuth();
   const token = session?.access_token;
   const queryClient = useQueryClient();
@@ -81,7 +81,7 @@ export default function FormSubmissionsPanel({ formId }) {
     queryKey: ["form-submissions", formId, page, token],
     queryFn: async () => {
       const res = await companyFetch(
-        `${getApiUrl()}/website/forms/${formId}/submissions?page=${page}&pageSize=20`,
+        `${getApiUrl()}${basePath}/forms/${formId}/submissions?page=${page}&pageSize=20`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -96,7 +96,7 @@ export default function FormSubmissionsPanel({ formId }) {
   const deleteMutation = useMutation({
     mutationFn: async (subId) => {
       const res = await companyFetch(
-        `${getApiUrl()}/website/forms/${formId}/submissions/${subId}`,
+        `${getApiUrl()}${basePath}/forms/${formId}/submissions/${subId}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },

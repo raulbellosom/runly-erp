@@ -1,13 +1,13 @@
-import { companyFetch } from '../../../lib/companyFetch.js'
+import { companyFetch } from '../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { getApiUrl } from '../../lib/runtimeConfig.js'
 import {
   Card, TextField, ComboboxField, Button, SwitchField,
 } from '@runly/ui'
 import { toast } from 'sonner'
 
-export default function FormSettingsPanel({ form, token, assignees, turnstileConfigured, onSaved }) {
+export default function FormSettingsPanel({ form, token, assignees, turnstileConfigured, onSaved, basePath = '/website' }) {
   const queryClient = useQueryClient()
   const [settings, setSettings] = useState({
     name:                   form.name                   ?? '',
@@ -26,7 +26,7 @@ export default function FormSettingsPanel({ form, token, assignees, turnstileCon
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await companyFetch(`${getApiUrl()}/website/forms/${form.id}`, {
+      const res = await companyFetch(`${getApiUrl()}${basePath}/forms/${form.id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

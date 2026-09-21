@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Copy, Check, ChevronDown, ChevronUp } from 'lucide-react'
-import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { getApiUrl } from '../../lib/runtimeConfig.js'
 import { Card } from '@runly/ui'
 import { toast } from 'sonner'
 

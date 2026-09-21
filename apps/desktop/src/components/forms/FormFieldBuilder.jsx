@@ -1,4 +1,4 @@
-import { companyFetch } from '../../../lib/companyFetch.js'
+import { companyFetch } from '../../lib/companyFetch.js'
 import { useState } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
@@ -10,8 +10,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Pencil, Trash2, Type, Mail, Phone, AlignLeft, List, CheckSquare, Hash, Calendar, ToggleLeft, LayoutGrid, Tags, Plus, X } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
-import { useAuth } from '../../../auth/AuthProvider.jsx'
-import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { useAuth } from '../../auth/AuthProvider.jsx'
+import { getApiUrl } from '../../lib/runtimeConfig.js'
 import {
   Button, CheckboxField, ConfirmDialog, SelectField, TextField,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -110,7 +110,7 @@ function CardOptionsEditor({ value, onChange }) {
 }
 
 // ── Field form (inside dialog) ───────────────────────────────────────────────
-function FieldForm({ formId, field, isEdit, onOpenChange, onSaved, wizardMode, maxStep = 1 }) {
+function FieldForm({ formId, field, isEdit, onOpenChange, onSaved, wizardMode, maxStep = 1, basePath }) {
   const { session } = useAuth()
   const token = session?.access_token
 
@@ -142,8 +142,8 @@ function FieldForm({ formId, field, isEdit, onOpenChange, onSaved, wizardMode, m
   const mutation = useMutation({
     mutationFn: async (data) => {
       const url = isEdit
-        ? `${getApiUrl()}/website/form-fields/${field.id}`
-        : `${getApiUrl()}/website/forms/${formId}/fields`
+        ? `${getApiUrl()}${basePath}/form-fields/${field.id}`
+        : `${getApiUrl()}${basePath}/forms/${formId}/fields`
       const res = await companyFetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers,
@@ -295,7 +295,7 @@ function FieldForm({ formId, field, isEdit, onOpenChange, onSaved, wizardMode, m
   )
 }
 
-function FieldDialog({ formId, field, open, onOpenChange, onSaved, wizardMode, maxStep }) {
+function FieldDialog({ formId, field, open, onOpenChange, onSaved, wizardMode, maxStep, basePath }) {
   const isEdit = Boolean(field)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -311,6 +311,7 @@ function FieldDialog({ formId, field, open, onOpenChange, onSaved, wizardMode, m
           onSaved={onSaved}
           wizardMode={wizardMode}
           maxStep={maxStep}
+          basePath={basePath}
         />
       </DialogContent>
     </Dialog>
@@ -396,7 +397,7 @@ function StepsBar({ steps, onAdd }) {
   )
 }
 
-export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizardMode = false }) {
+export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizardMode = false, basePath = '/website' }) {
   const { session } = useAuth()
   const token = session?.access_token
 
@@ -416,7 +417,7 @@ export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizar
 
   const reorderMutation = useMutation({
     mutationFn: async (reordered) => {
-      const res = await companyFetch(`${getApiUrl()}/website/forms/${formId}/fields/reorder`, {
+      const res = await companyFetch(`${getApiUrl()}${basePath}/forms/${formId}/fields/reorder`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: reordered.map((f, i) => ({ id: f.id, sortOrder: i * 10 })) }),
@@ -429,7 +430,7 @@ export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizar
 
   const deleteMutation = useMutation({
     mutationFn: async (fieldId) => {
-      const res = await companyFetch(`${getApiUrl()}/website/form-fields/${fieldId}`, {
+      const res = await companyFetch(`${getApiUrl()}${basePath}/form-fields/${fieldId}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Error al eliminar')
@@ -499,8 +500,8 @@ export default function FormFieldBuilder({ formId, fields = [], onRefresh, wizar
         + Agregar campo
       </button>
 
-      <FieldDialog formId={formId} field={null} open={addOpen} onOpenChange={setAddOpen} onSaved={() => { setLocalFields([]); onRefresh() }} wizardMode={wizardMode} maxStep={effectiveMaxStep} />
-      <FieldDialog formId={formId} field={editField} open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditField(null) }} onSaved={() => { setLocalFields([]); onRefresh() }} wizardMode={wizardMode} maxStep={effectiveMaxStep} />
+      <FieldDialog formId={formId} field={null} open={addOpen} onOpenChange={setAddOpen} onSaved={() => { setLocalFields([]); onRefresh() }} wizardMode={wizardMode} maxStep={effectiveMaxStep} basePath={basePath} />
+      <FieldDialog formId={formId} field={editField} open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditField(null) }} onSaved={() => { setLocalFields([]); onRefresh() }} wizardMode={wizardMode} maxStep={effectiveMaxStep} basePath={basePath} />
 
       <ConfirmDialog
         open={Boolean(confirmField)}
