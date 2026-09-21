@@ -9,4 +9,6 @@ export {
   growthLeadNoteSchema,
   growthLeadQuerySchema,
   growthLeadUpdateSchema,
+  growthPropertyCreateSchema,
+  growthPropertyUpdateSchema,
 } from "@runly/validators";

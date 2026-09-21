@@ -466,6 +466,9 @@ export const createUserSchema = z.object({
     .string()
     .min(8, "La contraseña debe tener al menos 8 caracteres."),
   roleId: z.string().uuid().optional(),
+  // Off by default: the admin creates the user active and shares the
+  // credentials directly; this only opts into a "your account is ready" email.
+  notifyByEmail: z.boolean().optional().default(false),
 });
 
 export const createMembershipSchema = z.object({
@@ -892,6 +895,21 @@ export const growthAnalyticsExportQuerySchema =
       report: z.enum(GROWTH_ANALYTICS_REPORTS),
     })
     .superRefine(validateGrowthAnalyticsRange);
+
+export const growthPropertyCreateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  domain: z.string().trim().min(1).max(300).optional(),
+});
+
+export const growthPropertyUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    domain: z.string().trim().min(1).max(300).nullable().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "No hay cambios para aplicar.",
+  });
 
 const documentBlockIdSchema = z.string().trim().min(1).max(100);
 const documentPathSchema = z
