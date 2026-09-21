@@ -114,7 +114,7 @@ export function useTransactionMutations({ accountId, token, queryKey, canEdit, o
   function saveRow(row, rowIdx) {
     if (!canEdit) return
     const draft = getDraft(row, rowIdx)
-    if (!draft._dirty && !draft._isNew) return
+    if (!draft._dirty) return
     const payload = buildTransactionPayload(draft, { onError: (msg) => toast.error(msg) })
     if (!payload) return
     saveMutation.mutate({ isNew: !!draft._isNew, id: row.id, payload })

@@ -42,7 +42,7 @@ export default function DesktopTransactionTable({
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 && (
+        {rows.length === 0 && !newRow && (
           <tr>
             <td colSpan={12} className="px-4 py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">
               Sin movimientos.
