@@ -4,6 +4,7 @@ import {
   publicFormSubmissionSchema,
   storefrontEventBatchSchema,
 } from "../routes/storefront/storefront-capture-validators.js";
+import { createGrowthPropertyService } from "../routes/growth/growth-property-service.js";
 
 const CLIENT_CLOCK_TOLERANCE_MS = 24 * 60 * 60 * 1000;
 const OPEN_LEAD_STATUSES = ["new", "follow_up", "qualified"];
@@ -65,6 +66,7 @@ export function createStorefrontCaptureService({
   verifyTurnstile = async () => false,
   notificationService = null,
   now = () => new Date(),
+  growthPropertyService = createGrowthPropertyService({ prisma, now }),
 }) {
   function hashOpaqueId(siteId, value) {
     return createHash("sha256")
@@ -163,12 +165,9 @@ export function createStorefrontCaptureService({
       );
     }
 
-    const site = await prisma.websiteSite.findFirst({
-      where: {
-        companyId: company.id,
-        enabled: true,
-        ...(siteId ? { id: siteId } : {}),
-      },
+    const site = await growthPropertyService.resolveProperty({
+      companyId: company.id,
+      propertyId: siteId,
     });
     if (!site) {
       throw new StorefrontCaptureError(

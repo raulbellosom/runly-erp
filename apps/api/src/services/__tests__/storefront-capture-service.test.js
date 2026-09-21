@@ -118,6 +118,7 @@ function buildPrisma(overrides = {}) {
           ? {
               id: SITE_ID,
               companyId: COMPANY_ID,
+              name: "Tienda",
               domain: "https://shop.example.com",
               analyticsMode: "anonymous",
               turnstileSiteKey: "public-key",
@@ -126,6 +127,73 @@ function buildPrisma(overrides = {}) {
               enabled: true,
             }
           : null,
+      findMany: async ({ where }) =>
+        where.companyId === COMPANY_ID
+          ? [
+              {
+                id: SITE_ID,
+                companyId: COMPANY_ID,
+                name: "Tienda",
+                domain: "https://shop.example.com",
+                analyticsMode: "anonymous",
+                turnstileSiteKey: "public-key",
+                turnstileSecretKey: "encrypted-secret",
+                enabled: true,
+              },
+            ]
+          : [],
+    },
+    growthProperty: {
+      findFirst: async ({ where }) =>
+        (!where.id || where.id === SITE_ID) && where.companyId === COMPANY_ID
+          ? {
+              id: SITE_ID,
+              companyId: COMPANY_ID,
+              kind: "website_module",
+              websiteSiteId: SITE_ID,
+              name: "Tienda",
+              domain: "https://shop.example.com",
+              status: "active",
+              analyticsMode: "anonymous",
+              turnstileSiteKey: "public-key",
+              turnstileSecretKey: "encrypted-secret",
+              enabled: true,
+            }
+          : null,
+      findMany: async ({ where }) =>
+        where.companyId === COMPANY_ID
+          ? [
+              {
+                id: SITE_ID,
+                companyId: COMPANY_ID,
+                kind: "website_module",
+                websiteSiteId: SITE_ID,
+                name: "Tienda",
+                domain: "https://shop.example.com",
+                status: "active",
+                analyticsMode: "anonymous",
+                turnstileSiteKey: "public-key",
+                turnstileSecretKey: "encrypted-secret",
+                enabled: true,
+              },
+            ]
+          : [],
+      upsert: async ({ where }) => {
+        const key = where.companyId_websiteSiteId;
+        return {
+          id: key.websiteSiteId,
+          companyId: key.companyId,
+          kind: "website_module",
+          websiteSiteId: key.websiteSiteId,
+          name: "Tienda",
+          domain: "https://shop.example.com",
+          status: "active",
+          analyticsMode: "anonymous",
+          turnstileSiteKey: "public-key",
+          turnstileSecretKey: "encrypted-secret",
+          enabled: true,
+        };
+      },
     },
     growthVisitor: {
       upsert: async ({ where, create, update }) => {
@@ -401,9 +469,11 @@ describe("createStorefrontCaptureService", () => {
     );
     assert.equal(prisma._state.events.length, 0);
 
-    prisma.websiteSite.findFirst = async () => ({
+    prisma.growthProperty.findFirst = async () => ({
       id: SITE_ID,
       companyId: COMPANY_ID,
+      kind: "website_module",
+      websiteSiteId: SITE_ID,
       domain: "https://shop.example.com",
       analyticsMode: "consent_required",
       enabled: true,
