@@ -438,6 +438,13 @@ export const runlyGrowthManifest = createModuleManifest({
       layout: "main",
       permissionKey: "growth.access",
     },
+    {
+      label: "Formularios",
+      path: "/forms",
+      icon: "FileText",
+      layout: "main",
+      permissionKey: "growth.forms.read",
+    },
   ],
   permissions: [
     { key: "growth.access", name: "Acceder a Growth" },
@@ -450,6 +457,10 @@ export const runlyGrowthManifest = createModuleManifest({
     { key: "growth.analytics.read", name: "Ver analitica web" },
     { key: "growth.analytics.export", name: "Exportar analitica web" },
     { key: "growth.properties.manage", name: "Gestionar sitios conectados" },
+    { key: "growth.forms.read", name: "Ver formularios" },
+    { key: "growth.forms.create", name: "Crear formularios" },
+    { key: "growth.forms.update", name: "Editar formularios" },
+    { key: "growth.forms.delete", name: "Eliminar formularios" },
   ],
   acl: {
     module: "growth.access",

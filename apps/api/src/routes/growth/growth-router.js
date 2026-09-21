@@ -9,6 +9,8 @@ import { createGrowthLeadRoutes } from "./growth-lead-routes.js";
 import { createGrowthLeadService } from "./growth-lead-service.js";
 import { createGrowthPropertyRoutes } from "./growth-property-routes.js";
 import { createGrowthPropertyService } from "./growth-property-service.js";
+import { createGrowthFormRoutes } from "./growth-form-routes.js";
+import { createFormsService } from "../../services/forms-service.js";
 
 export function createGrowthRouter({
   prisma,
@@ -24,6 +26,7 @@ export function createGrowthRouter({
   const propertyService = createGrowthPropertyService({ prisma });
   const analyticsService = createGrowthAnalyticsService({ prisma, growthPropertyService: propertyService });
   const commentsService = createCommentsService({ prisma });
+  const formsService = createFormsService({ prisma });
   app.route("", createGrowthLeadRoutes({ service, requirePermission, enrichFileAssets }));
   app.route("", createGrowthCommentRoutes({ service: commentsService, requirePermission }));
   app.route(
@@ -37,6 +40,10 @@ export function createGrowthRouter({
   app.route(
     "",
     createGrowthPropertyRoutes({ service: propertyService, requirePermission }),
+  );
+  app.route(
+    "",
+    createGrowthFormRoutes({ formsService, growthPropertyService: propertyService, requirePermission }),
   );
   return app;
 }

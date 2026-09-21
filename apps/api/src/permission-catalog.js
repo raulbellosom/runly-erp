@@ -1113,6 +1113,30 @@ export const PERMISSION_CATALOG = {
     groupKey: "growth",
     order: 22,
   },
+  "growth.forms.read": {
+    displayNameEs: "Ver formularios",
+    descriptionEs: "Permite consultar formularios y sus envios en Growth.",
+    groupKey: "growth",
+    order: 23,
+  },
+  "growth.forms.create": {
+    displayNameEs: "Crear formularios",
+    descriptionEs: "Permite crear formularios en Growth.",
+    groupKey: "growth",
+    order: 24,
+  },
+  "growth.forms.update": {
+    displayNameEs: "Editar formularios",
+    descriptionEs: "Permite editar campos y configuracion de formularios en Growth.",
+    groupKey: "growth",
+    order: 25,
+  },
+  "growth.forms.delete": {
+    displayNameEs: "Eliminar formularios",
+    descriptionEs: "Permite eliminar formularios y envios en Growth.",
+    groupKey: "growth",
+    order: 26,
+  },
 
   "documents.access": {
     displayNameEs: "Acceder a Documentos",

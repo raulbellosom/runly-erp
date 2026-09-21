@@ -1,8 +1,10 @@
 export {
   GROWTH_LEAD_PRIORITIES,
   GROWTH_LEAD_STATUSES,
+  createFormFieldSchema,
   growthAnalyticsExportQuerySchema,
   growthAnalyticsQuerySchema,
+  growthFormCreateSchema,
   growthLeadConvertSchema,
   growthLeadCreateSchema,
   growthLeadEnabledSchema,
@@ -11,4 +13,7 @@ export {
   growthLeadUpdateSchema,
   growthPropertyCreateSchema,
   growthPropertyUpdateSchema,
+  reorderFieldsSchema,
+  updateFormFieldSchema,
+  updateFormSchema,
 } from "@runly/validators";
