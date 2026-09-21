@@ -58,7 +58,7 @@ function FormCard({ form, active, onClick }) {
 }
 
 function IntegrationTip({ formId }) {
-  const snippet = `window.RunlyERP.forms.submit("${formId}", { values: { /* ... */ } })`;
+  const snippet = `window.RunlyERP.renderForm("#mi-formulario", { formId: "${formId}" })`;
   return (
     <div className="rounded-lg border border-[hsl(var(--border))] p-4 space-y-2 bg-[hsl(var(--muted)/0.4)]">
       <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
@@ -66,11 +66,16 @@ function IntegrationTip({ formId }) {
       </p>
       <p className="text-xs text-[hsl(var(--muted-foreground))]">
         Con el snippet de <code className="font-mono">runly-sdk.js</code> ya instalado (ver "Sitios conectados"),
-        envia este formulario desde JavaScript:
+        renderiza el formulario completo en un contenedor:
       </p>
       <pre className="overflow-x-auto rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] p-3 text-xs font-mono">
         {snippet}
       </pre>
+      <p className="text-xs text-[hsl(var(--muted-foreground))]">
+        O usa <code className="font-mono">sdk.forms.get(formId)</code> /{" "}
+        <code className="font-mono">sdk.forms.submit(formId, values)</code> del paquete{" "}
+        <code className="font-mono">@raulbellosom/runly-sdk</code> para construir tu propia UI.
+      </p>
     </div>
   );
 }

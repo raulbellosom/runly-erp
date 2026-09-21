@@ -2,7 +2,7 @@
 
 Generic JavaScript client for Runly ERP storefront APIs. Works in any browser environment, React app, or Vite project. Handles authentication, session persistence, file uploads, product catalog, module discovery, real-time events, and guest live chat.
 
-Migration status: the package is renamed locally. Publish `@raulbellosom/runly-sdk` before using the installation commands below in external projects. Existing consumers of `@raulbellosom/atlas-sdk` can keep their dependency during this transition; HTTP headers and session/storage contracts are unchanged. This change does not publish or deprecate either npm package.
+Migration status: `@raulbellosom/runly-sdk` is now published on npm (first published 2026-09-21, starting at the version `@raulbellosom/atlas-sdk` left off). Existing consumers of `@raulbellosom/atlas-sdk` can keep their dependency — HTTP headers and session/storage contracts are unchanged, and `atlas-sdk` is not deprecated — but new integrations should install `runly-sdk`.
 
 ```bash
 # npm
