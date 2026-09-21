@@ -15,6 +15,7 @@ import {
 } from "../lib/systemNotifications";
 import { unlockCallSounds } from "../modules/runly.chat/calls/callSounds";
 import { native } from '../native/index.js';
+import { syncCurrentDeviceFcmToken } from '../lib/fcm.js';
 import { createNotificationPreparation } from '../lib/notificationPreparation.js';
 
 const ENABLE_NOTIFICATIONS_TOAST_ID = "runly-enable-notifications";
@@ -36,15 +37,16 @@ function enableFromUserGesture(token) {
   toast.dismiss(ENABLE_NOTIFICATIONS_TOAST_ID);
 
   const notificationActivation = isTauriRuntime()
-    ? requestSystemNotificationPermission().then((permission) => {
+    ? requestSystemNotificationPermission().then(async (permission) => {
         if (permission !== "granted") throw new Error("Permiso de notificaciones denegado.");
+        await syncCurrentDeviceFcmToken({ authToken: token }).catch(() => {});
       })
     : subscribeCurrentDeviceToWebPush({ token, deviceLabel: getPwaLabel() });
 
   Promise.all([soundActivation, notificationActivation])
     .then(([soundUnlocked]) => {
       if (!soundUnlocked) throw new Error("El dispositivo no permitio activar el sonido.");
-      toast.success(native.isMobile() ? "Avisos locales activados mientras Runly está abierto." : "Notificaciones y sonidos activados.");
+      toast.success(native.isMobile() ? "Notificaciones activadas." : "Notificaciones y sonidos activados.");
     })
     .catch((error) => {
       toast.error(error?.message ?? "No se pudieron activar las notificaciones.");
@@ -55,7 +57,7 @@ function showEnablePrompt(token) {
   toast("Activa las notificaciones", {
     id: ENABLE_NOTIFICATIONS_TOAST_ID,
     description: native.isMobile()
-      ? "Permite los avisos mientras Runly está abierto. Los avisos con la app cerrada todavía no están disponibles."
+      ? "Recibe avisos y llamadas incluso con Runly cerrado."
       : "Recibe avisos y escucha las llamadas aunque Runly no este visible.",
     duration: Infinity,
     action: {
@@ -68,7 +70,10 @@ function showEnablePrompt(token) {
 async function prepareNotifications(token) {
   if (isTauriRuntime()) {
     const permission = await getSystemNotificationPermission().catch(() => "unsupported");
-    if (permission === "default") showEnablePrompt(token);
+    if (permission === "default") { showEnablePrompt(token); return; }
+    if (permission === "granted") {
+      await syncCurrentDeviceFcmToken({ authToken: token }).catch(() => {});
+    }
     return;
   }
 
