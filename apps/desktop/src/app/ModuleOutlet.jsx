@@ -243,6 +243,9 @@ const SCREEN_MAP = {
   "runly.growth:/leads/:id": lazy(
     () => import("../modules/runly.growth/screens/GrowthLeadDetailScreen.jsx"),
   ),
+  "runly.growth:/sites": lazy(
+    () => import("../modules/runly.growth/screens/GrowthPropertiesScreen.jsx"),
+  ),
   "runly.documents:/templates": lazy(
     () => import("../modules/runly.documents/screens/DocumentTemplatesScreen.jsx"),
   ),
