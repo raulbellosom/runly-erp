@@ -151,21 +151,23 @@ Permission gate: `growth.properties.manage` for write endpoints,
   `WebsiteForm` (i.e., the website module) — that limitation is intentional
   per Non-goals.
 
-### 6. Frontend — property switcher + connect wizard
+### 6. Frontend — connect wizard + properties screen
 
-New, Growth-module-scoped (not global) React context, modeled on
-`ActiveCompanyProvider.jsx` but independent of it:
+`GrowthAnalyticsScreen.jsx` already has a "Sitio" filter (`SelectField`,
+URL-persisted via `?siteId=`) backed by `GET /growth/analytics/sites`. Once
+that endpoint is repointed at `GrowthProperty` (section 5), the dropdown
+transparently gains external SDK sites alongside website-module ones — no
+frontend change needed there. This also means the "switch between
+properties without switching company" requirement is already met by that
+existing, URL-shareable filter; a second, parallel global-context switcher
+(`localStorage`-backed, company-switcher-style) would duplicate that state
+for no added capability, so it is deliberately not built.
+`GrowthLeadsScreen.jsx` has no site filter today; adding one is out of scope
+for this change (leads aren't currently filterable by site anywhere in the
+product).
 
-- `apps/desktop/src/modules/runly.growth/property/ActiveGrowthPropertyProvider.jsx`
-  — fetches `GET /growth/properties` for the active company, tracks
-  `activePropertyId` in state, persists to `localStorage` under
-  `runly-growth-active-property:<companyId>`. Exposes
-  `useActiveGrowthProperty()`.
-- `GrowthPropertySwitcher.jsx` — dropdown (built on `@runly/ui`
-  `ComboboxField`, per the UI-first policy) in the `PageHeader` area of
-  Growth screens. Shows each property's name/domain plus a kind badge
-  ("Sitio del módulo Web" / "Sitio externo (SDK)"), an "Todos los sitios"
-  aggregate option, and a "+ Conectar sitio externo" entry that opens:
+What *is* new:
+
 - `ConnectExternalSiteDialog.jsx` — `@runly/ui` `Dialog`, two steps:
   1. `TextField`s for name + domain → `POST /growth/properties`.
   2. Show the embed snippet (same script tag already used by
@@ -173,14 +175,9 @@ New, Growth-module-scoped (not global) React context, modeled on
      id as `siteId`), with a copy-to-clipboard button and a "Verificar
      conexión" button that calls the `verify` endpoint.
 - New nav screen `GrowthPropertiesScreen.jsx` ("Sitios conectados") —
-  `RunlyTable` listing all properties with status/kind badges, the connect
-  wizard entry point, and disable/rename actions. Added to the Growth
-  module's `navigation` array.
-- `GrowthAnalyticsScreen.jsx` / `GrowthLeadsScreen.jsx`: the existing site
-  filter dropdown (already present, backed by `GET /growth/analytics/sites`)
-  switches its default value to `activePropertyId` from the new context
-  instead of always defaulting to "all sites"; the dropdown's option list is
-  already the same data (now unified internal+external).
+  `DataTable` listing all properties with status/kind badges and the
+  connect wizard entry point. Added to the Growth module's `navigation`
+  array.
 
 ### Error handling
 
