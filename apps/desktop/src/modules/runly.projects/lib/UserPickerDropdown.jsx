@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
+import { Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { AssigneeAvatar } from './AssigneeChip'
 
 function getDisplayName(u) {
@@ -16,7 +17,7 @@ function getDisplayName(u) {
  *   placeholder  - trigger placeholder when nothing is selected
  *   emptyMessage - message shown when filter has no results
  *   autoFocus    - open the dropdown immediately on mount
- *   onBlur       - called when the dropdown closes by clicking outside
+ *   onBlur       - called when the dropdown closes (outside click, escape, or selection)
  *   compact      - smaller trigger height (for inline pickers like SubtaskRow)
  */
 export function UserPickerDropdown({
@@ -32,7 +33,6 @@ export function UserPickerDropdown({
 }) {
   const [open, setOpen] = useState(autoFocus)
   const [query, setQuery] = useState('')
-  const ref = useRef(null)
   const inputRef = useRef(null)
 
   const selected = value ? users.find((u) => u.id === value) : null
@@ -45,66 +45,59 @@ export function UserPickerDropdown({
     : users
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false)
-        setQuery('')
-        onBlur?.()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onBlur])
-
-  useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => inputRef.current?.focus(), 10)
-      return () => clearTimeout(t)
-    }
+    if (open) setQuery('')
   }, [open])
+
+  function handleOpenChange(next) {
+    setOpen(next)
+    if (!next) onBlur?.()
+  }
 
   function handleSelect(uid) {
     onChange(uid)
     setOpen(false)
-    setQuery('')
+    onBlur?.()
   }
 
   const triggerPadding = compact ? 'px-2 py-1' : 'px-3 py-2'
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div className="w-full">
       {label && (
         <label className="text-sm font-medium mb-1.5 block">{label}</label>
       )}
 
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 ${triggerPadding} rounded-md border border-border bg-background text-sm text-left hover:bg-muted/50 transition-colors`}
-      >
-        {selected ? (
-          <>
-            <AssigneeAvatar user={selected} size="sm" />
-            <div className="flex-1 min-w-0 flex items-baseline gap-1.5 overflow-hidden">
-              <span className="text-sm truncate shrink-0 max-w-[60%]">{getDisplayName(selected)}</span>
-              {selected.email && (
-                <span className="text-xs text-muted-foreground truncate">({selected.email})</span>
-              )}
-            </div>
-          </>
-        ) : (
-          <span className="text-muted-foreground flex-1 text-sm">{placeholder}</span>
-        )}
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute z-200 top-full mt-1 left-0 right-0 bg-[hsl(var(--surface-1))] text-foreground border border-border rounded-lg shadow-2xl overflow-hidden">
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={`w-full flex items-center gap-2 ${triggerPadding} rounded-md border border-border bg-background text-sm text-left hover:bg-muted/50 transition-colors`}
+          >
+            {selected ? (
+              <>
+                <AssigneeAvatar user={selected} size="sm" />
+                <div className="flex-1 min-w-0 flex items-baseline gap-1.5 overflow-hidden">
+                  <span className="text-sm truncate shrink-0 max-w-[60%]">{getDisplayName(selected)}</span>
+                  {selected.email && (
+                    <span className="text-xs text-muted-foreground truncate">({selected.email})</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <span className="text-muted-foreground flex-1 text-sm">{placeholder}</span>
+            )}
+            <ChevronDown
+              size={14}
+              className={`text-muted-foreground shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+            />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          sideOffset={4}
+          className="p-0 w-(--radix-popover-trigger-width) overflow-hidden"
+          onOpenAutoFocus={(e) => { e.preventDefault(); inputRef.current?.focus() }}
+        >
           {/* Search bar */}
           <div className="p-2 border-b border-border">
             <div className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5">
@@ -128,7 +121,6 @@ export function UserPickerDropdown({
                 <button
                   key={u.id}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(u.id)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted text-left transition-colors"
                 >
@@ -143,8 +135,8 @@ export function UserPickerDropdown({
               ))
             )}
           </div>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

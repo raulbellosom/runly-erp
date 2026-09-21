@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { EmptyState, LoadingState } from "@runly/ui";
 import { CalendarOff, CornerDownRight } from "lucide-react";
-import { useTasks } from "../hooks/useProjectsData";
+import { useTasks, useStatuses } from "../hooks/useProjectsData";
+
+const DEFAULT_BAR_COLOR = "#6366f1";
 
 const COL_WIDTH = 120;
 const ROW_HEIGHT = 40;
@@ -34,6 +36,13 @@ export default function TimelineView({
     ...(showSubtasks ? { include_subtasks: "true" } : { parentTaskId: "null" }),
   });
   const tasks = tasksData?.data ?? tasksData ?? [];
+  const { data: statusesData } = useStatuses(projectId);
+  const statuses = statusesData?.data ?? statusesData ?? [];
+  const statusMap = useMemo(() => {
+    const m = {};
+    for (const s of statuses) m[s.id] = s;
+    return m;
+  }, [statuses]);
 
   const { datedTasks, undatedTasks, weeks, timelineStart, totalMs } =
     useMemo(() => {
@@ -103,18 +112,19 @@ export default function TimelineView({
 
   return (
     <div className="flex h-full overflow-hidden">
-      <div className="w-44 flex-shrink-0 border-r border-border overflow-y-auto">
+      <div className="w-44 shrink-0 border-r border-border overflow-y-auto">
         <div
           style={{ height: ROW_HEIGHT }}
           className="border-b border-border"
         />
         {datedTasks.map((task) => (
-          <div
+          <button
+            type="button"
             key={task.id}
             onClick={() => onTaskClick(task.id)}
             style={{ height: ROW_HEIGHT }}
             className={[
-              "flex items-center px-3 text-sm truncate border-b border-border hover:bg-muted/50 cursor-pointer",
+              "w-full flex items-center px-3 text-sm text-left truncate border-b border-border hover:bg-muted/50 cursor-pointer",
               task.parentTaskId ? "border-l-2 border-l-indigo-400/60 pl-2" : "",
             ].join(" ")}
           >
@@ -132,7 +142,7 @@ export default function TimelineView({
               )}
               <span className="truncate">{task.title}</span>
             </div>
-          </div>
+          </button>
         ))}
         {undatedTasks.length > 0 && (
           <>
@@ -140,12 +150,13 @@ export default function TimelineView({
               Sin fecha
             </div>
             {undatedTasks.map((task) => (
-              <div
+              <button
+                type="button"
                 key={task.id}
                 onClick={() => onTaskClick(task.id)}
                 style={{ height: ROW_HEIGHT }}
                 className={[
-                  "flex items-center px-3 text-sm truncate border-b border-border text-muted-foreground hover:bg-muted/50 cursor-pointer",
+                  "w-full flex items-center px-3 text-sm text-left truncate border-b border-border text-muted-foreground hover:bg-muted/50 cursor-pointer",
                   task.parentTaskId
                     ? "border-l-2 border-l-indigo-400/60 pl-2"
                     : "",
@@ -165,7 +176,7 @@ export default function TimelineView({
                   )}
                   <span className="truncate">{task.title}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </>
         )}
@@ -181,7 +192,7 @@ export default function TimelineView({
               <div
                 key={i}
                 style={{ width: COL_WIDTH }}
-                className="flex-shrink-0 flex items-center justify-center text-xs text-muted-foreground border-r border-border"
+                className="shrink-0 flex items-center justify-center text-xs text-muted-foreground border-r border-border"
               >
                 {weekLabel(w)}
               </div>
@@ -201,6 +212,7 @@ export default function TimelineView({
             const widthPct = isMilestone
               ? 0
               : msToPercent(end - start, totalMs);
+            const barColor = statusMap[task.statusId]?.color ?? DEFAULT_BAR_COLOR;
 
             return (
               <div
@@ -222,7 +234,8 @@ export default function TimelineView({
                   />
                 ))}
                 {isMilestone ? (
-                  <div
+                  <button
+                    type="button"
                     onClick={() => onTaskClick(task.id)}
                     style={{
                       position: "absolute",
@@ -231,13 +244,15 @@ export default function TimelineView({
                       transform: "translateY(-50%) rotate(45deg)",
                       width: 12,
                       height: 12,
-                      background: "#6366f1",
+                      background: barColor,
                       cursor: "pointer",
                     }}
                     title={task.title}
+                    aria-label={task.title}
                   />
                 ) : (
-                  <div
+                  <button
+                    type="button"
                     onClick={() => onTaskClick(task.id)}
                     style={{
                       position: "absolute",
@@ -246,7 +261,7 @@ export default function TimelineView({
                       top: "50%",
                       transform: "translateY(-50%)",
                       height: 20,
-                      background: "#6366f1",
+                      background: barColor,
                       borderRadius: 10,
                       minWidth: 20,
                       cursor: "pointer",
@@ -260,7 +275,7 @@ export default function TimelineView({
                     <span className="text-[10px] text-white whitespace-nowrap overflow-hidden">
                       {task.title}
                     </span>
-                  </div>
+                  </button>
                 )}
               </div>
             );

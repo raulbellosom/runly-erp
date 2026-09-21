@@ -245,7 +245,7 @@ export default function AccountsScreen() {
               : effectiveTab !== 'groups'
                 ? (
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => navigate('/app/m/runly.ledger/import-ai')}>
+                      <Button variant="outline" size="sm" onClick={() => navigate('/app/m/runly.ledger/accounts/import-ai')}>
                         <Sparkles size={14} className="mr-1" /> Importar con IA
                       </Button>
                       <Button variant="primary" size="sm" onClick={() => setNewAccOpen(true)}>

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import {
   Button, Badge, EmptyState, ErrorState, LoadingState,
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@runly/ui";
 import { useProjects, useWorkspaceUsers } from "../hooks/useProjectsData";
 import { useProjectRealtime } from "../hooks/useProjectRealtime";
@@ -417,6 +417,16 @@ export default function ProjectsScreen() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuLabel className="flex items-center justify-between gap-2 font-normal text-muted-foreground">
+                      Estado
+                      <Badge
+                        variant={LIFECYCLE_BADGE[selectedProject.status]?.variant ?? "secondary"}
+                        className="text-xs"
+                      >
+                        {LIFECYCLE_BADGE[selectedProject.status]?.label ?? selectedProject.status}
+                      </Badge>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={() => {
                         setEditingProject(selectedProject);

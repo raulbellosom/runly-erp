@@ -139,7 +139,7 @@ export function SubtaskRow({ task, projectId, onDelete, onOpen }) {
       ) : (
         <button
           onClick={(e) => { e.stopPropagation(); setShowAssignPicker(true) }}
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="shrink-0 opacity-60 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
           tabIndex={-1}
           title="Asignar miembro"
         >
@@ -153,7 +153,7 @@ export function SubtaskRow({ task, projectId, onDelete, onOpen }) {
       {onOpen && (
         <button
           onClick={() => onOpen(task.id)}
-          className="text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+          className="text-muted-foreground hover:text-foreground transition-colors opacity-60 md:opacity-0 md:group-hover:opacity-100 shrink-0"
           tabIndex={-1}
           title="Abrir subtarea"
         >
@@ -167,7 +167,7 @@ export function SubtaskRow({ task, projectId, onDelete, onOpen }) {
 
       <button
         onClick={() => onDelete(task.id)}
-        className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+        className="text-muted-foreground hover:text-destructive transition-colors opacity-60 md:opacity-0 md:group-hover:opacity-100 shrink-0"
         tabIndex={-1}
       >
         <X size={12} />

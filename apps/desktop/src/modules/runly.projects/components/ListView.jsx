@@ -6,6 +6,9 @@ import {
   ConfirmDialog,
   Checkbox,
   LoadingState,
+  Table,
+  TableHeader,
+  TableBody,
 } from "@runly/ui";
 import { ChevronRight, CornerDownRight, Trash2, X, Lock, RefreshCw, Paperclip } from "lucide-react";
 import { toast } from "sonner";
@@ -209,8 +212,8 @@ export default function ListView({
             />
           )}
           {filtered.length > 0 && (
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-background border-b border-border">
+            <Table className="text-sm">
+              <TableHeader className="sticky top-0 bg-background border-b border-border z-10">
                 <tr>
                   <th className="px-3 py-2 w-8">
                     <Checkbox
@@ -240,8 +243,8 @@ export default function ListView({
                     Estado
                   </th>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {filtered.map((task) => {
                   const status = statusMap[task.statusId];
                   const priority =
@@ -251,7 +254,15 @@ export default function ListView({
                     <tr
                       key={task.id}
                       onClick={() => onTaskClick(task.id)}
-                      className="border-b border-border hover:bg-muted/50 cursor-pointer transition-colors"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onTaskClick(task.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      className="border-b border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:bg-muted/50 cursor-pointer transition-colors"
                     >
                       <td
                         className="px-3 py-2.5 w-8"
@@ -352,14 +363,14 @@ export default function ListView({
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </div>
 
         {/* Floating bulk action bar */}
         {selectedIds.size > 0 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-background border border-border rounded-lg shadow-lg px-4 py-2.5 text-sm">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2 bg-background border border-border rounded-lg shadow-lg px-4 py-2.5 text-sm max-w-[calc(100%-2rem)]">
             <span className="text-muted-foreground mr-1 shrink-0">
               {selectedIds.size} tarea{selectedIds.size !== 1 ? "s" : ""}
             </span>

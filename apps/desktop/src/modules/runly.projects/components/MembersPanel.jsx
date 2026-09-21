@@ -103,7 +103,7 @@ export default function MembersPanel({ open, onOpenChange, projectId }) {
                       {m.role !== 'OWNER' && (
                         <button
                           onClick={() => setRemoveTarget(m)}
-                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                          className="opacity-60 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
                           title="Eliminar miembro"
                         >
                           <UserMinus size={14} />

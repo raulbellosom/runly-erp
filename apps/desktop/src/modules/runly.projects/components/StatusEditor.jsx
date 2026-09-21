@@ -82,7 +82,7 @@ function StatusRow({ status, projectId, onDelete }) {
       <button
         onClick={() => !status.isDefault && onDelete(status)}
         className={[
-          'transition-colors opacity-0 group-hover:opacity-100',
+          'transition-colors opacity-60 md:opacity-0 md:group-hover:opacity-100',
           status.isDefault ? 'cursor-not-allowed text-muted-foreground/30' : 'text-muted-foreground hover:text-destructive',
         ].join(' ')}
         title={status.isDefault ? 'No se puede eliminar la columna por defecto' : 'Eliminar columna'}

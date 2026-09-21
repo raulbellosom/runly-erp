@@ -61,8 +61,16 @@ function TaskCard({ task, statusColor, onClick, isDragging, statuses, currentSta
     <div
       ref={setNodeRef}
       style={style}
-      className="group bg-background border border-border rounded p-2.5 cursor-pointer hover:border-accent-foreground/20 transition-colors"
+      className="group bg-background border border-border rounded p-2.5 cursor-pointer hover:border-accent-foreground/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-colors"
       onClick={() => onClick(task.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(task.id);
+        }
+      }}
+      tabIndex={0}
+      role="button"
     >
       <div className="flex items-start gap-1.5">
         {/* Grip handle: listeners only here so the card body stays scrollable on mobile */}
