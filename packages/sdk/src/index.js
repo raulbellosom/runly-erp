@@ -1691,6 +1691,20 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
             headers: withAuthHeaders(token),
           },
         ),
+      subscribeFcm: (token, payload) =>
+        request("/notifications/subscriptions/fcm", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(payload),
+        }),
+      unsubscribeFcm: (token, id) =>
+        request(
+          `/notifications/subscriptions/fcm/${encodeURIComponent(id)}`,
+          {
+            method: "DELETE",
+            headers: withAuthHeaders(token),
+          },
+        ),
       listPreferences: (token) =>
         request("/notifications/preferences", {
           headers: withAuthHeaders(token),
