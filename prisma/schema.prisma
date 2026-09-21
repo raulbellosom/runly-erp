@@ -1305,6 +1305,29 @@ model GrowthDailyMetric {
   @@map("growth_daily_metric")
 }
 
+model GrowthProperty {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  companyId          String    @db.Uuid @map("company_id")
+  kind               String    @default("external_sdk") @map("kind")
+  websiteSiteId      String?   @db.Uuid @map("website_site_id")
+  name               String
+  domain             String?
+  status             String    @default("active")
+  analyticsMode      String    @default("standard") @map("analytics_mode")
+  turnstileSiteKey   String?   @map("turnstile_site_key")
+  turnstileSecretKey String?   @map("turnstile_secret_key")
+  capabilities       Json?
+  verifiedAt         DateTime? @map("verified_at")
+  enabled            Boolean   @default(true)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, websiteSiteId])
+  @@index([companyId, enabled])
+  @@index([companyId, domain])
+  @@map("growth_property")
+}
+
 model EntityComment {
   id         String    @id @default(uuid(7)) @db.Uuid
   companyId  String    @db.Uuid @map("company_id")
