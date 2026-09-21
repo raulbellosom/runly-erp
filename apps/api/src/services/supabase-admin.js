@@ -5,8 +5,10 @@
 // resolve against `apps/api/node_modules` — the worker package intentionally
 // has a minimal dependency set.
 import { createClient } from "@supabase/supabase-js";
+import { wrapStorageForPublicUrls } from "../lib/supabase-public-url.js";
 
 export function createSupabaseAdminClient(env = process.env) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+  const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+  return wrapStorageForPublicUrls(client, env);
 }

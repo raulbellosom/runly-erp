@@ -194,6 +194,11 @@ const OPTIONAL_VAR_GROUPS = [
     vars: [
       { key: "CORS_ORIGIN",    placeholder: "http://localhost:5173",  comment: null },
       { key: "ATLAS_API_URL",  placeholder: "http://localhost:4010",  comment: null },
+      {
+        key: "RUNLY_SUPABASE_PUBLIC_URL",
+        placeholder: "",
+        comment: "# Leave unset for managed Supabase Cloud (SUPABASE_URL is already public). Set only if SUPABASE_URL is an internal address the browser cannot resolve.",
+      },
     ],
   },
   {
@@ -256,7 +261,10 @@ const OPTIONAL_VAR_GROUPS = [
 
 async function writeComposeEnv(envFilePath) {
   const content = await fs.readFile(envFilePath, "utf8");
-  const supabaseUrl  = parseEnvValue(content, "SUPABASE_URL")    ?? "";
+  // Browser-facing: prefer RUNLY_SUPABASE_PUBLIC_URL when set (an internal
+  // SUPABASE_URL the browser can't resolve), otherwise SUPABASE_URL is
+  // already the public one (the default for a managed Supabase project).
+  const supabaseUrl  = parseEnvValue(content, "RUNLY_SUPABASE_PUBLIC_URL") || parseEnvValue(content, "SUPABASE_URL") || "";
   const anonKey      = parseEnvValue(content, "SUPABASE_ANON_KEY") ?? "";
   const atlasApiUrl  = (process.env.RUNLY_API_URL ?? process.env.ATLAS_API_URL ?? parseEnvValue(content, "RUNLY_API_URL") ?? parseEnvValue(content, "ATLAS_API_URL"))   ?? "http://localhost:4010";
 

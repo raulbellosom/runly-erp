@@ -10,10 +10,21 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/desktop/package.json apps/desktop/package.json
 COPY apps/worker/package.json apps/worker/package.json
+COPY packages/core/package.json packages/core/package.json
+COPY packages/module-engine/package.json packages/module-engine/package.json
+COPY packages/offline/package.json packages/offline/package.json
+COPY packages/sdk/package.json packages/sdk/package.json
+COPY packages/storefront-sdk/package.json packages/storefront-sdk/package.json
+COPY packages/ui/package.json packages/ui/package.json
+COPY packages/validators/package.json packages/validators/package.json
+RUN pnpm install --frozen-lockfile
+# Copy full sources after install: apps/desktop, packages/* and modules/* change on
+# nearly every commit but none of them are needed for `pnpm install` itself (modules/
+# isn't even a workspace member) — copying them here keeps the install layer cached.
+# modules/ is still needed before the vite build below (see vite.config.js).
 COPY packages packages
 COPY apps/desktop apps/desktop
 COPY modules modules
-RUN pnpm install --frozen-lockfile
 
 # VITE_ args are only needed for local dev builds — the distributed image
 # leaves them empty. At runtime, web-entrypoint.sh injects real values via

@@ -1,3 +1,5 @@
+import { resolvePublicSupabaseUrl } from '../lib/supabase-public-url.js'
+
 const BUCKET = 'runly-website'
 const ASSET_EXTENSIONS = new Set([
   'js', 'mjs', 'css', 'png', 'jpg', 'jpeg', 'webp', 'svg', 'ico',
@@ -340,7 +342,7 @@ export function createDistServeService({ prisma, supabaseAdmin }) {
     // source_type === 'dist'
     if (isAssetPath(urlPath)) {
       const objectKey = `dist/${site.company_slug}${urlPath}`
-      const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${objectKey}`
+      const publicUrl = `${resolvePublicSupabaseUrl(process.env)}/storage/v1/object/public/${BUCKET}/${objectKey}`
       return c.redirect(publicUrl, 302)
     }
 
@@ -371,7 +373,7 @@ export function createDistServeService({ prisma, supabaseAdmin }) {
       return c.json({ error: 'Pagina no encontrada' }, 404)
     }
 
-    const storageBase = `${process.env.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/dist/${site.company_slug}`
+    const storageBase = `${resolvePublicSupabaseUrl(process.env)}/storage/v1/object/public/${BUCKET}/dist/${site.company_slug}`
     const proto = c.req.header('x-forwarded-proto') || 'http'
     const hostHeader = c.req.header('x-forwarded-host') || c.req.header('host') || ''
     const siteOrigin = hostHeader ? `${proto}://${hostHeader}` : ''
@@ -382,7 +384,7 @@ export function createDistServeService({ prisma, supabaseAdmin }) {
     // site.domain is the storefront's public domain — it is NOT the ERP API.
     const erpApiUrl = (process.env.RUNLY_APP_URL ?? '').replace(/\/$/, '') || siteOrigin
     const withConfig = injectRunlyConfig(rewritten, {
-      supabaseUrl:          process.env.SUPABASE_URL    ?? '',
+      supabaseUrl:          resolvePublicSupabaseUrl(process.env),
       supabaseAnonKey:      process.env.SUPABASE_ANON_KEY ?? '',
       apiUrl:               erpApiUrl,
       company:              site.company_slug ?? '',

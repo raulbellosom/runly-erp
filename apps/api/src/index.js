@@ -136,6 +136,7 @@ import {
 } from "./lib/image-variants.js";
 import { loadInstallerLiveKitDevEnv } from "./lib/livekit-dev-env.js";
 import { getCachedSignedUrls } from "./lib/signed-url-cache.js";
+import { wrapStorageForPublicUrls } from "./lib/supabase-public-url.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({
@@ -186,9 +187,13 @@ export const app = new Hono();
 const port = Number(process.env.RUNLY_API_PORT ?? 4010);
 const contactsService = createContactsService({ prisma });
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
+// Wrapped so every signed/public Storage URL this instance mints (and every
+// service/route below that receives it) is rewritten to RUNLY_SUPABASE_PUBLIC_URL
+// before it reaches the browser — see lib/supabase-public-url.js. Uploads,
+// downloads and signing requests still go straight to SUPABASE_URL internally.
+const supabaseAdmin = wrapStorageForPublicUrls(
+  createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY),
+  process.env,
 );
 const supabaseAnon = createClient(
   process.env.SUPABASE_URL,

@@ -918,6 +918,7 @@ export function BlueprintCrudScreen() {
       <div className="h-full min-h-0 w-full overflow-auto">
         <CustomComponent
           token={token}
+          companyId={activeCompanyId}
           navigate={navigate}
           moduleKey={moduleKey}
         />

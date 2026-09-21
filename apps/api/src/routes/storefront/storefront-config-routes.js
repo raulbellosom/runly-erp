@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { getCompanySlugHeader } from '../../lib/public-request-headers.js'
+import { resolvePublicSupabaseUrl } from '../../lib/supabase-public-url.js'
 
 export function createStorefrontConfigRoutes({ prisma }) {
   const app = new Hono()
@@ -13,7 +14,9 @@ export function createStorefrontConfigRoutes({ prisma }) {
 
     return c.json({
       data: {
-        supabaseUrl: process.env.SUPABASE_URL,
+        // Browser-facing — must be the public Supabase domain, never the
+        // internal Docker hostname the API/worker use to reach Kong.
+        supabaseUrl: resolvePublicSupabaseUrl(process.env),
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
         companyId: company.id,
       },

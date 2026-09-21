@@ -3,7 +3,7 @@ import { defineRunlyModule } from '@runly/module-engine'
 export default defineRunlyModule({
   key: 'custom.dispatch',
   name: 'Despachos y báscula',
-  version: '0.8.0',
+  version: '0.8.1',
   kind: 'FEATURE',
   description: 'Vales, pesajes y control de salida de materiales a granel.',
   icon: 'Scale',

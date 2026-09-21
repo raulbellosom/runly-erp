@@ -30,6 +30,7 @@ import { createVolumeTicketSchema, createScaleTicketSchema, updateTicketSchema, 
 import { captureTareSchema, correctWeighingSchema, weighingExceptionSchema } from '../api/weighing-validators.js'
 import { scanGateSchema, rejectExitSchema, guardNotifiedSchema } from '../api/exit-validators.js'
 import { buildVoucherPdfBuffer } from '../api/voucher-pdf.js'
+import { dispatchCleanupHandler } from '../api/dispatch-cleanup.js'
 import { createInitialForm } from '../components/lib/catalog-form-state.js'
 
 const models = [
@@ -62,7 +63,7 @@ test('el manifiesto y las vistas CUSTOM cumplen el contrato RME3', () => {
   for (const [view, component] of viewComponents) {
     assert.equal(view.schema.component, component)
   }
-  assert.equal(manifest.version, '0.8.0')
+  assert.equal(manifest.version, '0.8.1')
   assert.equal(manifest.pwa.startPath, '/operacion')
   assert.equal(manifest.navigation.length, 10)
 })
@@ -273,4 +274,52 @@ test('genera un PDF de vale con 3 copias y un QR real', async () => {
   const pdf = await buildVoucherPdfBuffer({ branding, ticket, weighings: [], qrValue: 'RUNLY-DISPATCH:1:abcdefghijklmnopqrstuvwx' })
   assert.ok(Buffer.isBuffer(pdf))
   assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-')
+})
+
+test('el cleanup handler tiene la forma que exige registerModuleHandler', () => {
+  assert.equal(typeof dispatchCleanupHandler.count, 'function')
+  assert.equal(typeof dispatchCleanupHandler.purge, 'function')
+})
+
+test('el purge del cleanup handler borra hijos antes que padres (orden seguro para FKs)', async () => {
+  const deletedTables = []
+  const fakeTx = {
+    $executeRaw(strings) {
+      const sql = strings.join('')
+      const [, table] = sql.match(/DELETE FROM (\w+)/) ?? []
+      deletedTables.push(table)
+      return Promise.resolve(0)
+    },
+  }
+
+  await dispatchCleanupHandler.purge({ tx: fakeTx, companyId: '018f4b34-89f1-7a21-9c9a-36a1fd6ec001' })
+
+  assert.deepEqual(deletedTables, [
+    'dispatch_ticket_event',
+    'dispatch_exit_attempt',
+    'dispatch_weighing',
+    'dispatch_ticket',
+    'dispatch_folio_series',
+    'dispatch_station_assignment',
+    'dispatch_material_profile',
+    'dispatch_station',
+    'dispatch_site',
+  ])
+
+  const parentIndex = (table) => deletedTables.indexOf(table)
+  // Every table must be deleted before every table it has a foreign key to.
+  assert.ok(parentIndex('dispatch_ticket_event') < parentIndex('dispatch_ticket'))
+  assert.ok(parentIndex('dispatch_exit_attempt') < parentIndex('dispatch_ticket'))
+  assert.ok(parentIndex('dispatch_weighing') < parentIndex('dispatch_ticket'))
+  assert.ok(parentIndex('dispatch_ticket') < parentIndex('dispatch_site'))
+  assert.ok(parentIndex('dispatch_ticket') < parentIndex('dispatch_station'))
+  assert.ok(parentIndex('dispatch_ticket') < parentIndex('dispatch_material_profile'))
+  assert.ok(parentIndex('dispatch_station_assignment') < parentIndex('dispatch_station'))
+  assert.ok(parentIndex('dispatch_folio_series') < parentIndex('dispatch_site'))
+  assert.ok(parentIndex('dispatch_material_profile') < parentIndex('dispatch_site'))
+  assert.ok(parentIndex('dispatch_station') < parentIndex('dispatch_site'))
+})
+
+test('el count del cleanup handler exige companyId', async () => {
+  await assert.rejects(() => dispatchCleanupHandler.count({ prisma: {}, companyId: null }))
 })

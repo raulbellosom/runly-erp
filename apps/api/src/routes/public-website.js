@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { createCatalogPublicService } from './catalog/catalog-public-service.js'
 import { createDistServeService } from '../services/dist-serve-service.js'
+import { resolvePublicSupabaseUrl } from '../lib/supabase-public-url.js'
 
 const ERP_PREFIXES = ['runly.', 'atlas.', 'website.', 'contacts.', 'hr.', 'finance.', 'fleet.']
 
@@ -11,7 +12,9 @@ export function createPublicWebsiteRouter({ prisma, supabaseAdmin }) {
   app.get('/desktop/config', async (c) => {
     return c.json({
       data: {
-        supabaseUrl: process.env.SUPABASE_URL ?? null,
+        // Browser-facing — must be the public Supabase domain, never the
+        // internal Docker hostname the API/worker use to reach Kong.
+        supabaseUrl: resolvePublicSupabaseUrl(process.env) || null,
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? null,
       },
     })
