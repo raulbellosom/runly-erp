@@ -19,7 +19,7 @@ export function clearStoredFcmToken() {
 export async function syncCurrentDeviceFcmToken({ authToken, deviceLabel = "Android" }) {
   if (!native.isMobile()) return { data: null };
   const fcmToken = await native.notifications.getPushToken().catch(() => null);
-  if (!fcmToken || fcmToken === getStoredFcmToken()) return { data: null };
+  if (!fcmToken) return { data: null };
 
   const response = await runly.notifications.subscribeFcm(authToken, { token: fcmToken, deviceLabel });
   window.localStorage.setItem(STORAGE_KEY, fcmToken);

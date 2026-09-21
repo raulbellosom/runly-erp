@@ -39,7 +39,7 @@ function enableFromUserGesture(token) {
   const notificationActivation = isTauriRuntime()
     ? requestSystemNotificationPermission().then(async (permission) => {
         if (permission !== "granted") throw new Error("Permiso de notificaciones denegado.");
-        await syncCurrentDeviceFcmToken({ authToken: token }).catch(() => {});
+        await syncCurrentDeviceFcmToken({ authToken: token });
       })
     : subscribeCurrentDeviceToWebPush({ token, deviceLabel: getPwaLabel() });
 
