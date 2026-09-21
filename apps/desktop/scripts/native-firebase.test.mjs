@@ -11,7 +11,7 @@ function fixture(t) {
   const app = join(root, 'app')
   mkdirSync(app)
   const config = { project_info: { project_id: 'test-project', project_number: '123' }, client: [{
-    client_info: { mobilesdk_app_id: '1:123:android:test', android_client_info: { package_name: 'com.racoondevs.atlaserp' } },
+    client_info: { mobilesdk_app_id: '1:123:android:test', android_client_info: { package_name: 'com.racoondevs.runlyerp' } },
     api_key: [{ current_key: 'public-test-key' }],
   }] }
   writeFileSync(join(root, 'android.json'), JSON.stringify(config))
@@ -54,7 +54,7 @@ test('rejects wrong project and wrong Android package', (t) => {
   assert.throws(() => prepareAndroidFirebase(f.root, f.app, { FIREBASE_PROJECT_ID: 'another-project' }), /does not match/)
   f.config.client[0].client_info.android_client_info.package_name = 'wrong.package'
   writeFileSync(join(f.root, 'android.json'), JSON.stringify(f.config))
-  assert.throws(() => prepareAndroidFirebase(f.root, f.app, {}), /com.racoondevs.atlaserp/)
+  assert.throws(() => prepareAndroidFirebase(f.root, f.app, {}), /com.racoondevs.runlyerp/)
   assert.equal(existsSync(f.destination), false)
 })
 
