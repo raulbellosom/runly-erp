@@ -113,7 +113,7 @@ export default function ProjectFieldsSheet({ projectId, open, onOpenChange }) {
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full flex flex-col gap-0 p-0" style={{ maxWidth: "480px" }}>
+        <SheetContent className="w-full sm:max-w-md flex flex-col gap-0 p-0">
           <SheetHeader className="px-6 py-4 border-b border-border shrink-0">
             <SheetTitle>Campos personalizados</SheetTitle>
           </SheetHeader>

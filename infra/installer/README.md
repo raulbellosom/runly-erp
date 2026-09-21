@@ -331,6 +331,24 @@ En Linux, LiveKit usa `network_mode: host`; Redis escucha exclusivamente en
 instalador valida DNS, TLS, Redis, el endpoint de LiveKit y la conexión desde Hono,
 y crea y elimina una sala temporal. Redes muy restrictivas pueden requerir TURN.
 
+Si un firewall del host (por ejemplo `ufw`) bloquea el tráfico del contenedor de
+la API hacia `host.docker.internal:7880`, la prueba de conexión falla con un
+timeout. El instalador **no ejecuta cambios de firewall por sí mismo** (requeriría
+root y asume `ufw`, que no todas las VPS usan); en su lugar, cuando detecta ese
+patrón de fallo con `ufw` activo, inspecciona las redes de Docker e imprime la
+regla exacta a copiar y ejecutar, por ejemplo:
+
+```bash
+sudo ufw allow proto tcp from 192.0.2.0/24 to 192.0.2.1 port 7880 comment 'Runly API to LiveKit'
+```
+
+Para llamadas desde fuera de la VPS, además hay que permitir el tráfico RTC:
+
+```bash
+sudo ufw allow 7881/tcp comment 'Runly LiveKit RTC TCP'
+sudo ufw allow 7882/udp comment 'Runly LiveKit RTC UDP'
+```
+
 Nunca expongas `LIVEKIT_API_SECRET` al frontend. Runly solo entrega tokens de
 sala de corta duracion desde la API.
 

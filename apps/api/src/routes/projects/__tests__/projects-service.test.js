@@ -161,4 +161,45 @@ describe('createProjectsService', () => {
       )
     })
   })
+
+  describe('reorderStatuses', () => {
+    function makeStatusPrisma(existingIds) {
+      return {
+        taskStatus: {
+          findMany: async ({ where }) => existingIds
+            .filter((id) => where.id.in.includes(id))
+            .map((id) => ({ id })),
+        },
+        $transaction: async (arg) => {
+          if (!Array.isArray(arg)) return arg(makeStatusPrisma(existingIds))
+          return Promise.all(arg)
+        },
+      }
+    }
+
+    it('sets position = index for the given order', async () => {
+      const applied = []
+      const prisma = makeStatusPrisma(['s1', 's2', 's3'])
+      prisma.taskStatus.update = async ({ where, data }) => { applied.push({ id: where.id, ...data }); return { id: where.id, ...data } }
+      prisma.taskStatus.findMany = async () => [{ id: 's1' }, { id: 's2' }, { id: 's3' }]
+      const svc = createProjectsService({ prisma })
+      await svc.reorderStatuses('proj-1', ['s3', 's1', 's2'])
+      assert.deepEqual(applied, [
+        { id: 's3', position: 0 },
+        { id: 's1', position: 1 },
+        { id: 's2', position: 2 },
+      ])
+    })
+
+    it('throws 400 when a status does not belong to the project', async () => {
+      const prisma = makeStatusPrisma(['s1', 's2'])
+      prisma.taskStatus.findMany = async () => [{ id: 's1' }]
+      prisma.taskStatus.update = async () => { throw new Error('should not update') }
+      const svc = createProjectsService({ prisma })
+      await assert.rejects(
+        () => svc.reorderStatuses('proj-1', ['s1', 'not-mine']),
+        (err) => { assert.ok(err instanceof ProjectServiceError); assert.equal(err.status, 400); return true }
+      )
+    })
+  })
 })

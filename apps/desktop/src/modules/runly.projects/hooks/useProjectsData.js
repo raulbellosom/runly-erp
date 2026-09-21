@@ -169,6 +169,31 @@ export function useUpdateStatus(projectId) {
   })
 }
 
+export function useReorderStatuses(projectId) {
+  const token = useToken()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (order) => runly.projects.reorderStatuses(projectId, order, token),
+    onMutate: async (order) => {
+      await qc.cancelQueries({ queryKey: ['projects', projectId, 'statuses'] })
+      const snapshot = qc.getQueryData(['projects', projectId, 'statuses'])
+      qc.setQueryData(['projects', projectId, 'statuses'], (old) => {
+        const list = old?.data ?? old
+        if (!Array.isArray(list)) return old
+        const byId = new Map(list.map((s) => [s.id, s]))
+        const reordered = order.map((id, position) => ({ ...byId.get(id), position })).filter(Boolean)
+        return Array.isArray(old) ? reordered : { ...old, data: reordered }
+      })
+      return { snapshot }
+    },
+    onError: (_, __, ctx) => {
+      if (ctx?.snapshot !== undefined) qc.setQueryData(['projects', projectId, 'statuses'], ctx.snapshot)
+      toast.error('No se pudo reordenar las columnas')
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['projects', projectId, 'statuses'] }),
+  })
+}
+
 export function useDeleteStatus(projectId) {
   const token = useToken()
   const qc = useQueryClient()

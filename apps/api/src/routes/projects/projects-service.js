@@ -229,6 +229,25 @@ export function createProjectsService({ prisma }) {
     await prisma.taskStatus.delete({ where: { id: statusId } })
   }
 
+  async function reorderStatuses(projectId, orderedIds) {
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      throw new ProjectServiceError('Se requiere el orden de las columnas.', 400)
+    }
+    const existing = await prisma.taskStatus.findMany({
+      where: { projectId, id: { in: orderedIds } },
+      select: { id: true },
+    })
+    if (existing.length !== orderedIds.length) {
+      throw new ProjectServiceError('Una o mas columnas no pertenecen a este proyecto.', 400)
+    }
+    await prisma.$transaction(
+      orderedIds.map((id, position) =>
+        prisma.taskStatus.update({ where: { id }, data: { position } }),
+      ),
+    )
+    return listStatuses(projectId)
+  }
+
   return {
     listProjects,
     getProject,
@@ -241,5 +260,6 @@ export function createProjectsService({ prisma }) {
     createStatus,
     updateStatus,
     deleteStatus,
+    reorderStatuses,
   }
 }

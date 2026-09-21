@@ -199,3 +199,54 @@ export function getLiveKitComposeProfiles(config) {
   if (config.mode !== "embedded") return [];
   return config.managedTls ? ["livekit", "livekit-tls"] : ["livekit"];
 }
+
+// Only applies to Linux embedded installs, where LiveKit runs with
+// network_mode: host and the API container reaches it through
+// host.docker.internal -> host-gateway. On a VPS with ufw enabled, traffic
+// from the Compose network to that gateway IP is commonly dropped, which
+// surfaces as a connect timeout in the smoke test. This never runs `ufw`
+// itself (that would need root and assumes ufw over firewalld/nftables/none);
+// it only inspects Docker networking to print the exact rule an admin can
+// copy-paste, mirroring the manual fix in docs/DEPLOY_VPS_DEV.md.
+export function buildLiveKitFirewallHint({
+  isLinux, mode, smokeOutput, apiContainer, internalUrl, runCommand,
+}) {
+  if (!isLinux || mode !== "embedded") return null;
+  if (!/timeout|econnrefused|etimedout|fetch failed/i.test(smokeOutput || "")) return null;
+
+  const ufwStatus = runCommand("ufw", ["status"]);
+  if (!ufwStatus.ok || !/status:\s*active/i.test(ufwStatus.output)) return null;
+
+  let port = "7880";
+  try { port = new URL(internalUrl).port || "7880"; } catch { /* keep default */ }
+
+  const networkResult = runCommand("docker", [
+    "inspect", apiContainer, "--format", "{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}",
+  ]);
+  const networkName = networkResult.ok ? networkResult.output.trim().split(/\s+/)[0] : "";
+
+  const subnetResult = networkName
+    ? runCommand("docker", ["network", "inspect", networkName, "--format", "{{(index .IPAM.Config 0).Subnet}}"])
+    : { ok: false, output: "" };
+  const subnet = subnetResult.ok ? subnetResult.output.trim() : "";
+
+  const gatewayResult = runCommand("docker", [
+    "network", "inspect", "bridge", "--format", "{{(index .IPAM.Config 0).Gateway}}",
+  ]);
+  const gateway = gatewayResult.ok ? gatewayResult.output.trim() : "";
+
+  if (!subnet || !gateway) {
+    return (
+      "LiveKit internal connectivity looks blocked by ufw, but Runly could not detect the exact "
+      + `Docker subnet/gateway to suggest a rule (inspect '${apiContainer}' and the 'bridge' network `
+      + `manually). Try something like: sudo ufw allow proto tcp from <api-network-subnet> to `
+      + `<docker-bridge-gateway> port ${port} comment 'Runly API to LiveKit', then re-run this step.`
+    );
+  }
+
+  return (
+    "LiveKit internal connectivity looks blocked by ufw. On the VPS, run:\n"
+    + `  sudo ufw allow proto tcp from ${subnet} to ${gateway} port ${port} comment 'Runly API to LiveKit'\n`
+    + "then re-run this installer step."
+  );
+}

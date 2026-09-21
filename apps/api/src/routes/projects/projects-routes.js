@@ -105,7 +105,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     }
   }
 
-  async function broadcastTaskEvent(projectId, taskId, action) {
+  async function broadcastProjectEvent(projectId, event, payload) {
     if (!broadcaster || !projectId) return
     try {
       const members = await prisma.projectMember.findMany({
@@ -113,12 +113,43 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
         select: { userId: true },
       })
       const memberIds = members.map((m) => m.userId)
-      await broadcaster.broadcastToUsers(memberIds, 'projects.task.updated', {
-        projectId,
-        taskId: taskId ?? null,
-        action,
-      })
+      await broadcaster.broadcastToUsers(memberIds, event, payload)
     } catch {}
+  }
+
+  function broadcastTaskEvent(projectId, taskId, action) {
+    return broadcastProjectEvent(projectId, 'projects.task.updated', {
+      projectId,
+      taskId: taskId ?? null,
+      action,
+    })
+  }
+
+  function broadcastStatusEvent(projectId, statusId, action) {
+    return broadcastProjectEvent(projectId, 'projects.status.updated', {
+      projectId,
+      statusId: statusId ?? null,
+      action,
+    })
+  }
+
+  function broadcastProjectMetaEvent(projectId, action) {
+    return broadcastProjectEvent(projectId, 'projects.project.updated', { projectId, action })
+  }
+
+  function broadcastMemberEvent(projectId, userId, action) {
+    return broadcastProjectEvent(projectId, 'projects.member.updated', {
+      projectId,
+      userId: userId ?? null,
+      action,
+    })
+  }
+
+  function broadcastCalendarSync(c) {
+    if (!broadcaster) return
+    const companyId = getCompanyId(c)
+    if (!companyId) return
+    broadcaster.broadcastToCompany(companyId, 'calendar.event.updated', { action: 'projects_sync' }).catch(() => {})
   }
 
   // --- Projects ---
@@ -134,6 +165,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       const body = await c.req.json()
       const project = await projectsSvc.createProject(getCompanyId(c), getUserId(c), body)
       await bridge.syncProjectCalendar(project)
+      broadcastCalendarSync(c)
       return c.json(project, 201)
     } catch (err) { return handleError(c, err, 'Error al crear proyecto.') }
   })
@@ -147,16 +179,21 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
 
   app.patch('/projects/:id', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
+      const projectId = c.req.param('id')
       const body = await c.req.json()
-      const project = await projectsSvc.updateProject(c.req.param('id'), getUserId(c), body)
+      const project = await projectsSvc.updateProject(projectId, getUserId(c), body)
       await bridge.syncProjectCalendar(project)
+      broadcastCalendarSync(c)
+      broadcastProjectMetaEvent(projectId, 'updated')
       return c.json(project)
     } catch (err) { return handleError(c, err, 'Error al actualizar proyecto.') }
   })
 
   app.delete('/projects/:id', requirePermission('projects.project.delete'), requireProjectAccess('OWNER'), async (c) => {
     try {
-      const project = await projectsSvc.archiveProject(c.req.param('id'), getUserId(c))
+      const projectId = c.req.param('id')
+      const project = await projectsSvc.archiveProject(projectId, getUserId(c))
+      broadcastProjectMetaEvent(projectId, 'archived')
       return c.json(project)
     } catch (err) { return handleError(c, err, 'Error al archivar proyecto.') }
   })
@@ -170,6 +207,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
           await bridge.grantMemberCalendarAccess(calendarId, m.userId)
         }
       }
+      broadcastCalendarSync(c)
       return c.json({ calendarId, calendarLinked: Boolean(calendarId) })
     } catch (err) { return handleError(c, err, 'Error al sincronizar calendario del proyecto.') }
   })
@@ -190,6 +228,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       const project = await prisma.project.findFirst({ where: { id: projectId } })
       if (project?.calendarId) await bridge.grantMemberCalendarAccess(project.calendarId, body.userId)
       await notifSvc.notifyMemberAdded({ companyId: getCompanyId(c), actorId: getUserId(c), projectId, addedUserId: body.userId })
+      broadcastMemberEvent(projectId, body.userId, 'added')
       return c.json(member, 201)
     } catch (err) { return handleError(c, err, 'Error al agregar miembro.') }
   })
@@ -203,6 +242,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
         where: { projectId_userId: { projectId, userId } },
         data: { role },
       })
+      broadcastMemberEvent(projectId, userId, 'role_changed')
       return c.json(member)
     } catch (err) { return handleError(c, err, 'Error al actualizar miembro.') }
   })
@@ -214,6 +254,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       await projectsSvc.removeMember(projectId, getUserId(c), userId)
       const project = await prisma.project.findFirst({ where: { id: projectId } })
       if (project?.calendarId) await bridge.revokeMemberCalendarAccess(project.calendarId, userId)
+      broadcastMemberEvent(projectId, userId, 'removed')
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al remover miembro.') }
   })
@@ -228,21 +269,40 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
 
   app.post('/projects/:id/statuses', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
-      const status = await projectsSvc.createStatus(c.req.param('id'), await c.req.json())
+      const projectId = c.req.param('id')
+      const status = await projectsSvc.createStatus(projectId, await c.req.json())
+      broadcastStatusEvent(projectId, status.id, 'created')
       return c.json(status, 201)
     } catch (err) { return handleError(c, err, 'Error al crear estado.') }
   })
 
+  // Must be registered before /statuses/:sid so "reorder" isn't matched as a status id.
+  app.patch('/projects/:id/statuses/reorder', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
+    try {
+      const projectId = c.req.param('id')
+      const { order } = await c.req.json()
+      const statuses = await projectsSvc.reorderStatuses(projectId, order)
+      broadcastStatusEvent(projectId, null, 'reordered')
+      return c.json(statuses)
+    } catch (err) { return handleError(c, err, 'Error al reordenar columnas.') }
+  })
+
   app.patch('/projects/:id/statuses/:sid', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
-      const status = await projectsSvc.updateStatus(c.req.param('sid'), await c.req.json())
+      const projectId = c.req.param('id')
+      const statusId = c.req.param('sid')
+      const status = await projectsSvc.updateStatus(statusId, await c.req.json())
+      broadcastStatusEvent(projectId, statusId, 'updated')
       return c.json(status)
     } catch (err) { return handleError(c, err, 'Error al actualizar estado.') }
   })
 
   app.delete('/projects/:id/statuses/:sid', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
-      await projectsSvc.deleteStatus(c.req.param('sid'))
+      const projectId = c.req.param('id')
+      const statusId = c.req.param('sid')
+      await projectsSvc.deleteStatus(statusId)
+      broadcastStatusEvent(projectId, statusId, 'deleted')
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar estado.') }
   })
@@ -273,6 +333,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       if (task.dueDate) {
         const project = await prisma.project.findFirst({ where: { id: task.projectId } })
         await bridge.syncTaskEvent(task, project?.calendarId)
+        broadcastCalendarSync(c)
       }
       broadcastTaskEvent(task.projectId, task.id, 'created')
       return c.json(task, 201)
@@ -320,6 +381,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
       if (body.dueDate !== undefined) {
         const project = await prisma.project.findFirst({ where: { id: task.projectId } })
         await bridge.syncTaskEvent(task, project?.calendarId)
+        broadcastCalendarSync(c)
       }
       if (body.statusId && oldStatusId && oldStatusId !== body.statusId) {
         await notifSvc.notifyTaskStatusChanged({
@@ -351,7 +413,10 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.delete('/projects/:id/tasks/:tid', requirePermission('projects.task.delete'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       const task = await tasksSvc.deleteTask(c.req.param('tid'))
-      if (task.calendarEventId) await bridge.deleteTaskEvent(task.calendarEventId)
+      if (task.calendarEventId) {
+        await bridge.deleteTaskEvent(task.calendarEventId)
+        broadcastCalendarSync(c)
+      }
       broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'deleted')
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar tarea.') }
@@ -442,6 +507,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
         mentionedUserIds: mentionedIds,
         commentId: comment.id,
       })
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'comment_added')
       return c.json(comment, 201)
     } catch (err) { return handleError(c, err, 'Error al crear comentario.') }
   })
@@ -450,6 +516,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     try {
       const { body } = await c.req.json()
       const comment = await commentsSvc.updateComment(c.req.param('cid'), c.get('authUserId'), body, getCompanyId(c), c.req.param('tid'))
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'comment_updated')
       return c.json(comment)
     } catch (err) { return handleError(c, err, 'Error al editar comentario.') }
   })
@@ -457,6 +524,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.delete('/projects/:id/tasks/:tid/comments/:cid', requirePermission('projects.task.update'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       await commentsSvc.deleteComment(c.req.param('cid'), c.get('authUserId'), getCompanyId(c), c.req.param('tid'))
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'comment_deleted')
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar comentario.') }
   })
@@ -473,6 +541,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
           commentId,
         })
       }
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'reaction_updated')
       return c.json(result)
     } catch (err) { return handleError(c, err, 'Error al actualizar reaccion.') }
   })
@@ -544,6 +613,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     try {
       const { blockerId } = await c.req.json()
       const dep = await depsSvc.addDependency(c.req.param('tid'), blockerId, c.req.param('id'))
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'dependency_added')
       return c.json(dep, 201)
     } catch (err) { return handleError(c, err, 'Error al agregar dependencia.') }
   })
@@ -551,6 +621,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.delete('/projects/:id/tasks/:tid/dependencies/:depId', requirePermission('projects.task.update'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       await depsSvc.removeDependency(c.req.param('depId'), c.req.param('tid'))
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'dependency_removed')
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar dependencia.') }
   })
@@ -564,22 +635,29 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
 
   app.post('/projects/:id/fields', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
+      const projectId = c.req.param('id')
       const body = await c.req.json()
-      const field = await fieldsSvc.createField(c.req.param('id'), body)
+      const field = await fieldsSvc.createField(projectId, body)
+      broadcastProjectEvent(projectId, 'projects.fields.updated', { projectId, action: 'created' })
       return c.json(field, 201)
     } catch (err) { return handleError(c, err, 'Error al crear campo.') }
   })
 
   app.patch('/projects/:id/fields/:fid', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
+      const projectId = c.req.param('id')
       const body = await c.req.json()
-      return c.json(await fieldsSvc.updateField(c.req.param('fid'), c.req.param('id'), body))
+      const field = await fieldsSvc.updateField(c.req.param('fid'), projectId, body)
+      broadcastProjectEvent(projectId, 'projects.fields.updated', { projectId, action: 'updated' })
+      return c.json(field)
     } catch (err) { return handleError(c, err, 'Error al actualizar campo.') }
   })
 
   app.delete('/projects/:id/fields/:fid', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
-      await fieldsSvc.deleteField(c.req.param('fid'), c.req.param('id'))
+      const projectId = c.req.param('id')
+      await fieldsSvc.deleteField(c.req.param('fid'), projectId)
+      broadcastProjectEvent(projectId, 'projects.fields.updated', { projectId, action: 'deleted' })
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar campo.') }
   })
@@ -594,7 +672,9 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.put('/projects/:id/tasks/:tid/field-values', requirePermission('projects.task.update'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       const entries = await c.req.json()
-      return c.json(await fieldsSvc.upsertFieldValues(c.req.param('tid'), c.req.param('id'), entries))
+      const result = await fieldsSvc.upsertFieldValues(c.req.param('tid'), c.req.param('id'), entries)
+      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'field_values_updated')
+      return c.json(result)
     } catch (err) { return handleError(c, err, 'Error al guardar valores de campos.') }
   })
 

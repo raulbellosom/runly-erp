@@ -1984,6 +1984,15 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           `/projects/${encodeURIComponent(projectId)}/statuses/${encodeURIComponent(statusId)}`,
           { method: "DELETE", headers: withAuthHeaders(token) },
         ),
+      reorderStatuses: (projectId, order, token) =>
+        request(
+          `/projects/${encodeURIComponent(projectId)}/statuses/reorder`,
+          {
+            method: "PATCH",
+            headers: withAuthHeaders(token),
+            body: JSON.stringify({ order }),
+          },
+        ),
       listTasks: (projectId, query, token) =>
         request(
           `/projects/${encodeURIComponent(projectId)}/tasks${toQueryString(query)}`,

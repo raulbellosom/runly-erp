@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
   Button, TextField, SelectField, MarkdownField, ConfirmDialog,
+  Popover, PopoverTrigger, PopoverContent,
 } from '@runly/ui'
-import { CalendarCheck, CalendarX, RefreshCw } from 'lucide-react'
+import { CalendarCheck, CalendarX, RefreshCw, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCreateProject, useUpdateProject, useArchiveProject, useProject, useSyncProjectCalendar } from '../hooks/useProjectsData'
 import { PROJECT_ICONS, getProjectIcon } from '../lib/projectIcons.js'
@@ -36,6 +37,7 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
   const [icon, setIcon] = useState('FolderKanban')
   const [template, setTemplate] = useState('general')
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
 
   const calendarLinked = projectDetail?.calendarLinked ?? (project?.calendarId != null)
 
@@ -98,21 +100,21 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg">
+      <DialogContent size="lg" scrollable>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar proyecto' : 'Nuevo proyecto'}</DialogTitle>
           <DialogDescription className="sr-only">
             {isEdit ? 'Editar los datos del proyecto' : 'Crear un nuevo proyecto'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto overscroll-contain space-y-5 pr-1 -mr-1">
           {/* Preview badge + Name */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-end gap-3">
             <span
-              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
               style={{ background: color }}
             >
-              <SelectedIcon size={20} className="text-white" />
+              <SelectedIcon size={22} className="text-white" />
             </span>
             <TextField
               label="Nombre"
@@ -120,7 +122,8 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
               onChange={(e) => setName(e.target.value)}
               placeholder="Nombre del proyecto"
               required
-              className="flex-1"
+              autoFocus
+              className="flex-1 h-12 text-base"
             />
           </div>
 
@@ -152,27 +155,46 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">
               Icono
             </label>
-            <div className="grid grid-cols-9 gap-1 max-h-52 overflow-y-auto rounded-lg border border-border p-1.5">
-              {PROJECT_ICONS.map(({ name: iName, Icon: Ic }) => (
+            <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+              <PopoverTrigger asChild>
                 <button
-                  key={iName}
                   type="button"
-                  onClick={() => setIcon(iName)}
-                  title={iName}
-                  className="w-10 h-10 rounded-lg flex items-center justify-center transition-all focus-visible:outline-none"
-                  style={
-                    icon === iName
-                      ? { backgroundColor: color + '22', color }
-                      : {}
-                  }
+                  className="w-full flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:border-foreground/30 transition-colors"
                 >
-                  <Ic
-                    size={17}
-                    className={icon === iName ? '' : 'text-muted-foreground hover:text-foreground'}
-                  />
+                  <span
+                    className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: color + '22', color }}
+                  >
+                    <SelectedIcon size={15} />
+                  </span>
+                  <span className="flex-1 text-left text-muted-foreground">Cambiar icono</span>
+                  <ChevronDown size={14} className="text-muted-foreground shrink-0" />
                 </button>
-              ))}
-            </div>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto p-1.5">
+                <div className="grid grid-cols-9 gap-1 max-h-52 overflow-y-auto">
+                  {PROJECT_ICONS.map(({ name: iName, Icon: Ic }) => (
+                    <button
+                      key={iName}
+                      type="button"
+                      onClick={() => { setIcon(iName); setIconPickerOpen(false) }}
+                      title={iName}
+                      className="w-10 h-10 rounded-lg flex items-center justify-center transition-all focus-visible:outline-none"
+                      style={
+                        icon === iName
+                          ? { backgroundColor: color + '22', color }
+                          : {}
+                      }
+                    >
+                      <Ic
+                        size={17}
+                        className={icon === iName ? '' : 'text-muted-foreground hover:text-foreground'}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <MarkdownField

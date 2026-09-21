@@ -24,6 +24,7 @@ import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
+  buildLiveKitFirewallHint,
   getLiveKitComposeProfiles,
   normalizeLiveKitDomain,
   renderLiveKitConfig,
@@ -530,11 +531,12 @@ async function validateLiveKitRuntime(config) {
     console.log("  Redis: PONG");
   }
 
+  const apiContainer = `${containerPrefix}-api-external`;
   let smokeResult = { ok: false, output: "API container is not ready." };
   for (let attempt = 1; attempt <= 24; attempt += 1) {
     smokeResult = tryCapture("docker", [
       "exec",
-      `${containerPrefix}-api-external`,
+      apiContainer,
       "node",
       "apps/api/src/scripts/livekit-smoke.js",
     ]);
@@ -542,7 +544,18 @@ async function validateLiveKitRuntime(config) {
     await new Promise((resolve) => setTimeout(resolve, 5_000));
   }
   if (!smokeResult.ok) {
-    throw new Error(`API-to-LiveKit smoke test failed: ${smokeResult.output}`);
+    const firewallHint = buildLiveKitFirewallHint({
+      isLinux,
+      mode: config.mode,
+      smokeOutput: smokeResult.output,
+      apiContainer,
+      internalUrl: config.internalUrl,
+      runCommand: tryCapture,
+    });
+    throw new Error(
+      `API-to-LiveKit smoke test failed: ${smokeResult.output}`
+      + (firewallHint ? `\n\n${firewallHint}` : ""),
+    );
   }
   console.log("  API -> LiveKit: temporary room created and deleted");
 

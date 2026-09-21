@@ -419,7 +419,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
         <SheetContent
           className="w-full flex flex-col gap-0 p-0"
           style={{
-            maxWidth: "860px",
+            maxWidth: "min(1200px, 95vw)",
             backdropFilter: "none",
             WebkitBackdropFilter: "none",
             background: "hsl(var(--background))",

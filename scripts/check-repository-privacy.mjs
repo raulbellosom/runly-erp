@@ -35,6 +35,9 @@ export function inspectFile(file, content) {
       if (/^(?:127\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)/.test(ip) || ip === '0.0.0.0' || ip === '10.0.2.2') continue
       // This test specifically verifies rejection of public IPs and acceptance of LAN hosts.
       if (file === 'apps/desktop/src/native/__tests__/native-host.test.js' && ['8.8.' + '8.8', '192.168.' + '1.5'].includes(ip)) continue
+      // Docker image tags (e.g. `supabase/postgres:17.6.1.136`) share the dotted-quad
+      // shape of an IPv4 address; a letter-led `name:` immediately before rules those out.
+      if (/[a-z][\w./-]*:$/i.test(addressText.slice(0, match.index))) continue
       add(number, 'non-example-ipv4')
     }
     for (const match of line.matchAll(/\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\b/gi)) {

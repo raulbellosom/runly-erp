@@ -13,8 +13,13 @@ import {
   SlidersHorizontal,
   Download,
   MessageSquare,
+  MoreVertical,
+  Pencil,
 } from "lucide-react";
-import { Button, Badge, EmptyState, ErrorState, LoadingState } from "@runly/ui";
+import {
+  Button, Badge, EmptyState, ErrorState, LoadingState,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from "@runly/ui";
 import { useProjects, useWorkspaceUsers } from "../hooks/useProjectsData";
 import { useProjectRealtime } from "../hooks/useProjectRealtime";
 import { runly } from "../../../lib/runly";
@@ -147,6 +152,7 @@ export default function ProjectsScreen() {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["project-linked-channel", effectiveId] });
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
       const conversationId = res?.data?.id;
       if (conversationId) navigate(`/app/m/runly.chat/chat/inbox/${conversationId}`);
     },
@@ -402,6 +408,46 @@ export default function ProjectsScreen() {
                 >
                   Editar
                 </Button>
+
+                {/* Mobile: actions hidden above on desktop collapse into this menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="sm:hidden" title="Mas acciones">
+                      <MoreVertical size={15} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setEditingProject(selectedProject);
+                        setProjectFormOpen(true);
+                      }}
+                    >
+                      <Pencil size={14} className="mr-2" />
+                      Editar proyecto
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setStatusEditorOpen(true)}>
+                      <Settings2 size={14} className="mr-2" />
+                      Gestionar columnas
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setFieldsSheetOpen(true)}>
+                      <SlidersHorizontal size={14} className="mr-2" />
+                      Campos personalizados
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleExport}>
+                      <Download size={14} className="mr-2" />
+                      Exportar CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={handleChatChannelClick}
+                      disabled={createChannelMutation.isPending || linkedChannelQuery.isLoading}
+                    >
+                      <MessageSquare size={14} className="mr-2" />
+                      {linkedChannelQuery.data?.id ? "Ir al canal" : "Crear canal de chat"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {/* View switcher */}
                 <div className="flex gap-0.5 border border-border rounded-md p-0.5">

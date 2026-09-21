@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  buildLiveKitFirewallHint,
   getLiveKitComposeProfiles,
   renderManagedCaddyfile,
   resolveLiveKitConfig,
@@ -191,5 +192,89 @@ describe("LiveKit installer contract", () => {
       renderManagedCaddyfile({ domain: "rtc.example.com", isLinux: false }),
       /reverse_proxy livekit:7880/,
     );
+  });
+});
+
+describe("LiveKit firewall hint", () => {
+  function fakeRunCommand({ ufwActive = true, networkName = "runly_default", subnet = "192.0.2.0/24", gateway = "192.0.2.1" } = {}) {
+    return (command, args) => {
+      if (command === "ufw" && args[0] === "status") {
+        return { ok: true, output: ufwActive ? "Status: active" : "Status: inactive" };
+      }
+      if (command === "docker" && args[0] === "inspect") {
+        return { ok: true, output: `${networkName} ` };
+      }
+      if (command === "docker" && args[0] === "network" && args[2] === "bridge") {
+        return { ok: true, output: gateway };
+      }
+      if (command === "docker" && args[0] === "network") {
+        return { ok: true, output: subnet };
+      }
+      return { ok: false, output: "" };
+    };
+  }
+
+  it("suggests the exact ufw rule when ufw is active and the smoke test timed out", () => {
+    const hint = buildLiveKitFirewallHint({
+      isLinux: true,
+      mode: "embedded",
+      smokeOutput: "TimeoutError: The operation was aborted due to timeout",
+      apiContainer: "runly-abc-api-local",
+      internalUrl: "http://host.docker.internal:7880",
+      runCommand: fakeRunCommand(),
+    });
+
+    assert.match(hint, /sudo ufw allow proto tcp from 192\.0\.2\.0\/24 to 192\.0\.2\.1 port 7880/);
+  });
+
+  it("returns null when ufw is not active", () => {
+    const hint = buildLiveKitFirewallHint({
+      isLinux: true,
+      mode: "embedded",
+      smokeOutput: "TimeoutError",
+      apiContainer: "runly-abc-api-local",
+      internalUrl: "http://host.docker.internal:7880",
+      runCommand: fakeRunCommand({ ufwActive: false }),
+    });
+
+    assert.equal(hint, null);
+  });
+
+  it("returns null on non-Linux or non-embedded installs", () => {
+    assert.equal(
+      buildLiveKitFirewallHint({
+        isLinux: false,
+        mode: "embedded",
+        smokeOutput: "TimeoutError",
+        apiContainer: "runly-abc-api-local",
+        internalUrl: "http://host.docker.internal:7880",
+        runCommand: fakeRunCommand(),
+      }),
+      null,
+    );
+    assert.equal(
+      buildLiveKitFirewallHint({
+        isLinux: true,
+        mode: "external",
+        smokeOutput: "TimeoutError",
+        apiContainer: "runly-abc-api-local",
+        internalUrl: "http://host.docker.internal:7880",
+        runCommand: fakeRunCommand(),
+      }),
+      null,
+    );
+  });
+
+  it("returns null when the failure is unrelated to connectivity", () => {
+    const hint = buildLiveKitFirewallHint({
+      isLinux: true,
+      mode: "embedded",
+      smokeOutput: "LIVEKIT_API_KEY is required.",
+      apiContainer: "runly-abc-api-local",
+      internalUrl: "http://host.docker.internal:7880",
+      runCommand: fakeRunCommand(),
+    });
+
+    assert.equal(hint, null);
   });
 });

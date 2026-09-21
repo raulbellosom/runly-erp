@@ -143,6 +143,18 @@ export function RealtimeProvider({ children }) {
       .on('broadcast', { event: 'projects.task.updated' }, ({ payload }) => {
         dispatch('projects.task.updated', payload)
       })
+      .on('broadcast', { event: 'projects.status.updated' }, ({ payload }) => {
+        dispatch('projects.status.updated', payload)
+      })
+      .on('broadcast', { event: 'projects.project.updated' }, ({ payload }) => {
+        dispatch('projects.project.updated', payload)
+      })
+      .on('broadcast', { event: 'projects.member.updated' }, ({ payload }) => {
+        dispatch('projects.member.updated', payload)
+      })
+      .on('broadcast', { event: 'projects.fields.updated' }, ({ payload }) => {
+        dispatch('projects.fields.updated', payload)
+      })
       .on('broadcast', { event: 'notes.note.updated' }, ({ payload }) => {
         // Note metadata (cover, icon, background, title, folder) — the body
         // itself syncs over the note's own Y.js channel. Refetch so the open
