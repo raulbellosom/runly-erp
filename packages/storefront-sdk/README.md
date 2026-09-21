@@ -31,14 +31,14 @@ pnpm add @raulbellosom/runly-sdk
 13. [Common patterns for module-specific data](#13-common-patterns-for-module-specific-data)
 14. [Environment variables for Vite projects](#14-environment-variables-for-vite-projects)
 15. [Roles system](#15-roles-system)
-16. [Deploying to Atlas Website (source\_type=dist)](#16-deploying-to-atlas-website-source_typedist)
+16. [Deploying to Runly Website (source\_type=dist)](#16-deploying-to-runly-website-source_typedist)
 17. [sdk.guestChat — guest live chat](#17-sdkguestchat--guest-live-chat)
 
 ---
 
 ## Glossary
 
-**Company slug** — a short identifier string (e.g. `"acme"`) that tells the API which tenant you are operating on. The platform admin provides this value. Every request sends it as the `X-Atlas-Company` header automatically.
+**Company slug** — a short identifier string (e.g. `"acme"`) that tells the API which tenant you are operating on. The platform admin provides this value. Every request sends it as the `X-Runly-Company` header automatically.
 
 **Blueprint** — a JSON schema object that describes a data entity installed in the ERP (its fields, relations, and display metadata). Blueprints are how you discover which modules and data types are available on a given ERP instance.
 
@@ -53,8 +53,8 @@ pnpm add @raulbellosom/runly-sdk
 ```js
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 
-// Read from window.ATLAS_CONFIG (injected by Atlas Website) or env vars for local dev.
-const cfg = (typeof window !== 'undefined' && window.ATLAS_CONFIG) ? window.ATLAS_CONFIG : {}
+// Read from window.RUNLY_CONFIG (injected by Runly Website) or env vars for local dev.
+const cfg = (typeof window !== 'undefined' && window.RUNLY_CONFIG) ? window.RUNLY_CONFIG : {}
 
 const sdk = createStorefrontClient({
   baseUrl:         cfg.apiUrl         ?? 'https://erp.tudominio.mx',
@@ -64,7 +64,7 @@ const sdk = createStorefrontClient({
 })
 
 // Log in — Supabase stores the session in localStorage automatically.
-// The same session is shared with Atlas ERP.
+// The same session is shared with Runly ERP.
 const { user, token } = await sdk.auth.login({
   email: 'cliente@ejemplo.mx',
   password: 'contraseña123',
@@ -99,7 +99,7 @@ import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 import { StorefrontProvider } from '@raulbellosom/runly-sdk/react'
 import App from './App.jsx'
 
-const cfg = (typeof window !== 'undefined' && window.ATLAS_CONFIG) ? window.ATLAS_CONFIG : {}
+const cfg = (typeof window !== 'undefined' && window.RUNLY_CONFIG) ? window.RUNLY_CONFIG : {}
 
 const sdk = createStorefrontClient({
   baseUrl:         cfg.apiUrl         ?? import.meta.env.VITE_ERP_URL,
@@ -208,10 +208,10 @@ export function ProductList() {
 | Option | Type | Required | Description | Example |
 |---|---|---|---|---|
 | `baseUrl` | `string` | Yes | Full URL of the ERP instance, no trailing slash | `'https://erp.tudominio.mx'` |
-| `company` | `string` | Yes | Company slug assigned by the platform admin. Sent as `X-Atlas-Company` on every request | `'tu-empresa'` |
-| `siteId` | `string` | No | Website site UUID for analytics and forms. In Atlas Website it is inferred from `window.ATLAS_CONFIG.siteId` | `'019...'` |
-| `supabaseUrl` | `string` | Yes | Supabase project URL. Available in `window.ATLAS_CONFIG.supabaseUrl` for Atlas Website dists | `'https://supabase.tudominio.mx'` |
-| `supabaseAnonKey` | `string` | Yes | Supabase anon key. Available in `window.ATLAS_CONFIG.supabaseAnonKey` | `'eyJ...'` |
+| `company` | `string` | Yes | Company slug assigned by the platform admin. Sent as `X-Runly-Company` on every request | `'tu-empresa'` |
+| `siteId` | `string` | No | Website site UUID for analytics and forms. In Runly Website it is inferred from `window.RUNLY_CONFIG.siteId` | `'019...'` |
+| `supabaseUrl` | `string` | Yes | Supabase project URL. Available in `window.RUNLY_CONFIG.supabaseUrl` for Runly Website dists | `'https://supabase.tudominio.mx'` |
+| `supabaseAnonKey` | `string` | Yes | Supabase anon key. Available in `window.RUNLY_CONFIG.supabaseAnonKey` | `'eyJ...'` |
 | `onSessionChange` | `function(session \| null)` | No | Called on every auth state change. Session is persisted by Supabase automatically — this is optional and mainly useful for debugging or syncing external state | `(s) => console.log('session:', s)` |
 
 The function throws a plain `Error` (not a `StorefrontError`) synchronously if `baseUrl`, `company`, `supabaseUrl`, or `supabaseAnonKey` is missing.
@@ -355,7 +355,7 @@ try {
 const profile = await sdk.auth.me()
 console.log('Perfil:', profile.email, profile.role)
 if (profile.hasErpAccess) {
-  window.location.href = window.ATLAS_CONFIG?.apiUrl ?? '/'
+  window.location.href = window.RUNLY_CONFIG?.apiUrl ?? '/'
 }
 ```
 
@@ -681,7 +681,7 @@ The discovery namespace lets you query which modules (features) are installed an
 
 **Caching:** All results are cached in memory for 30 seconds. Concurrent calls while a fetch is in-flight share a single promise — the network request is made only once. The cache resets on client instantiation.
 
-**Quick discovery via `GET /public`:** Any running Atlas ERP instance exposes a meta-endpoint at `GET /public` (no auth required) that lists every available public endpoint with its method, path, auth requirement, and description. This is the fastest way for a developer, tool, or AI agent to discover what the instance supports without reading documentation:
+**Quick discovery via `GET /public`:** Any running Runly ERP instance exposes a meta-endpoint at `GET /public` (no auth required) that lists every available public endpoint with its method, path, auth requirement, and description. This is the fastest way for a developer, tool, or AI agent to discover what the instance supports without reading documentation:
 
 ```bash
 curl https://erp.tudominio.mx/public
@@ -689,7 +689,7 @@ curl https://erp.tudominio.mx/public
 
 **What is a blueprint?** A blueprint is a JSON schema object describing a data view registered by an installed ERP module (e.g. a custom screen component, a public entity view). Each blueprint has at minimum: `{ key, moduleKey, kind, schema }`.
 
-**What is a module?** A module is an installable ERP feature (e.g. `atlas.catalog`, `custom.bookings`). The `modules()` method returns the list of modules currently installed and enabled on the running instance, including their navigation structure and what they expose publicly.
+**What is a module?** A module is an installable ERP feature (e.g. `runly.catalog`, `custom.bookings`). The `modules()` method returns the list of modules currently installed and enabled on the running instance, including their navigation structure and what they expose publicly.
 
 ---
 
@@ -705,7 +705,7 @@ Each module object:
 
 | Field | Type | Description |
 |---|---|---|
-| `key` | `string` | Unique module identifier, e.g. `'atlas.catalog'`, `'custom.bookings'` |
+| `key` | `string` | Unique module identifier, e.g. `'runly.catalog'`, `'custom.bookings'` |
 | `name` | `string` | Human-readable module name |
 | `version` | `string` | Installed version string |
 | `kind` | `string` | Module kind: `'CORE'`, `'FEATURE'`, or `'CUSTOM'` |
@@ -762,14 +762,14 @@ console.log('Vistas de reservaciones:', bookingViews.map(bp => bp.key))
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `moduleKey` | `string` | Yes | The module identifier, e.g. `'custom.bookings'`, `'atlas.catalog'` |
+| `moduleKey` | `string` | Yes | The module identifier, e.g. `'custom.bookings'`, `'runly.catalog'` |
 
 **Returns:** `Promise<boolean>`
 
 **Example:**
 
 ```js
-const hasCatalog = await sdk.discovery.hasModule('atlas.catalog')
+const hasCatalog = await sdk.discovery.hasModule('runly.catalog')
 if (!hasCatalog) {
   console.warn('El modulo de catalogo no esta disponible en este servidor')
 }
@@ -779,7 +779,7 @@ if (!hasCatalog) {
 
 ### `sdk.discovery.introspect()`
 
-**Description:** Fetches modules and blueprints in parallel and returns a unified schema object. This is the primary method for an external project or AI agent to build a complete picture of what an Atlas ERP instance supports — which modules are active, what they expose, and what views they declare.
+**Description:** Fetches modules and blueprints in parallel and returns a unified schema object. This is the primary method for an external project or AI agent to build a complete picture of what a Runly ERP instance supports — which modules are active, what they expose, and what views they declare.
 
 **Parameters:** None
 
@@ -800,7 +800,7 @@ console.log(`Modulos activos: ${modules.length}`)
 console.log(`Vistas publicas: ${blueprints.length}`)
 
 // Access a specific module and all its views
-const catalog = byModuleKey['atlas.catalog']
+const catalog = byModuleKey['runly.catalog']
 if (catalog) {
   console.log(`Catalogo v${catalog.version}, vistas: ${catalog.blueprints.length}`)
   console.log('Navegacion:', catalog.navigation.map(n => n.label))
@@ -822,8 +822,8 @@ const schema = await sdk.discovery.introspect()
 if (schema.byModuleKey['custom.reservations']) {
   loadReservationsModule(schema.byModuleKey['custom.reservations'])
 }
-if (schema.byModuleKey['atlas.catalog']) {
-  loadCatalogModule(schema.byModuleKey['atlas.catalog'])
+if (schema.byModuleKey['runly.catalog']) {
+  loadCatalogModule(schema.byModuleKey['runly.catalog'])
 }
 ```
 
@@ -911,7 +911,7 @@ async function shutdown() {
 
 The method automatically:
 - Attaches the `Authorization: Bearer <token>` header from the current session
-- Attaches the `X-Atlas-Company` header
+- Attaches the `X-Runly-Company` header
 - Retries once with a refreshed token on 401 responses
 - Throws `StorefrontError` on non-2xx responses
 
@@ -982,7 +982,7 @@ import { StorefrontError } from '@raulbellosom/runly-sdk'
 | `FORBIDDEN` | 403 | Authenticated but not allowed | Trying to delete someone else's file, accessing an admin-only endpoint |
 | `NOT_FOUND` | 404 | Resource does not exist | `getProduct` with a non-existent ID, `getUrl` with an unknown file ID |
 | `VALIDATION_ERROR` | 422 | Request body failed server-side validation | Missing required fields, invalid email format, file type not allowed |
-| `MODULE_NOT_AVAILABLE` | — | Module required for this operation is not installed | Calling catalog endpoints when `atlas.catalog` is not installed |
+| `MODULE_NOT_AVAILABLE` | — | Module required for this operation is not installed | Calling catalog endpoints when `runly.catalog` is not installed |
 | `NETWORK_ERROR` | 0 | Could not reach the server at all | No internet connection, DNS failure, server down |
 | `UNKNOWN` | varies | Any other non-2xx response | Server errors (500), conflicts (409), rate limiting (429) |
 
@@ -1836,15 +1836,15 @@ export const sdk = createStorefrontClient({
 })
 ```
 
-### Pattern B — deployed as Atlas Website dist (runtime config)
+### Pattern B — deployed as Runly Website dist (runtime config)
 
-If you upload your built dist to Atlas Website (`source_type=dist`), Atlas automatically injects `window.ATLAS_CONFIG` into every HTML response at serve time. No `.env` file or hardcoded URLs needed — the config adapts to whichever Atlas instance is serving the site.
+If you upload your built dist to Runly Website (`source_type=dist`), Runly automatically injects `window.RUNLY_CONFIG` into every HTML response at serve time. No `.env` file or hardcoded URLs needed — the config adapts to whichever Runly ERP instance is serving the site.
 
 ```js
 // src/sdk.js
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 
-const cfg = (typeof window !== 'undefined' && window.ATLAS_CONFIG) ? window.ATLAS_CONFIG : {}
+const cfg = (typeof window !== 'undefined' && window.RUNLY_CONFIG) ? window.RUNLY_CONFIG : {}
 
 export const sdk = createStorefrontClient({
   baseUrl:         cfg.apiUrl         ?? import.meta.env.VITE_ERP_URL         ?? '',
@@ -1854,13 +1854,13 @@ export const sdk = createStorefrontClient({
 })
 ```
 
-Fields available in `window.ATLAS_CONFIG`:
+Fields available in `window.RUNLY_CONFIG`:
 
 | Field | Description |
 |---|---|
-| `apiUrl` | Full URL of the Atlas ERP server — pass as `baseUrl` |
+| `apiUrl` | Full URL of the Runly ERP server — pass as `baseUrl` |
 | `company` | Company slug — pass as `company` |
-| `siteName` | Display name of the site configured in Atlas |
+| `siteName` | Display name of the site configured in Runly |
 | `siteId` | Website site UUID used by analytics and forms |
 | `analyticsMode` | `off`, `anonymous`, or `consent_required` |
 | `turnstileSiteKey` | Public Cloudflare Turnstile site key, when configured |
@@ -1870,7 +1870,7 @@ Fields available in `window.ATLAS_CONFIG`:
 | `supabaseAnonKey` | Supabase anon key (advanced) |
 | `storageKey` | localStorage key for the ERP session (advanced) |
 
-The two-fallback pattern (`cfg.apiUrl ?? import.meta.env.VITE_ERP_URL`) lets the same `src/sdk.js` work in both local development (env vars) and in production as an Atlas dist (injected config).
+The two-fallback pattern (`cfg.apiUrl ?? import.meta.env.VITE_ERP_URL`) lets the same `src/sdk.js` work in both local development (env vars) and in production as a Runly dist (injected config).
 
 Then import the singleton wherever needed:
 
@@ -1893,7 +1893,7 @@ Public endpoints:
 - `GET /public/storefront/v1/forms/:formId`
 - `POST /public/storefront/v1/forms/:formId/submissions`
 
-Requests use `X-Atlas-Company` and optional `X-Atlas-Site`. Event batches accept at most 50 events and 64 KB.
+Requests use `X-Runly-Company` and optional `X-Runly-Site`. Event batches accept at most 50 events and 64 KB.
 
 ### Analytics
 
@@ -1916,9 +1916,9 @@ Available methods: `start`, `page`, `track`, `setConsent`, `getConsent`, `flush`
 
 ```html
 <button
-  data-atlas-event="pricing_cta"
-  data-atlas-label="Plan profesional"
-  data-atlas-placement="hero"
+  data-runly-event="pricing_cta"
+  data-runly-label="Plan profesional"
+  data-runly-placement="hero"
 >
   Cotizar
 </button>
@@ -1982,8 +1982,8 @@ Plain HTML can use the automatically loaded IIFE:
 ```html
 <div id="contact-form"></div>
 <script>
-  window.AtlasERP.analytics.setConsent('granted')
-  window.AtlasERP.renderForm('#contact-form', {
+  window.RunlyERP.analytics.setConsent('granted')
+  window.RunlyERP.renderForm('#contact-form', {
     formId: '01900000-0000-7000-8000-000000000003',
     theme: 'auto',
     onSuccess: function (result) {
@@ -2037,26 +2037,26 @@ function VendorOnlyButton() {
 
 ---
 
-## 16. Deploying to Atlas Website (source\_type=dist)
+## 16. Deploying to Runly Website (source\_type=dist)
 
-Atlas Website supports uploading a compiled frontend (React, Astro, Next.js static export, SvelteKit, plain Vite) as a ZIP and serving it through the ERP instance. This section covers how the SDK integrates with that workflow.
+Runly Website supports uploading a compiled frontend (React, Astro, Next.js static export, SvelteKit, plain Vite) as a ZIP and serving it through the ERP instance. This section covers how the SDK integrates with that workflow.
 
 ### How it works
 
 1. You build your frontend: `vite build`, `next build`, `astro build`, etc.
-2. You ZIP the `dist/` output and upload it in Atlas Website settings.
-3. Atlas serves the HTML through its CDN and **automatically injects `window.ATLAS_CONFIG` and `/atlas-sdk.js`** into every HTML response with the runtime values for that instance.
+2. You ZIP the `dist/` output and upload it in Runly Website settings.
+3. Runly serves the HTML through its CDN and **automatically injects `window.RUNLY_CONFIG` and `/runly-sdk.js`** into every HTML response with the runtime values for that instance.
 
-No `.env` file is bundled into the ZIP. The config is injected at serve time, so the same dist ZIP works across multiple Atlas instances or environments.
+No `.env` file is bundled into the ZIP. The config is injected at serve time, so the same dist ZIP works across multiple Runly ERP instances or environments.
 
-### Recommended `src/sdk.js` for Atlas dists
+### Recommended `src/sdk.js` for Runly dists
 
 ```js
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 
-// window.ATLAS_CONFIG is injected by Atlas at serve time.
+// window.RUNLY_CONFIG is injected by Runly at serve time.
 // Fall back to env vars for local development.
-const cfg = (typeof window !== 'undefined' && window.ATLAS_CONFIG) ? window.ATLAS_CONFIG : {}
+const cfg = (typeof window !== 'undefined' && window.RUNLY_CONFIG) ? window.RUNLY_CONFIG : {}
 
 export const sdk = createStorefrontClient({
   baseUrl:         cfg.apiUrl         ?? import.meta.env.VITE_ERP_URL         ?? '',
@@ -2066,57 +2066,57 @@ export const sdk = createStorefrontClient({
 })
 ```
 
-### Stripe in Atlas dists
+### Stripe in Runly dists
 
-If a Stripe publishable key is configured on the site, it is available in `window.ATLAS_CONFIG.stripePublishableKey`:
+If a Stripe publishable key is configured on the site, it is available in `window.RUNLY_CONFIG.stripePublishableKey`:
 
 ```js
 // src/stripe.js
-export const stripe = window.ATLAS_CONFIG?.stripePublishableKey
-  ? Stripe(window.ATLAS_CONFIG.stripePublishableKey)
+export const stripe = window.RUNLY_CONFIG?.stripePublishableKey
+  ? Stripe(window.RUNLY_CONFIG.stripePublishableKey)
   : null
 ```
 
 ### ERP admin session detection
 
-Atlas also injects a lightweight beacon script that detects whether the current visitor has an active Atlas ERP session. You can read that session via `window.AtlasERP`:
+Runly also injects a lightweight beacon script that detects whether the current visitor has an active Runly ERP session. You can read that session via `window.RunlyERP`:
 
 ```js
-// Detect an Atlas ERP admin/employee visiting the public site
-const erpSession = await window.AtlasERP?.auth.getSession()
+// Detect a Runly ERP admin/employee visiting the public site
+const erpSession = await window.RunlyERP?.auth.getSession()
 if (erpSession) {
   console.log('ERP user visiting:', erpSession.user?.email)
 }
 ```
 
-`window.AtlasERP` (the beacon IIFE) and `sdk.auth` (the npm package) **share the same Supabase session**. Both read from and write to `sb-<project>-auth-token` in localStorage. An ERP user (admin, employee) who logs in on the storefront site is automatically recognized by the beacon and can navigate to Atlas ERP without logging in again. A storefront user (client, vendor) who navigates to Atlas ERP sees the login screen (they have no ERP permissions). Role determines access, not which auth system was used.
+`window.RunlyERP` (the beacon IIFE) and `sdk.auth` (the npm package) **share the same Supabase session**. Both read from and write to `sb-<project>-auth-token` in localStorage. An ERP user (admin, employee) who logs in on the storefront site is automatically recognized by the beacon and can navigate to Runly ERP without logging in again. A storefront user (client, vendor) who navigates to Runly ERP sees the login screen (they have no ERP permissions). Role determines access, not which auth system was used.
 
 **Redirect ERP users after login:**
 ```js
 const { user } = await sdk.auth.login({ email, password })
 if (user?.hasErpAccess) {
-  window.location.href = window.ATLAS_CONFIG?.apiUrl ?? '/'
+  window.location.href = window.RUNLY_CONFIG?.apiUrl ?? '/'
 }
 ```
 
 ### Build tips
 
-- For Vite/React: no special config needed — root-relative asset paths are rewritten automatically by Atlas.
-- For Astro: set `output: 'static'` and `site: '/'` in `astro.config.mjs`. Atlas corrects localhost URLs at serve time.
+- For Vite/React: no special config needed — root-relative asset paths are rewritten automatically by Runly.
+- For Astro: set `output: 'static'` and `site: '/'` in `astro.config.mjs`. Runly corrects localhost URLs at serve time.
 - For Next.js: use `output: 'export'` in `next.config.js`. Set `basePath: ''`.
-- For SvelteKit: use `@sveltejs/adapter-static`. Assets are rewritten by Atlas.
+- For SvelteKit: use `@sveltejs/adapter-static`. Assets are rewritten by Runly.
 
 ### Local development
 
-Run your dev server normally with `.env` variables (`VITE_ERP_URL`, `VITE_ERP_COMPANY`). The two-fallback pattern in `src/sdk.js` ensures the SDK uses env vars when `window.ATLAS_CONFIG` is not present.
+Run your dev server normally with `.env` variables (`VITE_ERP_URL`, `VITE_ERP_COMPANY`). The two-fallback pattern in `src/sdk.js` ensures the SDK uses env vars when `window.RUNLY_CONFIG` is not present.
 
 ---
 
 ## 17. sdk.guestChat — guest live chat
 
-The `guestChat` namespace lets public visitors start, continue, and close live chat conversations with your team through the `atlas.chat` module. No authentication is required — sessions are identified by a short-lived signed token stored in `localStorage`.
+The `guestChat` namespace lets public visitors start, continue, and close live chat conversations with your team through the `runly.chat` module. No authentication is required — sessions are identified by a short-lived signed token stored in `localStorage`.
 
-**Requires:** `atlas.chat` installed and enabled on the ERP instance. Both `supabaseUrl` and `supabaseAnonKey` must be provided to `createStorefrontClient` for real-time reply subscriptions to work (the `subscribeToReplies` method falls back to a no-op when they are absent).
+**Requires:** `runly.chat` installed and enabled on the ERP instance. Both `supabaseUrl` and `supabaseAnonKey` must be provided to `createStorefrontClient` for real-time reply subscriptions to work (the `subscribeToReplies` method falls back to a no-op when they are absent).
 
 ---
 
@@ -2178,7 +2178,7 @@ const session = await sdk.guestChat.createSession({
   referrer: document.referrer,
   userAgent: navigator.userAgent,
 })
-localStorage.setItem('atlas_chat_token', session.token)
+localStorage.setItem('runly_chat_token', session.token)
 console.log('Conversacion iniciada. Codigo de referencia:', session.trackingCode)
 ```
 
@@ -2205,11 +2205,11 @@ console.log('Conversacion iniciada. Codigo de referencia:', session.trackingCode
 **Example:**
 
 ```js
-const stored = localStorage.getItem('atlas_chat_token')
+const stored = localStorage.getItem('runly_chat_token')
 if (stored) {
   const data = await sdk.guestChat.getSession(stored)
   if (data.conversation?.status === 'closed') {
-    localStorage.removeItem('atlas_chat_token')
+    localStorage.removeItem('runly_chat_token')
     // Session expired — show welcome screen
   } else {
     // Restore the conversation UI
@@ -2393,7 +2393,7 @@ unsubscribe()
 
 ```js
 await sdk.guestChat.closeSession(token)
-localStorage.removeItem('atlas_chat_token')
+localStorage.removeItem('runly_chat_token')
 showThankYouScreen()
 ```
 
@@ -2423,7 +2423,7 @@ Same shape as `createSession` — the new token replaces the old one.
 ```js
 try {
   const session = await sdk.guestChat.resumeByCode('CHAT-000042', 'ana@ejemplo.mx')
-  localStorage.setItem('atlas_chat_token', session.token)
+  localStorage.setItem('runly_chat_token', session.token)
   const messages = await sdk.guestChat.listMessages(session.token)
   showChatScreen(messages)
 } catch (err) {
@@ -2577,7 +2577,7 @@ export default function App() {
       {/* Your app content */}
       <ChatWidget
         sdk={sdk}
-        companyName="Soporte Atlas"
+        companyName="Soporte Runly"
         accentColor="#6366f1"
       />
     </>
