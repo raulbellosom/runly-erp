@@ -721,6 +721,11 @@ export const webPushSubscriptionSchema = z.object({
   deviceLabel: z.string().trim().max(120).optional(),
 });
 
+export const fcmSubscriptionSchema = z.object({
+  token: z.string().trim().min(1).max(500),
+  deviceLabel: z.string().trim().max(120).optional(),
+});
+
 export const notificationPreferenceUpsertSchema = z.object({
   eventType: z.string().trim().min(1).max(100),
   inAppEnabled: z.boolean().optional().default(true),
