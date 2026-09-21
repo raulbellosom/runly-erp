@@ -1,6 +1,7 @@
 import { canReceiveResourceEvent } from './notification-access.js';
 import { createSmtpService } from "./smtp-service.js";
 import { createWebPushService } from "./web-push-service.js";
+import { createFcmService } from "./fcm-service.js";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_BATCH_SIZE = 25;
@@ -358,12 +359,14 @@ export function createNotificationDeliveryWorker({
   prisma,
   smtpService = null,
   webPushService = null,
+  fcmService = null,
   supabaseAdmin = null,
   logger = console,
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
 }) {
   const smtp = smtpService ?? createSmtpService({ prisma });
   const webPush = webPushService ?? createWebPushService({ prisma });
+  const fcm = fcmService ?? createFcmService({});
 
   // company id -> { logoUrl, companyName } for the email header. Logo comes from
   // BrandingConfig; falls back to the company name, then the Atlas wordmark.
@@ -568,6 +571,41 @@ export function createNotificationDeliveryWorker({
             if (result.permanentFailure) {
               await prisma.pushSubscription.update({
                 where: { id: subscription.id },
+                data: { enabled: false },
+              });
+            }
+          }
+          if (successfulDeliveries === 0) {
+            throw new Error(errors.join(" | "));
+          }
+        } else if (channel === "fcm") {
+          const tokens = await prisma.fcmDeviceToken.findMany({
+            where: {
+              userId: delivery.notification?.userId,
+              enabled: true,
+            },
+            select: { id: true, token: true },
+          });
+          if (!tokens.length) {
+            throw new Error("Destinatario sin tokens FCM activos.");
+          }
+
+          const payload = fcm.buildFcmData({ notification: delivery.notification });
+          let successfulDeliveries = 0;
+          const errors = [];
+          for (const deviceToken of tokens) {
+            const result = await fcm.sendToToken({ token: deviceToken.token, payload });
+            if (result.ok) {
+              successfulDeliveries += 1;
+              await prisma.fcmDeviceToken
+                .update({ where: { id: deviceToken.id }, data: { lastSeenAt: new Date() } })
+                .catch(() => {});
+              continue;
+            }
+            errors.push(result.error ?? "Envio fallido.");
+            if (result.permanentFailure) {
+              await prisma.fcmDeviceToken.update({
+                where: { id: deviceToken.id },
                 data: { enabled: false },
               });
             }
