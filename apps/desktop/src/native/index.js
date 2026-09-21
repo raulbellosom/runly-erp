@@ -10,7 +10,6 @@ const invoke = async (command, args) => {
   return invoke(command, args)
 }
 const notifications = () => import('@tauri-apps/plugin-notification')
-const unsupported = () => { throw new Error('Esta función no está disponible en este dispositivo.') }
 
 async function getHostInfo() {
   if (!isNative()) return null
@@ -73,7 +72,11 @@ export const native = {
       await getHostInfo()
       if (native.supports('notification-actions')) await (await notifications()).removeActive([{ id: notificationId(tag) }])
     },
-    getPushToken: unsupported,
+    async getPushToken() {
+      if (!isNativeMobile()) return null
+      const response = await invoke('host_fcm_token')
+      return response?.token ?? null
+    },
   },
   screenShare: {
     async start(session) { await native.requireCapability('screen-share'); return invoke('host_screen_start', { session }) },
