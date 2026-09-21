@@ -80,3 +80,9 @@ pub async fn host_screen_status(window: WebviewWindow, app: AppHandle) -> Result
     super::mobile_host::check_remote(&window)?;
     run(app, "status", json!({})).await
 }
+
+#[tauri::command]
+pub async fn host_fcm_token(window: WebviewWindow, app: AppHandle) -> Result<Value, String> {
+    super::mobile_host::check_remote(&window)?;
+    run(app, "currentToken", json!({})).await
+}

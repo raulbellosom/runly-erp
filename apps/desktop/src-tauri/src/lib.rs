@@ -32,7 +32,9 @@ pub fn run() {
             #[cfg(target_os = "android")]
             mobile_media::host_screen_stop,
             #[cfg(target_os = "android")]
-            mobile_media::host_screen_status
+            mobile_media::host_screen_status,
+            #[cfg(target_os = "android")]
+            mobile_media::host_fcm_token
         ])
         .setup(mobile_host::setup);
     builder
