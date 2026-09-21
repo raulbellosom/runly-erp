@@ -41,6 +41,34 @@ export function createGrowthDomain({
         headers: withAuthHeaders(token),
       }),
 
+    listForms: (token, { propertyId } = {}) =>
+      request(`/growth/forms${toQueryString({ propertyId })}`, {
+        headers: withAuthHeaders(token),
+      }),
+
+    listFormAssignees: (token) =>
+      request("/growth/forms/assignees", {
+        headers: withAuthHeaders(token),
+      }),
+
+    getForm: (formId, token) =>
+      request(`/growth/forms/${encodeURIComponent(formId)}`, {
+        headers: withAuthHeaders(token),
+      }),
+
+    createForm: (payload, token) =>
+      request("/growth/forms", {
+        method: "POST",
+        headers: withAuthHeaders(token),
+        body: JSON.stringify(payload),
+      }),
+
+    deleteForm: (formId, token) =>
+      request(`/growth/forms/${encodeURIComponent(formId)}`, {
+        method: "DELETE",
+        headers: withAuthHeaders(token),
+      }),
+
     getAnalyticsOverview: (token, query = {}) =>
       analyticsReport("overview", token, query),
 

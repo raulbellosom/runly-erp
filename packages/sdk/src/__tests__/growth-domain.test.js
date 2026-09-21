@@ -25,9 +25,11 @@ describe("atlas SDK - growth domain", () => {
     assert.deepEqual(Object.keys(domain).sort(), [
       "addLeadNote",
       "convertLead",
+      "createForm",
       "createLead",
       "createLeadComment",
       "createProperty",
+      "deleteForm",
       "deleteLeadComment",
       "exportAnalyticsCsv",
       "getAnalyticsAcquisition",
@@ -35,9 +37,12 @@ describe("atlas SDK - growth domain", () => {
       "getAnalyticsConversions",
       "getAnalyticsOverview",
       "getAnalyticsRetention",
+      "getForm",
       "getLead",
       "getLeadSummary",
       "listAnalyticsSites",
+      "listFormAssignees",
+      "listForms",
       "listLeadAssignees",
       "listLeadComments",
       "listLeads",
@@ -97,6 +102,11 @@ describe("atlas SDK - growth domain", () => {
     await client.growth.createProperty({ name: "runly.mx", domain: "runly.mx" }, token);
     await client.growth.updateProperty("prop-1", { name: "Sitio" }, token);
     await client.growth.verifyProperty("prop-1", token);
+    await client.growth.listForms(token, { propertyId: "prop-1" });
+    await client.growth.listFormAssignees(token);
+    await client.growth.getForm("form-1", token);
+    await client.growth.createForm({ propertyId: "prop-1", name: "Contacto" }, token);
+    await client.growth.deleteForm("form-1", token);
 
     const calls = fetchMock.mock.calls.map((call) => call.arguments);
     assert.equal(
@@ -157,6 +167,17 @@ describe("atlas SDK - growth domain", () => {
     assert.equal(calls[18][1].method, "PATCH");
     assert.equal(calls[19][0], "http://api/growth/properties/prop-1/verify");
     assert.equal(calls[19][1].method, "POST");
+    assert.equal(calls[20][0], "http://api/growth/forms?propertyId=prop-1");
+    assert.equal(calls[21][0], "http://api/growth/forms/assignees");
+    assert.equal(calls[22][0], "http://api/growth/forms/form-1");
+    assert.equal(calls[23][0], "http://api/growth/forms");
+    assert.equal(calls[23][1].method, "POST");
+    assert.deepEqual(JSON.parse(calls[23][1].body), {
+      propertyId: "prop-1",
+      name: "Contacto",
+    });
+    assert.equal(calls[24][0], "http://api/growth/forms/form-1");
+    assert.equal(calls[24][1].method, "DELETE");
     for (const [, options] of calls) {
       assert.equal(options.headers.Authorization, "Bearer tok");
     }
