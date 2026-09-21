@@ -163,11 +163,11 @@ if (form.notifyEmail) {
 
 `smtpService` is a new factory param on `createStorefrontCaptureService`,
 defaulting to `createSmtpService({ prisma })` (existing service, already
-used elsewhere for company-scoped SMTP config —
+used elsewhere for company-scoped SMTP config — sibling file
 `apps/api/src/services/smtp-service.js`). A missing/unconfigured SMTP
-config throws `SmtpConfigError`, caught and logged, never blocking the
-submission response — a contact form must keep working even if nobody set
-up SMTP for that company yet.
+config makes `sendEmail` throw a plain `Error('SMTP no configurado')`,
+caught and logged, never blocking the submission response — a contact form
+must keep working even if nobody set up SMTP for that company yet.
 
 `buildFormSubmissionEmail({ formName, values, fields, brand = null, env = process.env })`
 is a new function in `apps/api/src/services/email-templates.js`, following
