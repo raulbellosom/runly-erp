@@ -101,16 +101,41 @@ function createPrisma() {
     }),
   ];
 
+  const growthProperties = [];
+
   return {
     websiteSite: {
       findFirst: async ({ where }) =>
         where.companyId === COMPANY_ID && where.id === SITE_ID
-          ? { id: SITE_ID }
+          ? { id: SITE_ID, name: "Sitio principal", domain: "example.com" }
           : null,
       findMany: async ({ where }) =>
         where.companyId === COMPANY_ID
           ? [{ id: SITE_ID, name: "Sitio principal", domain: "example.com" }]
           : [],
+    },
+    growthProperty: {
+      findFirst: async ({ where }) =>
+        growthProperties.find(
+          (p) =>
+            p.companyId === where.companyId &&
+            (!where.id || p.id === where.id) &&
+            (where.enabled === undefined || p.enabled === where.enabled),
+        ) ?? null,
+      findMany: async ({ where }) =>
+        growthProperties.filter(
+          (p) => p.companyId === where.companyId && p.enabled === where.enabled,
+        ),
+      upsert: async ({ where, create }) => {
+        const key = where.companyId_websiteSiteId;
+        const existing = growthProperties.find(
+          (p) => p.companyId === key.companyId && p.websiteSiteId === key.websiteSiteId,
+        );
+        if (existing) return existing;
+        const created = { id: key.websiteSiteId, enabled: true, ...create };
+        growthProperties.push(created);
+        return created;
+      },
     },
     instanceConfig: {
       findUnique: async () => ({ value: "2026-06-13" }),
@@ -135,7 +160,13 @@ describe("createGrowthAnalyticsService", () => {
     const result = await service.listSites({ companyId: COMPANY_ID });
 
     assert.deepEqual(result, [
-      { id: SITE_ID, name: "Sitio principal", domain: "example.com" },
+      {
+        id: SITE_ID,
+        name: "Sitio principal",
+        domain: "example.com",
+        kind: "website_module",
+        status: "active",
+      },
     ]);
   });
 

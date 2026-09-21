@@ -1,3 +1,8 @@
+import {
+  GrowthPropertyServiceError,
+  createGrowthPropertyService,
+} from "./growth-property-service.js";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_RANGE_DAYS = 762;
 const FUNNEL_STEPS = [
@@ -173,27 +178,32 @@ function deltas(current, previous) {
 export function createGrowthAnalyticsService({
   prisma,
   now = () => new Date(),
+  growthPropertyService = createGrowthPropertyService({ prisma }),
 }) {
   async function listSites({ companyId }) {
-    return prisma.websiteSite.findMany({
-      where: { companyId, enabled: true },
-      select: { id: true, name: true, domain: true },
-      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
-    });
+    const properties = await growthPropertyService.listProperties({ companyId });
+    return properties.map((p) => ({
+      id: p.id,
+      name: p.name,
+      domain: p.domain,
+      kind: p.kind,
+      status: p.status,
+    }));
   }
 
   async function assertSite({ companyId, siteId }) {
     if (!siteId) return;
-    const site = await prisma.websiteSite.findFirst({
-      where: { id: siteId, companyId, enabled: true },
-      select: { id: true },
-    });
-    if (!site) {
-      throw new GrowthAnalyticsServiceError(
-        "Sitio web no encontrado.",
-        404,
-        "analytics_site_not_found",
-      );
+    try {
+      await growthPropertyService.assertProperty({ companyId, propertyId: siteId });
+    } catch (error) {
+      if (error instanceof GrowthPropertyServiceError) {
+        throw new GrowthAnalyticsServiceError(
+          "Sitio web no encontrado.",
+          404,
+          "analytics_site_not_found",
+        );
+      }
+      throw error;
     }
   }
 
