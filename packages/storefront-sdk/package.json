@@ -1,6 +1,6 @@
 {
   "name": "@raulbellosom/runly-sdk",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "type": "module",
   "description": "Generic JavaScript client for Runly ERP storefront APIs",
   "main": "./dist/index.js",

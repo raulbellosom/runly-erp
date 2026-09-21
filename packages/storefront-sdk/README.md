@@ -1882,6 +1882,60 @@ import { StorefrontProvider } from '@raulbellosom/runly-sdk/react'
 // ... wrap your app with <StorefrontProvider client={sdk}>
 ```
 
+### Pattern C — plain HTML site, not hosted by Runly (embeddable script)
+
+Use this when the site is not a Runly Website dist — a hand-built HTML site,
+or a site built with any framework but deployed somewhere else entirely
+(its own host, its own domain). No build step or npm install required: the
+embeddable script is loaded directly from the ERP instance and exposes the
+same functionality (analytics, forms, guest chat) as a global,
+`window.RunlyERP`.
+
+Inside the ERP admin, go to **Growth → Sitios conectados → Conectar sitio
+externo**, name the property and give it the external domain. The wizard
+generates a ready-to-paste snippet — every value in it (`apiUrl`,
+`supabaseUrl`, `supabaseAnonKey`, `storageKey`) is read live from whichever
+Runly ERP instance you're logged into when you open the wizard, so the same
+flow works unmodified against any Runly installation/domain — there is
+nothing in this pattern tied to one specific instance:
+
+```html
+<script>
+  window.RUNLY_CONFIG = {
+    "company": "acme",
+    "siteId": "0190...",
+    "apiUrl": "https://erp.tudominio.mx",
+    "supabaseUrl": "https://supabase.tudominio.mx",
+    "supabaseAnonKey": "eyJ...",
+    "storageKey": "sb-<project-ref>-auth-token"
+  };
+</script>
+<script src="https://erp.tudominio.mx/public/site/runly-sdk.js" async></script>
+```
+
+Paste this before `</body>` on every page of the external site that needs
+analytics, forms, or chat. After publishing, click "Verificar conexión" in
+the same wizard — it flips the property to `active` once it sees the first
+real event.
+
+`window.RunlyERP` then exposes:
+- `window.RunlyERP.analytics` — same methods as `sdk.analytics` (see
+  [Analytics](#analytics) below)
+- `window.RunlyERP.renderForm(selector, { formId })` — fetches a form
+  definition and renders a complete, working form into a container element;
+  see [17. sdk.guestChat](#17-sdkguestchat--guest-live-chat) for the guest
+  chat equivalent via the npm package, or use the `data-runly-event`
+  attributes shown under [Analytics](#analytics) for click tracking without
+  writing JS
+- `window.RunlyERP.auth.getSession()` — detects an already-logged-in ERP
+  admin/employee visiting the page (see "ERP admin session detection" under
+  Pattern B above — this works the same way regardless of which pattern
+  served the config)
+
+Values here are safe to hardcode: `supabaseAnonKey` is Supabase's public
+anon key (designed to be exposed client-side, like `company`/`siteId`), and
+`apiUrl`/`supabaseUrl` are just server addresses, not secrets.
+
 ---
 
 ## Storefront capture v1 (SDK 0.3.0)
