@@ -7,6 +7,9 @@ const PERMANENT_FCM_ERROR_CODES = new Set([
   "messaging/registration-token-not-registered",
   "messaging/invalid-registration-token",
   "messaging/invalid-argument",
+  "messaging/invalid-recipient",
+  "messaging/mismatched-credential",
+  "messaging/sender-id-mismatch",
 ]);
 
 function asErrorMessage(err) {
@@ -51,11 +54,11 @@ export function createFcmService({ messaging = null } = {}) {
   }
 
   async function sendToToken({ token, payload }) {
-    const client = getClient();
-    if (!client) {
-      return { ok: false, error: "FCM no configurado en el servidor." };
-    }
     try {
+      const client = getClient();
+      if (!client) {
+        return { ok: false, error: "FCM no configurado en el servidor." };
+      }
       await client.send({ token, data: payload, android: { priority: "high" } });
       return { ok: true };
     } catch (err) {

@@ -44,6 +44,10 @@ describe("fcm-service", () => {
     assert.equal(isPermanentFcmError({ code: "messaging/internal-error" }), false);
   });
 
+  it("flags a mismatched-credential token/project error as permanent", () => {
+    assert.equal(isPermanentFcmError({ code: "messaging/mismatched-credential" }), true);
+  });
+
   it("builds string-only data payload with the incoming-call tag and callId", () => {
     const payload = buildFcmData({
       notification: {
