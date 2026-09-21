@@ -270,7 +270,7 @@ describe("notification-service", () => {
 
     assert.deepEqual(
       prisma._deliveries.map((delivery) => delivery.channel).sort(),
-      ["in_app", "web_push"],
+      ["fcm", "in_app", "web_push"],
     );
   });
 
@@ -406,7 +406,7 @@ describe('important notification channels', () => {
       const service = createNotificationService({ prisma, broadcaster: { broadcastToUsers: async (...args) => broadcasts.push(args) } });
       const result = await service.publish({ companyId: COMPANY_ID, input: input(eventType) });
       assert.equal(result.created, 1);
-      assert.deepEqual(prisma._deliveries.map(d => [d.channel, d.status]), [['in_app', 'sent'], ['email', 'queued'], ['web_push', 'queued']]);
+      assert.deepEqual(prisma._deliveries.map(d => [d.channel, d.status]), [['in_app', 'sent'], ['email', 'queued'], ['web_push', 'queued'], ['fcm', 'queued']]);
       assert.deepEqual(broadcasts[0][0], [RECIPIENT_A]);
     });
   }
@@ -456,7 +456,10 @@ describe('important notification channels', () => {
     assert.equal(emails[0].to, `${RECIPIENT_A}@example.test`);
     assert.equal(emails[0].companyId, COMPANY_ID);
     assert.equal(pushes[0].payload.link, '/app/m/atlas.notes?note=demo');
-    assert.ok(prisma._deliveries.every(d => d.status === 'sent'));
+    // fcm rides along with web_push (see notification-service.js publish()) but has
+    // no delivery worker yet, so its row stays queued; only assert the channels
+    // this test actually drained.
+    assert.ok(prisma._deliveries.filter(d => d.channel !== 'fcm').every(d => d.status === 'sent'));
   });
 
   it('claims each queued delivery once across concurrent worker passes', async () => {
@@ -620,5 +623,32 @@ describe('subscribeWebPush preserves independent installations', () => {
     await service.subscribeWebPush({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, userAgent: null, input: { endpoint: 'https://push/a', keys: { p256dh: 'p', auth: 'a' } } });
     await service.subscribeWebPush({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, userAgent: null, input: { endpoint: 'https://push/b', keys: { p256dh: 'p', auth: 'a' } } });
     assert.equal(store.filter((s) => s.enabled).length, 2);
+  });
+});
+
+describe('fcm token subscriptions', () => {
+  it('upserts a token by its own value and returns the row', async () => {
+    const prisma = buildPrismaMock();
+    let upserted = null;
+    prisma.fcmDeviceToken = {
+      upsert: async ({ create }) => { upserted = { id: 'fcm-1', ...create }; return upserted; },
+    };
+    const service = createNotificationService({ prisma });
+    const result = await service.subscribeFcm({
+      authUserId: AUTH_USER_ID, companyId: COMPANY_ID,
+      input: { token: 'device-token-abc', deviceLabel: 'Pixel 8' },
+    });
+    assert.equal(result.data.token, 'device-token-abc');
+    assert.equal(upserted.userId, PROFILE_ID);
+  });
+
+  it('rejects unsubscribing a token that does not belong to the caller', async () => {
+    const prisma = buildPrismaMock();
+    prisma.fcmDeviceToken = { findFirst: async () => null };
+    const service = createNotificationService({ prisma });
+    await assert.rejects(
+      () => service.unsubscribeFcm({ authUserId: AUTH_USER_ID, companyId: COMPANY_ID, id: 'not-mine' }),
+      /Token FCM no encontrado/,
+    );
   });
 });

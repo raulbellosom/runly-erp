@@ -3,6 +3,7 @@ import {
   notificationListQuerySchema,
   notificationPreferenceUpsertSchema,
   webPushSubscriptionSchema,
+  fcmSubscriptionSchema,
 } from "@runly/validators";
 
 import { getDefaultNotificationPreference } from '@runly/core';
@@ -297,6 +298,12 @@ export function createNotificationService({ prisma, broadcaster = null }) {
           return true;
         });
 
+        // FCM (native Android push) always mirrors web_push: same preference,
+        // same eligibility, no producer has to ask for it separately.
+        if (allowedChannels.includes('web_push') && !allowedChannels.includes('fcm')) {
+          allowedChannels.push('fcm');
+        }
+
         if (!allowedChannels.length) continue;
 
         const notification = await tx.notification.create({
@@ -460,6 +467,47 @@ export function createNotificationService({ prisma, broadcaster = null }) {
     return { data: { deleted: true } };
   }
 
+  async function subscribeFcm({ authUserId, companyId: activeCompanyId, input }) {
+    const parsed = fcmSubscriptionSchema.parse(input ?? {});
+    const { profileId, companyId } = await resolveCompanyContext(authUserId, activeCompanyId);
+    const row = await prisma.fcmDeviceToken.upsert({
+      where: { token: parsed.token },
+      create: {
+        userId: profileId,
+        companyId,
+        token: parsed.token,
+        deviceLabel: parsed.deviceLabel ?? null,
+        enabled: true,
+        lastSeenAt: new Date(),
+      },
+      update: {
+        userId: profileId,
+        companyId,
+        deviceLabel: parsed.deviceLabel ?? null,
+        enabled: true,
+        lastSeenAt: new Date(),
+      },
+    });
+    return { data: row };
+  }
+
+  async function unsubscribeFcm({ authUserId, companyId: activeCompanyId, id }) {
+    const { profileId } = await resolveCompanyContext(authUserId, activeCompanyId);
+    const sub = await prisma.fcmDeviceToken.findFirst({
+      where: { id, userId: profileId },
+      select: { id: true },
+    });
+    if (!sub) {
+      throw new NotificationServiceError(
+        "Token FCM no encontrado.",
+        404,
+        "fcm_token_not_found",
+      );
+    }
+    await prisma.fcmDeviceToken.delete({ where: { id: sub.id } });
+    return { data: { deleted: true } };
+  }
+
   return {
     resolveCompanyContext,
     list,
@@ -472,5 +520,7 @@ export function createNotificationService({ prisma, broadcaster = null }) {
     upsertPreference,
     subscribeWebPush,
     unsubscribeWebPush,
+    subscribeFcm,
+    unsubscribeFcm,
   };
 }
