@@ -67,40 +67,4 @@ describe("website capture settings service", () => {
     assert.equal(site.stripeSecretKeySet, true);
     assert.equal(site.turnstileSecretKeySet, true);
   });
-
-  it("lists only active company members as form assignees", async () => {
-    const service = createWebsiteService({
-      prisma: {
-        membership: {
-          findMany: async ({ where }) => {
-            assert.deepEqual(where, {
-              companyId: COMPANY_ID,
-              enabled: true,
-              user: { enabled: true },
-            });
-            return [
-              {
-                user: {
-                  id: USER_ID,
-                  displayName: "Ana Lopez",
-                  email: "ana@example.com",
-                },
-              },
-            ];
-          },
-        },
-      },
-    });
-
-    const assignees = await service.listFormAssignees({
-      companyId: COMPANY_ID,
-    });
-    assert.deepEqual(assignees, [
-      {
-        id: USER_ID,
-        displayName: "Ana Lopez",
-        email: "ana@example.com",
-      },
-    ]);
-  });
 });

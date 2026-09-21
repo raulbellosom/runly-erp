@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { createWebsiteService } from './website-service.js'
+import { createFormsService } from '../../services/forms-service.js'
 import { createPagesRouter } from './pages-routes.js'
 import { createThemesRouter } from './themes-routes.js'
 import { createMenusRouter } from './menus-routes.js'
@@ -14,12 +15,13 @@ import { WebsiteServiceError } from './service-helpers.js'
 export function createWebsiteRouter({ prisma, requirePermission, supabaseAdmin }) {
   const app = new Hono()
   const websiteSvc = createWebsiteService({ prisma })
+  const formsService = createFormsService({ prisma })
 
   app.route('/website', createPagesRouter({ websiteSvc, requirePermission }))
   app.route('/website', createThemesRouter({ websiteSvc, requirePermission }))
   app.route('/website', createMenusRouter({ websiteSvc, requirePermission }))
   app.route('/website', createBlogRouter({ websiteSvc, requirePermission }))
-  app.route('/website', createFormsRouter({ websiteSvc, requirePermission }))
+  app.route('/website', createFormsRouter({ formsService, requirePermission }))
   app.route('/', createWebsiteSettingsRouter({ prisma, requirePermission, supabaseAdmin }))
   app.route('/', createDistRoutes({ prisma, supabaseAdmin, requirePermission }))
 
