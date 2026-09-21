@@ -390,6 +390,7 @@ model UserProfile {
   activities   Activity[]
   notifications Notification[]
   pushSubscriptions PushSubscription[]
+  fcmDeviceTokens FcmDeviceToken[]
   notificationPreferences NotificationPreference[]
 
   hrEmployees HrEmployee[]
@@ -842,6 +843,23 @@ model PushSubscription {
   @@index([userId, enabled])
   @@index([companyId, enabled])
   @@map("push_subscription")
+}
+
+model FcmDeviceToken {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @db.Uuid @map("user_id")
+  companyId   String?   @db.Uuid @map("company_id")
+  token       String    @unique
+  deviceLabel String?   @map("device_label")
+  enabled     Boolean   @default(true)
+  lastSeenAt  DateTime? @map("last_seen_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, enabled])
+  @@map("fcm_device_token")
 }
 
 model NotificationPreference {
