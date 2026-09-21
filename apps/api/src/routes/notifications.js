@@ -213,5 +213,39 @@ export function createNotificationsRouter({ prisma, requirePermission }) {
     },
   );
 
+  app.post(
+    "/notifications/subscriptions/fcm",
+    requirePermission("notifications.read"),
+    async (c) => {
+      try {
+        const authUserId = c.get("authUserId");
+        const body = await c.req.json();
+        const result = await service.subscribeFcm({
+          authUserId,
+          companyId: c.get("companyId"),
+          input: body,
+        });
+        return c.json(result, 201);
+      } catch (err) {
+        return handleError(c, err, "POST /notifications/subscriptions/fcm");
+      }
+    },
+  );
+
+  app.delete(
+    "/notifications/subscriptions/fcm/:id",
+    requirePermission("notifications.read"),
+    async (c) => {
+      try {
+        const authUserId = c.get("authUserId");
+        const id = c.req.param("id");
+        const result = await service.unsubscribeFcm({ authUserId, companyId: c.get("companyId"), id });
+        return c.json(result);
+      } catch (err) {
+        return handleError(c, err, "DELETE /notifications/subscriptions/fcm/:id");
+      }
+    },
+  );
+
   return app;
 }
