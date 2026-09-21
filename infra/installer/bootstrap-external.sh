@@ -34,6 +34,7 @@ files=(
   setup-external.sh
   stop-external.mjs
   stop-external.sh
+  update-external.sh
   .env.external.example
 )
 

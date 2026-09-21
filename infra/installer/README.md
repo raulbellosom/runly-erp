@@ -161,6 +161,20 @@ npm run runly:local:docs
 npm run runly:stop:local
 ```
 
+### Actualizar todo en un solo comando
+
+```bash
+bash ./update-local.sh
+# o: npm run runly:update:local
+```
+
+Encadena los dos pasos de arriba: refresca los scripts del instalador
+(equivalente a re-correr `bootstrap-local.sh`, que nunca toca `.env.local` ni
+`custom-modules/`) y luego corre `npm run runly:local` (pull + migrate + recreate).
+Es seguro re-ejecutarlo. Este archivo se distribuye via `bootstrap-local.sh`
+igual que el resto del instalador, asi que una instalacion existente lo recibe
+sola en el siguiente refresco.
+
 ---
 
 ## Modo `external` — Produccion (servidor Linux)
@@ -221,6 +235,23 @@ npm run runly:external
 npm run runly:external:docs
 npm run runly:stop:external
 ```
+
+### Actualizar todo en un solo comando
+
+```bash
+bash ./update-external.sh
+# o: npm run runly:update:external
+```
+
+Encadena los dos pasos de una actualizacion: refresca los scripts del
+instalador (equivalente a re-correr `bootstrap-external.sh`, que nunca toca
+`.env.external` ni `custom-modules/`) y luego corre `npm run runly:external`
+(pull + migrate + recreate). Se niega a correr si `.env.external` todavia no
+existe (eso es una instalacion nueva, no una actualizacion) — usa
+`bootstrap-external.sh` directamente para ese caso, porque necesita tus
+credenciales de Supabase antes de poder arrancar nada. Este archivo se
+distribuye via `bootstrap-external.sh` igual que el resto del instalador, asi
+que una instalacion existente lo recibe sola en el siguiente refresco.
 
 ### Variables en `.env.external`
 
@@ -384,6 +415,7 @@ para eliminar layers huerfanos sin tocar imagenes de otros proyectos en el mismo
 | Accion | Comando |
 |--------|---------|
 | Primera instalacion o tras reset | `node ./setup-local.mjs` (o `./setup-local.sh`) |
+| Actualizar todo (instalador + app) | `bash ./update-local.sh` |
 | Detener (conserva datos) | `node ./stop-local.mjs` (o `./stop-local.sh`) |
 | Reiniciar sin reinstalar (`selfhosted`) | `docker compose -f docker-compose.yml -f supabase/docker-compose.supabase.yml --profile local --profile livekit --profile livekit-tls up -d` |
 | Reiniciar sin reinstalar (`cli-dev`) | `docker compose --profile local --profile livekit --profile livekit-tls up -d` |
@@ -394,7 +426,8 @@ para eliminar layers huerfanos sin tocar imagenes de otros proyectos en el mismo
 | Accion | Comando |
 |--------|---------|
 | Primera instalacion | `node ./setup-external.mjs` (o `./setup-external.sh`) |
-| Actualizar a la ultima version | `./setup-external.sh` (pull + prune + recreate automatico) |
+| Actualizar solo la app (imagenes + migraciones) | `./setup-external.sh` (pull + prune + recreate automatico) |
+| Actualizar todo (instalador + app) | `bash ./update-external.sh` |
 | Detener (conserva datos) | `node ./stop-external.mjs` (o `./stop-external.sh`) |
 | Reiniciar rapido | `node ./setup-external.mjs --skip-pull --skip-migrate --up-only` |
 | Reset (borra .env.external) | `node ./stop-external.mjs --reset` |

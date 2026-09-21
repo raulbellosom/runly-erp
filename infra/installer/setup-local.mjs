@@ -641,6 +641,28 @@ async function writeLocalEnv(supabaseInput, identity) {
     || "qwen/qwen3.6-27b";
   const pfmVisionTimeout  = parseEnvValue(existingEnvContent, "PFM_VISION_TIMEOUT_MS") || "20000";
   const fromLocalEnv = (key) => parseEnvValue(existingEnvContent, key) || process.env[key] || "";
+  // runly.chat MirAI + runly.pfm/inventory AI extras — all optional, reuse GROQ_API_KEY.
+  const inventoryAiSigningSecret = fromLocalEnv("INVENTORY_AI_SIGNING_SECRET");
+  const pfmAssistantModel        = fromLocalEnv("PFM_ASSISTANT_MODEL");
+  const chatMiraiModel           = fromLocalEnv("CHAT_MIRAI_MODEL");
+  const chatMiraiRouterModel     = fromLocalEnv("CHAT_MIRAI_ROUTER_MODEL");
+  const chatMiraiWeb             = fromLocalEnv("CHAT_MIRAI_WEB") || "true";
+  const tavilyApiKey             = fromLocalEnv("TAVILY_API_KEY");
+  const chatMiraiWebModel        = fromLocalEnv("CHAT_MIRAI_WEB_MODEL");
+  // LiveKit Egress → Supabase Storage (call recordings) — optional, self-hosted only.
+  const supabaseS3Endpoint    = fromLocalEnv("SUPABASE_S3_ENDPOINT");
+  const supabaseS3AccessKeyId = fromLocalEnv("SUPABASE_S3_ACCESS_KEY_ID");
+  const supabaseS3SecretKey   = fromLocalEnv("SUPABASE_S3_SECRET_ACCESS_KEY");
+  const supabaseS3Region      = fromLocalEnv("SUPABASE_S3_REGION") || "us-east-1";
+  // Identity-level SMTP (password reset, cross-company mail) — optional; preserve
+  // any user-provided value across re-runs, same as the Google OAuth vars above.
+  const smtpHost      = fromLocalEnv("SMTP_HOST");
+  const smtpPort      = fromLocalEnv("SMTP_PORT") || "587";
+  const smtpUser      = fromLocalEnv("SMTP_USER");
+  const smtpPass      = fromLocalEnv("SMTP_PASS");
+  const smtpFromName  = fromLocalEnv("SMTP_FROM_NAME") || "Runly ERP";
+  const smtpFromEmail = fromLocalEnv("SMTP_FROM_EMAIL");
+  const smtpTls       = fromLocalEnv("SMTP_TLS") || "false";
   const mailerAutoconfirm = resolveMailerAutoconfirm(fromLocalEnv);
   const liveKit = resolveLiveKitConfig({
     deployment: "local",
@@ -686,6 +708,20 @@ RUNLY_SUPABASE_PUBLIC_URL=${deploymentValues.RUNLY_SUPABASE_PUBLIC_URL ?? ""}
 VITE_ATLAS_API_URL=http://localhost:4010
 CORS_ORIGIN=${corsOrigin}
 
+# ── Identity-level SMTP (password reset, cross-company mail) ─────────────────
+# Ajustes -> SMTP configures a SPECIFIC COMPANY's outgoing mail and always wins
+# for that company. These vars are for mail that isn't any one company's
+# business (password reset above all) — used outright before the database is
+# even checked. Point them at your own mail provider. Leave empty and this
+# mail simply won't send until you set them (there is no UI for this slot).
+SMTP_HOST=${smtpHost}
+SMTP_PORT=${smtpPort}
+SMTP_USER=${smtpUser}
+SMTP_PASS=${smtpPass}
+SMTP_FROM_NAME=${smtpFromName}
+SMTP_FROM_EMAIL=${smtpFromEmail}
+SMTP_TLS=${smtpTls}
+
 ${renderSelfHostedSupabaseEnv(supabase, fromLocalEnv, mailerAutoconfirm)}
 
 # ── Custom module ZIP upload ──────────────────────────────────────────────────
@@ -710,6 +746,24 @@ GROQ_API_KEY=${groqApiKey}
 GROQ_BASE_URL=${groqBaseUrl}
 PFM_VISION_MODEL=${pfmVisionModel}
 PFM_VISION_TIMEOUT_MS=${pfmVisionTimeout}
+
+# ── runly.chat MirAI assistant + runly.pfm/inventory AI extras (optional) ────
+# All reuse GROQ_API_KEY. Without it, the model overrides below are unused.
+INVENTORY_AI_SIGNING_SECRET=${inventoryAiSigningSecret}
+PFM_ASSISTANT_MODEL=${pfmAssistantModel}
+CHAT_MIRAI_MODEL=${chatMiraiModel}
+CHAT_MIRAI_ROUTER_MODEL=${chatMiraiRouterModel}
+CHAT_MIRAI_WEB=${chatMiraiWeb}
+TAVILY_API_KEY=${tavilyApiKey}
+CHAT_MIRAI_WEB_MODEL=${chatMiraiWebModel}
+
+# ── LiveKit Egress → Supabase Storage (call recordings, optional) ───────────
+# Get these from the self-hosted Supabase Storage container's own S3-compatible
+# config — NOT the same as SUPABASE_SERVICE_ROLE_KEY. Leave empty to disable.
+SUPABASE_S3_ENDPOINT=${supabaseS3Endpoint}
+SUPABASE_S3_ACCESS_KEY_ID=${supabaseS3AccessKeyId}
+SUPABASE_S3_SECRET_ACCESS_KEY=${supabaseS3SecretKey}
+SUPABASE_S3_REGION=${supabaseS3Region}
 
 # ── Runly Calls / LiveKit ──────────────────────────────────────────────────
 LIVEKIT_MODE=${liveKit.mode}

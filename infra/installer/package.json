@@ -11,6 +11,8 @@
     "runly:external:docs": "node ./setup-external.mjs --docs-only",
     "runly:external:quick": "node ./setup-external.mjs --skip-pull --skip-migrate --up-only",
     "runly:stop:local": "node ./stop-local.mjs",
-    "runly:stop:external": "node ./stop-external.mjs"
+    "runly:stop:external": "node ./stop-external.mjs",
+    "runly:update:local": "bash ./update-local.sh",
+    "runly:update:external": "bash ./update-external.sh"
   }
 }

@@ -34,6 +34,7 @@ files=(
   stop-local.mjs
   stop-local.ps1
   stop-local.sh
+  update-local.sh
 )
 
 echo "[runly-bootstrap] Descargando instalador local en $(pwd)"

@@ -203,6 +203,25 @@ const OPTIONAL_VAR_GROUPS = [
   },
   {
     header: [
+      "# ── Identity-level SMTP (password reset, cross-company mail) ─────────────────",
+      "# Ajustes -> SMTP configures a SPECIFIC COMPANY's outgoing mail and always wins",
+      "# for that company. These vars are for mail that isn't any one company's",
+      "# business (password reset above all) — used outright before the database is",
+      "# even checked. Point them at your own mail provider. Leave empty and this",
+      "# mail simply won't send until you set them (there is no UI for this slot).",
+    ],
+    vars: [
+      { key: "SMTP_HOST",      placeholder: "",            comment: null },
+      { key: "SMTP_PORT",      placeholder: "587",         comment: null },
+      { key: "SMTP_USER",      placeholder: "",            comment: null },
+      { key: "SMTP_PASS",      placeholder: "",            comment: null },
+      { key: "SMTP_FROM_NAME", placeholder: "Runly ERP",   comment: null },
+      { key: "SMTP_FROM_EMAIL", placeholder: "",           comment: null },
+      { key: "SMTP_TLS",       placeholder: "false",       comment: null },
+    ],
+  },
+  {
+    header: [
       "# ── Custom module ZIP upload ─────────────────────────────────────────────────",
       "# Container-side path where custom-modules/ is mounted (matches docker-compose volume).",
       "# Required for POST /modules/:key/upload and DELETE /modules/:key/purge.",
@@ -255,6 +274,34 @@ const OPTIONAL_VAR_GROUPS = [
       { key: "LIVEKIT_INTERNAL_URL", placeholder: "", comment: "# Derived automatically in embedded mode" },
       { key: "LIVEKIT_API_KEY", placeholder: "", comment: null },
       { key: "LIVEKIT_API_SECRET", placeholder: "", comment: null },
+    ],
+  },
+  {
+    header: [
+      "# ── LiveKit Egress → Supabase Storage (call recordings, optional) ───────────",
+      "# Get these from the self-hosted Supabase Storage container's own S3-compatible",
+      "# config — NOT the same as SUPABASE_SERVICE_ROLE_KEY. Leave empty to disable.",
+    ],
+    vars: [
+      { key: "SUPABASE_S3_ENDPOINT",          placeholder: "", comment: null },
+      { key: "SUPABASE_S3_ACCESS_KEY_ID",     placeholder: "", comment: null },
+      { key: "SUPABASE_S3_SECRET_ACCESS_KEY", placeholder: "", comment: null },
+      { key: "SUPABASE_S3_REGION",            placeholder: "us-east-1", comment: null },
+    ],
+  },
+  {
+    header: [
+      "# ── runly.chat MirAI assistant + runly.pfm/inventory AI extras (optional) ───",
+      "# All reuse GROQ_API_KEY. Without it, the model overrides below are unused.",
+    ],
+    vars: [
+      { key: "INVENTORY_AI_SIGNING_SECRET", placeholder: "", comment: "# Falls back to GROQ_API_KEY" },
+      { key: "PFM_ASSISTANT_MODEL",         placeholder: "", comment: "# Default: openai/gpt-oss-120b" },
+      { key: "CHAT_MIRAI_MODEL",            placeholder: "", comment: "# Default: openai/gpt-oss-120b" },
+      { key: "CHAT_MIRAI_ROUTER_MODEL",     placeholder: "", comment: "# Default: openai/gpt-oss-120b" },
+      { key: "CHAT_MIRAI_WEB",              placeholder: "true", comment: null },
+      { key: "TAVILY_API_KEY",              placeholder: "", comment: "# Needed for MirAI live/internet answers" },
+      { key: "CHAT_MIRAI_WEB_MODEL",        placeholder: "", comment: "# Groq compound fallback, paid plan; only used without TAVILY_API_KEY" },
     ],
   },
 ];
