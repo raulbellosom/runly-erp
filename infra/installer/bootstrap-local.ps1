@@ -35,6 +35,7 @@ $files = @(
   "lib/firebase-config.mjs",
   "lib/livekit-config.mjs",
   "lib/instance-identity.mjs",
+  "lib/supabase-selfhosted-config.mjs",
   "package.json",
   "setup-local.mjs",
   "setup-local.ps1",

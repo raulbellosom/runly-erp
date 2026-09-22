@@ -43,6 +43,12 @@ echo "[runly-bootstrap] Descargando instalador external en $(pwd)"
 for file in "${files[@]}"; do
   mkdir -p "$(dirname "$file")"
   curl -fsSLo "$file" "$base_url/$file"
+  # curl never preserves or sets the executable bit — every .sh entry point
+  # downloaded fresh here would otherwise need a manual `chmod +x` before it
+  # could be run as `./file.sh` (running it as `sh file.sh` sidesteps this,
+  # but then hits dash's lack of `set -o pipefail`/parameter-expansion
+  # support instead — see the 2026-09-22 recording-fix session).
+  [[ "$file" == *.sh ]] && chmod +x "$file"
 done
 
 mkdir -p custom-modules
