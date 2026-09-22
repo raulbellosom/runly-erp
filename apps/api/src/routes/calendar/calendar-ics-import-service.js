@@ -73,6 +73,7 @@ function expandOccurrences(event) {
     description: event.description ?? null,
     location: event.location ?? null,
     allDay: isAllDay,
+    // eslint-disable-next-line no-restricted-syntax -- deliberate UTC: internal dedup key (calendar-event-import-source.external_uid), not a user-facing date
     occurrenceKey: baseStart.toISOString().slice(0, 10),
   }];
 
@@ -100,6 +101,7 @@ function expandOccurrences(event) {
     current.getTime() <= untilMs &&
     instances.length < MAX_INSTANCES_PER_EVENT
   ) {
+    // eslint-disable-next-line no-restricted-syntax -- deliberate UTC: matches EXDATE/RECURRENCE-ID keys (also UTC date-sliced) and the dedup key above, not a user-facing date
     const dayKey = current.toISOString().slice(0, 10);
     produced += 1;
     if (!exdateKeys.has(dayKey) && current.getTime() >= windowStartMs && current.getTime() <= windowEndMs) {
