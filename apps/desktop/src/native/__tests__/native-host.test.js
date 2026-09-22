@@ -113,7 +113,7 @@ test('Vite applies frame restriction only to native host requests', () => {
 })
 
 test('fallback stops auto retries after failed navigation and retries on explicit action', async () => {
-  const nodes = Object.fromEntries(['status', 'retry', 'diagnostics'].map((id) => [id, { textContent: '', addEventListener(_type, cb) { this.click = cb } }]))
+  const nodes = Object.fromEntries(['status', 'retry', 'diagnostics', 'connect-form', 'origin-input', 'confirm-panel', 'confirm-origin', 'confirm-button', 'cancel-button', 'forget-link'].map((id) => [id, { textContent: '', value: '', addEventListener(_type, cb) { this.click = cb } }]))
   let attempts = 0
   const context = {
     document: { getElementById: (id) => nodes[id] }, location: { hash: '#failed' }, navigator: { onLine: false },
@@ -128,6 +128,6 @@ test('fallback stops auto retries after failed navigation and retries on explici
   assert.match(nodes.status.textContent, /No se pudo conectar/)
   await nodes.retry.click()
   assert.equal(attempts, 1)
-  assert.equal(nodes.retry.disabled, false)
+  assert.equal(nodes.retry.hidden, false)
   assert.match(nodes.diagnostics.textContent, /NETWORK_TLS_OR_TIMEOUT/)
 })
