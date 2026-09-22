@@ -9,6 +9,7 @@ export const ANALYTICS_TABS = [
 ];
 
 export const ANALYTICS_RANGE_OPTIONS = [
+  { value: "today", label: "Hoy" },
   { value: "7", label: "Ultimos 7 dias" },
   { value: "30", label: "Ultimos 30 dias" },
   { value: "90", label: "Ultimos 90 dias" },
@@ -34,10 +35,24 @@ function presetDates(days, now) {
   };
 }
 
+// Unlike the 7/30/90-day presets (which deliberately end yesterday, so
+// trend charts never mix in a still-accumulating day), "today" exists
+// specifically to check whether events are landing right now.
+function todayDates(now) {
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  const key = dateKey(today);
+  return { from: key, to: key };
+}
+
 export function resolveAnalyticsFilters(searchParams, now = new Date()) {
   const requestedRange = searchParams.get("range") ?? "30";
   const range = RANGE_KEYS.has(requestedRange) ? requestedRange : "30";
-  const defaults = presetDates(range === "custom" ? 30 : Number(range), now);
+  const defaults =
+    range === "today"
+      ? todayDates(now)
+      : presetDates(range === "custom" ? 30 : Number(range), now);
   const requestedTab = searchParams.get("tab") ?? "overview";
 
   return {

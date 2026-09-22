@@ -23,6 +23,17 @@ describe("growth analytics filters", () => {
     });
   });
 
+  it("resolves 'today' to a single-day range in the current UTC day", () => {
+    const filters = resolveAnalyticsFilters(
+      new URLSearchParams("range=today"),
+      new Date("2026-06-14T18:00:00.000Z"),
+    );
+
+    assert.equal(filters.range, "today");
+    assert.equal(filters.from, "2026-06-14");
+    assert.equal(filters.to, "2026-06-14");
+  });
+
   it("keeps valid custom filters and rejects unsupported tabs", () => {
     const filters = resolveAnalyticsFilters(
       new URLSearchParams(
