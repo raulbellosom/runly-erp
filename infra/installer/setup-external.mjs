@@ -374,7 +374,10 @@ async function writeLiveKitArtifacts(config) {
   if (config.mode !== "embedded") {
     await Promise.all([
       fs.rm(liveKitConfigFile, { force: true }),
-      fs.rm(liveKitEgressConfigFile, { force: true }),
+      // recursive: true also cleans up the directory Docker auto-creates at
+      // this bind-mount source path when the file didn't exist yet the
+      // first time `docker compose --profile livekit-egress up` ran.
+      fs.rm(liveKitEgressConfigFile, { force: true, recursive: true }),
       fs.rm(liveKitCaddyFile, { force: true }),
       fs.rm(legacyLiveKitExternalProxyFile, { force: true }),
     ]);
@@ -396,6 +399,9 @@ async function writeLiveKitArtifacts(config) {
   try { await fs.chmod(liveKitConfigFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
 
   if (config.recordingEnabled) {
+    // A stray directory here (see the recursive:true comment below) would
+    // make writeFile fail with EISDIR too, so clear it first.
+    await fs.rm(liveKitEgressConfigFile, { force: true, recursive: true });
     await fs.writeFile(
       liveKitEgressConfigFile,
       renderEgressConfig({
@@ -409,7 +415,10 @@ async function writeLiveKitArtifacts(config) {
     );
     try { await fs.chmod(liveKitEgressConfigFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
   } else {
-    await fs.rm(liveKitEgressConfigFile, { force: true });
+    // recursive: true also cleans up the directory Docker auto-creates at
+    // this bind-mount source path when the file didn't exist yet the first
+    // time `docker compose --profile livekit-egress up` ran.
+    await fs.rm(liveKitEgressConfigFile, { force: true, recursive: true });
   }
 
   if (config.managedTls) {

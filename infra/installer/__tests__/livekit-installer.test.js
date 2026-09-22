@@ -209,6 +209,16 @@ describe("LiveKit installer contract", () => {
       // flag to forget, no manual `docker compose --profile` step required.
       assert.match(setup, /recordingEnabled/);
       assert.match(setup, /renderEgressConfig/);
+      // Regression: a prior manual `docker compose --profile livekit-egress
+      // up` (before this repo knew how to render egress.yaml) makes Docker
+      // auto-create an empty DIRECTORY at the bind-mount source path when
+      // the file doesn't exist yet. Every rm of liveKitEgressConfigFile must
+      // pass recursive: true or it dies with EISDIR on exactly that VPS.
+      const egressRmCalls = [...setup.matchAll(/rm\(liveKitEgressConfigFile,\s*\{([^}]*)\}/g)];
+      assert.ok(egressRmCalls.length > 0, `${file}: expected at least one liveKitEgressConfigFile rm() call`);
+      for (const [, opts] of egressRmCalls) {
+        assert.match(opts, /recursive:\s*true/, `${file}: liveKitEgressConfigFile rm() missing recursive: true`);
+      }
     }
     for (const file of ["stop-local.mjs", "stop-external.mjs"]) {
       const stop = await read(file);
