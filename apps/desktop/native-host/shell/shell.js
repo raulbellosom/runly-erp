@@ -16,13 +16,17 @@ function showForm(message) {
   connectForm.hidden = false
   confirmPanel.hidden = true
   retry.hidden = true
+  forgetLink.hidden = false
 }
 
 function showConfirm(origin) {
   confirmOrigin.textContent = origin
+  status.textContent = 'Confirma la conexión con este servidor.'
   connectForm.hidden = true
   confirmPanel.hidden = false
   retry.hidden = true
+  forgetLink.hidden = true
+  confirmButton.focus()
 }
 
 function showConnecting() {
@@ -30,6 +34,7 @@ function showConnecting() {
   connectForm.hidden = true
   confirmPanel.hidden = true
   retry.hidden = true
+  forgetLink.hidden = true
 }
 
 function showFailed(message) {
@@ -37,6 +42,7 @@ function showFailed(message) {
   connectForm.hidden = true
   confirmPanel.hidden = true
   retry.hidden = false
+  forgetLink.hidden = false
 }
 
 async function attemptConnect(origin) {
@@ -53,17 +59,20 @@ async function attemptConnect(origin) {
   }
 }
 
-connectButton.addEventListener('click', () => {
+connectForm.addEventListener('submit', (event) => {
+  event.preventDefault()
   const value = originInput.value.trim()
   if (value) attemptConnect(value)
 })
 
 confirmButton.addEventListener('click', async () => {
   confirmButton.disabled = true
+  cancelButton.disabled = true
   try {
     await invoke('host_confirm_origin')
   } catch (error) {
     confirmButton.disabled = false
+    cancelButton.disabled = false
     showForm('No se pudo confirmar la conexión.')
   }
 })
