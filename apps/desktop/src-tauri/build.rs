@@ -46,6 +46,7 @@ fn main() {
             "host_notification_show",
             "host_screen_stop",
             "host_screen_status",
+            "host_fcm_token",
         ]),
     ))
     .expect("Tauri build configuration failed");

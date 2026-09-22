@@ -60,7 +60,7 @@ export function makeConfig(origin) {
               'notification:allow-is-permission-granted', 'notification:allow-request-permission', 'notification:allow-notify',
               'notification:allow-create-channel', 'notification:allow-remove-active', 'allow-host-notification-show',
               'allow-host-screen-start', 'allow-host-screen-stop', 'allow-host-screen-status',
-              'haptics:allow-impact-feedback', 'allow-host-open-external'] },
+              'haptics:allow-impact-feedback', 'allow-host-open-external', 'allow-host-fcm-token'] },
         ],
       },
     },
