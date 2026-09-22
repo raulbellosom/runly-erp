@@ -577,7 +577,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
     const editor = editorInstanceRef.current
     if (!editor) return
     const titleSize = editor.state.doc.firstChild?.nodeSize ?? 2
-    editor.chain().focus().setTextSelection(titleSize - 1).run()
+    editor.commands.focus(titleSize - 1)
   }
 
   return (
