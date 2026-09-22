@@ -4,11 +4,12 @@ import {
   Badge,
   Button,
   DataTable,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   ErrorState,
   PageHeader,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
 } from "@runly/ui";
 import { Code2, Globe, HelpCircle, Pencil, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -38,38 +39,51 @@ const STATUS_VARIANT = {
   disabled: "secondary",
 };
 
-function ConnectHelpPopover() {
+function ConnectHelpDialog() {
+  const [open, setOpen] = useState(false);
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="icon" aria-label="Ayuda sobre sitios conectados">
-          <HelpCircle className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-96 space-y-3 text-sm" align="end">
-        <div>
-          <p className="font-semibold text-[hsl(var(--foreground))]">Como conectar un sitio externo</p>
-          <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[hsl(var(--muted-foreground))]">
-            <li>"Conectar sitio externo" → dale un nombre y su dominio.</li>
-            <li>Copia el snippet generado (botón "Ver codigo" si necesitas verlo de nuevo despues).</li>
-            <li>Pegalo antes de <code className="font-mono">{"</body>"}</code> en el sitio externo y publicalo.</li>
-            <li>Vuelve aqui y dale click a "Verificar" — solo pasa a Activo cuando llega el primer evento real.</li>
-          </ol>
-        </div>
-        <div className="border-t border-[hsl(var(--border))] pt-2">
-          <p className="font-semibold text-[hsl(var(--foreground))]">Estados</p>
-          <ul className="mt-1 space-y-1 text-[hsl(var(--muted-foreground))]">
-            <li><Badge variant="warning">Verificacion pendiente</Badge> — creado, pero aun no llega ningun evento.</li>
-            <li><Badge variant="success">Activo</Badge> — ya recibimos al menos un evento real de ese sitio.</li>
-            <li><Badge variant="destructive">Sin actividad reciente</Badge> — estaba activo, pero no ha mandado datos en mas de 48h. Se revisa cada hora y vuelve a Activo solo cuando lleguen eventos de nuevo.</li>
-          </ul>
-        </div>
-        <p className="border-t border-[hsl(var(--border))] pt-2 text-xs text-[hsl(var(--muted-foreground))]">
-          Si el sitio usa CAPTCHA (Turnstile), configura las claves en "Editar" y vuelve a copiar el snippet —
-          el widget solo se activa si esas claves ya estaban en el codigo pegado.
-        </p>
-      </PopoverContent>
-    </Popover>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="shrink-0"
+        aria-label="Ayuda sobre sitios conectados"
+        onClick={() => setOpen(true)}
+      >
+        <HelpCircle className="h-4 w-4" />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sitios conectados</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="font-semibold text-[hsl(var(--foreground))]">Como conectar un sitio externo</p>
+              <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[hsl(var(--muted-foreground))]">
+                <li>"Conectar sitio externo" → dale un nombre y su dominio.</li>
+                <li>Copia el snippet generado (botón "Ver codigo" si necesitas verlo de nuevo despues).</li>
+                <li>Pegalo antes de <code className="font-mono">{"</body>"}</code> en el sitio externo y publicalo.</li>
+                <li>Vuelve aqui y dale click a "Verificar" — solo pasa a Activo cuando llega el primer evento real.</li>
+              </ol>
+            </div>
+            <div className="border-t border-[hsl(var(--border))] pt-3">
+              <p className="font-semibold text-[hsl(var(--foreground))]">Estados</p>
+              <ul className="mt-1.5 space-y-1.5 text-[hsl(var(--muted-foreground))]">
+                <li><Badge variant="warning">Verificacion pendiente</Badge> — creado, pero aun no llega ningun evento.</li>
+                <li><Badge variant="success">Activo</Badge> — ya recibimos al menos un evento real de ese sitio.</li>
+                <li><Badge variant="destructive">Sin actividad reciente</Badge> — estaba activo, pero no ha mandado datos en mas de 48h. Se revisa cada hora y vuelve a Activo solo cuando lleguen eventos de nuevo.</li>
+              </ul>
+            </div>
+            <p className="border-t border-[hsl(var(--border))] pt-3 text-xs text-[hsl(var(--muted-foreground))]">
+              Si el sitio usa CAPTCHA (Turnstile), configura las claves en "Editar" y vuelve a copiar el snippet —
+              el widget solo se activa si esas claves ya estaban en el codigo pegado.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -213,7 +227,7 @@ export default function GrowthPropertiesScreen() {
         description="Sitios rastreados por Growth, ya sea publicados con el modulo Web o conectados externamente via SDK."
         actions={
           <div className="flex items-center gap-2">
-            <ConnectHelpPopover />
+            <ConnectHelpDialog />
             {canManage ? (
               <Button type="button" onClick={() => setDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
