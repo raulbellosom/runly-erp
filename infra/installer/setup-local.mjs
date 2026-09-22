@@ -694,11 +694,19 @@ async function writeLocalEnv(supabaseInput, identity) {
   const chatMiraiWeb             = fromLocalEnv("CHAT_MIRAI_WEB") || "true";
   const tavilyApiKey             = fromLocalEnv("TAVILY_API_KEY");
   const chatMiraiWebModel        = fromLocalEnv("CHAT_MIRAI_WEB_MODEL");
-  // LiveKit Egress → Supabase Storage (call recordings) — optional, self-hosted only.
-  const supabaseS3Endpoint    = fromLocalEnv("SUPABASE_S3_ENDPOINT");
-  const supabaseS3AccessKeyId = fromLocalEnv("SUPABASE_S3_ACCESS_KEY_ID");
-  const supabaseS3SecretKey   = fromLocalEnv("SUPABASE_S3_SECRET_ACCESS_KEY");
-  const supabaseS3Region      = fromLocalEnv("SUPABASE_S3_REGION") || "us-east-1";
+  // LiveKit Egress → Supabase Storage (call recordings) — optional. For the
+  // installer-managed self-hosted Supabase stack, defaults come from the same
+  // S3_PROTOCOL_ACCESS_KEY_ID/SECRET generated above for storage-api — no
+  // manual credential step. An externally-managed Supabase (RUNLY_SUPABASE_MODE
+  // != selfhosted) has no such default; those vars must be filled in by hand
+  // from wherever that instance's storage-api is configured.
+  const supabaseS3Endpoint    = fromLocalEnv("SUPABASE_S3_ENDPOINT")
+    || (supabase.mode === "selfhosted" ? `${browserSupabaseUrl}/storage/v1/s3` : "");
+  const supabaseS3AccessKeyId = fromLocalEnv("SUPABASE_S3_ACCESS_KEY_ID")
+    || (supabase.mode === "selfhosted" ? supabase.secrets.S3_PROTOCOL_ACCESS_KEY_ID : "");
+  const supabaseS3SecretKey   = fromLocalEnv("SUPABASE_S3_SECRET_ACCESS_KEY")
+    || (supabase.mode === "selfhosted" ? supabase.secrets.S3_PROTOCOL_ACCESS_KEY_SECRET : "");
+  const supabaseS3Region      = fromLocalEnv("SUPABASE_S3_REGION") || "local";
   // Identity-level SMTP (password reset, cross-company mail) — optional; preserve
   // any user-provided value across re-runs, same as the Google OAuth vars above.
   const smtpHost      = fromLocalEnv("SMTP_HOST");
@@ -847,6 +855,9 @@ LIVEKIT_API_SECRET=${liveKit.apiSecret}
       `RUNLY_SUPABASE_SECRET_KEY_BASE=${supabase.secrets.RUNLY_SUPABASE_SECRET_KEY_BASE}`,
       `RUNLY_SUPABASE_REALTIME_DB_ENC_KEY=${supabase.secrets.RUNLY_SUPABASE_REALTIME_DB_ENC_KEY}`,
       `RUNLY_SUPABASE_META_CRYPTO_KEY=${supabase.secrets.RUNLY_SUPABASE_META_CRYPTO_KEY}`,
+      `REGION=local`,
+      `S3_PROTOCOL_ACCESS_KEY_ID=${supabase.secrets.S3_PROTOCOL_ACCESS_KEY_ID}`,
+      `S3_PROTOCOL_ACCESS_KEY_SECRET=${supabase.secrets.S3_PROTOCOL_ACCESS_KEY_SECRET}`,
       `RUNLY_SUPABASE_KONG_HOST_PORT=${supabase.ports.kongPort}`,
       `RUNLY_SUPABASE_STUDIO_HOST_PORT=${supabase.ports.studioPort}`,
       `RUNLY_SUPABASE_PUBLIC_URL=${browserSupabaseUrl}`,

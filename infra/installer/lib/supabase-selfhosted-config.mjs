@@ -81,6 +81,18 @@ export function resolveSupabaseSecrets(existing = {}, { randomBytes = crypto.ran
   const serviceRoleKey = clean(existing.SUPABASE_SERVICE_ROLE_KEY)
     || signHs256Jwt({ role: "service_role", iss: "supabase-runly" }, jwtSecret);
 
+  // S3-protocol credentials for Storage's /storage/v1/s3 endpoint (used by
+  // LiveKit Egress to upload call recordings — see call-recording-service.js
+  // and docs.supabase.com/guides/self-hosting/self-hosted-s3). Unlike
+  // SUPABASE_ANON_KEY/SERVICE_ROLE_KEY (JWTs signed against SUPABASE_JWT_SECRET
+  // and verifiable that way), these are opaque HMAC credentials the operator
+  // defines directly on the storage-api container via S3_PROTOCOL_ACCESS_KEY_ID/
+  // S3_PROTOCOL_ACCESS_KEY_SECRET — there is no Studio UI for this on
+  // self-hosted (that flow only exists on Supabase Cloud), so this installer
+  // generates and wires them the same way it does every other secret here.
+  const s3ProtocolAccessKeyId = clean(existing.S3_PROTOCOL_ACCESS_KEY_ID) || randomToken(16, "hex", randomBytes);
+  const s3ProtocolAccessKeySecret = clean(existing.S3_PROTOCOL_ACCESS_KEY_SECRET) || randomToken(32, "base64url", randomBytes);
+
   return {
     SUPABASE_JWT_SECRET: jwtSecret,
     SUPABASE_POSTGRES_PASSWORD: postgresPassword,
@@ -89,6 +101,8 @@ export function resolveSupabaseSecrets(existing = {}, { randomBytes = crypto.ran
     RUNLY_SUPABASE_SECRET_KEY_BASE: secretKeyBase,
     RUNLY_SUPABASE_REALTIME_DB_ENC_KEY: realtimeDbEncKey,
     RUNLY_SUPABASE_META_CRYPTO_KEY: metaCryptoKey,
+    S3_PROTOCOL_ACCESS_KEY_ID: s3ProtocolAccessKeyId,
+    S3_PROTOCOL_ACCESS_KEY_SECRET: s3ProtocolAccessKeySecret,
   };
 }
 

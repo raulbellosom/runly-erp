@@ -139,6 +139,30 @@ describe("LiveKit installer contract", () => {
     assert.match(compose, /docker\.sock/);
   });
 
+  it("wires storage-api's S3 protocol credentials for self-hosted recording uploads", async () => {
+    // Self-hosted Supabase Storage has no Studio UI to generate these (that
+    // flow only exists on Supabase Cloud) — the installer must generate and
+    // wire S3_PROTOCOL_ACCESS_KEY_ID/SECRET itself, the same as every other
+    // secret in resolveSupabaseSecrets, or SUPABASE_S3_* in .env.local has
+    // nothing valid to point at.
+    const supabaseCompose = await read("supabase/docker-compose.supabase.yml");
+    assert.match(supabaseCompose, /S3_PROTOCOL_ACCESS_KEY_ID:\s*\$\{S3_PROTOCOL_ACCESS_KEY_ID\}/);
+    assert.match(supabaseCompose, /S3_PROTOCOL_ACCESS_KEY_SECRET:\s*\$\{S3_PROTOCOL_ACCESS_KEY_SECRET\}/);
+    assert.doesNotMatch(supabaseCompose, /REGION:\s*stub/);
+
+    const setupLocal = await read("setup-local.mjs");
+    assert.match(setupLocal, /S3_PROTOCOL_ACCESS_KEY_ID=\$\{supabase\.secrets\.S3_PROTOCOL_ACCESS_KEY_ID\}/);
+    assert.match(setupLocal, /S3_PROTOCOL_ACCESS_KEY_SECRET=\$\{supabase\.secrets\.S3_PROTOCOL_ACCESS_KEY_SECRET\}/);
+    // The public gateway (Kong) already routes /storage/v1/, S3 protocol
+    // included — SUPABASE_S3_ENDPOINT must default through it, never
+    // straight to the storage-api container or to Studio (which Kong does
+    // not expose at all — see kong.yml's route table).
+    assert.match(setupLocal, /\$\{browserSupabaseUrl\}\/storage\/v1\/s3/);
+
+    const kong = await read("supabase/volumes/api/kong.yml");
+    assert.match(kong, /paths:\s*\n\s*-\s*\/storage\/v1\//);
+  });
+
   it("renders literal (non-interpolated) credentials and host-appropriate addresses for egress", () => {
     const linux = renderEgressConfig({
       apiKey: "APIabc123",

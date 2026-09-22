@@ -27,15 +27,26 @@ test('resolveSupabaseSecrets generates all required secrets once and preserves t
   assert.ok(first.RUNLY_SUPABASE_META_CRYPTO_KEY.length >= 32);
   assert.ok(verifyHs256Jwt(first.SUPABASE_ANON_KEY, first.SUPABASE_JWT_SECRET).role === 'anon');
   assert.ok(verifyHs256Jwt(first.SUPABASE_SERVICE_ROLE_KEY, first.SUPABASE_JWT_SECRET).role === 'service_role');
+  // Storage's S3-protocol credentials (LiveKit Egress -> call recordings):
+  // opaque HMAC secrets, not JWTs, so they're generated the same way as
+  // SUPABASE_POSTGRES_PASSWORD above rather than signed against jwtSecret.
+  assert.ok(first.S3_PROTOCOL_ACCESS_KEY_ID.length >= 16);
+  assert.ok(first.S3_PROTOCOL_ACCESS_KEY_SECRET.length >= 32);
 
   const again = resolveSupabaseSecrets(first);
   assert.deepEqual(again, first);
 });
 
 test('resolveSupabaseSecrets never rotates a secret that is already present', () => {
-  const existing = { SUPABASE_JWT_SECRET: 'existing-secret-value-long-enough-32b' };
+  const existing = {
+    SUPABASE_JWT_SECRET: 'existing-secret-value-long-enough-32b',
+    S3_PROTOCOL_ACCESS_KEY_ID: 'existing-s3-key-id',
+    S3_PROTOCOL_ACCESS_KEY_SECRET: 'existing-s3-key-secret',
+  };
   const resolved = resolveSupabaseSecrets(existing);
   assert.equal(resolved.SUPABASE_JWT_SECRET, existing.SUPABASE_JWT_SECRET);
+  assert.equal(resolved.S3_PROTOCOL_ACCESS_KEY_ID, existing.S3_PROTOCOL_ACCESS_KEY_ID);
+  assert.equal(resolved.S3_PROTOCOL_ACCESS_KEY_SECRET, existing.S3_PROTOCOL_ACCESS_KEY_SECRET);
 });
 
 test('findFreePort returns the preferred port when free, and increments on collision', async () => {
