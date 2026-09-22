@@ -162,6 +162,25 @@ describe('calendar-event-service', () => {
       }), { status: 404 })
       assert.equal(insertedAttendees, null)
     })
+
+    it('validates attendees against the active company when the calendar is personal (companyId: null)', async () => {
+      let insertedAttendees = null
+      const prisma = makePrisma({
+        calendarCalendar: {
+          findMany: async () => [{ id: 'cal-personal' }],
+          findFirst: async () => ({ id: 'cal-personal', ownerId: 'user-1', companyId: null }),
+        },
+        calendarEventAttendee: {
+          create: async ({ data }) => ({ id: 'att-1', ...data }),
+          createMany: async ({ data }) => { insertedAttendees = data; return { count: data.length } },
+        },
+      })
+      const svc = createCalendarEventService({ prisma })
+      await svc.createEvent('user-1', {
+        calendarId: 'cal-personal', title: 'X', startAt: '2026-06-01T00:00:00Z', attendeeIds: ['peer'],
+      }, 'company-1')
+      assert.deepEqual(insertedAttendees, [{ eventId: 'evt-new', userId: 'peer' }])
+    })
   })
 
   describe('addAttendee company guard', () => {

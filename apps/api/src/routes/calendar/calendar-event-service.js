@@ -124,13 +124,17 @@ export function createCalendarEventService({ prisma }) {
 
   // Returns the subset of candidateIds that share a company with actingUserId
   // (plus the acting user themselves). Blocks adding out-of-company attendees.
-  async function filterCompanyPeers(actingUserId, candidateIds, calendarId) {
+  // Personal calendars have companyId: null (never retroactively assigned one —
+  // see calendar-service.test.js), so attendee validation falls back to the
+  // caller's active company context instead of throwing on a null scope.
+  async function filterCompanyPeers(actingUserId, candidateIds, calendarId, activeCompanyId = null) {
     const ids = [...new Set((candidateIds ?? []).filter(Boolean))]
     if (!ids.length) return []
     const calendar = await prisma.calendarCalendar.findFirst({ where: { id: calendarId, enabled: true }, select: { companyId: true } })
+    const scopeCompanyId = calendar?.companyId ?? activeCompanyId
     const access = createUserAccessService({ prisma })
-    await access.assertCompanyMember(calendar?.companyId, actingUserId)
-    return access.assertCandidates({ companyId: calendar.companyId, userIds: ids })
+    await access.assertCompanyMember(scopeCompanyId, actingUserId)
+    return access.assertCandidates({ companyId: scopeCompanyId, userIds: ids })
   }
 
   async function listEvents({ userId, companyId, start, end, calendarIds, sourceModule, sourceEntityId }) {
@@ -223,7 +227,7 @@ export function createCalendarEventService({ prisma }) {
     const grant = calendar?.ownerId === userId || await prisma.calendarShare.findFirst({ where: { calendarId, userId, role: { in: ['EDITOR', 'MANAGER'] } }, select: { id: true } })
     if (!grant) throw new CalendarServiceError('Recurso no encontrado.', 404)
     const normalizedRecurrence = normalizeRecurrenceRule(recurrenceRule)
-    const validAttendeeIds = await filterCompanyPeers(userId, attendeeIds, calendarId)
+    const validAttendeeIds = await filterCompanyPeers(userId, attendeeIds, calendarId, companyId)
 
     // Event row + its attendees + reminders are written atomically.
     const event = await prisma.$transaction(async (tx) => {
@@ -357,7 +361,7 @@ export function createCalendarEventService({ prisma }) {
       throw new CalendarServiceError('No tienes permiso para agregar invitados.', 403)
     }
 
-    const [peer] = await filterCompanyPeers(userId, [attendeeUserId], event.calendarId)
+    const [peer] = await filterCompanyPeers(userId, [attendeeUserId], event.calendarId, companyId)
     if (peer !== attendeeUserId) {
       throw new CalendarServiceError('Solo puedes invitar a usuarios de tu empresa.', 403)
     }

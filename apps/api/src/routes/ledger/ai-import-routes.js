@@ -3,11 +3,13 @@ import { Hono } from 'hono'
 import { aiImportCommitSchema } from './validators.js'
 import { createAiImportService, AiImportServiceError } from './ai-import-service.js'
 import {
-  extractPdfPages, extractRowsFromText, extractStatementRows, suggestColumnMapping,
+  ExtractionError, extractPdfPages, extractRowsFromText, extractStatementRows, suggestColumnMapping,
 } from './ai-import-extraction.js'
 import { dedupeIntraFile, markDbDuplicates } from './ai-import-dedup.js'
 import { ImportTokenError } from './ai-import-token.js'
 import { getCompanyId, getActorId, getValidationErrorMessage } from './service-helpers.js'
+import { prepareVisionImage } from '../../services/vision-image.js'
+import { VisionServiceError } from '../../services/vision-service.js'
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -15,6 +17,7 @@ const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 function handleError(c, err, fallback) {
   if (err instanceof AiImportServiceError) return c.json({ error: err.message }, err.status)
   if (err instanceof ImportTokenError) return c.json({ error: err.message }, err.status)
+  if (err instanceof VisionServiceError) return c.json({ error: err.message }, err.status || 502)
   if (err?.name === 'ExtractionError') return c.json({ error: err.message }, err.status || 422)
   if (err instanceof SyntaxError) return c.json({ error: 'El cuerpo de la solicitud no es JSON valido.' }, 400)
   if (process.env.NODE_ENV !== 'production') console.error('[runly.ledger/ai-import]', err)
@@ -73,8 +76,18 @@ export function createAiImportRouter({ prisma, requirePermission }) {
       }
 
       if (IMAGE_MIME_TYPES.includes(mimeType)) {
-        const imageBase64 = buffer.toString('base64')
-        const { parsed } = await service.vision.extractLedgerStatementPage({ imageBase64, mimeType })
+        // Photos/screenshots of full statements run far larger than receipt
+        // photos (which already go through this same resize before hitting
+        // Groq — see receipts-service.js). Skipping it here let raw
+        // multi-MB uploads through, which Groq's vision endpoint rejects.
+        let visionBuffer
+        try {
+          visionBuffer = await prepareVisionImage(buffer)
+        } catch (err) {
+          throw new ExtractionError(err.message, 422)
+        }
+        const imageBase64 = visionBuffer.toString('base64')
+        const { parsed } = await service.vision.extractLedgerStatementPage({ imageBase64, mimeType: 'image/jpeg' })
         const rawRows = parsed.rows ?? []
         return c.json({ data: await finishRecognize({ rawRows, documentText: '', companyId, actorId, service }) })
       }
