@@ -1939,6 +1939,7 @@ app.get("/memberships/me", authMiddleware, async (c) => {
           ? {
               id: m.company.id,
               name: m.company.name,
+              slug: m.company.slug,
               logoUrl: logoFileId ? (logoUrlMap.get(logoFileId) ?? null) : null,
               primaryColor: m.company.brandingConfig?.primaryColor ?? null,
             }
