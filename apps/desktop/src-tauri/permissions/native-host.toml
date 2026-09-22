@@ -5,7 +5,7 @@ commands.allow = ["host_info"]
 
 [[permission]]
 identifier = "allow-host-connect"
-description = "Retry the compiled frontend from the bundled recovery page."
+description = "Preflight and connect to the currently configured or a candidate server origin."
 commands.allow = ["host_connect"]
 
 [[permission]]
@@ -47,3 +47,13 @@ commands.allow = ["host_screen_stop"]
 identifier = "allow-host-screen-status"
 description = "Read Android screen sharing state without credentials."
 commands.allow = ["host_screen_status"]
+
+[[permission]]
+identifier = "allow-host-confirm-origin"
+description = "Persist and navigate to a server origin that already passed preflight."
+commands.allow = ["host_confirm_origin"]
+
+[[permission]]
+identifier = "allow-host-forget-origin"
+description = "Clear the currently trusted server origin."
+commands.allow = ["host_forget_origin"]

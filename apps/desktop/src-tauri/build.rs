@@ -38,6 +38,8 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "host_info",
             "host_connect",
+            "host_confirm_origin",
+            "host_forget_origin",
             "host_ready",
             "host_events",
             "host_ack_events",

@@ -53,7 +53,7 @@ export function makeConfig(origin) {
         csp: "default-src 'self'; script-src 'self'; style-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'",
         capabilities: [
           { identifier: 'native-shell', windows: ['main'], platforms: ['android', 'iOS'], local: true,
-            permissions: ['allow-host-info', 'allow-host-connect'] },
+            permissions: ['allow-host-info', 'allow-host-connect', 'allow-host-confirm-origin', 'allow-host-forget-origin'] },
           { identifier: 'native-remote', windows: ['main'], platforms: ['android', 'iOS'], local: false,
             remote: { urls: [`${origin}/app/*`] },
             permissions: ['allow-host-info', 'allow-host-ready', 'allow-host-events', 'allow-host-ack-events',

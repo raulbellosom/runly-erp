@@ -21,6 +21,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             mobile_host::host_info,
             mobile_host::host_connect,
+            mobile_host::host_confirm_origin,
+            mobile_host::host_forget_origin,
             mobile_host::host_ready,
             mobile_host::host_events,
             mobile_host::host_ack_events,
