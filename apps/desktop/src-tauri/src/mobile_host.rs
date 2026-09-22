@@ -44,6 +44,10 @@ pub struct HostState {
     // the user yet. Lives only in memory — lost if the app is killed before
     // confirmation, by design (see spec's error-handling section).
     pending_origin: Mutex<Option<String>>,
+    // Bumped at the start of every host_connect call. A call whose preflight
+    // resolves after a newer call has started must not act on stale results —
+    // see the race this guards against in the commit that introduced it.
+    connect_generation: AtomicU64,
 }
 
 pub fn allowed_remote(url: &Url, origin: &str) -> bool {
@@ -294,7 +298,11 @@ pub async fn host_connect(
             .ok_or("NO_ORIGIN_CONFIGURED")?,
     };
 
+    let my_generation = state.connect_generation.fetch_add(1, Ordering::SeqCst) + 1;
     preflight(&candidate).await?;
+    if state.connect_generation.load(Ordering::SeqCst) != my_generation {
+        return Err("SUPERSEDED".into());
+    }
 
     let already_trusted = state.origin.lock().unwrap().as_deref() == Some(candidate.as_str());
     if !already_trusted {
