@@ -360,6 +360,24 @@ describe("createCallRecordingService.listRecordings", () => {
     assert.equal(rows[1].playlistUrl, undefined);
   });
 
+  it("surfaces the real signing error as playlistUrlError instead of a bare missing playlistUrl", async () => {
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findMany: async () => [
+          { id: REC, status: "READY", playlistObjectKey: "recordings/conv/rec/index.m3u8" },
+        ],
+      },
+    };
+    const supabaseAdmin = {
+      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: { message: "Object not found" } }) }) },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress, supabaseAdmin });
+    const rows = await svc.listRecordings({ conversationId: CONV, profileId: USER });
+    assert.equal(rows[0].playlistUrl, undefined);
+    assert.equal(rows[0].playlistUrlError, "Object not found");
+  });
+
   it("serializes a BigInt sizeBytes to a plain Number (JSON.stringify throws on raw BigInt)", async () => {
     const prisma = {
       $queryRaw: async () => [{ id: "member-row" }],

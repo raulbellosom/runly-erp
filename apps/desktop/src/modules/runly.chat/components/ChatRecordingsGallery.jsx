@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConfirmDialog, EmptyState, ErrorState, Skeleton } from "@runly/ui";
+import {
+  ConfirmDialog, EmptyState, ErrorState, Skeleton,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@runly/ui";
 import { Loader2, AlertCircle, Play, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useConversationRecordings, useDeleteRecording } from "../hooks/useConversationRecordings";
@@ -128,15 +131,31 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
   // (call-recording-service.js listRecordings) — a READY recording can still
   // have no playlistUrl if that signing call failed.
   const isUnavailable = isReady && !hasPlaylist;
+  // The real reason, when the backend has one: failureReason is persisted on
+  // FAILED rows (call-recording-service.js startRecording/reconcileActiveRecordings);
+  // playlistUrlError is computed live on every listRecordings call for a READY
+  // row whose signed-URL request failed. Falls back to a generic message for
+  // older rows recorded before this field existed.
+  const errorDetail = isFailed
+    ? (recording.failureReason || "No se pudo procesar la grabación.")
+    : isUnavailable
+      ? (recording.playlistUrlError || "No se pudo generar el enlace de reproducción.")
+      : null;
 
+  // When there's a problem, lead with it instead of duration/size — a "13s ·
+  // 5.3 MB" subtitle next to a warning icon told the user nothing was wrong
+  // beyond a vague icon (the bug reported: recordings with a real S3 object
+  // and real metadata still can't be signed into a playable URL).
   const metaParts = [];
-  if (isReady && recording.durationMs != null) metaParts.push(`${Math.round(recording.durationMs / 1000)}s`);
-  const fileSize = isReady ? formatFileSize(recording.sizeBytes) : null;
-  if (fileSize) metaParts.push(fileSize);
-  if (recording.startedBy?.displayName) metaParts.push(`Por ${recording.startedBy.displayName}`);
-  if (!metaParts.length) {
-    metaParts.push(isFailed ? "No se pudo procesar" : isUnavailable ? "No disponible" : "Procesando...");
+  if (errorDetail) {
+    metaParts.push(errorDetail);
+  } else {
+    if (isReady && recording.durationMs != null) metaParts.push(`${Math.round(recording.durationMs / 1000)}s`);
+    const fileSize = isReady ? formatFileSize(recording.sizeBytes) : null;
+    if (fileSize) metaParts.push(fileSize);
   }
+  if (recording.startedBy?.displayName) metaParts.push(`Por ${recording.startedBy.displayName}`);
+  if (!metaParts.length) metaParts.push("Procesando...");
 
   async function handleDelete() {
     try {
@@ -165,8 +184,21 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
               <Play className="h-4 w-4" />
             </button>
           )}
-          {isFailed && <AlertCircle className="h-5 w-5 shrink-0 text-red-500" aria-label="No se pudo procesar" />}
-          {isUnavailable && <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" aria-label="No disponible" />}
+          {(isFailed || isUnavailable) && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle
+                    className={`h-5 w-5 shrink-0 ${isFailed ? "text-red-500" : "text-amber-500"}`}
+                    aria-label={errorDetail}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  {errorDetail}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {!isReady && !isFailed && (
             <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" aria-label="Procesando" />
           )}

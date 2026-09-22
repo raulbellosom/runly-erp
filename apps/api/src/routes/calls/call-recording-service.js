@@ -190,12 +190,15 @@ export function createCallRecordingService({
             .createSignedUrl(row.playlistObjectKey, 3600);
           if (error) {
             console.warn(`${LOG_PREFIX} No se pudo firmar la URL de reproducción:`, row.id, row.playlistObjectKey, error.message ?? error);
-            return row; // playback surfaces "no disponible"-style state client-side
+            // playlistUrlError is computed live on every listRecordings call
+            // (never persisted) so the UI can show the actual reason instead
+            // of a bare "no disponible" — see ChatRecordingsGallery.jsx.
+            return { ...row, playlistUrlError: error.message || "No se pudo firmar el enlace de reproducción." };
           }
           return { ...row, playlistUrl: data.signedUrl };
         } catch (err) {
           console.warn(`${LOG_PREFIX} Error inesperado firmando la URL de reproducción:`, row.id, row.playlistObjectKey, err?.message ?? err);
-          return row;
+          return { ...row, playlistUrlError: err?.message || "No se pudo firmar el enlace de reproducción." };
         }
       }));
 
