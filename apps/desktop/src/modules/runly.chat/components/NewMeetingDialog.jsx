@@ -125,10 +125,10 @@ export function NewMeetingDialog({ open, onOpenChange, defaultConversationId = n
   }
 
   // Invites go out only once the event is actually saved.
-  async function sendScheduledInvites(targetId) {
+  async function sendScheduledInvites(targetId, schedule) {
     if (!emails.length) return;
     try {
-      const res = unwrap(await runly.calls.sendInvites(targetId, emails, token));
+      const res = unwrap(await runly.calls.sendInvites(targetId, emails, token, schedule));
       const { notice } = summarizeInviteResult(res);
       const outcome = describeInviteOutcome(res);
       if (outcome) toast.success(outcome);
@@ -158,8 +158,11 @@ export function NewMeetingDialog({ open, onOpenChange, defaultConversationId = n
           setScheduled(null);
           onOpenChange(false);
         }}
-        onSaved={async () => {
-          await sendScheduledInvites(scheduled.targetId);
+        onSaved={async (savedPayload) => {
+          await sendScheduledInvites(scheduled.targetId, {
+            scheduledAt: savedPayload?.startAt ?? null,
+            scheduledEndAt: savedPayload?.endAt ?? null,
+          });
           createdRoomRef.current = null;
           toast.success(`Reunión programada. Código de invitados: ${scheduled.link.code}`);
           setScheduled(null);

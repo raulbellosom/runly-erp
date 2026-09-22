@@ -155,7 +155,7 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
     return invite;
   }
 
-  async function sendInvites({ conversationId, profileId, emails }) {
+  async function sendInvites({ conversationId, profileId, emails, scheduledAt = null, scheduledEndAt = null }) {
     await assertCanManage({ conversationId, profileId });
     const link = await prisma.callLink.findFirst({ where: { conversationId, revokedAt: null } });
     if (!link) throw new CallLinkError("Genera un enlace antes de invitar.", 409);
@@ -182,8 +182,12 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
     // Platform users get pulled straight into the meeting (member + live-call
     // participant) plus the in-app / web_push "incoming call" alert — no guest
     // email. Best-effort: a failure here never blocks the external invites.
+    // Skipped entirely for a scheduled meeting: that alert says "te invitaron
+    // a una videollamada" with no date, which is wrong for something that
+    // hasn't started — a matched user falls through to the dated email invite
+    // below instead, same as an unmatched address.
     let notifiedUsers = [];
-    if (matchedUsers.length && callService?.inviteMembersToLiveCall) {
+    if (matchedUsers.length && callService?.inviteMembersToLiveCall && !scheduledAt) {
       try {
         const res = await callService.inviteMembersToLiveCall({
           conversationId,
@@ -246,7 +250,7 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
     } catch { /* fall back to the generic wording */ }
 
     for (const email of normalized) {
-      if (matchedByEmail.has(email)) continue;
+      if (matchedByEmail.has(email) && !scheduledAt) continue;
       const inviteToken = crypto.randomBytes(24).toString("hex");
       const invite = await prisma.callInvite.create({
         data: {
@@ -261,7 +265,7 @@ export function createCallLinksService({ prisma, smtpService, callService, supab
       const url = joinUrl(link.token, inviteToken);
       if (smtpOk) {
         try {
-          const mail = buildCallInviteEmail({ joinUrl: url, inviterName, conversationTitle, brand, env });
+          const mail = buildCallInviteEmail({ joinUrl: url, inviterName, conversationTitle, scheduledAt, scheduledEndAt, brand, env });
           await smtpService.sendEmail({
             companyId: smtpCompanyId,
             to: email,

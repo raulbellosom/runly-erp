@@ -18,6 +18,11 @@ export function createProjectsCalendarBridge({ prisma }) {
               name: project.name,
               color: project.color ?? "#6366f1",
               icon: project.icon ?? null,
+              // Backfills calendars created before this field was wired up
+              // (they were stuck with company_id: null, which threw off
+              // attendee-company validation on event creation) — self-heals
+              // on the next project touch.
+              companyId: project.companyId ?? null,
             },
           });
           return project.calendarId;
@@ -31,6 +36,7 @@ export function createProjectsCalendarBridge({ prisma }) {
       const calendar = await prisma.calendarCalendar.create({
         data: {
           ownerId: project.ownerId,
+          companyId: project.companyId ?? null,
           name: project.name,
           color: project.color ?? "#6366f1",
           icon: project.icon ?? null,

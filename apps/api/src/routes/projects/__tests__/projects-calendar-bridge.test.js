@@ -70,6 +70,38 @@ describe('createProjectsCalendarBridge', () => {
       assert.equal(updatedProject?.calendarId, calId)
     })
 
+    // Regression: the calendar used to be created without the project's
+    // companyId, leaving it permanently "personal-shaped" (company_id: null)
+    // and throwing off attendee-company validation in calendar-event-service.
+    it('tags the created calendar with the project company', async () => {
+      let created = null
+      const prisma = {
+        ...makeCalendarPrisma(),
+        calendarCalendar: {
+          ...makeCalendarPrisma().calendarCalendar,
+          create: async (args) => { created = args.data; return { id: 'cal-1', ...args.data } },
+        },
+      }
+      const bridge = createProjectsCalendarBridge({ prisma })
+      await bridge.syncProjectCalendar({ id: 'proj-1', ownerId: 'user-1', companyId: 'company-1', name: 'Mi Proyecto', color: '#6366f1' })
+      assert.equal(created?.companyId, 'company-1')
+    })
+
+    it('backfills companyId on an already-linked calendar', async () => {
+      let updateData = null
+      const prisma = {
+        ...makeCalendarPrisma(),
+        calendarCalendar: {
+          ...makeCalendarPrisma().calendarCalendar,
+          findFirst: async () => ({ id: 'cal-1' }),
+          update: async ({ where, data }) => { updateData = data; return { id: where.id, ...data } },
+        },
+      }
+      const bridge = createProjectsCalendarBridge({ prisma })
+      await bridge.syncProjectCalendar({ id: 'proj-1', ownerId: 'user-1', companyId: 'company-1', calendarId: 'cal-1', name: 'Mi Proyecto', color: '#6366f1' })
+      assert.equal(updateData?.companyId, 'company-1')
+    })
+
     it('returns null silently when atlas.calendar is not installed', async () => {
       const bridge = createProjectsCalendarBridge({ prisma: makeNoPrisma() })
       const calId = await bridge.syncProjectCalendar({ id: 'proj-1', ownerId: 'user-1', name: 'P', color: null })

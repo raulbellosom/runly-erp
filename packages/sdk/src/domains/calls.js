@@ -43,8 +43,10 @@ export function createCallsDomain(request, withAuthHeaders) {
       json(`/calls/conversations/${encodeURIComponent(conversationId)}/link`, "PATCH", patch, token),
     revokeLink: (conversationId, token) =>
       json(`/calls/conversations/${encodeURIComponent(conversationId)}/link`, "DELETE", undefined, token),
-    sendInvites: (conversationId, emails, token) =>
-      json(`/calls/conversations/${encodeURIComponent(conversationId)}/link/invites`, "POST", { emails }, token),
+    // `schedule` — optional `{ scheduledAt, scheduledEndAt }` for a meeting
+    // booked ahead of time; omit for an instant "join now" call invite.
+    sendInvites: (conversationId, emails, token, schedule) =>
+      json(`/calls/conversations/${encodeURIComponent(conversationId)}/link/invites`, "POST", schedule ? { emails, ...schedule } : { emails }, token),
 
     // --- guest moderation (by call) ---
     listGuests: (callId, token) =>

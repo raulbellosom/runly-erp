@@ -8,6 +8,11 @@ export const callLinkPatchSchema = z.object({
 
 export const callInviteSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(50),
+  // Present only when inviting to a meeting booked ahead of time (runly.chat's
+  // "Programar" flow) — lets the invite email show a date instead of implying
+  // the call is happening right now.
+  scheduledAt: z.string().datetime().nullish(),
+  scheduledEndAt: z.string().datetime().nullish(),
 });
 
 export const callGuestJoinSchema = z

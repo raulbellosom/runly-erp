@@ -138,8 +138,8 @@ export function createCallsRouter({
   internal.post("/conversations/:conversationId/link/invites", async (c) => {
     try {
       const conversationId = conversationIdSchema.parse(c.req.param("conversationId"));
-      const { emails } = callInviteSchema.parse(await c.req.json());
-      return c.json({ data: await linksService.sendInvites({ conversationId, profileId: await profileId(c), emails }) });
+      const { emails, scheduledAt, scheduledEndAt } = callInviteSchema.parse(await c.req.json());
+      return c.json({ data: await linksService.sendInvites({ conversationId, profileId: await profileId(c), emails, scheduledAt, scheduledEndAt }) });
     } catch (error) { return handleError(c, error, "Error enviando invitaciones."); }
   });
 

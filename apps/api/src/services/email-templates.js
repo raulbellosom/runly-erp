@@ -106,27 +106,64 @@ export function renderAtlasEmailLayout({ kicker, heading, bodyHtml = "", cta = n
 // `brand` — optional `{ name, logoUrl, primaryColor }` resolved by the caller
 // from the inviting company's BrandingConfig. Omit it (or leave fields out)
 // and the email renders with plain Runly branding — see renderAtlasEmailLayout.
-export function buildCallInviteEmail({ joinUrl, inviterName = null, conversationTitle = null, brand = null, env = process.env }) {
+// `es-MX`, no explicit timeZone — matches the existing convention in
+// notification-delivery-worker.js's formatDateTime for the same reason
+// (kept simple; not instance-timezone-aware).
+function formatScheduledDateTime(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("es-MX", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatScheduledRange(scheduledAt, scheduledEndAt) {
+  const start = formatScheduledDateTime(scheduledAt);
+  if (!start) return null;
+  const endDate = scheduledEndAt ? new Date(scheduledEndAt) : null;
+  if (!endDate || Number.isNaN(endDate.getTime())) return start;
+  const sameDay = new Date(scheduledAt).toDateString() === endDate.toDateString();
+  if (sameDay) {
+    const endTime = endDate.toLocaleString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+    return `${start} - ${endTime}`;
+  }
+  return `${start} - ${formatScheduledDateTime(scheduledEndAt)}`;
+}
+
+// `scheduledAt`/`scheduledEndAt` — pass these for a meeting booked ahead of
+// time (runly.chat's "Programar" flow); omit them for an instant "join now"
+// call invite. The wording and CTA adapt so a scheduled invite actually says
+// when the meeting is, instead of implying it's happening right now.
+export function buildCallInviteEmail({ joinUrl, inviterName = null, conversationTitle = null, scheduledAt = null, scheduledEndAt = null, brand = null, env = process.env }) {
   const orgName = brand?.name ? brand.name : "Runly ERP";
   const who = inviterName ? `${inviterName} te invitó` : "Te invitaron";
   const where = conversationTitle ? ` en "${conversationTitle}"` : "";
-  const heading = "Te invitaron a una llamada";
+  const whenText = formatScheduledRange(scheduledAt, scheduledEndAt);
+  const heading = whenText ? "Te invitaron a una reunión" : "Te invitaron a una llamada";
 
   const bodyHtml = `
         <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#334155">
           ${escapeHtml(who)} a una videollamada${escapeHtml(where)} en ${escapeHtml(orgName)}.
         </p>
+        ${whenText ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#334155"><strong>Cuándo:</strong> ${escapeHtml(whenText)}</p>` : ""}
         <p style="margin:0 0 16px 0;font-size:13px;line-height:1.6;color:#64748b">
-          Solo necesitas tu nombre para entrar. Si el boton no funciona, copia este enlace en tu navegador:<br />
+          ${whenText ? "Guarda este enlace y únete a la hora programada. " : "Solo necesitas tu nombre para entrar. "}Si el boton no funciona, copia este enlace en tu navegador:<br />
           <span style="word-break:break-all;color:#334155">${escapeHtml(joinUrl)}</span>
         </p>`;
 
   const html = renderAtlasEmailLayout({
-    kicker: "Invitacion a llamada",
+    kicker: whenText ? "Invitación a reunión" : "Invitacion a llamada",
     heading,
     bodyHtml,
     cta: { label: "Unirme a la llamada", url: joinUrl },
-    footnote: `Recibiste este correo porque alguien te invitó a una llamada en ${orgName}.`,
+    footnote: `Recibiste este correo porque alguien te invitó a una ${whenText ? "reunión" : "llamada"} en ${orgName}.`,
     brand,
     env,
   });
@@ -135,6 +172,7 @@ export function buildCallInviteEmail({ joinUrl, inviterName = null, conversation
     orgName,
     "",
     `${who} a una videollamada${where}.`,
+    ...(whenText ? ["", `Cuándo: ${whenText}`] : []),
     "",
     `Unirme a la llamada: ${joinUrl}`,
   ].join("\n");

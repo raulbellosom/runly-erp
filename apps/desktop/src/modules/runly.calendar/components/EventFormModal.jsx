@@ -263,7 +263,7 @@ export default function EventFormModal({
         await createEvent.mutateAsync(payload);
         toast.success("Evento creado");
       }
-      onSaved?.();
+      onSaved?.(payload);
       onClose();
     } catch (err) {
       toast.error(err.message || "Error al guardar el evento");
