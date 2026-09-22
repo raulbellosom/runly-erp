@@ -6,8 +6,11 @@ import {
   DataTable,
   ErrorState,
   PageHeader,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@runly/ui";
-import { Code2, Globe, Pencil, Plus } from "lucide-react";
+import { Code2, Globe, HelpCircle, Pencil, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "../../../auth/AuthProvider.jsx";
@@ -32,6 +35,40 @@ const STATUS_VARIANT = {
   pending_verification: "warning",
   disabled: "secondary",
 };
+
+function ConnectHelpPopover() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="icon" aria-label="Ayuda sobre sitios conectados">
+          <HelpCircle className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 space-y-3 text-sm" align="end">
+        <div>
+          <p className="font-semibold text-[hsl(var(--foreground))]">Como conectar un sitio externo</p>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[hsl(var(--muted-foreground))]">
+            <li>"Conectar sitio externo" → dale un nombre y su dominio.</li>
+            <li>Copia el snippet generado (botón "Ver codigo" si necesitas verlo de nuevo despues).</li>
+            <li>Pegalo antes de <code className="font-mono">{"</body>"}</code> en el sitio externo y publicalo.</li>
+            <li>Vuelve aqui y dale click a "Verificar" — solo pasa a Activo cuando llega el primer evento real.</li>
+          </ol>
+        </div>
+        <div className="border-t border-[hsl(var(--border))] pt-2">
+          <p className="font-semibold text-[hsl(var(--foreground))]">Estados</p>
+          <ul className="mt-1 space-y-1 text-[hsl(var(--muted-foreground))]">
+            <li><Badge variant="warning">Verificacion pendiente</Badge> — creado, pero aun no llega ningun evento.</li>
+            <li><Badge variant="success">Activo</Badge> — ya recibimos al menos un evento real de ese sitio.</li>
+          </ul>
+        </div>
+        <p className="border-t border-[hsl(var(--border))] pt-2 text-xs text-[hsl(var(--muted-foreground))]">
+          Si el sitio usa CAPTCHA (Turnstile), configura las claves en "Editar" y vuelve a copiar el snippet —
+          el widget solo se activa si esas claves ya estaban en el codigo pegado.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function GrowthPropertiesScreen() {
   const { session, userProfile } = useAuth();
@@ -65,6 +102,18 @@ export default function GrowthPropertiesScreen() {
     mutationFn: (propertyId) => runly.growth.verifyProperty(propertyId, token),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["growth", "properties"] }),
   });
+
+  async function handleVerify(propertyId) {
+    const result = await verifyMutation.mutateAsync(propertyId);
+    if (result?.verified) {
+      toast.success("Sitio verificado: ya estamos recibiendo datos.");
+    } else {
+      toast.info(
+        "Aun no recibimos eventos de ese sitio. Verifica que el snippet este publicado.",
+      );
+    }
+    return result;
+  }
 
   const updateMutation = useMutation({
     mutationFn: ({ propertyId, payload }) => runly.growth.updateProperty(propertyId, payload, token),
@@ -103,6 +152,18 @@ export default function GrowthPropertiesScreen() {
               header: "",
               cell: ({ row }) => (
                 <div className="flex gap-2 justify-end">
+                  {row.original.kind === "external_sdk" && row.original.status === "pending_verification" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={verifyMutation.isPending}
+                      onClick={() => handleVerify(row.original.id)}
+                    >
+                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                      Verificar
+                    </Button>
+                  )}
                   {row.original.kind === "external_sdk" && (
                     <Button
                       type="button"
@@ -129,7 +190,7 @@ export default function GrowthPropertiesScreen() {
           ]
         : []),
     ],
-    [canManage],
+    [canManage, verifyMutation.isPending],
   );
 
   if (!canAccess) {
@@ -148,12 +209,15 @@ export default function GrowthPropertiesScreen() {
         title="Sitios conectados"
         description="Sitios rastreados por Growth, ya sea publicados con el modulo Web o conectados externamente via SDK."
         actions={
-          canManage ? (
-            <Button type="button" onClick={() => setDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Conectar sitio externo
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            <ConnectHelpPopover />
+            {canManage ? (
+              <Button type="button" onClick={() => setDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Conectar sitio externo
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
