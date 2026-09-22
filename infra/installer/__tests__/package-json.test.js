@@ -67,6 +67,30 @@ test('bootstrap entry scripts download every local library imported by setup', a
   }
 })
 
+test('bootstrap-local downloads docker-compose.supabase.yml and every file it mounts as a volume', async () => {
+  // Regression (2026-09-22): docker-compose.supabase.yml itself, plus every
+  // ./supabase/... path it bind-mounts (kong.yml, kong-entrypoint.sh, the
+  // *.sql init scripts), was entirely absent from bootstrap-local.sh's file
+  // list. update-local.sh kept re-downloading everything else while silently
+  // leaving whatever stale copies of these already happened to be on a VPS
+  // untouched — a fix to docker-compose.supabase.yml (S3_PROTOCOL_ACCESS_
+  // KEY_ID/SECRET, confirmed live against a real VPS) never actually reached
+  // it, and the failure mode gave no error at all, just an update that
+  // silently did nothing for that file.
+  const compose = await fs.readFile(path.resolve('infra/installer/supabase/docker-compose.supabase.yml'), 'utf8')
+  const mounted = [...compose.matchAll(/-\s+\.\/(supabase\/[^:]+):/g)].map((m) => m[1])
+  assert.ok(mounted.length > 0, 'expected docker-compose.supabase.yml to bind-mount at least one ./supabase/... file')
+
+  const bootstrapLocalSh = await fs.readFile(path.resolve('infra/installer/bootstrap-local.sh'), 'utf8')
+  const bootstrapLocalPs1 = await fs.readFile(path.resolve('infra/installer/bootstrap-local.ps1'), 'utf8')
+  for (const bootstrap of [bootstrapLocalSh, bootstrapLocalPs1]) {
+    assert.ok(bootstrap.includes('supabase/docker-compose.supabase.yml'), 'bootstrap-local must download supabase/docker-compose.supabase.yml itself')
+    for (const mountedFile of mounted) {
+      assert.ok(bootstrap.includes(mountedFile), `bootstrap-local must download ${mountedFile} (mounted by docker-compose.supabase.yml)`)
+    }
+  }
+})
+
 test('bootstrap scripts download the full installer file set for local and external flows', async () => {
   const bootstrapLocalPs1 = await fs.readFile(path.resolve('infra/installer/bootstrap-local.ps1'), 'utf8')
   const bootstrapLocalSh = await fs.readFile(path.resolve('infra/installer/bootstrap-local.sh'), 'utf8')

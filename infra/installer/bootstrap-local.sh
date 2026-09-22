@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The files array below is parsed literally (whitespace-split) by
+# bootstrap-refresh.test.js, so no comments or blank lines inside it —
+# put explanatory notes here, above the array, instead.
+#
+# docker-compose.supabase.yml's own volume mounts (kong.yml,
+# kong-entrypoint.sh, the *.sql init scripts) must be listed alongside it —
+# without them, an update keeps whatever stale copies already happen to be
+# on disk regardless of what changed in the repo. Missed once already: this
+# exact gap is why the 2026-09-22 S3_PROTOCOL_ACCESS_KEY_ID/SECRET fix to
+# docker-compose.supabase.yml never reached a real VPS via update-local.sh.
 base_url="https://raw.githubusercontent.com/raulbellosom/runly-erp/main/infra/installer"
 if [[ "${RUNLY_BOOTSTRAP_REFRESHED-${ATLAS_BOOTSTRAP_REFRESHED:-}}" != "local" ]]; then
   bootstrap_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -36,6 +46,13 @@ files=(
   stop-local.ps1
   stop-local.sh
   update-local.sh
+  supabase/docker-compose.supabase.yml
+  supabase/volumes/api/kong.yml
+  supabase/volumes/api/kong-entrypoint.sh
+  supabase/volumes/db/realtime.sql
+  supabase/volumes/db/webhooks.sql
+  supabase/volumes/db/roles.sql
+  supabase/volumes/db/jwt.sql
 )
 
 echo "[runly-bootstrap] Descargando instalador local en $(pwd)"

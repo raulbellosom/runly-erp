@@ -42,7 +42,14 @@ $files = @(
   "setup-local.sh",
   "stop-local.mjs",
   "stop-local.ps1",
-  "stop-local.sh"
+  "stop-local.sh",
+  "supabase/docker-compose.supabase.yml",
+  "supabase/volumes/api/kong.yml",
+  "supabase/volumes/api/kong-entrypoint.sh",
+  "supabase/volumes/db/realtime.sql",
+  "supabase/volumes/db/webhooks.sql",
+  "supabase/volumes/db/roles.sql",
+  "supabase/volumes/db/jwt.sql"
 )
 
 Write-Host "[runly-bootstrap] Descargando instalador local en $PWD"
