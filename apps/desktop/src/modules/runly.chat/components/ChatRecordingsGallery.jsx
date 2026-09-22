@@ -31,9 +31,16 @@ function formatFileSize(bytes) {
 }
 
 // Attaches `src` (a blob: URL wrapping the rewritten HLS manifest — see
-// RecordingRow's manifestBlobUrl) to the given video ref: native
-// playback on Safari (which supports HLS natively), the hls.js polyfill
-// (lazy-loaded so it never enters the main bundle) everywhere else.
+// RecordingRow's manifestBlobUrl) to the given video ref: hls.js
+// (lazy-loaded so it never enters the main bundle) wherever `Hls.isSupported()`
+// says MediaSource-based playback is available, native `<video>` src only as
+// the fallback for genuine Safari/iOS. This order matters and must not be
+// flipped: some Chromium builds report `canPlayType('application/vnd.apple.mpegurl')`
+// as truthy without actually being able to parse an HLS manifest — checking
+// that BEFORE Hls.isSupported() (as this used to) sends those browsers down
+// the native path, which then fails immediately with MediaError code 4
+// (SRC_NOT_SUPPORTED, confirmed against production on Windows/Chromium).
+// Matches hls.js's own documented integration snippet.
 // A real useEffect is required here (not useState's lazy initializer,
 // which only ever runs once at mount) because `src` only becomes non-null
 // after the row is expanded post-mount — the effect must re-run then.
@@ -49,39 +56,44 @@ function useHls(videoRef, src, onFatalError) {
     if (!src || !videoRef.current) return undefined;
     const video = videoRef.current;
 
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
-      setReady(true);
-      return () => {
-        // Symmetric with the hls.js branch's hls.destroy() below — stops
-        // playback and releases the media resource on cleanup instead of
-        // relying solely on the <video> node being unmounted.
-        video.pause();
-        video.removeAttribute("src");
-        video.load();
-      };
-    }
-
     let hls;
     let cancelled = false;
     import("hls.js").then(({ default: Hls }) => {
       if (cancelled) return;
-      if (!Hls.isSupported()) {
-        onFatalError?.();
+
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          // Nothing surfaced this to the console before — a fatal error just
+          // silently triggered the fallback UI with no way to tell network
+          // (fetch/CORS) apart from demux/buffer failures. Log every error
+          // hls.js reports, fatal or not, with its full detail.
+          console.warn("[ChatRecordingsGallery] hls.js error:", data?.type, data?.details, data?.fatal ? "(fatal)" : "(recoverable)", data);
+          if (data?.fatal) onFatalError?.();
+        });
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        setReady(true);
         return;
       }
-      hls = new Hls();
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data?.fatal) onFatalError?.();
-      });
-      hls.loadSource(src);
-      hls.attachMedia(video);
-      setReady(true);
+
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = src;
+        setReady(true);
+        return;
+      }
+
+      onFatalError?.();
     });
 
     return () => {
       cancelled = true;
       hls?.destroy();
+      // Symmetric cleanup for the native-src branch — safe to call
+      // unconditionally even when hls.js managed playback instead.
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
     };
   }, [src, videoRef, onFatalError]);
 
@@ -102,6 +114,14 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
   const retriedRef = useRef(false);
 
   const handleFatalError = useCallback(() => {
+    // hls.js's own ERROR event is logged in useHls above; this also fires
+    // straight from the native <video> element's onError (Safari's native
+    // HLS path, and any decode error MSE surfaces onto the element itself),
+    // which carries its own MediaError with a numeric .code — log it too.
+    if (videoRef.current?.error) {
+      const { code, message } = videoRef.current.error;
+      console.warn("[ChatRecordingsGallery] <video> MediaError:", code, message);
+    }
     if (!retriedRef.current) {
       retriedRef.current = true;
       refetch?.();

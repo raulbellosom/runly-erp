@@ -1,88 +1,22 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, Maximize2 } from "lucide-react";
-import { Popover, PopoverAnchor, PopoverContent, SelectField, ComboboxField, SearchInput } from "@runly/ui";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { Loader2, Maximize2, Search as SearchIcon } from "lucide-react";
+import { Popover, PopoverAnchor, PopoverContent, ComboboxField, SearchInput } from "@runly/ui";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
 import { isImageMime } from "../lib/chatUtils";
 import { FileTypeIcon } from "./ChatFilesGallery";
 import { useFileRefSignedUrl } from "../hooks/useFileRefSignedUrl";
+import { useRovingFocus } from "../hooks/useRovingFocus";
 import { EntityFileViewer } from "./EntityFileViewer";
+import { ConnectorRow } from "./ConnectorRow";
+import { ENTITY_TYPE_LIST, FLAT_ENTITY_TYPES, fetchEntityOptions, matchesConnectorSearch } from "../lib/entityReferenceTypes";
 
-// Fixed 4-type set — values match the backend's `entityType` enum in
-// chatSendMessageSchema (packages/validators/src/chat.js) byte-for-byte,
-// since these strings round-trip to the API unchanged.
-const ENTITY_TYPES = [
-  { value: "contact", label: "Contacto" },
-  { value: "file", label: "Archivo" },
-  { value: "ledger_account", label: "Cuenta contable" },
-  { value: "hr_employee", label: "Colaborador" },
-  { value: "project", label: "Proyecto" },
-  { value: "task", label: "Tarea" },
-  { value: "calendar_event", label: "Evento" },
-];
-
-// ComboboxField (packages/ui/src/components/FormFields.jsx) does NOT do
-// server-side search-as-you-type: its `onSearchChange` fires exactly once,
-// when first opened with an empty `options` array, and every keystroke after
-// that only filters the already-loaded array client-side. So each entity
-// type's list is fetched ONCE (a capped page) when that type is selected —
-// not per keystroke — and ComboboxField's own client-side filter narrows it.
-async function fetchOptions(entityType, token) {
-  if (entityType === "contact") {
-    // Dedicated lightweight picker endpoint (server clamps limit to 30).
-    const res = await runly.contacts.picker(token, { limit: 100 });
-    return (res?.data ?? []).map((c) => ({ label: c.name, value: c.id }));
-  }
-  if (entityType === "file") {
-    // Params first, token second — different arg order than the other three.
-    // Thumbnails are fetched lazily per-tile at the "card" variant (see
-    // FilePickerTile below) rather than reusing the full-resolution signedUrl
-    // this listing embeds — that URL is meant for direct downloads/link-outs,
-    // not for rendering a grid of dozens of preview tiles at once.
-    const res = await runly.files.list({ pageSize: 100 }, token);
-    return (res?.data ?? []).map((f) => ({
-      label: f.originalName,
-      value: f.id,
-      mimeType: f.mimeType ?? null,
-      sizeBytes: f.sizeBytes ?? null,
-    }));
-  }
-  if (entityType === "hr_employee") {
-    // The SDK's listEmployees only forwards q/status/enabled/limit — NOT
-    // pageSize (silently dropped) — so `limit` is used explicitly here
-    // rather than relying on the server's own default `limit` fallback.
-    const res = await runly.hr.listEmployees(token, { limit: 100 });
-    return (res?.data ?? []).map((e) => ({ label: `${e.firstName} ${e.lastName}`.trim(), value: e.id }));
-  }
-  if (entityType === "ledger_account") {
-    // No server-side search/filter param exists on this endpoint — fetch the
-    // full list once (typically small per company) and let ComboboxField's
-    // own client-side filter narrow it.
-    const res = await runly.ledger.listAccounts(token, {});
-    return (res?.data ?? []).map((a) => ({ label: a.bank ? `${a.name} · ${a.bank}` : a.name, value: a.id }));
-  }
-  if (entityType === "project") {
-    // GET /projects (projects-routes.js) returns the array directly —
-    // `c.json(projects)`, not `{ data: [...] }` — unlike contact/hr_employee/
-    // ledger_account above. `res?.data ?? res ?? []` covers both shapes, same
-    // defensive pattern ProjectsScreen.jsx already uses for this same call.
-    const res = await runly.projects.listProjects(token);
-    return (res?.data ?? res ?? []).map((p) => ({ label: p.name, value: p.id }));
-  }
-  if (entityType === "calendar_event") {
-    // A fixed 90-days-back / 365-days-ahead window — this is a "mention an
-    // event you'd realistically want to reference," not the full calendar
-    // history. listEvents requires start/end (calendar-event-service.js
-    // throws 400 without them).
-    const now = Date.now();
-    const start = new Date(now - 90 * 86400000).toISOString();
-    const end = new Date(now + 365 * 86400000).toISOString();
-    const res = await runly.calendar.listEvents(token, { start, end });
-    return (res ?? []).map((e) => ({ label: e.title, value: e.id }));
-  }
-  return [];
-}
+// How many matches each type contributes to the "Todos" merged view before
+// it's truncated behind a "Ver los N" link that switches to that type's own
+// full list — keeps the merged view scannable when a query matches broadly.
+const ALL_MODE_MATCHES_PER_TYPE = 4;
+const ALL_MODE_MIN_QUERY_LENGTH = 2;
 
 // One grid tile — its own component so each file gets its own lazy "card"
 // (96x96) thumbnail query, fired only for image files and only once this
@@ -97,6 +31,7 @@ function FilePickerTile({ opt, isSelected, atCap, onToggle, onPreview }) {
     <div className="relative">
       <button
         type="button"
+        data-connector-row
         onClick={() => onToggle(opt)}
         disabled={disabled}
         title={opt.label}
@@ -164,15 +99,16 @@ function FilePickerTile({ opt, isSelected, atCap, onToggle, onPreview }) {
 }
 
 // A real thumbnail grid for the "Archivo" type instead of a filename-only
-// text dropdown — the point of attaching a file reference is usually to
-// pick a specific photo/document by how it LOOKS, not by remembering its
-// exact filename. Supports selecting several files at once (confirmed via
-// the "Adjuntar (N)" button, capped at `maxSelect`) and a per-tile "ver en
+// text list — the point of attaching a file reference is usually to pick a
+// specific photo/document by how it LOOKS, not by remembering its exact
+// filename. Supports selecting several files at once (confirmed via the
+// "Adjuntar (N)" button, capped at `maxSelect`) and a per-tile "ver en
 // grande" preview through the same viewer used for already-sent references.
-function FilePickerGrid({ options, isLoading, maxSelect, onConfirm }) {
-  const [search, setSearch] = useState("");
+// `search` comes from the picker's single shared search box, not its own.
+function FilePickerGrid({ options, isLoading, search, maxSelect, onConfirm }) {
   const [selected, setSelected] = useState([]);
   const [previewOpt, setPreviewOpt] = useState(null);
+  const rovingKeyDown = useRovingFocus();
 
   const filtered = useMemo(() => {
     if (!search.trim()) return options;
@@ -197,18 +133,12 @@ function FilePickerGrid({ options, isLoading, maxSelect, onConfirm }) {
 
   return (
     <div className="space-y-2">
-      <SearchInput
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        onClear={() => setSearch("")}
-        placeholder="Buscar archivo..."
-      />
       {isLoading ? (
         <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Cargando...</p>
       ) : filtered.length === 0 ? (
         <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Sin resultados</p>
       ) : (
-        <div className="grid grid-cols-4 gap-1.5 max-h-72 overflow-y-auto pr-1">
+        <div className="grid grid-cols-4 gap-1.5 max-h-72 overflow-y-auto pr-1" onKeyDown={rovingKeyDown}>
           {filtered.map((opt) => (
             <FilePickerTile
               key={opt.value}
@@ -248,18 +178,105 @@ function FilePickerGrid({ options, isLoading, maxSelect, onConfirm }) {
   );
 }
 
-// `task` can't use the flat fetchOptions path: GET /projects/:id/tasks is
-// per-project only, there's no cross-project task list endpoint. Mirrors
-// FilePickerGrid's precedent just above (a type-specific sub-component
-// instead of forcing every type through the same single ComboboxField).
+// Single-select list for any flat type except `file` (its own thumbnail
+// grid above) — every row renders through the shared ConnectorRow, filtered
+// by the picker's shared search box. Clicking a row attaches it immediately,
+// same quick single-pick behavior every type except file/inventory_item had
+// before this redesign.
+function SingleSelectList({ entityType, query, search, onPick }) {
+  const rovingKeyDown = useRovingFocus();
+  const filtered = useMemo(
+    () => (query?.data ?? []).filter((o) => matchesConnectorSearch(o, search)),
+    [query?.data, search],
+  );
+
+  if (query?.isLoading) {
+    return <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Cargando...</p>;
+  }
+  if (filtered.length === 0) {
+    return <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Sin resultados</p>;
+  }
+  return (
+    <div className="space-y-1 max-h-80 overflow-y-auto pr-1" onKeyDown={rovingKeyDown}>
+      {filtered.map((opt) => (
+        <ConnectorRow key={opt.value} entityType={entityType} opt={opt} onClick={() => onPick(opt.value, opt.label)} />
+      ))}
+    </div>
+  );
+}
+
+// Multi-select list for `inventory_item` — several items can be attached to
+// the same message at once (confirmed via "Adjuntar (N)"), mirroring
+// FilePickerGrid's multi-select confirm flow but as rows instead of tiles.
+function MultiSelectList({ entityType, query, search, maxSelect, onConfirm }) {
+  const [selected, setSelected] = useState([]);
+  const rovingKeyDown = useRovingFocus();
+
+  const filtered = useMemo(
+    () => (query?.data ?? []).filter((o) => matchesConnectorSearch(o, search)),
+    [query?.data, search],
+  );
+
+  const atCap = maxSelect != null && selected.length >= maxSelect;
+
+  function toggle(opt) {
+    setSelected((prev) => {
+      const exists = prev.some((s) => s.value === opt.value);
+      if (exists) return prev.filter((s) => s.value !== opt.value);
+      if (maxSelect != null && prev.length >= maxSelect) return prev;
+      return [...prev, opt];
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      {query?.isLoading ? (
+        <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Cargando...</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Sin resultados</p>
+      ) : (
+        <div className="space-y-1 max-h-72 overflow-y-auto pr-1" onKeyDown={rovingKeyDown}>
+          {filtered.map((opt) => (
+            <ConnectorRow
+              key={opt.value}
+              entityType={entityType}
+              opt={opt}
+              isSelected={selected.some((s) => s.value === opt.value)}
+              disabled={atCap && !selected.some((s) => s.value === opt.value)}
+              onClick={() => toggle(opt)}
+            />
+          ))}
+        </div>
+      )}
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+          {selected.length > 0
+            ? `${selected.length} seleccionado${selected.length === 1 ? "" : "s"}`
+            : "Selecciona uno o varios"}
+        </span>
+        <button
+          type="button"
+          onClick={() => onConfirm(selected)}
+          disabled={selected.length === 0}
+          className="text-xs font-medium px-3 py-1.5 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+        >
+          Adjuntar{selected.length > 0 ? ` (${selected.length})` : ""}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// `task` can't use the flat fetchEntityOptions path: GET /projects/:id/tasks
+// is per-project only, there's no cross-project task list endpoint. Its own
+// two-level cascade instead of the shared search box, which is hidden while
+// this type is active (see isTaskType in EntityReferencePicker below).
 function TaskPickerCascade({ token, onPick }) {
   const [projectId, setProjectId] = useState(null);
 
   const projectsQuery = useQuery({
     queryKey: ["chat-entity-ref-task-projects", token],
     queryFn: async () => {
-      // Same unwrapped-array response as the `project` fetchOptions case
-      // above — see the comment there.
       const res = await runly.projects.listProjects(token);
       return (res?.data ?? res ?? []).map((p) => ({ label: p.name, value: p.id }));
     },
@@ -305,31 +322,89 @@ function TaskPickerCascade({ token, onPick }) {
   );
 }
 
+function TypeChip({ label, Icon, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={[
+        "inline-flex items-center gap-1 shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+        active
+          ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]"
+          : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]",
+      ].join(" ")}
+    >
+      {Icon && <Icon className="h-3 w-3" />}
+      {label}
+    </button>
+  );
+}
+
+// The chat composer's "conectores" picker: attaches a reference to another
+// module's record (a contact, file, vehicle, inventory item, ...) to a
+// message. Opens straight into a single search box plus a row of type
+// filter chips — "Todos" searches every module at once (2+ characters, to
+// avoid firing nine requests on open), or a chip narrows to one module's
+// full picker (a thumbnail grid for files, a project/task cascade for
+// tasks, everything else a searchable list of rich rows via ConnectorRow).
 export function EntityReferencePicker({ open, onOpenChange, onPick, maxSelect, children }) {
   const { session } = useAuth();
   const token = session?.access_token;
-  const [entityType, setEntityType] = useState(null);
-  const isFileType = entityType === "file";
-  const isTaskType = entityType === "task";
+  const [activeType, setActiveType] = useState("all");
+  const [search, setSearch] = useState("");
+  const rovingKeyDown = useRovingFocus();
 
-  const optionsQuery = useQuery({
-    queryKey: ["chat-entity-ref-options", entityType, token],
-    queryFn: () => fetchOptions(entityType, token),
-    enabled: Boolean(entityType && token && entityType !== "task"),
-    staleTime: 30_000,
+  const isAll = activeType === "all";
+  const isFileType = activeType === "file";
+  const isTaskType = activeType === "task";
+  const isInventoryType = activeType === "inventory_item";
+  const isSingleListType = !isAll && !isFileType && !isTaskType && !isInventoryType;
+
+  const isAllSearchActive = isAll && search.trim().length >= ALL_MODE_MIN_QUERY_LENGTH;
+
+  // One query per flat type, kept alive independently: enabled when it's the
+  // active chip, or when "Todos" is active with a long-enough query. Reusing
+  // the same query for both modes means switching from a "Todos" match into
+  // that type's own full list (via "Ver los N") is instant, already cached.
+  const optionsQueries = useQueries({
+    queries: FLAT_ENTITY_TYPES.map((t) => ({
+      queryKey: ["chat-entity-ref-options", t.value, token],
+      queryFn: () => fetchEntityOptions(t.value, token),
+      enabled: Boolean(token) && (activeType === t.value || isAllSearchActive),
+      staleTime: 30_000,
+    })),
   });
+  const resultsByType = useMemo(() => {
+    const map = {};
+    FLAT_ENTITY_TYPES.forEach((t, i) => {
+      map[t.value] = optionsQueries[i];
+    });
+    return map;
+  }, [optionsQueries]);
+
+  const groupedResults = useMemo(() => {
+    if (!isAllSearchActive) return [];
+    return FLAT_ENTITY_TYPES.map((t) => {
+      const matches = (resultsByType[t.value]?.data ?? []).filter((o) => matchesConnectorSearch(o, search));
+      return { type: t, matches: matches.slice(0, ALL_MODE_MATCHES_PER_TYPE), total: matches.length };
+    }).filter((g) => g.matches.length > 0);
+  }, [isAllSearchActive, search, resultsByType]);
+
+  const isAllSearchLoading = isAllSearchActive && FLAT_ENTITY_TYPES.some((t) => resultsByType[t.value]?.isLoading);
 
   function close() {
     onOpenChange(false);
-    setEntityType(null);
+    setActiveType("all");
+    setSearch("");
   }
 
-  function handlePick(recordId, label) {
+  function handlePick(entityType, recordId, label) {
     onPick({ entityType, recordId, label });
     close();
   }
 
-  function handleConfirmFiles(selectedOpts) {
+  function handleConfirmMulti(entityType, selectedOpts) {
     for (const opt of selectedOpts) onPick({ entityType, recordId: opt.value, label: opt.label });
     close();
   }
@@ -339,41 +414,100 @@ export function EntityReferencePicker({ open, onOpenChange, onPick, maxSelect, c
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v);
-        if (!v) setEntityType(null);
+        if (!v) {
+          setActiveType("all");
+          setSearch("");
+        }
       }}
     >
       <PopoverAnchor asChild>{children}</PopoverAnchor>
-      <PopoverContent side="top" align="start" className={["p-3 space-y-2", isFileType ? "w-96" : "w-72", isTaskType ? "min-w-72" : ""].join(" ")}>
-        <SelectField
-          label="Tipo"
-          value={entityType ?? ""}
-          onChange={(v) => setEntityType(v || null)}
-          options={ENTITY_TYPES}
-          placeholder="Selecciona un tipo..."
-        />
-        {entityType && isFileType && (
-          <FilePickerGrid
-            options={optionsQuery.data ?? []}
-            isLoading={optionsQuery.isLoading}
-            maxSelect={maxSelect}
-            onConfirm={handleConfirmFiles}
+      <PopoverContent side="top" align="start" className="w-96 p-3 space-y-2.5">
+        {!isTaskType && (
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClear={() => setSearch("")}
+            placeholder="Buscar contacto, archivo, vehículo, inventario..."
+            aria-label="Buscar conector"
+            autoFocus
           />
         )}
-        {entityType && isTaskType && (
-          <TaskPickerCascade token={token} onPick={handlePick} />
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Filtrar por tipo de conector">
+          <TypeChip label="Todos" Icon={SearchIcon} active={isAll} onClick={() => setActiveType("all")} />
+          {ENTITY_TYPE_LIST.map((t) => (
+            <TypeChip key={t.value} label={t.label} Icon={t.Icon} active={activeType === t.value} onClick={() => setActiveType(t.value)} />
+          ))}
+        </div>
+
+        {isAll && (
+          !isAllSearchActive ? (
+            <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center px-4">
+              Escribe al menos {ALL_MODE_MIN_QUERY_LENGTH} letras para buscar en todos los conectores, o elige un tipo arriba.
+            </p>
+          ) : isAllSearchLoading && groupedResults.length === 0 ? (
+            <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Buscando...</p>
+          ) : groupedResults.length === 0 ? (
+            <p className="text-xs text-[hsl(var(--muted-foreground))] py-6 text-center">Sin resultados</p>
+          ) : (
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1" onKeyDown={rovingKeyDown}>
+              {groupedResults.map(({ type, matches, total }) => (
+                <div key={type.value}>
+                  <div className="flex items-center justify-between px-1 pb-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                      {type.label}
+                    </span>
+                    {total > matches.length && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveType(type.value)}
+                        className="text-[10px] font-medium text-[hsl(var(--primary))] hover:underline"
+                      >
+                        Ver los {total}
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {matches.map((opt) => (
+                      <ConnectorRow
+                        key={opt.value}
+                        entityType={type.value}
+                        opt={opt}
+                        onClick={() => handlePick(type.value, opt.value, opt.label)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
-        {entityType && !isFileType && !isTaskType && (
-          <ComboboxField
-            label="Registro"
-            options={optionsQuery.data ?? []}
-            value={null}
-            onChange={(recordId) => {
-              const opt = (optionsQuery.data ?? []).find((o) => o.value === recordId);
-              if (!opt) return;
-              handlePick(recordId, opt.label);
-            }}
-            placeholder="Buscar..."
-            emptyText={optionsQuery.isLoading ? "Cargando..." : "Sin resultados"}
+
+        {isFileType && (
+          <FilePickerGrid
+            options={resultsByType.file?.data ?? []}
+            isLoading={resultsByType.file?.isLoading}
+            search={search}
+            maxSelect={maxSelect}
+            onConfirm={(opts) => handleConfirmMulti("file", opts)}
+          />
+        )}
+        {isTaskType && <TaskPickerCascade token={token} onPick={(id, label) => handlePick("task", id, label)} />}
+        {isInventoryType && (
+          <MultiSelectList
+            entityType="inventory_item"
+            query={resultsByType.inventory_item}
+            search={search}
+            maxSelect={maxSelect}
+            onConfirm={(opts) => handleConfirmMulti("inventory_item", opts)}
+          />
+        )}
+        {isSingleListType && (
+          <SingleSelectList
+            entityType={activeType}
+            query={resultsByType[activeType]}
+            search={search}
+            onPick={(id, label) => handlePick(activeType, id, label)}
           />
         )}
       </PopoverContent>

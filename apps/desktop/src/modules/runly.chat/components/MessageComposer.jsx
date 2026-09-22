@@ -13,7 +13,7 @@ import {
 import {
   Send, Paperclip, Smile, X, Loader2, AlertCircle, Mic, Plus,
   Play, FileText, FileType2, FileSpreadsheet, FileImage, FileVideo, FileAudio,
-  FileArchive, FileCode, File as FileIcon, Link2, User, Landmark, IdCard,
+  FileArchive, FileCode, File as FileIcon, Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
@@ -27,6 +27,7 @@ import { DropZoneOverlay } from "./DropZoneOverlay";
 import { MessageQuote } from "./MessageQuote";
 import { ChatAttachmentViewer } from "./ChatAttachmentViewer";
 import { mapPendingToViewerFiles, attachmentIdsToDiscard } from "../lib/pendingAttachments";
+import { ENTITY_TYPE_BY_VALUE } from "../lib/entityReferenceTypes";
 
 // Quick-access emoji for the mobile inline strip (matches MessageReactionPicker).
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🙏", "🔥", "😮", "😢", "🎉"];
@@ -58,15 +59,6 @@ function toReplyPreview(m) {
     isDeleted: Boolean(m.deleted_at),
   };
 }
-
-// Maps a stored/pending entityType string to its chip/card icon — same 4-way
-// mapping used by EntityReferenceCard.jsx for the resolved cards.
-const ENTITY_REF_ICON = {
-  contact: User,
-  file: Paperclip,
-  ledger_account: Landmark,
-  hr_employee: IdCard,
-};
 
 const MAX_ENTITY_REFS = 5;
 
@@ -868,7 +860,7 @@ export const MessageComposer = forwardRef(function MessageComposer(
           style={{ scrollbarWidth: "none" }}
         >
           {pendingEntityRefs.map((ref) => {
-            const Icon = ENTITY_REF_ICON[ref.entityType] ?? Link2;
+            const Icon = ENTITY_TYPE_BY_VALUE[ref.entityType]?.Icon ?? Link2;
             return (
               <div
                 key={`${ref.entityType}:${ref.recordId}`}

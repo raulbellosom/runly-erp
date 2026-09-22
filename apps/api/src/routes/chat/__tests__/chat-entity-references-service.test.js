@@ -341,3 +341,79 @@ describe("chat-entity-references-service — project/task/calendar_event", () =>
     assert.equal(typeof result[0].subtitle, "string");
   });
 });
+
+describe("chat-entity-references-service — vehicle/inventory_item", () => {
+  it("resolves a vehicle reference, using plate as title and brand/model/year as subtitle", async () => {
+    const deps = {
+      fleetService: { getVehicle: async ({ id }) => {
+        assert.equal(id, "vehicle-1");
+        return {
+          plate: "ABC-123", vehicle_brand_name: "Toyota", vehicle_model_name: "Hilux",
+          vehicle_model_year: 2022, status: "active", cover_image_file_asset_id: "file-9",
+        };
+      } },
+      inventoryService: {}, projectsService: {}, tasksService: {}, calendarEventService: {},
+      contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
+    };
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
+    const result = await service.resolveEntityRefs({
+      authUserId: "auth-1", companyId: "company-1",
+      entityRefs: [{ entityType: "vehicle", recordId: "vehicle-1" }],
+    });
+    assert.deepEqual(result, [{
+      entityType: "vehicle", recordId: "vehicle-1", title: "ABC-123",
+      subtitle: "Toyota Hilux 2022", url: "/app/m/runly.fleet/vehicles/vehicle-1",
+      status: "active", coverImageFileId: "file-9",
+    }]);
+  });
+
+  it("drops a vehicle reference the caller cannot access (404 from getVehicle)", async () => {
+    const deps = {
+      fleetService: { getVehicle: async () => { throw new Error("Vehiculo no encontrado."); } },
+      inventoryService: {}, projectsService: {}, tasksService: {}, calendarEventService: {},
+      contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
+    };
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
+    const result = await service.resolveEntityRefs({
+      authUserId: "auth-1", companyId: "company-1",
+      entityRefs: [{ entityType: "vehicle", recordId: "vehicle-1" }],
+    });
+    assert.deepEqual(result, []);
+  });
+
+  it("resolves an inventory_item reference, using assetTag/categoryName as subtitle", async () => {
+    const deps = {
+      inventoryService: { getItem: async (id, companyId) => {
+        assert.equal(id, "item-1");
+        assert.equal(companyId, "company-1");
+        return { name: "Taladro Bosch", assetTag: "AST-2026-004", categoryName: "Herramientas", status: "available", coverImageFileId: "file-7" };
+      } },
+      fleetService: {}, projectsService: {}, tasksService: {}, calendarEventService: {},
+      contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
+    };
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
+    const result = await service.resolveEntityRefs({
+      authUserId: "auth-1", companyId: "company-1",
+      entityRefs: [{ entityType: "inventory_item", recordId: "item-1" }],
+    });
+    assert.deepEqual(result, [{
+      entityType: "inventory_item", recordId: "item-1", title: "Taladro Bosch",
+      subtitle: "AST-2026-004 · Herramientas", url: "/app/m/runly.inventory/inventory/item-1",
+      status: "available", coverImageFileId: "file-7",
+    }]);
+  });
+
+  it("drops an inventory_item reference the caller cannot access (404 from getItem)", async () => {
+    const deps = {
+      inventoryService: { getItem: async () => { throw new Error("Item not found"); } },
+      fleetService: {}, projectsService: {}, tasksService: {}, calendarEventService: {},
+      contactsService: {}, filesService: {}, hrService: {}, ledgerService: {}, prisma: {},
+    };
+    const service = createChatEntityReferencesService({ ...deps, prisma: withActor(deps.prisma) });
+    const result = await service.resolveEntityRefs({
+      authUserId: "auth-1", companyId: "company-1",
+      entityRefs: [{ entityType: "inventory_item", recordId: "item-1" }],
+    });
+    assert.deepEqual(result, []);
+  });
+});

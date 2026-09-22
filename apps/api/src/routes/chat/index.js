@@ -53,6 +53,7 @@ import { createProjectsService } from "../projects/projects-service.js";
 import { createInventoryService } from "../../services/inventory-service.js";
 import { createTasksService } from "../projects/tasks-service.js";
 import { createCalendarEventService } from "../calendar/calendar-event-service.js";
+import { createFleetService } from "../fleet/fleet-service.js";
 
 function handleError(c, err, fallback) {
   if (err instanceof UserAccessError || err instanceof ChatServiceError || err instanceof GuestChatServiceError || err instanceof ChatPermissionsError || err instanceof ChatReactionsError || err instanceof ChatModerationServiceError) {
@@ -77,6 +78,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   const tasksService = createTasksService({ prisma });
   const calendarEventService = createCalendarEventService({ prisma });
   const inventoryService = createInventoryService({ prisma });
+  const fleetService = createFleetService({ prisma });
   const entityReferencesService = createChatEntityReferencesService({
     prisma,
     contactsService: createContactsService({ prisma }),
@@ -86,6 +88,8 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     projectsService,
     tasksService,
     calendarEventService,
+    fleetService,
+    inventoryService,
   });
   const chatService = createChatService({ prisma, supabaseAdmin, notificationService, broadcaster, permissionsService, mentionsService, entityReferencesService, channelLinksService });
   const chatExternalInboxService = createChatExternalInboxService({ prisma, broadcaster });

@@ -2200,6 +2200,10 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         }),
     },
     fleet: {
+      listVehicles: (params, token) =>
+        request(`/fleet/vehicles${toQueryString(params)}`, {
+          headers: withAuthHeaders(token),
+        }),
       getVehicleDocuments: (vehicleId, token) =>
         request(`/fleet/vehicles/${encodeURIComponent(vehicleId)}/documents`, {
           headers: withAuthHeaders(token),

@@ -6,9 +6,10 @@ const REFERENCE_PERMISSIONS = {
   hr_employee: 'hr.employee.read', project: 'projects.project.read',
   task: 'projects.task.read', calendar_event: 'calendar.events.read',
   ledger_account: 'ledger.accounts.read',
+  vehicle: 'fleet.vehicles.read', inventory_item: 'inventory.item.read',
 };
 
-export function createChatEntityReferencesService({ prisma, contactsService, filesService, hrService, ledgerService, projectsService, tasksService, calendarEventService }) {
+export function createChatEntityReferencesService({ prisma, contactsService, filesService, hrService, ledgerService, projectsService, tasksService, calendarEventService, fleetService, inventoryService }) {
   const access = createUserAccessService({ prisma });
   // Not a static registry object keyed by entityType — each type's
   // underlying call shape genuinely differs (three take authUserId+id
@@ -106,6 +107,32 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
           url: `/app/m/runly.ledger/accounts/${recordId}`,
           currency: row.currency ?? null,
           balance: row.current_balance != null ? Number(row.current_balance) : null,
+        };
+      }
+      if (entityType === "vehicle") {
+        const row = await fleetService.getVehicle({ companyId: ctx.companyId, id: recordId });
+        if (!row) return null;
+        const modelInfo = [row.vehicle_brand_name, row.vehicle_model_name, row.vehicle_model_year].filter(Boolean).join(" ");
+        return {
+          entityType, recordId,
+          title: row.plate || modelInfo || "Vehiculo",
+          // status is surfaced as its own badge on the card (see
+          // EntityReferenceCard.jsx), not duplicated into this subtitle text.
+          subtitle: modelInfo || null,
+          url: `/app/m/runly.fleet/vehicles/${recordId}`,
+          status: row.status ?? null,
+          coverImageFileId: row.cover_image_file_asset_id ?? null,
+        };
+      }
+      if (entityType === "inventory_item") {
+        const row = await inventoryService.getItem(recordId, ctx.companyId);
+        if (!row) return null;
+        return {
+          entityType, recordId, title: row.name,
+          subtitle: [row.assetTag, row.categoryName].filter(Boolean).join(" · ") || null,
+          url: `/app/m/runly.inventory/inventory/${recordId}`,
+          status: row.status ?? null,
+          coverImageFileId: row.coverImageFileId ?? null,
         };
       }
       return null; // unknown entityType — drop silently
