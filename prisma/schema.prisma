@@ -1936,11 +1936,12 @@ model CalendarCalendar {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner        UserProfile           @relation("CalendarOwner", fields: [ownerId], references: [id])
-  company      Company?              @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  shares       CalendarShare[]
-  events       CalendarEvent[]
-  googleSource GoogleCalendarSource?
+  owner         UserProfile                 @relation("CalendarOwner", fields: [ownerId], references: [id])
+  company       Company?                    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  shares        CalendarShare[]
+  events        CalendarEvent[]
+  googleSource  GoogleCalendarSource?
+  importSources CalendarEventImportSource[]
 
   @@index([ownerId])
   @@index([companyId])
@@ -1986,6 +1987,7 @@ model CalendarEvent {
   files         CalendarEventFile[]
   googleLink    GoogleCalendarEventLink?
   calls         Call[]
+  importSource  CalendarEventImportSource?
 
   @@index([calendarId])
   @@index([startAt])
@@ -2188,6 +2190,24 @@ model CalendarEventAttendee {
 
   @@unique([eventId, userId])
   @@map("calendar_event_attendee")
+}
+
+// Tracks which CalendarEvent rows came from a .ics import (aCalendar+ etc.),
+// keyed by the source file's per-occurrence UID, so re-importing the same
+// (or an updated) export into the same calendar skips events already
+// brought in. See calendar-ics-import-service.js.
+model CalendarEventImportSource {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  calendarId  String   @db.Uuid @map("calendar_id")
+  externalUid String   @map("external_uid")
+  eventId     String   @unique @db.Uuid @map("event_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  calendar CalendarCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  event    CalendarEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, externalUid])
+  @@map("calendar_event_import_source")
 }
 
 model CalendarReminder {
