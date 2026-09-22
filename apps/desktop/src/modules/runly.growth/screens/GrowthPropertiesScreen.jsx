@@ -21,6 +21,12 @@ const KIND_LABEL = {
   external_sdk: "Sitio externo (SDK)",
 };
 
+const STATUS_LABEL = {
+  active: "Activo",
+  pending_verification: "Verificacion pendiente",
+  disabled: "Desactivado",
+};
+
 const STATUS_VARIANT = {
   active: "success",
   pending_verification: "warning",
@@ -86,7 +92,7 @@ export default function GrowthPropertiesScreen() {
         header: "Estado",
         cell: ({ row }) => (
           <Badge variant={STATUS_VARIANT[row.original.status] ?? "secondary"}>
-            {row.original.status}
+            {STATUS_LABEL[row.original.status] ?? row.original.status}
           </Badge>
         ),
       },
