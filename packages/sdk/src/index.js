@@ -1911,6 +1911,12 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
             headers: withAuthHeaders(token),
           },
         ),
+      importIcs: (formData, token) =>
+        request("/calendar/ics-import", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: formData,
+        }),
       listNotifications: (token, query = {}) =>
         request(`/calendar/notifications${toQueryString(query)}`, {
           headers: withAuthHeaders(token),
