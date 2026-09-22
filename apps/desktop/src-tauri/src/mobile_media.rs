@@ -12,6 +12,16 @@ pub fn stop_on_navigation(app: AppHandle) {
     });
 }
 
+pub async fn get_origin(app: AppHandle) -> Result<Option<String>, String> {
+    let result = run(app, "getOrigin", json!({})).await?;
+    Ok(result.get("origin").and_then(|v| v.as_str()).map(String::from))
+}
+
+pub async fn set_origin(app: AppHandle, origin: Option<String>) -> Result<(), String> {
+    run(app, "setOrigin", json!({ "origin": origin })).await?;
+    Ok(())
+}
+
 pub fn init() -> TauriPlugin<Wry> {
     Builder::new("runly-media")
         .setup(|app, api| {
