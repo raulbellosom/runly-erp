@@ -15,8 +15,10 @@ import {
   DialogFooter,
   PasswordField,
   ConfirmDialog,
+  SelectField,
+  SwitchField,
 } from "@runly/ui";
-import { Camera, Eye, KeyRound, Send } from "lucide-react";
+import { Camera, Eye, KeyRound, Send, Shield } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -27,6 +29,7 @@ import { IDENTITY_USER_FORM } from "../blueprints/identity-user-form.blueprint.j
 import { componentRegistry } from "../../../lib/moduleComponentRegistry.js";
 
 const API_BASE = getApiUrl();
+const NO_ROLE_VALUE = "__none__";
 
 export default function UserEditScreen() {
   // See UserDetailScreen.jsx for why "id" isn't a real react-router param
@@ -61,6 +64,41 @@ export default function UserEditScreen() {
     enabled: Boolean(token && userId),
   });
   const user = userQuery.data?.data ?? null;
+
+  // The membership for the company currently being administered — this is
+  // what "Eliminar"/"Activar" on the users list actually flips, and what
+  // determines the Activo/Inactivo status shown everywhere. Editing it here
+  // (instead of only in the user's detail page) is what admins expect from
+  // an "editar usuario" screen.
+  const currentMembership = useMemo(
+    () => (user?.memberships ?? []).find((m) => m.companyId === activeCompanyId) ?? null,
+    [user, activeCompanyId],
+  );
+
+  const rolesQuery = useQuery({
+    queryKey: ["identity-roles"],
+    queryFn: () => runly.identity.listRoles(token),
+    enabled: Boolean(token) && !isSelf,
+  });
+  const roleOptions = useMemo(() => {
+    const roles = rolesQuery.data?.data ?? [];
+    return [
+      { value: NO_ROLE_VALUE, label: "Sin rol" },
+      ...roles
+        .filter((role) => role.companyId === null || role.companyId === activeCompanyId)
+        .map((role) => ({ value: role.id, label: role.name })),
+    ];
+  }, [rolesQuery.data, activeCompanyId]);
+
+  const updateMembershipMutation = useMutation({
+    mutationFn: (patch) => runly.identity.updateMembership(userId, currentMembership.id, patch, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["identity-user", userId] });
+      queryClient.invalidateQueries({ queryKey: ["identity-users"] });
+      toast.success("Acceso actualizado");
+    },
+    onError: (err) => toast.error(err?.message || "No se pudo actualizar el acceso"),
+  });
 
   const avatarMutation = useMutation({
     mutationFn: (file) => runly.identity.uploadUserAvatar(userId, file, token),
@@ -161,6 +199,35 @@ export default function UserEditScreen() {
               </Button>
             </div>
           )}
+        </Card>
+      )}
+
+      {!isSelf && currentMembership && (
+        <Card variant="shell-flat" className="mt-6 p-4 md:p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+            <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">Rol y acceso</h3>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <SelectField
+              label="Rol"
+              icon={Shield}
+              value={currentMembership.roleId ?? NO_ROLE_VALUE}
+              options={roleOptions}
+              disabled={updateMembershipMutation.isPending}
+              onValueChange={(value) =>
+                updateMembershipMutation.mutate({
+                  roleId: value === NO_ROLE_VALUE ? null : value,
+                })
+              }
+            />
+            <SwitchField
+              label={currentMembership.enabled ? "Activo" : "Inactivo"}
+              checked={currentMembership.enabled}
+              disabled={updateMembershipMutation.isPending}
+              onChange={(checked) => updateMembershipMutation.mutate({ enabled: checked })}
+            />
+          </div>
         </Card>
       )}
 

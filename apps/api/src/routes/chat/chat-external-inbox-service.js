@@ -10,7 +10,7 @@ export function createChatExternalInboxService({ prisma, broadcaster = null }) {
     return resolveUserProfileId(prisma, authUserId);
   }
 
-  async function listExternalInbox({ authUserId, status = "open", limit = 30, cursor = null, search = null }) {
+  async function listExternalInbox({ authUserId, companyId, status = "open", limit = 30, cursor = null, search = null }) {
     const profileId = await getUserProfileId(authUserId);
 
     // Build search filter dynamically to avoid untyped NULL parameter (42P18)
@@ -58,6 +58,7 @@ export function createChatExternalInboxService({ prisma, broadcaster = null }) {
       LEFT JOIN chat_guest_sessions gs ON gs.id = c.created_by_guest_id
       WHERE c.type = 'external_support'
         AND c.deleted_at IS NULL
+        AND c.company_id = ${companyId}::uuid
         AND c.status = ${status}
         ${searchFilter}
       ORDER BY COALESCE(c.last_message_at, c.created_at) DESC

@@ -759,9 +759,12 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   internal.get("/external/inbox", requirePermission("chat.support.manage"), async (c) => {
     try {
       const authUserId = c.get("authUserId");
+      const companyId = c.get("companyId");
+      if (!companyId) return c.json({ data: [] });
       const { status, limit, search } = c.req.query();
       const result = await chatExternalInboxService.listExternalInbox({
         authUserId,
+        companyId,
         status: status ?? "open",
         limit: limit ? Math.min(parseInt(limit, 10), 100) : 30,
         search: search?.trim() || null,
@@ -875,22 +878,19 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   // GET /chat/operators/available — list operators available for chat in the caller's company
   internal.get("/operators/available", requirePermission("chat.support.manage"), async (c) => {
     try {
-      const authUserId = c.get("authUserId");
-      const profileRows = await prisma.$queryRaw`
-        SELECT company_id FROM user_profile WHERE auth_user_id = ${authUserId} LIMIT 1
-      `;
-      if (!profileRows[0]) return c.json({ data: [] });
-      const companyId = profileRows[0].company_id;
+      const companyId = c.get("companyId");
+      if (!companyId) return c.json({ data: [] });
       const operators = await prisma.$queryRaw`
-        SELECT id,
-               display_name AS "displayName",
+        SELECT p.id,
+               p.display_name AS "displayName",
                NULL AS "avatarUrl",
-               email,
-               available_for_chat AS "availableForChat"
-        FROM user_profile
-        WHERE company_id = ${companyId}::uuid
-          AND available_for_chat = true
-        ORDER BY display_name ASC
+               p.email,
+               p.available_for_chat AS "availableForChat"
+        FROM user_profile p
+        INNER JOIN membership m ON m.user_id = p.id AND m.enabled = true
+        WHERE m.company_id = ${companyId}::uuid
+          AND p.available_for_chat = true
+        ORDER BY p.display_name ASC
       `;
       return c.json({ data: operators });
     } catch (err) {
