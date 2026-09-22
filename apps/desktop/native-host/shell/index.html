@@ -12,7 +12,7 @@
     <img class="mark" src="runly-mark.svg" width="96" height="96" alt="">
     <h1>Runly ERP</h1>
     <p id="status" role="status">Conectando con Runly…</p>
-    <form id="connect-form" hidden>
+    <form id="connect-form" hidden novalidate>
       <label for="origin-input">URL de tu servidor Runly</label>
       <input id="origin-input" type="url" placeholder="https://runly.tuempresa.com" autocomplete="off" autocapitalize="off" spellcheck="false">
       <button id="connect-button" type="submit">Conectar</button>
@@ -24,7 +24,7 @@
     </div>
     <button id="retry" type="button" hidden>Reintentar</button>
     <details><summary>Diagnóstico</summary><pre id="diagnostics"></pre></details>
-    <p class="forget"><a id="forget-link" href="#">Cambiar de servidor</a></p>
+    <p class="forget"><a id="forget-link" href="#" hidden>Cambiar de servidor</a></p>
   </main>
 </body>
 </html>
