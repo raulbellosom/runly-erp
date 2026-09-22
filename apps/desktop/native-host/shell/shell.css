@@ -2,4 +2,10 @@
 body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:env(safe-area-inset-top) 24px env(safe-area-inset-bottom);box-sizing:border-box}
 main{width:100%;max-width:360px}.mark{display:block;width:96px;height:96px;border-radius:24px}
 h1{font-size:28px;margin-top:24px}p{color:#b9c7df;line-height:1.6;min-height:52px}
-button{border:0;border-radius:10px;padding:14px 22px;background:#467bea;color:white;font:inherit;cursor:pointer}button:disabled{opacity:.5}details{margin-top:32px;color:#b9c7df}summary{cursor:pointer;padding:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6}
+button{border:0;border-radius:10px;padding:14px 22px;background:#467bea;color:white;font:inherit;cursor:pointer}button:disabled{opacity:.5}
+details{margin-top:32px;color:#b9c7df}summary{cursor:pointer;padding:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6}
+form{display:grid;gap:10px;margin-top:8px}label{font-size:13px;color:#b9c7df;text-align:left}
+input{border:1px solid #2a3a5c;border-radius:10px;padding:12px 14px;background:#0f1e38;color:#e8edf7;font:inherit}
+#confirm-panel{display:grid;gap:10px}#confirm-panel button{width:100%}#cancel-button{background:#2a3a5c}
+.forget{margin-top:16px;min-height:auto}.forget a{color:#7ea1e8}
+[hidden]{display:none!important}

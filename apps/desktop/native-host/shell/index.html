@@ -12,8 +12,19 @@
     <img class="mark" src="runly-mark.svg" width="96" height="96" alt="">
     <h1>Runly ERP</h1>
     <p id="status" role="status">Conectando con Runly…</p>
-    <button id="retry" type="button">Reintentar</button>
+    <form id="connect-form" hidden>
+      <label for="origin-input">URL de tu servidor Runly</label>
+      <input id="origin-input" type="url" placeholder="https://runly.tuempresa.com" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="connect-button" type="button">Conectar</button>
+    </form>
+    <div id="confirm-panel" hidden>
+      <p>Vas a conectar a <strong id="confirm-origin"></strong>. Esta app confiará en este servidor y le dará acceso a notificaciones, vibración y captura de pantalla cuando lo uses.</p>
+      <button id="confirm-button" type="button">Confirmar</button>
+      <button id="cancel-button" type="button">Cancelar</button>
+    </div>
+    <button id="retry" type="button" hidden>Reintentar</button>
     <details><summary>Diagnóstico</summary><pre id="diagnostics"></pre></details>
+    <p class="forget"><a id="forget-link" href="#">Cambiar de servidor</a></p>
   </main>
 </body>
 </html>
