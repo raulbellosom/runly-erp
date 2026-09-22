@@ -60,7 +60,7 @@ Cambios de React, CSS y módulos requieren despliegue web. Cambios Kotlin/Swift/
 | Tauri | Cargo.lock fijaba 2.11.0, CLI 2.11.4 y API JS 2.11.1. Existe `mobile_entry_point` y biblioteca cdylib. Se eleva Rust Tauri a 2.11.5. |
 | Desktop | `tauri.conf.json`: `frontendDist: ../dist`, Vite 5173, CSP null, main con Notification/SQL/Store/Shell. Se conserva el modelo y se restringe su capability a Desktop. |
 | Mobile | Proyecto Android generado bajo `src-tauri/gen/android`. Config separada generada por el wrapper, main construido desde Rust, shell local y origen fijo. |
-| Runtime | `desktopRuntime.js`/`serverStore.js` trataban todo Tauri como Desktop. La detección compartida distingue web, PWA, Desktop, Android e iOS; Mobile usa configuración web y nunca ofrece elegir servidor. |
+| Runtime | `desktopRuntime.js`/`serverStore.js` trataban todo Tauri como Desktop. La detección compartida distingue web, PWA, Desktop, Android e iOS; Mobile usa configuración web; un build `--universal` (ver más abajo) deja elegir servidor en runtime con preflight y confirmación explícita, y los demás modos siguen con origen fijo en compilación. |
 | Packages | `@runly/core` alberga detección sin React ni plugins; `@runly/offline` reserva SQLite a Desktop. UI/SDK/module-engine siguen compartidos. |
 | Auth | `LoginScreen` usa `signInWithPassword`; Supabase persiste y refresca sesión. `detectSessionInUrl: false`. AuthProvider recupera sesión y perfil, maneja expiración/logout. |
 | Persistencia | Supabase usa almacenamiento web por defecto; SessionVault duplica sesión en IndexedDB para offline. No hay cifrado nativo de esos tokens. Se conserva comportamiento y aislamiento por origen. |
@@ -119,6 +119,10 @@ pnpm native:android build production --aab
 
 # APK de pruebas firmado con clave debug de Android, nunca para Play Store
 pnpm native:android build staging --debug --apk
+
+# Build universal (sin origen fijo, para distribución pública — el usuario
+# conecta su propio servidor la primera vez que abre la app):
+pnpm native:android build production --apk --universal
 
 # Desarrollo con emulador (10.0.2.2 apunta al host Windows)
 $env:RUNLY_NATIVE_DEV_ORIGIN = 'http://10.0.2.2:5173'
@@ -240,6 +244,8 @@ Pipeline de tienda: build release reproducible, firma segura externa, versionCod
 
 Spec: `docs/superpowers/specs/2026-09-11-atlas-native-host-design.md`.
 Plan: `docs/superpowers/plans/2026-09-11-atlas-native-host.md`.
+
+Servidor en runtime (build `--universal`) — Spec: `docs/superpowers/specs/2026-09-22-android-runtime-server-connect-design.md`. Plan: `docs/superpowers/plans/2026-09-22-android-runtime-server-connect.md`.
 
 Resultados iniciales:
 
