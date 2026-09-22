@@ -233,8 +233,8 @@ export default function GrowthFormsScreen() {
           action={{ label: "Crear primer formulario", onClick: () => setNewFormOpen(true) }}
         />
       ) : (
-        <div className="flex gap-5 items-start">
-          <div className="w-56 shrink-0 space-y-2">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start">
+          <div className="w-full space-y-2 md:w-56 md:shrink-0">
             {forms.map((form) => (
               <FormCard
                 key={form.id}
@@ -263,20 +263,22 @@ export default function GrowthFormsScreen() {
                 </Card>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList>
-                    <TabsTrigger value="campos">Campos</TabsTrigger>
-                    <TabsTrigger value="preview"><Eye size={13} className="mr-1.5" />Vista previa</TabsTrigger>
-                    <TabsTrigger value="configuracion">Configuracion</TabsTrigger>
-                    <TabsTrigger value="api"><Code2 size={13} className="mr-1.5" />API</TabsTrigger>
-                    <TabsTrigger value="envios">
-                      Envios
-                      {subCount > 0 && (
-                        <span className="ml-1.5 text-[10px] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-full px-1.5 py-0.5 leading-none">
-                          {subCount}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
+                  <div className="overflow-x-auto pb-1">
+                    <TabsList className="min-w-max">
+                      <TabsTrigger value="campos">Campos</TabsTrigger>
+                      <TabsTrigger value="preview"><Eye size={13} className="mr-1.5" />Vista previa</TabsTrigger>
+                      <TabsTrigger value="configuracion">Configuracion</TabsTrigger>
+                      <TabsTrigger value="api"><Code2 size={13} className="mr-1.5" />API</TabsTrigger>
+                      <TabsTrigger value="envios">
+                        Envios
+                        {subCount > 0 && (
+                          <span className="ml-1.5 text-[10px] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-full px-1.5 py-0.5 leading-none">
+                            {subCount}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
                   <TabsContent value="campos">
                     {formDetailQuery.isPending ? (
