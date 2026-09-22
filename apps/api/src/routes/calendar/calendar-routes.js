@@ -4,6 +4,7 @@ import {
   CalendarServiceError,
 } from "./calendar-service.js";
 import { createCalendarEventService } from "./calendar-event-service.js";
+import { createCalendarIcsImportService } from "./calendar-ics-import-service.js";
 import { createCalendarNotificationService } from "./calendar-notification-service.js";
 import { resolveGoogleCalendarConfig } from "./google/google-config.js";
 import { createGoogleTokenCrypto } from "./google/google-token-crypto.js";
@@ -160,6 +161,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
   const app = new Hono();
   const svc = createCalendarService({ prisma });
   const eventSvc = createCalendarEventService({ prisma });
+  const icsImportSvc = createCalendarIcsImportService({ prisma });
   const notifSvc = createCalendarNotificationService({ prisma });
   const googleDeps = createGoogleRouteDependencies({ prisma, google });
 
@@ -678,6 +680,33 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
         return c.json(event, 201);
       } catch (err) {
         return handleError(c, err, "No se pudo crear el evento.");
+      }
+    },
+  );
+
+  app.post(
+    "/calendar/ics-import",
+    requirePermission("calendar.events.create"),
+    async (c) => {
+      try {
+        const userId = getUserId(c);
+        const body = await c.req.parseBody();
+        const file = body.file;
+        if (!file || typeof file === "string") {
+          return c.json({ error: "Se requiere un archivo .ics." }, 400);
+        }
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+        const result = await icsImportSvc.importIcs({
+          userId,
+          companyId: getCompanyId(c),
+          calendarId: body.calendarId || null,
+          calendarName: body.calendarName || null,
+          fileBuffer,
+        });
+        broadcastCalendarEvent(c, null, "ics_import");
+        return c.json(result, 201);
+      } catch (err) {
+        return handleError(c, err, "No se pudo importar el archivo .ics.");
       }
     },
   );
