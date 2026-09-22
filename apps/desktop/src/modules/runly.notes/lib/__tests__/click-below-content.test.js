@@ -9,6 +9,12 @@ test('shouldFocusDocumentEnd: true when the click target IS the container (blank
 
 test('shouldFocusDocumentEnd: false when the click target is a node rendered inside the container', () => {
   const container = {}
-  const innerNode = {}
+  const innerNode = { classList: { contains: () => false } }
   assert.equal(shouldFocusDocumentEnd(innerNode, container), false)
+})
+
+test('shouldFocusDocumentEnd: true when the click target is the NoteSheet blank background', () => {
+  const container = {}
+  const noteSheetNode = { classList: { contains: (cls) => cls === 'note-sheet' } }
+  assert.equal(shouldFocusDocumentEnd(noteSheetNode, container), true)
 })

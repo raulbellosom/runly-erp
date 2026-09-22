@@ -519,7 +519,10 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
             // SupabaseYjsProvider's readOnly mode) — just the plain icon, so
             // the note's internal title line matches the editable editor
             // instead of showing bare text with no icon next to it.
-            <div className="relative z-10 note-sheet-inset pt-4 flex items-center justify-between gap-2 -mb-10">
+            <div
+              className="relative z-10 note-sheet-inset pt-4 flex items-center justify-between gap-2 -mb-10"
+              onClick={viewing ? undefined : handleTitleRowClick}
+            >
               {viewing ? (
                 <div className="w-10 h-10 flex items-center justify-center">
                   <NoteIcon name={note.icon || 'NotebookPen'} size={22} className="text-amber-500" />
@@ -560,6 +563,21 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
     if (shouldFocusDocumentEnd(e.target, e.currentTarget)) {
       editorInstanceRef.current?.commands.focus('end')
     }
+  }
+
+  // Makes the whole icon/title row behave like a text input: clicking any
+  // blank part of it (not the icon button or a presence avatar) focuses the
+  // title, caret at its end — matching where a click on real title text
+  // would land — instead of only the exact pixels the "Sin título" glyphs
+  // occupy. Guarded to the row's own background (target !== currentTarget
+  // means the click hit a real child control, e.g. the icon button) so it
+  // never steals focus from those.
+  function handleTitleRowClick(e) {
+    if (e.target !== e.currentTarget) return
+    const editor = editorInstanceRef.current
+    if (!editor) return
+    const titleSize = editor.state.doc.firstChild?.nodeSize ?? 2
+    editor.chain().focus().setTextSelection(titleSize - 1).run()
   }
 
   return (
