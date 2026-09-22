@@ -195,4 +195,46 @@ describe("calls recording routes", () => {
     assert.equal(response.status, 404);
     assert.equal(body.error, "Conversación no encontrada.");
   });
+
+  it("deletes a recording, threading the caller's resolved profile id through", async () => {
+    let received;
+    const recordingId = "44444444-4444-4444-8444-444444444444";
+    const recordingService = {
+      deleteRecording: async (args) => { received = args; },
+    };
+    const app = createApp({}, recordingService);
+    const response = await app.request(`/calls/recordings/${recordingId}`, { method: "DELETE" });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(body, { data: { id: recordingId } });
+    assert.deepEqual(received, { recordingId, profileId: PROFILE_ID });
+  });
+
+  it("rejects deleting a recording when the caller is not a member of its conversation (IDOR guard)", async () => {
+    const recordingId = "44444444-4444-4444-8444-444444444444";
+    const recordingService = {
+      deleteRecording: async () => {
+        throw new CallRecordingError("Grabación no encontrada.", 404);
+      },
+    };
+    const app = createApp({}, recordingService);
+    const response = await app.request(`/calls/recordings/${recordingId}`, { method: "DELETE" });
+    const body = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.equal(body.error, "Grabación no encontrada.");
+  });
+
+  it("rejects deleting a still-active recording", async () => {
+    const recordingId = "44444444-4444-4444-8444-444444444444";
+    const recordingService = {
+      deleteRecording: async () => {
+        throw new CallRecordingError("Detén la grabación antes de eliminarla.", 409);
+      },
+    };
+    const app = createApp({}, recordingService);
+    const response = await app.request(`/calls/recordings/${recordingId}`, { method: "DELETE" });
+    assert.equal(response.status, 409);
+  });
 });

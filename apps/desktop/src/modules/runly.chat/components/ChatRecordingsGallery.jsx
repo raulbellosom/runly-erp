@@ -1,8 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EmptyState, ErrorState, Skeleton } from "@runly/ui";
-import { Loader2, AlertCircle, Play, Video } from "lucide-react";
-import { useConversationRecordings } from "../hooks/useConversationRecordings";
-import { formatMessageTime } from "../lib/chatUtils";
+import { ConfirmDialog, EmptyState, ErrorState, Skeleton } from "@runly/ui";
+import { Loader2, AlertCircle, Play, Trash2, Video } from "lucide-react";
+import { toast } from "sonner";
+import { useConversationRecordings, useDeleteRecording } from "../hooks/useConversationRecordings";
+
+// Always shows the full date, unlike chatUtils' formatMessageTime (which
+// collapses "today" down to just a time) — recordings are reviewed well
+// after the fact and several can share a day, so the date is load-bearing
+// here, not just decoration.
+function formatRecordingDateTime(dateStr) {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleString("es-MX", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatFileSize(bytes) {
+  if (bytes == null) return null;
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(unitIndex > 0 && value < 10 ? 1 : 0)} ${units[unitIndex]}`;
+}
 
 // Attaches `src` (a signed HLS .m3u8 URL) to the given video ref: native
 // playback on Safari (which supports HLS natively), the hls.js polyfill
@@ -61,9 +84,10 @@ function useHls(videoRef, src, onFatalError) {
   return ready;
 }
 
-function RecordingRow({ recording, refetch }) {
+function RecordingRow({ recording, refetch, deleteRecording }) {
   const [expanded, setExpanded] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const videoRef = useRef(null);
   // Same one-retry-then-give-up convention as MessageAttachments.jsx's
   // AudioCard: on the first playback error, refetch the recordings list
@@ -99,37 +123,64 @@ function RecordingRow({ recording, refetch }) {
 
   const isReady = recording.status === "READY";
   const isFailed = recording.status === "FAILED";
+  const isActive = ["STARTING", "ACTIVE", "PROCESSING"].includes(recording.status);
   // The backend only fills playlistUrl when signed-URL generation succeeds
   // (call-recording-service.js listRecordings) — a READY recording can still
   // have no playlistUrl if that signing call failed.
   const isUnavailable = isReady && !hasPlaylist;
 
+  const metaParts = [];
+  if (isReady && recording.durationMs != null) metaParts.push(`${Math.round(recording.durationMs / 1000)}s`);
+  const fileSize = isReady ? formatFileSize(recording.sizeBytes) : null;
+  if (fileSize) metaParts.push(fileSize);
+  if (recording.startedBy?.displayName) metaParts.push(`Por ${recording.startedBy.displayName}`);
+  if (!metaParts.length) {
+    metaParts.push(isFailed ? "No se pudo procesar" : isUnavailable ? "No disponible" : "Procesando...");
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteRecording.mutateAsync(recording.id);
+      setConfirmDeleteOpen(false);
+    } catch (err) {
+      toast.error(err?.message ?? "No se pudo eliminar la grabación.");
+    }
+  }
+
   return (
     <div className="rounded-xl border border-[hsl(var(--border))] p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{formatMessageTime(recording.startedAt)}</p>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">
-            {isReady && recording.durationMs != null
-              ? `${Math.round(recording.durationMs / 1000)}s`
-              : isFailed ? "No se pudo procesar" : isUnavailable ? "No disponible" : "Procesando..."}
-          </p>
+          <p className="truncate text-sm font-medium">{formatRecordingDateTime(recording.startedAt)}</p>
+          <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">{metaParts.join(" · ")}</p>
         </div>
-        {isReady && hasPlaylist && (
-          <button
-            type="button"
-            onClick={toggleExpanded}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]"
-            aria-label="Reproducir"
-          >
-            <Play className="h-4 w-4" />
-          </button>
-        )}
-        {isFailed && <AlertCircle className="h-5 w-5 shrink-0 text-red-500" aria-label="No se pudo procesar" />}
-        {isUnavailable && <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" aria-label="No disponible" />}
-        {!isReady && !isFailed && (
-          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" aria-label="Procesando" />
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {isReady && hasPlaylist && (
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]"
+              aria-label="Reproducir"
+            >
+              <Play className="h-4 w-4" />
+            </button>
+          )}
+          {isFailed && <AlertCircle className="h-5 w-5 shrink-0 text-red-500" aria-label="No se pudo procesar" />}
+          {isUnavailable && <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" aria-label="No disponible" />}
+          {!isReady && !isFailed && (
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" aria-label="Procesando" />
+          )}
+          {!isActive && (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteOpen(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-500"
+              aria-label="Eliminar grabación"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
       {expanded && isReady && hasPlaylist && (
         playbackError ? (
@@ -142,12 +193,22 @@ function RecordingRow({ recording, refetch }) {
           <video ref={videoRef} controls onError={handleFatalError} className="mt-2 w-full rounded-lg bg-black" />
         )
       )}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Eliminar grabación"
+        description="Esta acción no se puede deshacer. El archivo de video (si existe) se borrará permanentemente."
+        confirmLabel="Eliminar"
+        loading={deleteRecording.isPending}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }
 
 export function ChatRecordingsGallery({ conversationId }) {
   const { data, isLoading, isError, refetch } = useConversationRecordings(conversationId);
+  const deleteRecording = useDeleteRecording(conversationId);
   const recordings = data?.data ?? data ?? [];
 
   if (isLoading) {
@@ -180,7 +241,9 @@ export function ChatRecordingsGallery({ conversationId }) {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-2 p-3">
-      {recordings.map((r) => <RecordingRow key={r.id} recording={r} refetch={refetch} />)}
+      {recordings.map((r) => (
+        <RecordingRow key={r.id} recording={r} refetch={refetch} deleteRecording={deleteRecording} />
+      ))}
     </div>
   );
 }

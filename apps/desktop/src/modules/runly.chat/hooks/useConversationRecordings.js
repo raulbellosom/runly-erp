@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
 
@@ -20,5 +20,14 @@ export function useConversationRecordings(conversationId, enabled = true) {
       return rows.some((r) => ["STARTING", "ACTIVE", "PROCESSING"].includes(r.status)) ? 8000 : false;
     },
     queryFn: () => runly.calls.listRecordings(conversationId, session.access_token),
+  });
+}
+
+export function useDeleteRecording(conversationId) {
+  const { session } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (recordingId) => runly.calls.deleteRecording(recordingId, session.access_token),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-recordings", conversationId] }),
   });
 }

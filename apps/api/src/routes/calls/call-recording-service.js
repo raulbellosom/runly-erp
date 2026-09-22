@@ -154,6 +154,7 @@ export function createCallRecordingService({
     const rows = await prisma.callRecording.findMany({
       where: { conversationId },
       orderBy: { startedAt: "desc" },
+      include: { startedBy: { select: { displayName: true } } },
     });
     const withSignedUrls = !supabaseAdmin
       ? rows
@@ -163,10 +164,14 @@ export function createCallRecordingService({
           const { data, error } = await supabaseAdmin.storage
             .from(RECORDING_BUCKET)
             .createSignedUrl(row.playlistObjectKey, 3600);
-          if (error) return row;
+          if (error) {
+            console.warn(`${LOG_PREFIX} No se pudo firmar la URL de reproducción:`, row.id, row.playlistObjectKey, error.message ?? error);
+            return row; // playback surfaces "no disponible"-style state client-side
+          }
           return { ...row, playlistUrl: data.signedUrl };
-        } catch {
-          return row; // playback surfaces "no disponible"-style state client-side if this stays unset
+        } catch (err) {
+          console.warn(`${LOG_PREFIX} Error inesperado firmando la URL de reproducción:`, row.id, row.playlistObjectKey, err?.message ?? err);
+          return row;
         }
       }));
 
@@ -305,6 +310,37 @@ export function createCallRecordingService({
     return all;
   }
 
+  // Manual delete (conversation member, any terminal status) — distinct from
+  // cleanupExpiredRecordings' automatic 90-day sweep, which only ever
+  // touches READY rows past their own expiresAt. FAILED rows (a bad egress
+  // attempt, no video ever produced) never expire on their own otherwise,
+  // so without this they'd sit in the UI forever with no way to clear them.
+  async function deleteRecording({ recordingId, profileId }) {
+    const rec = await prisma.callRecording.findUnique({ where: { id: recordingId } });
+    if (!rec) throw new CallRecordingError("Grabación no encontrada.", 404);
+    await assertMember(rec.conversationId, profileId);
+    if (ACTIVE_STATUSES.includes(rec.status)) {
+      throw new CallRecordingError("Detén la grabación antes de eliminarla.", 409);
+    }
+
+    if (rec.playlistObjectKey && supabaseAdmin) {
+      const prefix = rec.playlistObjectKey.split("/").slice(0, -1).join("/");
+      let files;
+      try {
+        files = await listAllStorageObjects(prefix);
+      } catch {
+        throw new CallRecordingError("No se pudo borrar el archivo de la grabación.", 500);
+      }
+      const keys = files.length ? files.map((f) => `${prefix}/${f.name}`) : [rec.playlistObjectKey];
+      const { error: removeError } = await supabaseAdmin.storage.from(RECORDING_BUCKET).remove(keys);
+      if (removeError) {
+        throw new CallRecordingError("No se pudo borrar el archivo de la grabación.", 500);
+      }
+    }
+
+    await prisma.callRecording.delete({ where: { id: recordingId } });
+  }
+
   // Spec §5 goal 4 / §23 edge case: delete storage objects + rows past retention.
   async function cleanupExpiredRecordings() {
     const expired = await prisma.callRecording.findMany({
@@ -345,5 +381,5 @@ export function createCallRecordingService({
     return cleaned;
   }
 
-  return { startRecording, stopRecording, listRecordings, reconcileActiveRecordings, cleanupExpiredRecordings };
+  return { startRecording, stopRecording, listRecordings, deleteRecording, reconcileActiveRecordings, cleanupExpiredRecordings };
 }

@@ -16,6 +16,7 @@ import { createGuestCallRouter } from "./guest-routes.js";
 
 const callIdSchema = z.string().uuid();
 const conversationIdSchema = z.string().uuid();
+const recordingIdSchema = z.string().uuid();
 
 function handleError(c, error, fallback) {
   if (
@@ -221,6 +222,17 @@ export function createCallsRouter({
       return c.json({ data });
     } catch (error) { return handleError(c, error, "Error obteniendo grabaciones."); }
   });
+  internal.delete(
+    "/recordings/:recordingId",
+    requirePermission("chat.calls.record"),
+    async (c) => {
+      try {
+        const recordingId = recordingIdSchema.parse(c.req.param("recordingId"));
+        await recordingService.deleteRecording({ recordingId, profileId: c.get("userId") });
+        return c.json({ data: { id: recordingId } });
+      } catch (error) { return handleError(c, error, "Error eliminando la grabación."); }
+    },
+  );
 
   internal.get("/:id", async (c) => {
     try {

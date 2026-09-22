@@ -451,3 +451,89 @@ describe("createCallRecordingService.cleanupExpiredRecordings", () => {
     assert.deepEqual(deleted, []);
   });
 });
+
+describe("createCallRecordingService.deleteRecording", () => {
+  it("deletes a FAILED row with no storage object to clean up", async () => {
+    let deletedId;
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findUnique: async () => ({ id: REC, conversationId: CONV, status: "FAILED", playlistObjectKey: null }),
+        delete: async ({ where }) => { deletedId = where.id; return {}; },
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await svc.deleteRecording({ recordingId: REC, profileId: USER });
+    assert.equal(deletedId, REC);
+  });
+
+  it("removes the storage objects for a READY row before deleting it", async () => {
+    const removedKeys = [];
+    let deletedId;
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findUnique: async () => ({
+          id: REC, conversationId: CONV, status: "READY",
+          playlistObjectKey: "recordings/conv/rec/index.m3u8",
+        }),
+        delete: async ({ where }) => { deletedId = where.id; return {}; },
+      },
+    };
+    const supabaseAdmin = {
+      storage: {
+        from: () => ({
+          remove: async (keys) => { removedKeys.push(...keys); return { error: null }; },
+          list: async () => ({ data: [], error: null }),
+        }),
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress, supabaseAdmin });
+    await svc.deleteRecording({ recordingId: REC, profileId: USER });
+    assert.deepEqual(removedKeys, ["recordings/conv/rec/index.m3u8"]);
+    assert.equal(deletedId, REC);
+  });
+
+  it("rejects deleting a still-active (STARTING/ACTIVE) recording — must stop it first", async () => {
+    let deleteCalled = false;
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findUnique: async () => ({ id: REC, conversationId: CONV, status: "ACTIVE", playlistObjectKey: null }),
+        delete: async () => { deleteCalled = true; return {}; },
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await assert.rejects(
+      svc.deleteRecording({ recordingId: REC, profileId: USER }),
+      (e) => e instanceof CallRecordingError && e.status === 409,
+    );
+    assert.equal(deleteCalled, false);
+  });
+
+  it("rejects deleting a recording that does not exist", async () => {
+    const prisma = { callRecording: { findUnique: async () => null } };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await assert.rejects(
+      svc.deleteRecording({ recordingId: REC, profileId: USER }),
+      (e) => e instanceof CallRecordingError && e.status === 404,
+    );
+  });
+
+  it("rejects deleting a recording for a caller who is not a member of the conversation (IDOR guard)", async () => {
+    let deleteCalled = false;
+    const prisma = {
+      $queryRaw: async () => [], // not a member
+      callRecording: {
+        findUnique: async () => ({ id: REC, conversationId: CONV, status: "READY", playlistObjectKey: null }),
+        delete: async () => { deleteCalled = true; return {}; },
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await assert.rejects(
+      svc.deleteRecording({ recordingId: REC, profileId: "someone-else" }),
+      (e) => e instanceof CallRecordingError && e.status === 404,
+    );
+    assert.equal(deleteCalled, false);
+  });
+});
