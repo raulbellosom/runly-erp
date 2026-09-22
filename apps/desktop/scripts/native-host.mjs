@@ -55,7 +55,7 @@ export function makeConfig(origin) {
           { identifier: 'native-shell', windows: ['main'], platforms: ['android', 'iOS'], local: true,
             permissions: ['allow-host-info', 'allow-host-connect', 'allow-host-confirm-origin', 'allow-host-forget-origin'] },
           { identifier: 'native-remote', windows: ['main'], platforms: ['android', 'iOS'], local: false,
-            remote: { urls: [`${origin}/app/*`] },
+            remote: { urls: origin ? [`${origin}/app/*`] : ['https://*/app/*'] },
             permissions: ['allow-host-info', 'allow-host-ready', 'allow-host-events', 'allow-host-ack-events',
               'notification:allow-is-permission-granted', 'notification:allow-request-permission', 'notification:allow-notify',
               'notification:allow-create-channel', 'notification:allow-remove-active', 'allow-host-notification-show',
@@ -71,7 +71,12 @@ export function makeConfig(origin) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [platform = 'android', action = 'dev', environment = process.env.RUNLY_NATIVE_ENV || 'staging'] = process.argv.slice(2)
   if (!['android', 'ios'].includes(platform) || !['init', 'dev', 'build', 'config'].includes(action)) throw new Error('Usage: native-host.mjs android|ios init|dev|build|config development|staging|production')
-  const origin = resolveEnvironment(environment, process.env.RUNLY_NATIVE_DEV_ORIGIN, action, process.argv.slice(5).includes('--debug'))
+  const extra = process.argv.slice(5)
+  if (extra.some((arg) => !['--debug', '--apk', '--aab', '--universal'].includes(arg))) throw new Error('Only --debug/--apk/--aab/--universal supported; use RUNLY_NATIVE_TARGET for ABI')
+  const universal = extra.includes('--universal')
+  if (universal && (platform !== 'android' || action !== 'build')) throw new Error('--universal only applies to `android build`')
+  if (universal && environment !== 'production') throw new Error('--universal builds must use the production environment')
+  const origin = universal ? null : resolveEnvironment(environment, process.env.RUNLY_NATIVE_DEV_ORIGIN, action, extra.includes('--debug'))
   if (platform === 'android' && action !== 'init') {
     prepareAndroidFirebase(resolve(desktop, '../..'), resolve(desktop, 'src-tauri/gen/android/app'))
   }
@@ -79,8 +84,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   writeFileSync(configPath, `${JSON.stringify(makeConfig(origin), null, 2)}\n`)
   if (action === 'config') console.log(configPath)
   else {
-    const extra = process.argv.slice(5)
-    if (extra.some((arg) => !['--debug', '--apk', '--aab'].includes(arg))) throw new Error('Only --debug/--apk/--aab supported; use RUNLY_NATIVE_TARGET for ABI')
     const target = process.env.RUNLY_NATIVE_TARGET || 'aarch64'
     if (!['aarch64', 'armv7', 'i686', 'x86_64'].includes(target)) throw new Error('Invalid Android target')
     const cli = resolve(desktop, 'node_modules/@tauri-apps/cli/tauri.js')
@@ -93,9 +96,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (action === 'dev') args.push('--debug')
     if (platform === 'android' && tauriAction === 'build') args.push('--target', target)
     if (platform === 'ios' && extra.some((arg) => ['--apk', '--aab'].includes(arg))) throw new Error('APK/AAB apply only to Android')
-    if (tauriAction === 'build') args.push(...extra)
+    if (tauriAction === 'build') args.push(...extra.filter((arg) => arg !== '--universal'))
     const result = spawnSync(process.execPath, args, {
-      cwd: desktop, stdio: 'inherit', env: { ...process.env, RUNLY_NATIVE_ENV: environment, RUNLY_NATIVE_ORIGIN: origin },
+      cwd: desktop, stdio: 'inherit',
+      env: { ...process.env, RUNLY_NATIVE_ENV: environment, ...(origin ? { RUNLY_NATIVE_ORIGIN: origin } : {}) },
     })
     if (result.error) throw result.error
     if (action === 'init' && result.status === 0) buildNativeBrandAssets()

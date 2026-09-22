@@ -9,26 +9,42 @@ fn main() {
         let environment = std::env::var("RUNLY_NATIVE_ENV")
             .or_else(|_| std::env::var("ATLAS_NATIVE_ENV"))
             .expect("Use scripts/native-host.mjs to build Mobile");
+        // Absent only for a `--universal` production build — every other
+        // environment still requires a compiled-in origin.
         let origin = std::env::var("RUNLY_NATIVE_ORIGIN")
             .or_else(|_| std::env::var("ATLAS_NATIVE_ORIGIN"))
-            .expect("Missing compiled native origin");
+            .ok();
         let config: serde_json::Value =
             serde_json::from_str(include_str!("../native-host/environments.json")).unwrap();
         match environment.as_str() {
-            "production" | "staging" => {
-                assert_eq!(Some(origin.as_str()), config[&environment].as_str())
+            "production" => {
+                if let Some(value) = &origin {
+                    assert_eq!(Some(value.as_str()), config["production"].as_str())
+                }
+                // No origin: universal build, resolved by the user at runtime.
+            }
+            "staging" => {
+                let value = origin
+                    .as_deref()
+                    .expect("Missing compiled native origin for staging");
+                assert_eq!(Some(value), config["staging"].as_str())
             }
             "development" => {
+                let value = origin
+                    .as_deref()
+                    .expect("Missing compiled native origin for development");
                 assert_ne!(
                     std::env::var("PROFILE").unwrap(),
                     "release",
                     "Development origin forbidden in release"
                 );
-                assert!(origin.starts_with("http://") || origin.starts_with("https://"));
+                assert!(value.starts_with("http://") || value.starts_with("https://"));
             }
             _ => panic!("Unknown native environment"),
         }
-        println!("cargo:rustc-env=ATLAS_NATIVE_ORIGIN={origin}");
+        if let Some(value) = &origin {
+            println!("cargo:rustc-env=ATLAS_NATIVE_ORIGIN={value}");
+        }
         println!(
             "cargo:rustc-env=ATLAS_NATIVE_VERSION={}",
             config["nativeHostVersion"].as_str().unwrap()
