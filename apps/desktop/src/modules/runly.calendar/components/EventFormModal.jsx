@@ -49,6 +49,20 @@ function toLocalDatetime(isoStr) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+// Default duration when the start time changes: one hour later, same day.
+// Clamped at 23:59 instead of rolling into the next day so "mismo dia" holds
+// even when the new start is late at night.
+function addOneHourSameDay(startLocal) {
+  const [datePart, timePart] = startLocal?.split("T") ?? [];
+  if (!datePart || !timePart) return startLocal;
+  const [hStr, mStr] = timePart.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (Number.isNaN(h) || Number.isNaN(m)) return startLocal;
+  if (h >= 23) return `${datePart}T23:59`;
+  return `${datePart}T${String(h + 1).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 function buildDefaultForm(defaultDate, defaultCalendarId, allCalendars, defaultVideoUrl = "") {
   const now = new Date();
   const base = defaultDate || toLocalIso(now);
@@ -263,7 +277,11 @@ export default function EventFormModal({
         await createEvent.mutateAsync(payload);
         toast.success("Evento creado");
       }
-      onSaved?.(payload);
+      // Wait for onSaved before closing: some callers (e.g. NewMeetingDialog)
+      // clear caller-owned cleanup state inside onSaved, and onClose can run
+      // destructive cleanup (deleting an orphan meeting room) based on that
+      // state — closing first would race onClose ahead of that clear.
+      await onSaved?.(payload);
       onClose();
     } catch (err) {
       toast.error(err.message || "Error al guardar el evento");
@@ -342,7 +360,14 @@ export default function EventFormModal({
                   label="Inicio"
                   required
                   value={form.startAt}
-                  onChange={(e) => set("startAt", e.target.value)}
+                  onChange={(e) => {
+                    const nextStart = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      startAt: nextStart,
+                      endAt: addOneHourSameDay(nextStart),
+                    }));
+                  }}
                 />
                 <DateTimeField
                   label="Fin"
