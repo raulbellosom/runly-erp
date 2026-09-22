@@ -402,9 +402,13 @@ async function writeLiveKitArtifacts(config) {
         httpPort: process.env.LIVEKIT_HTTP_HOST_PORT,
         redisPort: process.env.LIVEKIT_REDIS_PORT,
       }),
-      { encoding: "utf8", mode: 0o600 },
+      // 0644, unlike livekit.yaml's 0600: the egress container runs its
+      // process as a non-root user (livekit-server's does not), so a
+      // root-owned 0600 bind mount reads as EACCES from inside it — see the
+      // docker-compose.yml egress service comment.
+      { encoding: "utf8", mode: 0o644 },
     );
-    try { await fs.chmod(liveKitEgressConfigFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+    try { await fs.chmod(liveKitEgressConfigFile, 0o644); } catch { /* Windows does not apply POSIX modes. */ }
   } else {
     // recursive: true also cleans up the directory Docker auto-creates at
     // this bind-mount source path when the file didn't exist yet the first

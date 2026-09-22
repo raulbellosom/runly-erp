@@ -169,9 +169,20 @@ services:
     container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-egress
     profiles: ["livekit-egress"]
     restart: unless-stopped
+    # Required by every LiveKit Egress deployment (including local/self-hosted)
+    # since it runs Chrome for room-composite rendering — without it every
+    # request fails with "chrome failed to start". See
+    # docs.livekit.io/transport/self-hosting/egress/.
+    cap_add:
+      - SYS_ADMIN
     environment:
       - EGRESS_CONFIG_FILE=/etc/egress/egress.yaml
     volumes:
+      # egress.yaml is written 0644 (see renderEgressConfig's callers), not
+      # 0600 like livekit.yaml — the egress process runs as a non-root user
+      # inside the container (unlike livekit-server, which runs as root), so
+      # a 0600 root-owned bind mount reads as "permission denied" from
+      # inside the container even though the host root user can read it fine.
       - ./livekit/egress.yaml:/etc/egress/egress.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:

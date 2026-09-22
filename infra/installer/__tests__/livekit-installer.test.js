@@ -139,6 +139,28 @@ describe("LiveKit installer contract", () => {
     assert.match(compose, /docker\.sock/);
   });
 
+  it("grants egress SYS_ADMIN and writes its config world-readable (regression: 2026-09-22 recording outage)", async () => {
+    // Confirmed against the live outage log: without cap_add SYS_ADMIN, every
+    // egress request fails with "chrome failed to start" (LiveKit's own
+    // self-hosting docs say this is required for ALL deployments, including
+    // local ones). And because livekit/egress runs its process as a non-root
+    // user — unlike livekit-server, which runs as root — a 0600 root-owned
+    // egress.yaml bind mount reads back as EACCES inside the container: this
+    // is exactly what "open /etc/egress/egress.yaml: permission denied" in a
+    // crash-restart loop turned out to be, which meant no egress worker ever
+    // registered and every StartRoomCompositeEgress call just timed out.
+    const compose = await read("docker-compose.yml");
+    assert.match(compose, /egress:[\s\S]*?cap_add:\s*\n\s*-\s*SYS_ADMIN/);
+
+    for (const file of ["setup-local.mjs", "setup-external.mjs"]) {
+      const setup = await read(file);
+      const egressWrite = setup.match(/renderEgressConfig\(\{[\s\S]*?\}\),\s*\n([\s\S]*?)\);/);
+      assert.ok(egressWrite, `${file}: could not locate the egress.yaml writeFile call`);
+      assert.match(egressWrite[1], /mode:\s*0o644/, `${file}: egress.yaml must be written 0644, not 0600 like livekit.yaml`);
+      assert.match(setup, /fs\.chmod\(liveKitEgressConfigFile,\s*0o644\)/, `${file}: egress.yaml chmod must also be 0644`);
+    }
+  });
+
   it("wires storage-api's S3 protocol credentials for self-hosted recording uploads", async () => {
     // Self-hosted Supabase Storage has no Studio UI to generate these (that
     // flow only exists on Supabase Cloud) — the installer must generate and
