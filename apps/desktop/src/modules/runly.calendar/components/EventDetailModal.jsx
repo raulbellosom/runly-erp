@@ -92,47 +92,56 @@ export default function EventDetailModal({
       <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
         <DialogContent
           size="lg"
-          scrollable
-          className="px-0 pt-0 pb-0 md:p-0 gap-0 overflow-hidden max-h-[85dvh] md:max-h-[85dvh]"
+          scrollable={false}
+          className="px-0 pt-0 pb-0 md:p-0 gap-0 overflow-hidden"
         >
-          <div className="h-1.5 shrink-0" style={{ backgroundColor: calColor }} />
+          {/* Sticky header — color bar, edit/delete actions and title stay
+              pinned while the section below scrolls. DialogContent itself is
+              the scroll container (native overflow-y-auto), so `sticky` (not
+              a flex/overflow-hidden split) is what actually pins this against
+              its own base scroll classes. Needs an opaque-ish background
+              since .glass-strong is translucent — otherwise scrolled content
+              would show through. */}
+          <div className="sticky top-0 z-10 bg-[hsl(var(--card))]/95 backdrop-blur-sm rounded-t-2xl">
+            <div className="h-1.5 rounded-t-2xl" style={{ backgroundColor: calColor }} />
 
-          <DialogHeader className="shrink-0 mb-0 space-y-0 px-5 pt-3 pb-3 pr-12">
-            <div className="flex items-center justify-end gap-1 -mt-1 -mr-1">
-              {canEdit && (
-                <button
-                  onClick={() => onEdit(event)}
-                  className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
-                  title={event._isRecurrenceInstance ? "Editar serie" : "Editar"}
-                >
-                  <Edit2
-                    size={15}
-                    className="text-[hsl(var(--muted-foreground))]"
-                  />
-                </button>
-              )}
-              {canDelete && !event.sourceModule && (
-                <button
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={deleteEvent.isPending}
-                  className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
-                  title={
-                    event._isRecurrenceInstance ? "Eliminar serie" : "Eliminar"
-                  }
-                >
-                  <Trash2
-                    size={15}
-                    className="text-[hsl(var(--muted-foreground))]"
-                  />
-                </button>
-              )}
-            </div>
-            <DialogTitle className="text-lg font-semibold leading-tight">
-              {event.title}
-            </DialogTitle>
-          </DialogHeader>
+            <DialogHeader className="mb-0 space-y-0 px-5 pt-3 pb-3 pr-12">
+              <div className="flex items-center justify-end gap-1 -mt-1 -mr-1">
+                {canEdit && (
+                  <button
+                    onClick={() => onEdit(event)}
+                    className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
+                    title={event._isRecurrenceInstance ? "Editar serie" : "Editar"}
+                  >
+                    <Edit2
+                      size={15}
+                      className="text-[hsl(var(--muted-foreground))]"
+                    />
+                  </button>
+                )}
+                {canDelete && !event.sourceModule && (
+                  <button
+                    onClick={() => setConfirmOpen(true)}
+                    disabled={deleteEvent.isPending}
+                    className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
+                    title={
+                      event._isRecurrenceInstance ? "Eliminar serie" : "Eliminar"
+                    }
+                  >
+                    <Trash2
+                      size={15}
+                      className="text-[hsl(var(--muted-foreground))]"
+                    />
+                  </button>
+                )}
+              </div>
+              <DialogTitle className="text-lg font-semibold leading-tight">
+                {event.title}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-5 space-y-3">
+          <div className="px-5 pb-5 space-y-3">
             {isChatMeeting && callsEnabled && (
               <Button
                 type="button"
