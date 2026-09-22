@@ -234,7 +234,6 @@ export { DistDropZone } from "./components/DistDropZone.jsx";
 export { FileUploader } from "./components/FileUploader.jsx";
 export { AIUploadDropzone } from "./components/AIUploadDropzone.jsx";
 export { AIFlowSteps } from "./components/AIFlowSteps.jsx";
-export { FileViewer } from "./components/FileViewer.jsx";
 export { AdvancedFileViewer } from "./components/AdvancedFileViewer.jsx";
 export { FileVisual } from "./components/FileVisual.jsx";
 export {

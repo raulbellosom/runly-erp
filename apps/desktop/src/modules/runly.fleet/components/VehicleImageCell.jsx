@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileViewer } from "@runly/ui";
+import { useCallback, useEffect, useState } from "react";
+import { AdvancedFileViewer } from "@runly/ui";
 import { runly } from '../../../lib/runly'
 
 function mapViewerFiles(items) {
@@ -108,11 +108,6 @@ export default function VehicleImageCell({ value, row, token, apiBaseUrl }) {
     }
   }, [coverImageAssetId, hasAnyImage, token, vehicleId]);
 
-  const currentViewerFile = useMemo(() => {
-    if (!Array.isArray(viewerFiles) || viewerFiles.length === 0) return null;
-    return viewerFiles[activeIndex] ?? viewerFiles[0];
-  }, [activeIndex, viewerFiles]);
-
   if (!hasAnyImage) {
     return <span className="text-[hsl(var(--muted-foreground))]">—</span>;
   }
@@ -141,15 +136,13 @@ export default function VehicleImageCell({ value, row, token, apiBaseUrl }) {
         ) : null}
       </button>
 
-      <FileViewer
+      <AdvancedFileViewer
         open={openViewer}
-        onClose={() => setOpenViewer(false)}
-        file={currentViewerFile}
+        onOpenChange={setOpenViewer}
         files={viewerFiles}
         activeIndex={activeIndex}
-        onActiveIndexChange={setActiveIndex}
-        onResolveFile={async (file) => getSignedUrl(file?.fileAssetId)}
-        title="Imagen del vehiculo"
+        onIndexChange={setActiveIndex}
+        onResolveSignedUrl={(file) => getSignedUrl(file?.fileAssetId)}
       />
     </>
   );

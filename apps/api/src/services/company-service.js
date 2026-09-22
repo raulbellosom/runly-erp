@@ -369,7 +369,7 @@ export function createCompanyService({ prisma, supabaseAdmin }) {
     async listMembers(activeCompanyId) {
       const companyId = await resolveCompanyId(activeCompanyId);
       const memberships = await prisma.membership.findMany({
-        where: { companyId },
+        where: { companyId, user: { isBot: false } },
         include: {
           user: { select: { id: true, displayName: true, email: true, avatarFileId: true } },
           role: { select: { id: true, name: true } },
@@ -391,6 +391,7 @@ export function createCompanyService({ prisma, supabaseAdmin }) {
       const candidates = await prisma.userProfile.findMany({
         where: {
           enabled: true,
+          isBot: false,
           OR: [
             { displayName: { contains: q, mode: "insensitive" } },
             { email: { contains: q, mode: "insensitive" } },

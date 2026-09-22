@@ -116,7 +116,7 @@ import { createNotificationDeliveryWorker } from "./services/notification-delive
 import { createNotificationService } from "./services/notification-service.js";
 import { createRealtimeBroadcaster } from "./services/realtime-broadcaster.js";
 import { createSmtpService } from "./services/smtp-service.js";
-import { buildPasswordResetEmail, buildCompanyInvitationEmail, resolveAppBaseUrl } from "./services/email-templates.js";
+import { buildPasswordResetEmail, buildUserWelcomeEmail, resolveAppBaseUrl } from "./services/email-templates.js";
 import { createCompanyBrandService } from "./services/company-brand-service.js";
 import {
   get as cacheGet,
@@ -2535,9 +2535,13 @@ app.get(
     try {
       const tenant = c.get("tenantContext");
       const roles = await prisma.role.findMany({
-        where: tenant.isSystemAdmin
-          ? {}
-          : { OR: [{ companyId: null }, { companyId: tenant.companyId }] },
+        // system.admin is a reserved platform role (meant for the instance's
+        // first user, assigned outside this UI) — it never appears in the
+        // Identity role list or picker, even for a system admin viewer.
+        where: {
+          key: { not: "system.admin" },
+          ...(tenant.isSystemAdmin ? {} : { OR: [{ companyId: null }, { companyId: tenant.companyId }] }),
+        },
         include: {
           permissions: {
             select: {
@@ -3211,45 +3215,87 @@ app.get(
   },
 );
 
+// Direct create-and-activate: the admin provisions the login and grants
+// company access in one step, no accept step for the invited person. Email
+// notification is opt-in (fields.notifyByEmail) — the admin decides whether
+// to share the credentials by email or hand them over directly.
 app.post('/identity/users', authMiddleware, requirePermission('identity.users.create'), async (c) => {
   try {
     const fields = createUserSchema.parse(await c.req.json());
-    const companyId = c.get('companyId');
-    const invitation = await collaborationInvitations.create({ resourceType: 'company', resourceId: companyId, companyId,
-      actorId: c.get('userId'), email: fields.email, roleId: fields.roleId ?? null });
-    // Provision a login for a new identity. An existing identity receives the
-    // same invitation response and keeps its password and personal profile.
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({ email: fields.email, password: fields.password, email_confirm: true });
+    const tenant = c.get('tenantContext');
+    const companyId = tenant.companyId;
+    if (!companyId) return c.json({ error: 'Selecciona una empresa activa para crear un usuario.' }, 400);
+    const email = fields.email.trim().toLowerCase();
+
+    if (fields.roleId) {
+      const targetRole = await prisma.role.findFirst({ where: { id: fields.roleId, enabled: true }, select: { key: true, companyId: true } });
+      if (!targetRole) return c.json({ error: 'Rol no encontrado.' }, 404);
+      const scopeCheck = checkMembershipRoleScope({ roleCompanyId: targetRole.companyId, membershipCompanyId: companyId });
+      if (!scopeCheck.ok) return c.json({ error: scopeCheck.error }, scopeCheck.status);
+      const protectedCheck = checkProtectedRoleAssignment({
+        roleKey: targetRole.key,
+        protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
+        isSystemAdmin: tenant.isSystemAdmin,
+        actorCanManageRoles: Boolean(tenant.isAdmin || tenant.permissionSet?.has('identity.roles.update')),
+      });
+      if (!protectedCheck.ok) return c.json({ error: protectedCheck.error }, protectedCheck.status);
+    }
+
+    // Provision a login for a new identity. An existing identity (email
+    // already registered elsewhere) keeps its password and personal profile —
+    // this just grants it access to this company.
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({ email, password: fields.password, email_confirm: true });
     if (authError && !["email_exists", "user_already_exists"].includes(authError.code)) throw new Error("Provisioning unavailable");
+
+    let profile;
     if (authData?.user?.id) {
       try {
-        await prisma.userProfile.create({ data: { authUserId: authData.user.id, firstName: fields.firstName, lastName: fields.lastName,
-          displayName: `${fields.firstName} ${fields.lastName}`.trim(), email: fields.email.trim().toLowerCase() } });
+        profile = await prisma.userProfile.create({ data: { authUserId: authData.user.id, firstName: fields.firstName, lastName: fields.lastName,
+          displayName: `${fields.firstName} ${fields.lastName}`.trim(), email } });
       } catch (err) {
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
         throw err;
       }
+    } else {
+      profile = await prisma.userProfile.findUnique({ where: { email } });
     }
-    const invitationPath = `/app/accept-invitation?token=${encodeURIComponent(invitation.token)}`;
-    const baseUrl = resolveAppBaseUrl(process.env);
-    const invitationUrl = baseUrl ? `${baseUrl}${invitationPath}` : invitationPath;
-    // SMTP is optional on a fresh installation; the administrator can copy the
-    // same link. Neither result discloses whether the email had an account.
-    if (baseUrl) {
-      const inviteCompanyId = c.get('companyId');
-      const inviteBrand = await companyBrandService.getBrandForCompany(inviteCompanyId);
-      const inviteMail = buildCompanyInvitationEmail({ invitationUrl, brand: inviteBrand });
-      await createSmtpService({ prisma, companyId: inviteCompanyId }).sendEmail({
-        to: fields.email,
-        subject: inviteMail.subject,
-        text: inviteMail.text,
-        html: inviteMail.html,
-        fromName: companyBrandService.fromNameFor(inviteBrand),
-      }).catch(() => {});
+    if (!profile) throw new Error("No se pudo localizar la identidad del usuario.");
+
+    const existingMembership = await prisma.membership.findUnique({ where: { companyId_userId: { companyId, userId: profile.id } } });
+    const membership = existingMembership
+      ? await prisma.membership.update({ where: { id: existingMembership.id }, data: { enabled: true, roleId: fields.roleId ?? existingMembership.roleId } })
+      : await prisma.membership.create({ data: { companyId, userId: profile.id, roleId: fields.roleId ?? null } });
+
+    cacheDelByPrefix('user_ctx:');
+    const { actorName } = getActivityContext(c);
+    await publishActivityFromContext(prisma, c, {
+      type: 'identity.user.create',
+      severity: 'success',
+      entityType: 'UserProfile',
+      entityId: profile.id,
+      summary: `${actorName} creó y activó al usuario ${profile.displayName}`,
+    });
+
+    if (fields.notifyByEmail) {
+      const baseUrl = resolveAppBaseUrl(process.env);
+      if (baseUrl) {
+        const loginUrl = `${baseUrl}/app/login`;
+        const brand = await companyBrandService.getBrandForCompany(companyId);
+        const mail = buildUserWelcomeEmail({ loginUrl, email, brand });
+        await createSmtpService({ prisma, companyId }).sendEmail({
+          to: email,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+          fromName: companyBrandService.fromNameFor(brand),
+        }).catch(() => {});
+      }
     }
-    return c.json({ data: { invitationId: invitation.id, invitationUrl, expiresAt: invitation.expiresAt } }, 201);
+
+    return c.json({ data: { userId: profile.id, membershipId: membership.id, email, enabled: true } }, 201);
   } catch (err) {
-    return c.json({ error: 'No se pudo preparar la invitacion con los datos proporcionados.' }, err.status ?? 400);
+    if (err?.name === 'ZodError') return c.json({ error: err.errors[0]?.message ?? 'Datos inválidos.' }, 400);
+    return c.json({ error: 'No se pudo crear el usuario con los datos proporcionados.' }, err.status ?? 400);
   }
 });
 
@@ -3808,9 +3854,9 @@ app.patch(
         return c.json({ error: "Usuario no encontrado." }, 404);
       }
       const body = await c.req.json();
-      if (!tenant.isSystemAdmin) {
+      if (!tenant.isAdmin) {
         const keys = Object.keys(body);
-        if (keys.some((key) => key !== "enabled")) return c.json({ error: "El perfil personal solo puede modificarlo su titular o la administracion de la plataforma." }, 403);
+        if (keys.some((key) => key !== "enabled")) return c.json({ error: "El perfil personal solo puede modificarlo su titular o un administrador." }, 403);
         if (typeof body.enabled !== "boolean") return c.json({ error: "Datos invalidos." }, 400);
         if (!body.enabled && id === c.get("userContext").profile.id) return c.json({ error: "No puedes revocar tu propio acceso." }, 400);
         await prisma.membership.updateMany({ where: { companyId: tenant.companyId, userId: id }, data: { enabled: body.enabled } });

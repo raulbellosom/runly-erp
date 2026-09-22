@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   useAttachmentsController,
   resolveAttachmentFileType,
-  FileViewer,
+  AdvancedFileViewer,
 } from '@runly/ui'
 import {
   Download,
@@ -140,6 +140,20 @@ export function InventoryFileGallery({ item, token, companyId = null, apiBaseUrl
     resolveSignedUrl,
   } = controller
 
+  const viewerFiles = useMemo(
+    () =>
+      associatedItems.map((f) => ({
+        ...f,
+        id: f.fileAssetId ?? f.id,
+        originalName: f.fileName ?? 'Archivo',
+      })),
+    [associatedItems],
+  )
+  const viewerIndex = Math.max(
+    0,
+    viewerItem ? associatedItems.findIndex((f) => f.id === viewerItem.id) : 0,
+  )
+
   // Split into images and other files
   const { images, others } = useMemo(() => {
     const imgs = []
@@ -239,7 +253,21 @@ export function InventoryFileGallery({ item, token, companyId = null, apiBaseUrl
 
       {/* File viewer (lightbox for images / PDF viewer) */}
       {viewerItem && (
-        <FileViewer item={viewerItem} onClose={closeViewer} />
+        <AdvancedFileViewer
+          open={Boolean(viewerItem)}
+          onOpenChange={(open) => !open && closeViewer()}
+          files={viewerFiles}
+          activeIndex={viewerIndex}
+          onIndexChange={(nextIndex) => {
+            const target = associatedItems[nextIndex]
+            if (target) openAssociated(target)
+          }}
+          onResolveSignedUrl={(file) => {
+            if (file?.signedUrl) return file.signedUrl
+            if (!file?.fileAssetId) return null
+            return resolveSignedUrl(file.fileAssetId)
+          }}
+        />
       )}
     </div>
   )

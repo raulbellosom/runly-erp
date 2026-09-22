@@ -213,7 +213,7 @@ export default function UserEditScreen() {
       />
 
       <div className="mt-6">
-        {isSystemAdmin ? <RunlyForm
+        {!isSelf ? <RunlyForm
           blueprint={IDENTITY_USER_FORM}
           initialData={user ?? {}}
           mode="edit"

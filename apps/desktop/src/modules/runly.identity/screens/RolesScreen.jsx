@@ -36,11 +36,15 @@ export default function RolesScreen() {
   const queryClient = useQueryClient();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  // RunlyCrudView's table has no react-query cache to invalidate — it only
+  // refetches when its refreshSignal prop changes.
+  const [refreshSignal, setRefreshSignal] = useState(0);
 
   const createRoleMutation = useMutation({
     mutationFn: (data) => runly.identity.createRole(data, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["identity-roles"] });
+      setRefreshSignal((v) => v + 1);
       setSheetOpen(false);
       toast.success("Rol creado");
     },
@@ -88,6 +92,7 @@ export default function RolesScreen() {
           companyId={activeCompanyId}
           apiBaseUrl={API_BASE_URL}
           suppressToolbarCreate
+          refreshSignal={refreshSignal}
           onNavigate={({ recordId }) => {
             if (recordId) navigate(`/app/m/runly.identity/identity/roles/${recordId}`);
           }}

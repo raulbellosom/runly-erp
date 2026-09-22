@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AdvancedFileViewer,
   Badge,
   Button,
   ConfirmDialog,
   DataTable,
-  FileViewer,
   PageHeader,
 } from "@runly/ui";
 import { Download, Files } from "lucide-react";
@@ -117,7 +117,16 @@ export default function GeneratedDocumentsScreen() {
         emptyTitle="No hay documentos generados"
         emptyDescription="Los PDFs generados desde Growth apareceran aqui."
       />
-      <FileViewer open={Boolean(viewerFile)} onClose={() => setViewerFile(null)} file={viewerFile} />
+      {viewerFile && (
+        <AdvancedFileViewer
+          open={Boolean(viewerFile)}
+          onOpenChange={(open) => !open && setViewerFile(null)}
+          files={[viewerFile]}
+          activeIndex={0}
+          onIndexChange={() => {}}
+          onResolveSignedUrl={(file) => file.signedUrl}
+        />
+      )}
       <ConfirmDialog
         open={Boolean(toggleTarget)}
         onOpenChange={(open) => !open && setToggleTarget(null)}

@@ -1,6 +1,6 @@
 import { companyFetch } from '../../../lib/companyFetch.js'
 import { useEffect, useMemo, useState } from "react";
-import { FileViewer } from "@runly/ui";
+import { AdvancedFileViewer } from "@runly/ui";
 
 function getBaseUrl(apiBaseUrl) {
   return String(apiBaseUrl ?? "").trim().replace(/\/+$/, "");
@@ -86,17 +86,19 @@ export default function DriverAvatarCell({ value, row, token, apiBaseUrl }) {
       >
         {cellContent}
       </button>
-      <FileViewer
+      <AdvancedFileViewer
         open={openViewer}
-        onClose={() => setOpenViewer(false)}
-        file={{
-          id: fileAssetId,
-          fileAssetId,
-          originalName: fullName ? `Foto de ${fullName}` : "Foto de chofer",
-          mimeType: "image/*",
-          signedUrl: photoUrl,
-        }}
-        files={[]}
+        onOpenChange={setOpenViewer}
+        files={[
+          {
+            id: fileAssetId,
+            originalName: fullName ? `Foto de ${fullName}` : "Foto de chofer",
+            mimeType: "image/jpeg",
+          },
+        ]}
+        activeIndex={0}
+        onIndexChange={() => {}}
+        onResolveSignedUrl={() => photoUrl}
       />
     </>
   );

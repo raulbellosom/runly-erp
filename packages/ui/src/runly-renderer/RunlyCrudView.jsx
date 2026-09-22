@@ -108,6 +108,10 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
   onCreateSuccess,
   onEditSuccess,
   onDeleteSuccess,
+  // Bumped by the caller after a mutation this view doesn't own itself (e.g.
+  // a custom create Sheet outside RunlyCrudView's built-in form) to force the
+  // table to refetch — the table has no react-query cache to invalidate.
+  refreshSignal: externalRefreshSignal = 0,
 }, ref) {
   const tableApiPath = getApiPath(tableBlueprint);
   const resolvedInitialMode = MODES.has(initialMode) ? initialMode : "list";
@@ -580,7 +584,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
             onView={currentDetailBlueprint ? openDetail : undefined}
             onEdit={currentFormBlueprint ? openEdit : undefined}
             onDelete={requestDelete}
-            refreshSignal={refreshSignal}
+            refreshSignal={refreshSignal + externalRefreshSignal}
           />
 
           <Sheet

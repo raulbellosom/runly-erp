@@ -3,6 +3,7 @@ import { companyFetch } from '../../../lib/companyFetch.js'
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AdvancedFileViewer,
   AttachmentsPanel,
   Badge,
   Button,
@@ -11,7 +12,6 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorState,
-  FileViewer,
   LoadingState,
   PageHeader,
   SelectField,
@@ -589,11 +589,16 @@ export default function GrowthLeadDetailScreen() {
           });
         }}
       />
-      <FileViewer
-        open={Boolean(generatedFile)}
-        onClose={() => setGeneratedFile(null)}
-        file={generatedFile}
-      />
+      {generatedFile && (
+        <AdvancedFileViewer
+          open={Boolean(generatedFile)}
+          onOpenChange={(open) => !open && setGeneratedFile(null)}
+          files={[generatedFile]}
+          activeIndex={0}
+          onIndexChange={() => {}}
+          onResolveSignedUrl={(file) => file.signedUrl}
+        />
+      )}
 
       <ConfirmDialog
         open={disableOpen}

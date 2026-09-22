@@ -29,8 +29,13 @@ export function createAiImportService({ prisma, env = process.env }) {
 
     let existingTransactions = []
     if (detected) {
+      // consecutive isn't a real column (ledger-service.js's register listing
+      // computes it the same way, per account, via this same window function)
+      // — selecting it as a plain column throws "column does not exist" here.
       existingTransactions = await prisma.$queryRaw`
-        SELECT id, consecutive, fecha, deposito, retiro, nombre FROM ledger_transaction
+        SELECT id, fecha, deposito, retiro, nombre,
+          ROW_NUMBER() OVER (ORDER BY fecha, created_at)::int4 AS consecutive
+        FROM ledger_transaction
         WHERE account_id = ${detected.id}::uuid AND enabled = true
       `
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, DistDropZone, ErrorState, FileViewer, PageHeader, Skeleton } from "@runly/ui";
+import { AdvancedFileViewer, Button, Card, DistDropZone, ErrorState, PageHeader, Skeleton } from "@runly/ui";
 import { Palette, Upload, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -440,6 +440,7 @@ export default function CompanyBranding() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["company-branding"] });
       await queryClient.invalidateQueries({ queryKey: ["instance-status"] });
+      await queryClient.invalidateQueries({ queryKey: ["memberships-me"] });
       applyBrandTheme(form.primaryColor);
       setBranding({ ...currentBranding, primaryColor: form.primaryColor });
       toast.success("Marca visual actualizada");
@@ -549,16 +550,20 @@ export default function CompanyBranding() {
 
           {/* Logo full-screen viewer */}
           {(currentLogoUrl || logoPreviewUrl) && (
-            <FileViewer
+            <AdvancedFileViewer
               open={viewerOpen}
-              onClose={() => setViewerOpen(false)}
-              file={{
-                url: logoPreviewUrl ?? currentLogoUrl,
-                signedUrl: logoPreviewUrl ?? currentLogoUrl,
-                originalName: "Logotipo de la empresa",
-                mimeType: "image/png",
-              }}
-              title="Logotipo de la empresa"
+              onOpenChange={setViewerOpen}
+              files={[
+                {
+                  id: form.logoFileId ?? "pending-logo",
+                  mimeType: logoFile?.type || "image/png",
+                  originalName: logoFile?.name || "Logotipo de la empresa",
+                  sizeBytes: logoFile?.size || 0,
+                },
+              ]}
+              activeIndex={0}
+              onIndexChange={() => {}}
+              onResolveSignedUrl={() => logoPreviewUrl ?? currentLogoUrl}
             />
           )}
         </div>

@@ -7,6 +7,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CheckboxField,
   PageHeader,
   PasswordField,
   SelectField,
@@ -36,7 +37,6 @@ export default function UserCreateScreen() {
     enabled: Boolean(token) && canReadRoles,
   });
 
-  const [invitationUrl, setInvitationUrl] = useState(null);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -44,6 +44,7 @@ export default function UserCreateScreen() {
     password: "",
     confirmPassword: "",
     roleId: NO_ROLE_VALUE,
+    notifyByEmail: false,
   });
 
   const roleOptions = useMemo(
@@ -59,10 +60,10 @@ export default function UserCreateScreen() {
 
   const createUserMutation = useMutation({
     mutationFn: (payload) => runly.identity.createUser(payload, token),
-    onSuccess: ({ data }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["identity-users"] });
-      toast.success("Invitacion preparada");
-      setInvitationUrl(new URL(data.invitationUrl, window.location.origin).href);
+      toast.success("Usuario creado y activado");
+      navigate("/app/m/runly.identity/identity/users");
     },
     onError: (err) => {
       try {
@@ -80,6 +81,7 @@ export default function UserCreateScreen() {
       lastName: form.lastName.trim(),
       email: form.email.trim(),
       password: form.password,
+      notifyByEmail: form.notifyByEmail,
     };
     if (form.roleId && form.roleId !== NO_ROLE_VALUE) {
       payload.roleId = form.roleId;
@@ -99,7 +101,7 @@ export default function UserCreateScreen() {
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader
         eyebrow="Runly Identity"
-        title="Invitar usuario"
+        title="Nuevo usuario"
         actions={
           <Button variant="outline" onClick={() => navigate("/app/m/runly.identity/identity/users")}>
             <ArrowLeft className="h-4 w-4" />
@@ -117,12 +119,6 @@ export default function UserCreateScreen() {
           </CardContent>
         </Card>
       )}
-
-      {invitationUrl && <Card><CardContent className="space-y-3 pt-6">
-        <p>Comparte este enlace con la persona invitada. Debe iniciar sesión con el correo indicado y aceptar para obtener acceso. La contraseña inicial solo se aplica a cuentas nuevas.</p>
-        <TextField label="Enlace de invitación" value={invitationUrl} readOnly />
-        <Button onClick={() => navigator.clipboard.writeText(invitationUrl).then(() => toast.success('Enlace copiado')).catch(() => toast.error('Selecciona y copia el enlace'))}>Copiar enlace</Button>
-      </CardContent></Card>}
 
       {canManageUsers && (
         <Card variant="shell-flat">
@@ -196,14 +192,23 @@ export default function UserCreateScreen() {
               />
             </div>
 
+            <CheckboxField
+              label="Enviar notificación por correo"
+              hint="El usuario queda activo de inmediato. Solo se le avisa por correo si marcas esta opción; si no, comparte la contraseña directamente."
+              checked={form.notifyByEmail}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, notifyByEmail: e.target.checked }))
+              }
+            />
+
             <div className="flex justify-end">
               <Button
                 disabled={!isValid || createUserMutation.isPending}
                 onClick={handleSubmit}
               >
                 {createUserMutation.isPending
-                  ? "Preparando invitación..."
-                  : "Invitar usuario"}
+                  ? "Creando usuario..."
+                  : "Crear usuario"}
               </Button>
             </div>
           </CardContent>
