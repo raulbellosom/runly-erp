@@ -74,7 +74,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const extra = process.argv.slice(5)
   if (extra.some((arg) => !['--debug', '--apk', '--aab', '--universal'].includes(arg))) throw new Error('Only --debug/--apk/--aab/--universal supported; use RUNLY_NATIVE_TARGET for ABI')
   const universal = extra.includes('--universal')
-  if (universal && (platform !== 'android' || action !== 'build')) throw new Error('--universal only applies to `android build`')
+  if (universal && (platform !== 'android' || !['build', 'config'].includes(action))) throw new Error('--universal only applies to `android build` or `android config`')
   if (universal && environment !== 'production') throw new Error('--universal builds must use the production environment')
   const origin = universal ? null : resolveEnvironment(environment, process.env.RUNLY_NATIVE_DEV_ORIGIN, action, extra.includes('--debug'))
   if (platform === 'android' && action !== 'init') {
