@@ -163,6 +163,29 @@ describe("LiveKit installer contract", () => {
     assert.match(kong, /paths:\s*\n\s*-\s*\/storage\/v1\//);
   });
 
+  it("never lets a stale SUPABASE_S3_* survive an update in selfhosted mode", async () => {
+    // Regression (2026-09-22): a .env.local written before this pairing
+    // existed had SUPABASE_S3_REGION=us-east-1 (an old unrelated default)
+    // while storage-api's own REGION was "local" — SigV4 signing disagreed
+    // and every recording 500'd with no useful client-side error. The fix is
+    // that in selfhosted mode these four are ALWAYS recomputed from
+    // supabase.secrets/browserSupabaseUrl, never gated behind
+    // `fromLocalEnv(...) ||`, so an old value self-heals on the next update
+    // instead of silently winning. External mode keeps the fromLocalEnv
+    // fallback since Runly doesn't own that Supabase's storage-api config.
+    const setupLocal = await read("setup-local.mjs");
+    const selfhostedBranch = /supabase\.mode === "selfhosted"\s*\?\s*([^:]+):\s*\(?fromLocalEnv\("SUPABASE_S3_(?:ENDPOINT|ACCESS_KEY_ID|SECRET_ACCESS_KEY|REGION)"\)/g;
+    const matches = [...setupLocal.matchAll(selfhostedBranch)];
+    assert.equal(matches.length, 4, "expected all 4 SUPABASE_S3_* vars to branch on supabase.mode");
+    for (const [, selfhostedValue] of matches) {
+      assert.doesNotMatch(
+        selfhostedValue,
+        /fromLocalEnv/,
+        `selfhosted branch must not fall back to a possibly-stale fromLocalEnv value: ${selfhostedValue}`,
+      );
+    }
+  });
+
   it("renders literal (non-interpolated) credentials and host-appropriate addresses for egress", () => {
     const linux = renderEgressConfig({
       apiKey: "APIabc123",

@@ -694,19 +694,33 @@ async function writeLocalEnv(supabaseInput, identity) {
   const chatMiraiWeb             = fromLocalEnv("CHAT_MIRAI_WEB") || "true";
   const tavilyApiKey             = fromLocalEnv("TAVILY_API_KEY");
   const chatMiraiWebModel        = fromLocalEnv("CHAT_MIRAI_WEB_MODEL");
-  // LiveKit Egress → Supabase Storage (call recordings) — optional. For the
-  // installer-managed self-hosted Supabase stack, defaults come from the same
-  // S3_PROTOCOL_ACCESS_KEY_ID/SECRET generated above for storage-api — no
-  // manual credential step. An externally-managed Supabase (RUNLY_SUPABASE_MODE
-  // != selfhosted) has no such default; those vars must be filled in by hand
-  // from wherever that instance's storage-api is configured.
-  const supabaseS3Endpoint    = fromLocalEnv("SUPABASE_S3_ENDPOINT")
-    || (supabase.mode === "selfhosted" ? `${browserSupabaseUrl}/storage/v1/s3` : "");
-  const supabaseS3AccessKeyId = fromLocalEnv("SUPABASE_S3_ACCESS_KEY_ID")
-    || (supabase.mode === "selfhosted" ? supabase.secrets.S3_PROTOCOL_ACCESS_KEY_ID : "");
-  const supabaseS3SecretKey   = fromLocalEnv("SUPABASE_S3_SECRET_ACCESS_KEY")
-    || (supabase.mode === "selfhosted" ? supabase.secrets.S3_PROTOCOL_ACCESS_KEY_SECRET : "");
-  const supabaseS3Region      = fromLocalEnv("SUPABASE_S3_REGION") || "local";
+  // LiveKit Egress → Supabase Storage (call recordings) — optional. In
+  // selfhosted mode these four are NOT independent user secrets to preserve
+  // across re-runs like the rest of fromLocalEnv's fallbacks — client
+  // (SUPABASE_S3_*) and server (storage-api's S3_PROTOCOL_*/REGION, both set
+  // a few lines below from the same `supabase.secrets`) describe the *same*
+  // installer-managed instance, so they must always match exactly. Always
+  // recomputing them here, instead of only filling a blank, means a stale
+  // value from before this pairing existed (e.g. an old SUPABASE_S3_REGION
+  // left over from a manual edit or an earlier installer version) gets
+  // self-healed on every update instead of silently desyncing the S3 SigV4
+  // signature and failing recordings with an opaque 500 — see the
+  // 2026-09-22 recording-fix session, which hit exactly that.
+  // An externally-managed Supabase (RUNLY_SUPABASE_MODE != selfhosted) has no
+  // such pairing to enforce; those vars remain the operator's own to fill in
+  // from wherever that instance's storage-api is actually configured.
+  const supabaseS3Endpoint    = supabase.mode === "selfhosted"
+    ? `${browserSupabaseUrl}/storage/v1/s3`
+    : fromLocalEnv("SUPABASE_S3_ENDPOINT");
+  const supabaseS3AccessKeyId = supabase.mode === "selfhosted"
+    ? supabase.secrets.S3_PROTOCOL_ACCESS_KEY_ID
+    : fromLocalEnv("SUPABASE_S3_ACCESS_KEY_ID");
+  const supabaseS3SecretKey   = supabase.mode === "selfhosted"
+    ? supabase.secrets.S3_PROTOCOL_ACCESS_KEY_SECRET
+    : fromLocalEnv("SUPABASE_S3_SECRET_ACCESS_KEY");
+  const supabaseS3Region      = supabase.mode === "selfhosted"
+    ? "local"
+    : (fromLocalEnv("SUPABASE_S3_REGION") || "us-east-1");
   // Identity-level SMTP (password reset, cross-company mail) — optional; preserve
   // any user-provided value across re-runs, same as the Google OAuth vars above.
   const smtpHost      = fromLocalEnv("SMTP_HOST");
