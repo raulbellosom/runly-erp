@@ -154,6 +154,10 @@ export default function GrowthFormsScreen() {
   const properties = propertiesQuery.data?.data ?? [];
   const [propertyId, setPropertyId] = useState(null);
   const activePropertyId = propertyId ?? properties[0]?.id ?? null;
+  const activeProperty = properties.find((p) => p.id === activePropertyId) ?? null;
+  const turnstileConfigured = Boolean(
+    activeProperty?.turnstileSiteKey && activeProperty?.turnstileSecretKeySet,
+  );
 
   const formsQuery = useQuery({
     queryKey: ["growth", "forms", activePropertyId],
@@ -303,7 +307,7 @@ export default function GrowthFormsScreen() {
                         form={formDetail}
                         token={token}
                         assignees={assignees}
-                        turnstileConfigured={false}
+                        turnstileConfigured={turnstileConfigured}
                         basePath={BASE_PATH}
                         onSaved={() => {
                           formDetailQuery.refetch();

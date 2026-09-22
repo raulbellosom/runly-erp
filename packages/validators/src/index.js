@@ -906,6 +906,8 @@ export const growthPropertyUpdateSchema = z
     name: z.string().trim().min(1).max(200).optional(),
     domain: z.string().trim().min(1).max(300).nullable().optional(),
     enabled: z.boolean().optional(),
+    turnstileSiteKey: z.string().trim().max(500).nullable().optional(),
+    turnstileSecretKey: z.string().trim().max(500).nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No hay cambios para aplicar.",

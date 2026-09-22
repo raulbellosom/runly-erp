@@ -19,13 +19,22 @@ function handleError(c, error) {
   return c.json({ error: "Error interno de sitios Growth." }, 500);
 }
 
+// The encrypted turnstileSecretKey never needs to reach the admin UI — it's
+// only decrypted server-side at Turnstile-verify time. Exposes a boolean
+// instead, same shape as WebsiteSite's turnstileSecretKeySet.
+function publicProperty(property) {
+  if (!property) return property;
+  const { turnstileSecretKey, ...rest } = property;
+  return { ...rest, turnstileSecretKeySet: Boolean(turnstileSecretKey) };
+}
+
 export function createGrowthPropertyRoutes({ service, requirePermission }) {
   const app = new Hono();
 
   app.get("/growth/properties", requirePermission("growth.access"), async (c) => {
     try {
-      const data = await service.listProperties({ companyId: companyId(c) });
-      return c.json({ data });
+      const properties = await service.listProperties({ companyId: companyId(c) });
+      return c.json({ data: properties.map(publicProperty) });
     } catch (error) {
       return handleError(c, error);
     }
@@ -37,11 +46,11 @@ export function createGrowthPropertyRoutes({ service, requirePermission }) {
     zValidator("json", growthPropertyCreateSchema),
     async (c) => {
       try {
-        const data = await service.createExternalProperty({
+        const property = await service.createExternalProperty({
           companyId: companyId(c),
           ...c.req.valid("json"),
         });
-        return c.json({ data }, 201);
+        return c.json({ data: publicProperty(property) }, 201);
       } catch (error) {
         return handleError(c, error);
       }
@@ -54,12 +63,12 @@ export function createGrowthPropertyRoutes({ service, requirePermission }) {
     zValidator("json", growthPropertyUpdateSchema),
     async (c) => {
       try {
-        const data = await service.updateProperty({
+        const property = await service.updateProperty({
           companyId: companyId(c),
           propertyId: c.req.param("id"),
           patch: c.req.valid("json"),
         });
-        return c.json({ data });
+        return c.json({ data: publicProperty(property) });
       } catch (error) {
         return handleError(c, error);
       }
@@ -75,7 +84,7 @@ export function createGrowthPropertyRoutes({ service, requirePermission }) {
           companyId: companyId(c),
           propertyId: c.req.param("id"),
         });
-        return c.json({ data: result.property, verified: result.verified });
+        return c.json({ data: publicProperty(result.property), verified: result.verified });
       } catch (error) {
         return handleError(c, error);
       }

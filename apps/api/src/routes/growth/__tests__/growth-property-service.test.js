@@ -114,6 +114,29 @@ test("createExternalProperty + verifyProperty happy path", async () => {
   assert.equal(verified.property.status, "active");
 });
 
+test("updateProperty encrypts turnstileSecretKey before storing it", async () => {
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-for-growth-property-service";
+  const created = {
+    id: "prop-1",
+    companyId: COMPANY_ID,
+    kind: "external_sdk",
+    domain: "runly.mx",
+    enabled: true,
+  };
+  const prisma = createPrismaStub({ growthProperties: [created] });
+  const service = createGrowthPropertyService({ prisma });
+
+  const updated = await service.updateProperty({
+    companyId: COMPANY_ID,
+    propertyId: "prop-1",
+    patch: { turnstileSiteKey: "0x-site-key", turnstileSecretKey: "0x-secret-key" },
+  });
+
+  assert.equal(updated.turnstileSiteKey, "0x-site-key");
+  assert.ok(updated.turnstileSecretKey);
+  assert.notEqual(updated.turnstileSecretKey, "0x-secret-key");
+});
+
 test("createExternalProperty rejects a duplicate domain for the same company", async () => {
   const prisma = createPrismaStub({
     growthProperties: [

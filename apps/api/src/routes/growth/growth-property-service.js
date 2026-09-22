@@ -1,3 +1,5 @@
+import { encryptPassword } from "../../services/smtp-service.js";
+
 export class GrowthPropertyServiceError extends Error {
   constructor(message, status = 400, code = "growth_property_error") {
     super(message);
@@ -10,6 +12,14 @@ export class GrowthPropertyServiceError extends Error {
 function normalizeDomain(value) {
   const trimmed = String(value ?? "").trim();
   return trimmed || null;
+}
+
+// Mirrors website-service.js's encryptedSecret() — turnstileSecretKey is
+// stored encrypted, decrypted only at Turnstile-verify time (see
+// createTurnstileVerifier in storefront-capture-routes.js).
+function encryptedSecret(value) {
+  if (value === null || value === "") return null;
+  return encryptPassword(value);
 }
 
 function sortByCreatedAt(list) {
@@ -122,6 +132,12 @@ export function createGrowthPropertyService({ prisma, now = () => new Date() }) 
     if (patch.name !== undefined) data.name = String(patch.name).trim();
     if (patch.domain !== undefined) data.domain = normalizeDomain(patch.domain);
     if (patch.enabled !== undefined) data.enabled = Boolean(patch.enabled);
+    if (patch.turnstileSiteKey !== undefined) {
+      data.turnstileSiteKey = String(patch.turnstileSiteKey ?? "").trim() || null;
+    }
+    if (patch.turnstileSecretKey !== undefined) {
+      data.turnstileSecretKey = encryptedSecret(patch.turnstileSecretKey);
+    }
     return prisma.growthProperty.update({ where: { id: propertyId }, data });
   }
 

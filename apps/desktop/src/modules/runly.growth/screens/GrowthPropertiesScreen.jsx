@@ -7,13 +7,14 @@ import {
   ErrorState,
   PageHeader,
 } from "@runly/ui";
-import { Globe, Plus } from "lucide-react";
+import { Globe, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "../../../auth/AuthProvider.jsx";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider.jsx";
 import { runly } from "../../../lib/runly.js";
 import { ConnectExternalSiteDialog } from "../components/ConnectExternalSiteDialog.jsx";
+import { EditPropertyDialog } from "../components/EditPropertyDialog.jsx";
 
 const KIND_LABEL = {
   website_module: "Sitio del modulo Web",
@@ -39,6 +40,7 @@ export default function GrowthPropertiesScreen() {
   );
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["growth", "properties"],
@@ -55,6 +57,16 @@ export default function GrowthPropertiesScreen() {
   const verifyMutation = useMutation({
     mutationFn: (propertyId) => runly.growth.verifyProperty(propertyId, token),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["growth", "properties"] }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ propertyId, payload }) => runly.growth.updateProperty(propertyId, payload, token),
+    onSuccess: () => {
+      toast.success("Sitio actualizado");
+      setEditTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["growth", "properties"] });
+    },
+    onError: (err) => toast.error(err?.message || "No se pudo guardar el sitio"),
   });
 
   const properties = data?.data ?? [];
@@ -77,8 +89,27 @@ export default function GrowthPropertiesScreen() {
           </Badge>
         ),
       },
+      ...(canManage
+        ? [
+            {
+              id: "actions",
+              header: "",
+              cell: ({ row }) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditTarget(row.original)}
+                >
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editar
+                </Button>
+              ),
+            },
+          ]
+        : []),
     ],
-    [],
+    [canManage],
   );
 
   if (!canAccess) {
@@ -128,6 +159,16 @@ export default function GrowthPropertiesScreen() {
         verifying={verifyMutation.isPending}
         onCreate={(payload) => createMutation.mutateAsync(payload).then((res) => res.data)}
         onVerify={(propertyId) => verifyMutation.mutateAsync(propertyId)}
+      />
+
+      <EditPropertyDialog
+        open={Boolean(editTarget)}
+        onOpenChange={(open) => { if (!open) setEditTarget(null); }}
+        property={editTarget}
+        saving={updateMutation.isPending}
+        onSave={(payload) =>
+          updateMutation.mutate({ propertyId: editTarget.id, payload })
+        }
       />
     </div>
   );
