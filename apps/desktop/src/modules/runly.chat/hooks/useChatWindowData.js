@@ -48,9 +48,9 @@ function useInternalChatData(conversationId, { enabled }) {
 // Selects the data source for ChatWindow. `variant` is stable for a given mount,
 // so both sub-hooks are always called (rules of hooks) but only the active one
 // runs queries / subscriptions.
-export function useChatWindowData(conversationId, variant = "internal") {
+export function useChatWindowData(conversationId, variant = "internal", { onStatusChange = null } = {}) {
   const isExternal = variant === "external";
   const internal = useInternalChatData(conversationId, { enabled: !isExternal });
-  const external = useExternalChatData(conversationId, { enabled: isExternal });
+  const external = useExternalChatData(conversationId, { enabled: isExternal, onStatusChange });
   return isExternal ? external : internal;
 }

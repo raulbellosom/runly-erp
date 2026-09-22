@@ -12,7 +12,7 @@ export { mergeExternalPages };
 // conversation. Returns the same shape as useChatWindowData's internal branch,
 // backed by the /chat/external/* endpoints and the chat:conv:* broadcast
 // channel the guest widget also publishes to.
-export function useExternalChatData(conversationId, { enabled = true } = {}) {
+export function useExternalChatData(conversationId, { enabled = true, onStatusChange = null } = {}) {
   const { session } = useAuth();
   const token = session?.access_token;
   const queryClient = useQueryClient();
@@ -89,12 +89,16 @@ export function useExternalChatData(conversationId, { enabled = true } = {}) {
         typingClearRef.current = setTimeout(() => setGuestTyping(false), 4000);
       },
       guest_read: (msg) => setGuestLastReadAt(msg?.payload?.at ?? new Date().toISOString()),
+      conversation_closed: () => {
+        invalidate();
+        onStatusChange?.("closed");
+      },
     });
     return () => {
       unsub?.();
       clearTimeout(typingClearRef.current);
     };
-  }, [on, conversationId, invalidate]);
+  }, [on, conversationId, invalidate, onStatusChange]);
 
   const sendMut = useMutation({
     mutationFn: (data) => runly.chat.sendExternalMessage(conversationId, data, token),

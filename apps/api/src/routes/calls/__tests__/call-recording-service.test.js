@@ -161,7 +161,10 @@ describe("createCallRecordingService.reconcileActiveRecordings (sweep)", () => {
         return [{
           egressId: "egress_1",
           status: 3 /* EGRESS_COMPLETE */,
-          segmentResults: [{ playlistName: "index.m3u8", playlistLocation: "recordings/conv/rec/index.m3u8", duration: 60_000_000_000n, size: 12_345n }],
+          // playlistLocation deliberately does NOT match the expected key below —
+          // the service must derive playlistObjectKey from conversationId/recordingId
+          // itself, not trust this echoed-back field (see buildPlaylistObjectKey).
+          segmentResults: [{ playlistName: "index.m3u8", playlistLocation: "https://storage.example.test/runly-chat/recordings/conv/index.m3u8", duration: 60_000_000_000n, size: 12_345n }],
         }];
       }
     }
@@ -178,7 +181,7 @@ describe("createCallRecordingService.reconcileActiveRecordings (sweep)", () => {
     });
     await svc.reconcileActiveRecordings();
     assert.equal(updateData.status, "READY");
-    assert.equal(updateData.playlistObjectKey, "recordings/conv/rec/index.m3u8");
+    assert.equal(updateData.playlistObjectKey, `recordings/${CONV}/${REC}/index.m3u8`);
     assert.equal(updateData.durationMs, 60_000);
     assert.ok(updateData.expiresAt instanceof Date);
     assert.equal(posted.length, 1);

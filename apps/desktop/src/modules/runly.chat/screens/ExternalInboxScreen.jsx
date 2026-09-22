@@ -473,6 +473,9 @@ export function ExternalInboxScreen() {
               conversation={selected}
               variant="external"
               onClose={handleBack}
+              onConversationUpdate={(patch) =>
+                setSelected((prev) => (prev ? { ...prev, ...patch } : prev))
+              }
             />
           ) : (
             <div className="flex-1 hidden md:flex items-center justify-center text-[hsl(var(--muted-foreground))]">

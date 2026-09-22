@@ -48,8 +48,32 @@ export function createCallRecordingService({
       : EgressClientImpl;
   }
 
-  function objectPrefix(conversationId, recordingId) {
+  // LiveKit's SegmentedFileOutput treats `filenamePrefix` as a literal
+  // filename stem, not a directory: segments are named
+  // `<filenamePrefix>_NNNNNN.ts` and the playlist is written to
+  // `dirname(filenamePrefix)/<playlistName>`. A prefix of just
+  // "recordings/<conversationId>/<recordingId>" therefore places the
+  // playlist one level too shallow, at "recordings/<conversationId>/index.m3u8"
+  // — shared by every recording of that conversation, so a later recording
+  // silently overwrites an earlier one's playlist. The trailing "/segment"
+  // stem makes recordingId a real directory segment so each recording gets
+  // its own playlist path (verified against production egress output).
+  function objectDir(conversationId, recordingId) {
     return `recordings/${conversationId}/${recordingId}`;
+  }
+
+  function objectPrefix(conversationId, recordingId) {
+    return `${objectDir(conversationId, recordingId)}/segment`;
+  }
+
+  // The playlist's final key is derived from what we asked LiveKit to write,
+  // not from the EgressInfo it echoes back in segmentResults[].playlistLocation:
+  // depending on how SUPABASE_S3_ENDPOINT is configured, that field can come
+  // back as an absolute URL rather than a bucket-relative key, and
+  // supabaseAdmin.storage.createSignedUrl() (listRecordings, below) requires
+  // a bucket-relative key — an absolute URL there always fails to resolve.
+  function buildPlaylistObjectKey(conversationId, recordingId) {
+    return `${objectDir(conversationId, recordingId)}/index.m3u8`;
   }
 
   // IDOR gate shared by all three recording routes: the caller must be an
@@ -253,7 +277,7 @@ export function createCallRecordingService({
           const seg = info.segmentResults?.[0];
           const data = {
             status: "READY",
-            playlistObjectKey: seg?.playlistLocation ?? null,
+            playlistObjectKey: buildPlaylistObjectKey(row.conversationId, row.id),
             durationMs: nsToMs(seg?.duration),
             sizeBytes: seg?.size != null ? BigInt(seg.size) : null,
             endedAt: now(),

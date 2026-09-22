@@ -51,7 +51,7 @@ function saveHidden(conversationId, set) {
 
 // ── Main ChatWindow ───────────────────────────────────────────────────────────
 
-export function ChatWindow({ conversation, onClose, initialFilesView = false, initialJumpMessageId = null, embedded = null, onCollapse = null, variant = "internal" }) {
+export function ChatWindow({ conversation, onClose, initialFilesView = false, initialJumpMessageId = null, embedded = null, onCollapse = null, variant = "internal", onConversationUpdate = null }) {
   const navigate = useNavigate();
   const { userProfile, session } = useAuth();
   const isExternal = variant === "external";
@@ -63,12 +63,18 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const handleCloseExternal = useCallback(async () => {
     if (!conversationId) return;
     await runly.chat.closeExternal(conversationId, token);
+    onConversationUpdate?.({ status: "closed" });
     queryClient.invalidateQueries({ queryKey: ["chat-external-inbox"], exact: false });
-  }, [conversationId, token, queryClient]);
+  }, [conversationId, token, queryClient, onConversationUpdate]);
 
   // One selector for all message data — internal chat hooks, or the external
-  // support path (/chat/external/*). Both return the same shape.
-  const chatData = useChatWindowData(conversationId, variant);
+  // support path (/chat/external/*). Both return the same shape. onStatusChange
+  // keeps the conversation object the parent holds in sync when the status
+  // changes from elsewhere (another operator, or this same close action) —
+  // otherwise the header/composer below read a stale snapshot until reload.
+  const chatData = useChatWindowData(conversationId, variant, {
+    onStatusChange: (status) => onConversationUpdate?.({ status }),
+  });
   const messagesData = useMemo(() => ({ data: chatData.messages }), [chatData.messages]);
   const { isLoading, hasMore, isLoadingMore, loadMore } = chatData;
   const sendMessage = chatData.sendMessage;
