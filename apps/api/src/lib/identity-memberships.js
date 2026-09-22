@@ -14,9 +14,9 @@ export function checkMembershipRoleScope({ roleCompanyId, membershipCompanyId })
   };
 }
 
-export function checkProtectedRoleAssignment({ roleKey, protectedKeys, actorCanManageRoles, isSystemAdmin = false }) {
+export function checkProtectedRoleAssignment({ roleKey, protectedKeys, actorCanManageRoles, isSystemAdmin = false, isAdmin = false }) {
   const normalizedKey = String(roleKey ?? "").trim().toLowerCase();
-  if (normalizedKey === 'system.admin' && !isSystemAdmin) {
+  if (normalizedKey === 'system.admin' && !isSystemAdmin && !isAdmin) {
     return { ok: false, status: 403, error: 'Se requiere administración de la plataforma.' };
   }
   const isProtected = protectedKeys instanceof Set && protectedKeys.has(normalizedKey);

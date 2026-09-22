@@ -71,6 +71,7 @@ if (fs.existsSync(composeFile)) {
       "--profile", "office",
       "--profile", "livekit",
       "--profile", "livekit-tls",
+      "--profile", "livekit-egress",
       "down", "--remove-orphans",
       ...(isReset ? ["--volumes"] : []),
     ],

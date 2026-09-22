@@ -195,9 +195,37 @@ export function renderManagedCaddyfile({ domain, isLinux }) {
   ].join("\n");
 }
 
-export function getLiveKitComposeProfiles(config) {
+// Egress is a separate process from livekit-server and reads its own static
+// YAML (bind-mounted, not run through Compose's ${VAR} substitution), so
+// api_key/api_secret must be baked in literally here — same reason
+// renderLiveKitConfig writes literal `keys:` values instead of a placeholder.
+// ws_url/redis must resolve the same way renderLiveKitConfig's redis address
+// does: on Linux, livekit/livekit-redis run with network_mode: host (see
+// docker-compose.linux.yml), so Compose service-name DNS ("livekit",
+// "livekit-redis") does not resolve from another container — everything
+// must instead go over 127.0.0.1 on the shared host network, which is why
+// the egress service also gets network_mode: host on Linux.
+export function renderEgressConfig({ apiKey, apiSecret, isLinux, httpPort, redisPort }) {
+  const port = isLinux ? (Number(httpPort) || 7880) : 7880;
+  const resolvedRedisPort = isLinux ? (Number(redisPort) || 6380) : 6379;
+  const redisAddress = isLinux ? `127.0.0.1:${resolvedRedisPort}` : `livekit-redis:${resolvedRedisPort}`;
+  const wsUrl = isLinux ? `ws://127.0.0.1:${port}` : "ws://livekit:7880";
+  return [
+    "log_level: info",
+    `api_key: ${JSON.stringify(apiKey)}`,
+    `api_secret: ${JSON.stringify(apiSecret)}`,
+    `ws_url: ${wsUrl}`,
+    "redis:",
+    `  address: ${redisAddress}`,
+    "",
+  ].join("\n");
+}
+
+export function getLiveKitComposeProfiles(config, { recordingEnabled = false } = {}) {
   if (config.mode !== "embedded") return [];
-  return config.managedTls ? ["livekit", "livekit-tls"] : ["livekit"];
+  const profiles = config.managedTls ? ["livekit", "livekit-tls"] : ["livekit"];
+  if (recordingEnabled) profiles.push("livekit-egress");
+  return profiles;
 }
 
 // Only applies to Linux embedded installs, where LiveKit runs with

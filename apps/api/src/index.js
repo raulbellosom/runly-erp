@@ -2542,11 +2542,12 @@ app.get(
       // reassigning a membership in another company shows no usable roles.
       const canManageAnyCompany = tenant.isSystemAdmin || tenant.permissionSet?.has("identity.users.update");
       const roles = await prisma.role.findMany({
-        // system.admin is a reserved platform role (meant for the instance's
-        // first user, assigned outside this UI) — it never appears in the
-        // Identity role list or picker, even for a system admin viewer.
+        // system.admin is a reserved platform role. It's visible to admins
+        // (company or system) so they know it exists and can assign it —
+        // hidden from everyone else so it never shows up as an assignable
+        // option in a non-admin's role picker.
         where: {
-          key: { not: "system.admin" },
+          ...(tenant.isAdmin ? {} : { key: { not: "system.admin" } }),
           ...(canManageAnyCompany ? {} : { OR: [{ companyId: null }, { companyId: tenant.companyId }] }),
         },
         include: {
@@ -3036,6 +3037,7 @@ app.patch(
           roleKey: targetRole.key,
           protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
           isSystemAdmin: tenant.isSystemAdmin,
+          isAdmin: tenant.isAdmin,
           actorCanManageRoles: Boolean(
             tenant.isAdmin || tenant.permissionSet?.has("identity.roles.update"),
           ),
@@ -3138,6 +3140,7 @@ app.post(
           roleKey: targetRole.key,
           protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
           isSystemAdmin: tenant.isSystemAdmin,
+          isAdmin: tenant.isAdmin,
           actorCanManageRoles: Boolean(
             tenant.isAdmin || tenant.permissionSet?.has("identity.roles.update"),
           ),
@@ -3243,6 +3246,7 @@ app.post('/identity/users', authMiddleware, requirePermission('identity.users.cr
         roleKey: targetRole.key,
         protectedKeys: PROTECTED_IDENTITY_ROLE_KEYS,
         isSystemAdmin: tenant.isSystemAdmin,
+        isAdmin: tenant.isAdmin,
         actorCanManageRoles: Boolean(tenant.isAdmin || tenant.permissionSet?.has('identity.roles.update')),
       });
       if (!protectedCheck.ok) return c.json({ error: protectedCheck.error }, protectedCheck.status);

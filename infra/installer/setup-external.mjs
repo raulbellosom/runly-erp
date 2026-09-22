@@ -27,6 +27,7 @@ import {
   buildLiveKitFirewallHint,
   getLiveKitComposeProfiles,
   normalizeLiveKitDomain,
+  renderEgressConfig,
   renderLiveKitConfig,
   renderManagedCaddyfile,
   resolveLiveKitConfig,
@@ -50,6 +51,7 @@ const envFile       = path.resolve(__dirname, ".env.external");
 const envExampleFile = path.resolve(__dirname, ".env.external.example");
 const devKitDir     = resolveDevKitDir(path.resolve(__dirname, "custom-modules"));
 const liveKitConfigFile = path.resolve(__dirname, "livekit", "livekit.yaml");
+const liveKitEgressConfigFile = path.resolve(__dirname, "livekit", "egress.yaml");
 const liveKitCaddyFile = path.resolve(__dirname, "livekit", "Caddyfile");
 const legacyLiveKitExternalProxyFile = path.resolve(__dirname, "livekit", "reverse-proxy.nginx.conf");
 const isLinux = process.platform === "linux";
@@ -70,6 +72,7 @@ const webImage    = (process.env.RUNLY_WEB_EXTERNAL_IMAGE ?? process.env.ATLAS_W
 const liveKitImage = process.env.LIVEKIT_IMAGE ?? "livekit/livekit-server:v1.12.0";
 const liveKitRedisImage = process.env.LIVEKIT_REDIS_IMAGE ?? "redis:7-alpine";
 const liveKitCaddyImage = process.env.LIVEKIT_CADDY_IMAGE ?? "caddy:2-alpine";
+const liveKitEgressImage = process.env.LIVEKIT_EGRESS_IMAGE ?? "livekit/egress:v1.9.0";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -371,6 +374,7 @@ async function writeLiveKitArtifacts(config) {
   if (config.mode !== "embedded") {
     await Promise.all([
       fs.rm(liveKitConfigFile, { force: true }),
+      fs.rm(liveKitEgressConfigFile, { force: true }),
       fs.rm(liveKitCaddyFile, { force: true }),
       fs.rm(legacyLiveKitExternalProxyFile, { force: true }),
     ]);
@@ -390,6 +394,23 @@ async function writeLiveKitArtifacts(config) {
     { encoding: "utf8", mode: 0o600 },
   );
   try { await fs.chmod(liveKitConfigFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+
+  if (config.recordingEnabled) {
+    await fs.writeFile(
+      liveKitEgressConfigFile,
+      renderEgressConfig({
+        apiKey: config.apiKey,
+        apiSecret: config.apiSecret,
+        isLinux,
+        httpPort: process.env.LIVEKIT_HTTP_HOST_PORT,
+        redisPort: process.env.LIVEKIT_REDIS_PORT,
+      }),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    try { await fs.chmod(liveKitEgressConfigFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+  } else {
+    await fs.rm(liveKitEgressConfigFile, { force: true });
+  }
 
   if (config.managedTls) {
     await fs.writeFile(
@@ -421,12 +442,14 @@ function removeInactiveLiveKitServices(config) {
     ...composeFiles,
     "--profile", "livekit",
     "--profile", "livekit-tls",
+    "--profile", "livekit-egress",
     "rm", "--stop", "--force",
   ];
   if (config.mode !== "embedded") {
-    tryRun("docker", [...composeArgs, "livekit-caddy", "livekit", "livekit-redis"]);
-  } else if (!config.managedTls) {
-    tryRun("docker", [...composeArgs, "livekit-caddy"]);
+    tryRun("docker", [...composeArgs, "livekit-caddy", "livekit", "livekit-redis", "egress"]);
+  } else {
+    if (!config.managedTls) tryRun("docker", [...composeArgs, "livekit-caddy"]);
+    if (!config.recordingEnabled) tryRun("docker", [...composeArgs, "egress"]);
   }
 }
 
@@ -484,6 +507,13 @@ async function configureLiveKit(filePath) {
   }
   await fs.writeFile(filePath, content, { encoding: "utf8", mode: 0o600 });
   try { await fs.chmod(filePath, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+
+  // Recording is opt-in via the S3 vars themselves ("leave empty to
+  // disable", per .env.external's own comment) rather than a separate flag —
+  // filling them in is already the explicit action that turns it on.
+  config.recordingEnabled = config.mode === "embedded" && ["SUPABASE_S3_ENDPOINT", "SUPABASE_S3_ACCESS_KEY_ID", "SUPABASE_S3_SECRET_ACCESS_KEY"]
+    .every((key) => String(parseEnvValue(content, key) || "").trim().length > 0);
+
   await writeLiveKitArtifacts(config);
   return config;
 }
@@ -728,6 +758,7 @@ async function main() {
       pullWithRetry(liveKitImage, "LiveKit");
       pullWithRetry(liveKitRedisImage, "LiveKit Redis");
       if (liveKit.managedTls) pullWithRetry(liveKitCaddyImage, "LiveKit Caddy");
+      if (liveKit.recordingEnabled) pullWithRetry(liveKitEgressImage, "LiveKit Egress");
     }
     // Remove dangling layers left behind when `latest` tags are re-pulled.
     // This prevents disk accumulation on every deploy without touching other projects.
@@ -755,11 +786,13 @@ async function main() {
   console.log("\nStarting Runly (external profile)...");
   if (!office.enabled) run("docker", ["compose", ...composeFiles, "--profile", "office", "stop", "collabora"]);
   removeInactiveLiveKitServices(liveKit);
-  const liveKitProfiles = getLiveKitComposeProfiles(liveKit)
+  const liveKitProfiles = getLiveKitComposeProfiles(liveKit, { recordingEnabled: liveKit.recordingEnabled })
     .flatMap((profile) => ["--profile", profile]);
   // Limit forced restarts to Runly/Calls: an unchanged editor must keep its sessions.
   const services = ["runly-api-external", "runly-worker-external", "runly-web-external",
-    ...(liveKit.mode === "embedded" ? ["livekit-redis", "livekit", ...(liveKit.managedTls ? ["livekit-caddy"] : [])] : [])];
+    ...(liveKit.mode === "embedded" ? ["livekit-redis", "livekit",
+      ...(liveKit.managedTls ? ["livekit-caddy"] : []),
+      ...(liveKit.recordingEnabled ? ["egress"] : [])] : [])];
   run(
     "docker",
     ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
@@ -775,6 +808,7 @@ async function main() {
         LIVEKIT_IMAGE:            liveKitImage,
         LIVEKIT_REDIS_IMAGE:      liveKitRedisImage,
         LIVEKIT_CADDY_IMAGE:      liveKitCaddyImage,
+        LIVEKIT_EGRESS_IMAGE:     liveKitEgressImage,
       },
     },
   );

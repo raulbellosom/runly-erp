@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildLiveKitFirewallHint,
   getLiveKitComposeProfiles,
+  renderEgressConfig,
   renderManagedCaddyfile,
   resolveLiveKitConfig,
 } from "../lib/livekit-config.mjs";
@@ -125,6 +126,52 @@ describe("LiveKit installer contract", () => {
     assert.match(linux, /livekit-redis:\s+network_mode: host/s);
     assert.match(linux, /--bind", "127\.0\.0\.1"/);
     assert.match(linux, /runly-api-external:[\s\S]*host\.docker\.internal:host-gateway/);
+    // egress must also be host-networked on Linux — livekit/livekit-redis are
+    // host-networked above, so their Compose service names ("livekit",
+    // "livekit-redis") don't resolve from a container still on the bridge
+    // network. Regression coverage for the 2026-09-22 recording outage.
+    assert.match(linux, /egress:\s+network_mode: host/s);
+  });
+
+  it("keeps egress opt-in via a separate Compose profile with its own docker.sock trust boundary note", async () => {
+    const compose = await read("docker-compose.yml");
+    assert.match(compose, /egress:[\s\S]*?profiles: \["livekit-egress"\]/);
+    assert.match(compose, /docker\.sock/);
+  });
+
+  it("renders literal (non-interpolated) credentials and host-appropriate addresses for egress", () => {
+    const linux = renderEgressConfig({
+      apiKey: "APIabc123",
+      apiSecret: "s3cr3t",
+      isLinux: true,
+      httpPort: "7880",
+      redisPort: "6380",
+    });
+    assert.match(linux, /api_key: "APIabc123"/);
+    assert.match(linux, /api_secret: "s3cr3t"/);
+    assert.match(linux, /ws_url: ws:\/\/127\.0\.0\.1:7880/);
+    assert.match(linux, /address: 127\.0\.0\.1:6380/);
+    assert.doesNotMatch(linux, /\$\{LIVEKIT_API_KEY\}/);
+    assert.doesNotMatch(linux, /livekit-redis:/);
+    assert.doesNotMatch(linux, /ws:\/\/livekit:/);
+
+    const bridged = renderEgressConfig({ apiKey: "APIabc123", apiSecret: "s3cr3t", isLinux: false });
+    assert.match(bridged, /ws_url: ws:\/\/livekit:7880/);
+    assert.match(bridged, /address: livekit-redis:6379/);
+  });
+
+  it("adds the livekit-egress profile only when recording is enabled", () => {
+    const config = resolveLiveKitConfig({
+      deployment: "external",
+      isLinux: true,
+      randomBytes: deterministicRandom,
+      values: { domain: "rtc.example.com" },
+    });
+    assert.deepEqual(getLiveKitComposeProfiles(config), ["livekit", "livekit-tls"]);
+    assert.deepEqual(
+      getLiveKitComposeProfiles(config, { recordingEnabled: true }),
+      ["livekit", "livekit-tls", "livekit-egress"],
+    );
   });
 
   it("documents all variables and enables embedded by default", async () => {
@@ -157,10 +204,16 @@ describe("LiveKit installer contract", () => {
       assert.match(setup, /fs\.chmod\(liveKitConfigFile, 0o600\)/);
       assert.match(setup, /will not modify/);
       assert.doesNotMatch(setup, /renderExternalProxyGuide/);
+      // Recording opts in via the S3 vars themselves, mirroring the
+      // ".env comment says 'leave empty to disable'" contract — no separate
+      // flag to forget, no manual `docker compose --profile` step required.
+      assert.match(setup, /recordingEnabled/);
+      assert.match(setup, /renderEgressConfig/);
     }
     for (const file of ["stop-local.mjs", "stop-external.mjs"]) {
       const stop = await read(file);
       assert.match(stop, /"--profile", "livekit-tls"/);
+      assert.match(stop, /"--profile", "livekit-egress"/);
       assert.match(stop, /reverse-proxy\.nginx\.conf/);
     }
 

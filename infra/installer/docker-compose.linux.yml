@@ -50,6 +50,14 @@ services:
     network_mode: host
     ports: !reset []
 
+  # Must share host networking with livekit/livekit-redis above: on Linux
+  # those two are host-networked, so egress (still on the Compose bridge
+  # network otherwise) could not resolve their Compose service names or
+  # reach them at all. Its config (livekit/egress.yaml, rendered by
+  # renderEgressConfig) points at 127.0.0.1 for exactly this reason.
+  egress:
+    network_mode: host
+
   livekit-caddy:
     network_mode: host
     ports: !reset []

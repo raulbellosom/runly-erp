@@ -48,7 +48,7 @@ test("checkProtectedRoleAssignment rejects a protected role for an actor without
   assert.equal(result.status, 403);
 });
 
-test("checkProtectedRoleAssignment allows a platform role only for a system administrator", () => {
+test("checkProtectedRoleAssignment allows a platform role for a system administrator", () => {
   const result = checkProtectedRoleAssignment({
     roleKey: "system.admin",
     protectedKeys: new Set(["runly.admin", "system.admin"]),
@@ -56,6 +56,26 @@ test("checkProtectedRoleAssignment allows a platform role only for a system admi
     isSystemAdmin: true,
   });
   assert.equal(result.ok, true);
+});
+
+test("checkProtectedRoleAssignment allows a platform role for a company admin", () => {
+  const result = checkProtectedRoleAssignment({
+    roleKey: "system.admin",
+    protectedKeys: new Set(["runly.admin", "system.admin"]),
+    actorCanManageRoles: true,
+    isAdmin: true,
+  });
+  assert.equal(result.ok, true);
+});
+
+test("checkProtectedRoleAssignment rejects a platform role for neither a system nor company admin", () => {
+  const result = checkProtectedRoleAssignment({
+    roleKey: "system.admin",
+    protectedKeys: new Set(["runly.admin", "system.admin"]),
+    actorCanManageRoles: true,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
 });
 
 test("checkProtectedRoleAssignment is case-insensitive and trims the role key", () => {

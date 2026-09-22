@@ -63,7 +63,7 @@ for (const [from, to] of copyPairs) {
 const webManifest = {
   name: 'Runly ERP',
   short_name: 'Runly',
-  description: 'CONNECT. MANAGE. GROW.',
+  description: 'Tu negocio en movimiento.',
   // The ERP SPA is served under /app/ (VITE_BASE_PATH). The origin root serves
   // the public marketing website, so the installed PWA must open the launcher.
   id: '/app/',
