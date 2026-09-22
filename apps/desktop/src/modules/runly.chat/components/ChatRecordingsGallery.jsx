@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConfirmDialog, EmptyState, ErrorState, Skeleton,
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -30,7 +30,8 @@ function formatFileSize(bytes) {
   return `${value.toFixed(unitIndex > 0 && value < 10 ? 1 : 0)} ${units[unitIndex]}`;
 }
 
-// Attaches `src` (a signed HLS .m3u8 URL) to the given video ref: native
+// Attaches `src` (a blob: URL wrapping the rewritten HLS manifest — see
+// RecordingRow's manifestBlobUrl) to the given video ref: native
 // playback on Safari (which supports HLS natively), the hls.js polyfill
 // (lazy-loaded so it never enters the main bundle) everywhere else.
 // A real useEffect is required here (not useState's lazy initializer,
@@ -94,10 +95,10 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
   const videoRef = useRef(null);
   // Same one-retry-then-give-up convention as MessageAttachments.jsx's
   // AudioCard: on the first playback error, refetch the recordings list
-  // (the signed playlistUrl has a 1-hour TTL, so a panel left open past
-  // that gets a fresh URL) and let the effect above reattach with it; if
-  // it still fails, stop retrying and show an inline error instead of
-  // silently leaving a broken/blank player.
+  // (each segment's signed URL, baked into the manifest, has a 1-hour TTL,
+  // so a panel left open past that gets a fresh manifest) and let the
+  // effect above reattach with it; if it still fails, stop retrying and
+  // show an inline error instead of silently leaving a broken/blank player.
   const retriedRef = useRef(false);
 
   const handleFatalError = useCallback(() => {
@@ -109,8 +110,21 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
     setPlaybackError(true);
   }, [refetch]);
 
-  const hasPlaylist = Boolean(recording.playlistUrl);
-  useHls(videoRef, expanded && hasPlaylist ? recording.playlistUrl : null, handleFatalError);
+  // The backend hands us the rewritten manifest text (every segment line
+  // replaced with its own signed URL — see call-recording-service.js
+  // listRecordings/signManifestSegments), not a fetchable URL: a signed URL
+  // for the .m3u8 alone doesn't work, since hls.js/native HLS resolve each
+  // segment's bare relative filename against it and drop its signing token.
+  // A blob: URL lets hls.js (and Safari's native HLS engine) load that text
+  // as if it were a normal manifest fetch.
+  const hasPlaylist = Boolean(recording.playlistManifest);
+  const manifestBlobUrl = useMemo(() => {
+    if (!recording.playlistManifest) return null;
+    return URL.createObjectURL(new Blob([recording.playlistManifest], { type: "application/vnd.apple.mpegurl" }));
+  }, [recording.playlistManifest]);
+  useEffect(() => () => { if (manifestBlobUrl) URL.revokeObjectURL(manifestBlobUrl); }, [manifestBlobUrl]);
+
+  useHls(videoRef, expanded && manifestBlobUrl ? manifestBlobUrl : null, handleFatalError);
 
   function toggleExpanded() {
     setExpanded((wasExpanded) => {
@@ -127,14 +141,15 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
   const isReady = recording.status === "READY";
   const isFailed = recording.status === "FAILED";
   const isActive = ["STARTING", "ACTIVE", "PROCESSING"].includes(recording.status);
-  // The backend only fills playlistUrl when signed-URL generation succeeds
-  // (call-recording-service.js listRecordings) — a READY recording can still
-  // have no playlistUrl if that signing call failed.
+  // The backend only fills playlistManifest when it could read the .m3u8 and
+  // sign every segment it references (call-recording-service.js
+  // listRecordings) — a READY recording can still have no manifest if any of
+  // that failed.
   const isUnavailable = isReady && !hasPlaylist;
   // The real reason, when the backend has one: failureReason is persisted on
   // FAILED rows (call-recording-service.js startRecording/reconcileActiveRecordings);
   // playlistUrlError is computed live on every listRecordings call for a READY
-  // row whose signed-URL request failed. Falls back to a generic message for
+  // row whose manifest read/segment signing failed. Falls back to a generic message for
   // older rows recorded before this field existed.
   const errorDetail = isFailed
     ? (recording.failureReason || "No se pudo procesar la grabación.")

@@ -341,7 +341,20 @@ describe("createCallRecordingService.reconcileActiveRecordings (sweep)", () => {
 });
 
 describe("createCallRecordingService.listRecordings", () => {
-  it("attaches a signed playlistUrl only to READY rows with a playlistObjectKey", async () => {
+  const SAMPLE_MANIFEST = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:3",
+    "#EXT-X-TARGETDURATION:6",
+    "#EXTINF:6.0,",
+    "segment_00000.ts",
+    "#EXTINF:4.2,",
+    "segment_00001.ts",
+    "#EXT-X-ENDLIST",
+    "",
+  ].join("\n");
+
+  it("rewrites the manifest with a signed URL for every segment it references, only for READY rows with a playlistObjectKey", async () => {
+    const signedCalls = [];
     const prisma = {
       $queryRaw: async () => [{ id: "member-row" }], // caller is an active member
       callRecording: {
@@ -352,15 +365,30 @@ describe("createCallRecordingService.listRecordings", () => {
       },
     };
     const supabaseAdmin = {
-      storage: { from: () => ({ createSignedUrl: async (key) => ({ data: { signedUrl: `https://signed.example/${key}` }, error: null }) }) },
+      storage: {
+        from: () => ({
+          download: async () => ({ data: { text: async () => SAMPLE_MANIFEST }, error: null }),
+          createSignedUrls: async (paths) => {
+            signedCalls.push(paths);
+            return { data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${path}` })), error: null };
+          },
+        }),
+      },
     };
     const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress, supabaseAdmin });
     const rows = await svc.listRecordings({ conversationId: CONV, profileId: USER });
-    assert.equal(rows[0].playlistUrl, "https://signed.example/recordings/conv/rec/index.m3u8");
-    assert.equal(rows[1].playlistUrl, undefined);
+    assert.deepEqual(signedCalls[0], [
+      "recordings/conv/rec/segment_00000.ts",
+      "recordings/conv/rec/segment_00001.ts",
+    ]);
+    assert.ok(rows[0].playlistManifest.includes("https://signed.example/recordings/conv/rec/segment_00000.ts"));
+    assert.ok(rows[0].playlistManifest.includes("https://signed.example/recordings/conv/rec/segment_00001.ts"));
+    assert.ok(!rows[0].playlistManifest.includes("\nsegment_00000.ts"), "bare segment filename must not survive the rewrite");
+    assert.ok(rows[0].playlistManifest.includes("#EXTINF:6.0,"), "non-segment lines must pass through untouched");
+    assert.equal(rows[1].playlistManifest, undefined);
   });
 
-  it("surfaces the real signing error as playlistUrlError instead of a bare missing playlistUrl", async () => {
+  it("surfaces the real manifest-read error as playlistUrlError instead of a bare missing playlist", async () => {
     const prisma = {
       $queryRaw: async () => [{ id: "member-row" }],
       callRecording: {
@@ -370,12 +398,35 @@ describe("createCallRecordingService.listRecordings", () => {
       },
     };
     const supabaseAdmin = {
-      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: { message: "Object not found" } }) }) },
+      storage: { from: () => ({ download: async () => ({ data: null, error: { message: "Object not found" } }) }) },
     };
     const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress, supabaseAdmin });
     const rows = await svc.listRecordings({ conversationId: CONV, profileId: USER });
-    assert.equal(rows[0].playlistUrl, undefined);
+    assert.equal(rows[0].playlistManifest, undefined);
     assert.equal(rows[0].playlistUrlError, "Object not found");
+  });
+
+  it("surfaces a segment-signing failure as playlistUrlError", async () => {
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findMany: async () => [
+          { id: REC, status: "READY", playlistObjectKey: "recordings/conv/rec/index.m3u8" },
+        ],
+      },
+    };
+    const supabaseAdmin = {
+      storage: {
+        from: () => ({
+          download: async () => ({ data: { text: async () => SAMPLE_MANIFEST }, error: null }),
+          createSignedUrls: async () => ({ data: null, error: { message: "bucket unreachable" } }),
+        }),
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress, supabaseAdmin });
+    const rows = await svc.listRecordings({ conversationId: CONV, profileId: USER });
+    assert.equal(rows[0].playlistManifest, undefined);
+    assert.equal(rows[0].playlistUrlError, "bucket unreachable");
   });
 
   it("serializes a BigInt sizeBytes to a plain Number (JSON.stringify throws on raw BigInt)", async () => {

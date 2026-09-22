@@ -4,6 +4,7 @@ import { readLiveKitConfig } from "./call-service.js";
 const MAX_DURATION_MS = 4 * 60 * 60 * 1000; // hard cap — spec §24 risk 3
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000; // spec §5 goal 4
 const RECORDING_BUCKET = "runly-chat";
+const SEGMENT_SIGN_TTL_SECONDS = 3600;
 const ACTIVE_STATUSES = ["STARTING", "ACTIVE", "PROCESSING"];
 const STORAGE_LIST_PAGE_SIZE = 1000;
 const LOG_PREFIX = "[runly.calls/recording]";
@@ -173,6 +174,40 @@ export function createCallRecordingService({
     return { id: updated.id, status: updated.status };
   }
 
+  // A signed URL from Supabase Storage authorizes exactly the one object it
+  // was created for. LiveKit's HLS output references each segment from the
+  // .m3u8 by bare relative filename (standard HLS), so handing the client a
+  // signed URL for the *playlist* alone doesn't help: hls.js/native HLS
+  // resolves "segment_00000.ts" relative to that URL and drops the playlist's
+  // own signing token in the process (confirmed against production — those
+  // requests come back 400). The fix is to never hand the raw .m3u8 to the
+  // client at all: read it here with admin storage access, sign every
+  // segment it references individually, and rewrite each line to its own
+  // absolute signed URL (valid HLS: an absolute URI line is used as-is, not
+  // resolved against the manifest's own location).
+  async function signManifestSegments(manifestText, dir) {
+    const lines = manifestText.split("\n");
+    const segmentNames = [...new Set(
+      lines.map((line) => line.trim()).filter((line) => line && !line.startsWith("#")),
+    )];
+    if (!segmentNames.length) return manifestText;
+
+    const { data: signedList, error } = await supabaseAdmin.storage
+      .from(RECORDING_BUCKET)
+      .createSignedUrls(segmentNames.map((name) => `${dir}/${name}`), SEGMENT_SIGN_TTL_SECONDS);
+    if (error || !Array.isArray(signedList)) {
+      throw new Error(error?.message || "No se pudieron firmar los segmentos de la grabación.");
+    }
+    const urlByName = new Map(signedList.map((item) => [item.path.slice(dir.length + 1), item.signedUrl]));
+    return lines
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) return line;
+        return urlByName.get(trimmed) || line; // unresolved segment: leave as-is, player surfaces the resulting fetch failure
+      })
+      .join("\n");
+  }
+
   async function listRecordings({ conversationId, profileId }) {
     await assertMember(conversationId, profileId);
     const rows = await prisma.callRecording.findMany({
@@ -185,20 +220,20 @@ export function createCallRecordingService({
       : await Promise.all(rows.map(async (row) => {
         if (row.status !== "READY" || !row.playlistObjectKey) return row;
         try {
-          const { data, error } = await supabaseAdmin.storage
-            .from(RECORDING_BUCKET)
-            .createSignedUrl(row.playlistObjectKey, 3600);
-          if (error) {
-            console.warn(`${LOG_PREFIX} No se pudo firmar la URL de reproducción:`, row.id, row.playlistObjectKey, error.message ?? error);
+          const { data, error } = await supabaseAdmin.storage.from(RECORDING_BUCKET).download(row.playlistObjectKey);
+          if (error || !data) {
+            console.warn(`${LOG_PREFIX} No se pudo leer el manifest de reproducción:`, row.id, row.playlistObjectKey, error?.message ?? error);
             // playlistUrlError is computed live on every listRecordings call
             // (never persisted) so the UI can show the actual reason instead
             // of a bare "no disponible" — see ChatRecordingsGallery.jsx.
-            return { ...row, playlistUrlError: error.message || "No se pudo firmar el enlace de reproducción." };
+            return { ...row, playlistUrlError: error?.message || "No se pudo leer el manifest de reproducción." };
           }
-          return { ...row, playlistUrl: data.signedUrl };
+          const dir = row.playlistObjectKey.split("/").slice(0, -1).join("/");
+          const playlistManifest = await signManifestSegments(await data.text(), dir);
+          return { ...row, playlistManifest };
         } catch (err) {
-          console.warn(`${LOG_PREFIX} Error inesperado firmando la URL de reproducción:`, row.id, row.playlistObjectKey, err?.message ?? err);
-          return { ...row, playlistUrlError: err?.message || "No se pudo firmar el enlace de reproducción." };
+          console.warn(`${LOG_PREFIX} Error inesperado preparando la reproducción:`, row.id, row.playlistObjectKey, err?.message ?? err);
+          return { ...row, playlistUrlError: err?.message || "No se pudo preparar la reproducción." };
         }
       }));
 
