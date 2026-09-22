@@ -12,10 +12,11 @@ use tauri::{Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
-const ORIGIN: &str = match option_env!("ATLAS_NATIVE_ORIGIN") {
-    Some(value) => value,
-    None => "https://app.example.invalid",
-};
+// Seeds HostState.origin at startup for internal QA builds (staging/development,
+// and pinned production builds) that still compile with a fixed origin. A
+// `--universal` production build (see native-host.mjs) omits this entirely,
+// so HostState.origin starts empty and the local shell prompts the user.
+const COMPILED_ORIGIN: Option<&str> = option_env!("ATLAS_NATIVE_ORIGIN");
 const VERSION: &str = match option_env!("ATLAS_NATIVE_VERSION") {
     Some(value) => value,
     None => "1.0.0",
@@ -36,6 +37,13 @@ pub struct HostState {
     next_id: AtomicU64,
     generation: AtomicU64,
     fallback: Mutex<Option<Url>>,
+    // The currently trusted server origin, if any. `None` means the local
+    // shell must prompt the user to connect before any remote page can load.
+    origin: Mutex<Option<String>>,
+    // A candidate origin that passed preflight but hasn't been confirmed by
+    // the user yet. Lives only in memory — lost if the app is killed before
+    // confirmation, by design (see spec's error-handling section).
+    pending_origin: Mutex<Option<String>>,
 }
 
 pub fn allowed_remote(url: &Url, origin: &str) -> bool {
@@ -43,6 +51,24 @@ pub fn allowed_remote(url: &Url, origin: &str) -> bool {
         && url.username().is_empty()
         && url.password().is_none()
         && url.path().starts_with("/app/")
+}
+
+// Validates a candidate server origin before it's ever trusted: HTTPS only,
+// no credentials/port/path/query/fragment. Returns the normalized origin
+// (scheme://host, no trailing slash) on success.
+pub fn validate_origin_format(input: &str) -> Result<String, &'static str> {
+    let url = Url::parse(input).map_err(|_| "INVALID_ORIGIN")?;
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+        || !(url.path().is_empty() || url.path() == "/")
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err("INVALID_ORIGIN");
+    }
+    Ok(url.origin().ascii_serialization())
 }
 
 fn local_shell(url: &Url) -> bool {
@@ -55,8 +81,15 @@ fn local_shell(url: &Url) -> bool {
 }
 
 pub(crate) fn check_remote(window: &WebviewWindow) -> Result<(), String> {
+    let state = window.state::<Arc<HostState>>();
+    let origin = state
+        .origin
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("NO_ORIGIN_CONFIGURED")?;
     if window.label() == "main"
-        && allowed_remote(&window.url().map_err(|_| "URL_UNAVAILABLE")?, ORIGIN)
+        && allowed_remote(&window.url().map_err(|_| "URL_UNAVAILABLE")?, &origin)
     {
         Ok(())
     } else {
@@ -115,7 +148,13 @@ impl HostState {
 #[tauri::command]
 pub fn host_info(window: WebviewWindow) -> Result<serde_json::Value, String> {
     let url = window.url().map_err(|_| "URL_UNAVAILABLE")?;
-    if window.label() != "main" || !(local_shell(&url) || allowed_remote(&url, ORIGIN)) {
+    let state = window.state::<Arc<HostState>>();
+    let origin = state.origin.lock().unwrap().clone();
+    let is_allowed_remote = origin
+        .as_deref()
+        .map(|o| allowed_remote(&url, o))
+        .unwrap_or(false);
+    if window.label() != "main" || !(local_shell(&url) || is_allowed_remote) {
         return Err("UNTRUSTED_CONTEXT".into());
     }
     let mut capabilities = vec![
@@ -132,7 +171,7 @@ pub fn host_info(window: WebviewWindow) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "platform": std::env::consts::OS, "nativeHostVersion": VERSION,
         "osVersion": os_info::get().version().to_string(), "bridgeVersion": 1,
-        "frontendUrl": format!("{ORIGIN}/app/"),
+        "frontendUrl": origin.map(|o| format!("{o}/app/")),
         "capabilities": capabilities
     }))
 }
@@ -170,23 +209,14 @@ pub fn has_frame_policy(csp: &str) -> bool {
         && directive("object-src") == Some(vec!["object-src", "'none'"])
 }
 
-#[tauri::command]
-pub async fn host_connect(
-    window: WebviewWindow,
-    state: State<'_, Arc<HostState>>,
-) -> Result<(), String> {
-    let local = window.url().map_err(|_| "URL_UNAVAILABLE")?;
-    if window.label() != "main" || !local_shell(&local) {
-        return Err("LOCAL_ONLY".into());
-    }
-    *state.fallback.lock().unwrap() = Some(local);
+async fn preflight(origin: &str) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::none())
         .user_agent(USER_AGENT)
         .build()
         .map_err(|_| "NETWORK_INIT")?;
-    let target = format!("{ORIGIN}/app/");
+    let target = format!("{origin}/app/");
     let response = client
         .get(&target)
         .header("Cache-Control", "no-cache")
@@ -204,10 +234,111 @@ pub async fn host_connect(
     if !protected {
         return Err("MISSING_NATIVE_FRAME_POLICY".into());
     }
-    arm_watchdog(window.clone(), state.inner().clone());
+    Ok(())
+}
+
+fn navigate_to_origin(
+    window: &WebviewWindow,
+    state: &Arc<HostState>,
+    origin: &str,
+) -> Result<(), String> {
+    arm_watchdog(window.clone(), state.clone());
+    let target = format!("{origin}/app/");
     window
         .navigate(Url::parse(&target).map_err(|_| "INVALID_FRONTEND")?)
         .map_err(|_| "NAVIGATION_FAILED".into())
+}
+
+#[cfg(target_os = "android")]
+async fn persist_origin(app: tauri::AppHandle, origin: Option<String>) -> Result<(), String> {
+    super::mobile_media::set_origin(app, origin).await
+}
+
+#[cfg(not(target_os = "android"))]
+async fn persist_origin(_app: tauri::AppHandle, _origin: Option<String>) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn load_persisted_origin(app: tauri::AppHandle) -> Option<String> {
+    tauri::async_runtime::block_on(super::mobile_media::get_origin(app))
+        .ok()
+        .flatten()
+        .or_else(|| COMPILED_ORIGIN.map(String::from))
+}
+
+#[cfg(not(target_os = "android"))]
+fn load_persisted_origin(_app: tauri::AppHandle) -> Option<String> {
+    COMPILED_ORIGIN.map(String::from)
+}
+
+#[tauri::command]
+pub async fn host_connect(
+    window: WebviewWindow,
+    state: State<'_, Arc<HostState>>,
+    origin: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let local = window.url().map_err(|_| "URL_UNAVAILABLE")?;
+    if window.label() != "main" || !local_shell(&local) {
+        return Err("LOCAL_ONLY".into());
+    }
+    *state.fallback.lock().unwrap() = Some(local);
+
+    let candidate = match origin {
+        Some(value) => validate_origin_format(&value)?,
+        None => state
+            .origin
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or("NO_ORIGIN_CONFIGURED")?,
+    };
+
+    preflight(&candidate).await?;
+
+    let already_trusted = state.origin.lock().unwrap().as_deref() == Some(candidate.as_str());
+    if !already_trusted {
+        *state.pending_origin.lock().unwrap() = Some(candidate.clone());
+        return Ok(serde_json::json!({ "status": "pending_confirmation", "origin": candidate }));
+    }
+
+    navigate_to_origin(&window, state.inner(), &candidate)?;
+    Ok(serde_json::json!({ "status": "connected" }))
+}
+
+#[tauri::command]
+pub async fn host_confirm_origin(
+    window: WebviewWindow,
+    state: State<'_, Arc<HostState>>,
+) -> Result<(), String> {
+    let local = window.url().map_err(|_| "URL_UNAVAILABLE")?;
+    if window.label() != "main" || !local_shell(&local) {
+        return Err("LOCAL_ONLY".into());
+    }
+    let origin = state
+        .pending_origin
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or("NO_PENDING_ORIGIN")?;
+    persist_origin(window.app_handle().clone(), Some(origin.clone())).await?;
+    *state.origin.lock().unwrap() = Some(origin.clone());
+    navigate_to_origin(&window, state.inner(), &origin)
+}
+
+#[tauri::command]
+pub async fn host_forget_origin(
+    window: WebviewWindow,
+    state: State<'_, Arc<HostState>>,
+) -> Result<(), String> {
+    let local = window.url().map_err(|_| "URL_UNAVAILABLE")?;
+    if window.label() != "main" || !local_shell(&local) {
+        return Err("LOCAL_ONLY".into());
+    }
+    persist_origin(window.app_handle().clone(), None).await?;
+    *state.origin.lock().unwrap() = None;
+    *state.pending_origin.lock().unwrap() = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -262,6 +393,7 @@ pub fn host_open_external(window: WebviewWindow, url: String) -> Result<(), Stri
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(HostState::default());
+    *state.origin.lock().unwrap() = load_persisted_origin(app.handle().clone());
     app.manage(state.clone());
     let events = state.clone();
     app.deep_link().on_open_url(move |event| {
@@ -277,12 +409,19 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
     let metadata = serde_json::json!({ "platform": std::env::consts::OS, "bridgeVersion": 1 });
     let init = format!("Object.defineProperty(window, '__RUNLY_NATIVE_HOST__', {{value: Object.freeze({metadata}), writable:false}});");
+    let nav_state = state.clone();
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("Runly ERP")
         .user_agent(USER_AGENT)
         .initialization_script(init)
         .on_navigation(move |url| {
-            if local_shell(url) || allowed_remote(url, ORIGIN) {
+            let trusted = nav_state.origin.lock().unwrap().clone();
+            if local_shell(url)
+                || trusted
+                    .as_deref()
+                    .map(|o| allowed_remote(url, o))
+                    .unwrap_or(false)
+            {
                 return true;
             }
             if ["http", "https"].contains(&url.scheme())
@@ -298,8 +437,12 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 super::mobile_media::stop_on_navigation(window.app_handle().clone());
             }
+            let trusted = state.origin.lock().unwrap().clone();
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started)
-                && allowed_remote(payload.url(), ORIGIN)
+                && trusted
+                    .as_deref()
+                    .map(|o| allowed_remote(payload.url(), o))
+                    .unwrap_or(false)
             {
                 arm_watchdog(window, state.clone());
             }
@@ -352,5 +495,35 @@ mod tests {
         assert!(!has_frame_policy(
             "report-uri /frame-src 'none'; object-src 'none'"
         ));
+    }
+
+    #[test]
+    fn validate_origin_format_accepts_bare_https_origin() {
+        assert_eq!(
+            validate_origin_format("https://runly.example.com").unwrap(),
+            "https://runly.example.com"
+        );
+        assert_eq!(
+            validate_origin_format("https://runly.example.com/").unwrap(),
+            "https://runly.example.com"
+        );
+    }
+
+    #[test]
+    fn validate_origin_format_rejects_unsafe_variants() {
+        for input in [
+            "http://runly.example.com",
+            "https://user@runly.example.com",
+            "https://runly.example.com:8443",
+            "https://runly.example.com/app",
+            "https://runly.example.com?x=1",
+            "https://runly.example.com#frag",
+            "not a url",
+        ] {
+            assert!(
+                validate_origin_format(input).is_err(),
+                "expected {input} to be rejected"
+            );
+        }
     }
 }
