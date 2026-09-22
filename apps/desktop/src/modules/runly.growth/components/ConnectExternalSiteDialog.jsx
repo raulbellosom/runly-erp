@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Dialog,
@@ -19,7 +19,13 @@ import { getSupabaseClient } from "../../../lib/supabase.js";
 // an ERP-published dist site would have auto-injected for it. Without
 // apiUrl the embeddable script defaults to same-origin ('/'), which is
 // wrong for any site that isn't served by this ERP instance itself.
-function buildSnippet({ companySlug, propertyId }) {
+//
+// turnstileSiteKey is baked in the same conditional way injectRunlyConfig
+// does it — renderForm() in runly-sdk.js only ever reads it from this
+// static window.RUNLY_CONFIG object, never from the live public config
+// endpoint, so a property whose Turnstile keys were added *after* this
+// snippet was first copied needs the snippet re-copied to pick them up.
+function buildSnippet({ companySlug, propertyId, turnstileSiteKey }) {
   const apiUrl = getApiUrl();
   const supabase = getSupabaseClient();
   const supabaseUrl = supabase.supabaseUrl;
@@ -35,6 +41,7 @@ function buildSnippet({ companySlug, propertyId }) {
     supabaseUrl,
     supabaseAnonKey,
     storageKey,
+    ...(turnstileSiteKey ? { turnstileSiteKey } : {}),
   };
 
   return [
@@ -49,6 +56,7 @@ export function ConnectExternalSiteDialog({
   open,
   onOpenChange,
   companySlug,
+  existingProperty = null,
   onCreate,
   onVerify,
   creating,
@@ -56,13 +64,17 @@ export function ConnectExternalSiteDialog({
 }) {
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
-  const [property, setProperty] = useState(null);
+  const [property, setProperty] = useState(existingProperty);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (open) setProperty(existingProperty);
+  }, [open, existingProperty]);
 
   function reset() {
     setName("");
     setDomain("");
-    setProperty(null);
+    setProperty(existingProperty);
     setCopied(false);
   }
 
@@ -84,7 +96,13 @@ export function ConnectExternalSiteDialog({
   }
 
   function handleCopy() {
-    navigator.clipboard.writeText(buildSnippet({ companySlug, propertyId: property.id }));
+    navigator.clipboard.writeText(
+      buildSnippet({
+        companySlug,
+        propertyId: property.id,
+        turnstileSiteKey: property.turnstileSiteKey,
+      }),
+    );
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -99,7 +117,9 @@ export function ConnectExternalSiteDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Conectar sitio externo</DialogTitle>
+          <DialogTitle>
+            {existingProperty ? "Codigo de instalacion" : "Conectar sitio externo"}
+          </DialogTitle>
         </DialogHeader>
 
         {!property ? (
@@ -123,8 +143,19 @@ export function ConnectExternalSiteDialog({
               Pega este fragmento antes de {"</body>"} en tu sitio externo:
             </p>
             <pre className="overflow-x-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-3 text-xs">
-              {buildSnippet({ companySlug, propertyId: property.id })}
+              {buildSnippet({
+                companySlug,
+                propertyId: property.id,
+                turnstileSiteKey: property.turnstileSiteKey,
+              })}
             </pre>
+            {!property.turnstileSiteKey && (
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                Este sitio no tiene Turnstile configurado — el formulario funciona sin
+                CAPTCHA. Si mas tarde agregas las claves en "Editar", vuelve a copiar
+                este codigo para que el widget se active.
+              </p>
+            )}
             <Button type="button" variant="outline" onClick={handleCopy}>
               {copied ? (
                 <Check className="mr-2 h-4 w-4" />

@@ -7,7 +7,7 @@ import {
   ErrorState,
   PageHeader,
 } from "@runly/ui";
-import { Globe, Pencil, Plus } from "lucide-react";
+import { Code2, Globe, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "../../../auth/AuthProvider.jsx";
@@ -41,6 +41,7 @@ export default function GrowthPropertiesScreen() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
+  const [snippetTarget, setSnippetTarget] = useState(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["growth", "properties"],
@@ -95,15 +96,28 @@ export default function GrowthPropertiesScreen() {
               id: "actions",
               header: "",
               cell: ({ row }) => (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditTarget(row.original)}
-                >
-                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Editar
-                </Button>
+                <div className="flex gap-2 justify-end">
+                  {row.original.kind === "external_sdk" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSnippetTarget(row.original)}
+                    >
+                      <Code2 className="mr-1.5 h-3.5 w-3.5" />
+                      Ver codigo
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditTarget(row.original)}
+                  >
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                </div>
               ),
             },
           ]
@@ -152,9 +166,15 @@ export default function GrowthPropertiesScreen() {
       )}
 
       <ConnectExternalSiteDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        open={dialogOpen || Boolean(snippetTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogOpen(false);
+            setSnippetTarget(null);
+          }
+        }}
         companySlug={activeCompany?.slug}
+        existingProperty={snippetTarget}
         creating={createMutation.isPending}
         verifying={verifyMutation.isPending}
         onCreate={(payload) => createMutation.mutateAsync(payload).then((res) => res.data)}
