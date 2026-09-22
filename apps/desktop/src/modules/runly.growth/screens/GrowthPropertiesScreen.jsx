@@ -27,12 +27,14 @@ const KIND_LABEL = {
 const STATUS_LABEL = {
   active: "Activo",
   pending_verification: "Verificacion pendiente",
+  inactive: "Sin actividad reciente",
   disabled: "Desactivado",
 };
 
 const STATUS_VARIANT = {
   active: "success",
   pending_verification: "warning",
+  inactive: "destructive",
   disabled: "secondary",
 };
 
@@ -59,6 +61,7 @@ function ConnectHelpPopover() {
           <ul className="mt-1 space-y-1 text-[hsl(var(--muted-foreground))]">
             <li><Badge variant="warning">Verificacion pendiente</Badge> — creado, pero aun no llega ningun evento.</li>
             <li><Badge variant="success">Activo</Badge> — ya recibimos al menos un evento real de ese sitio.</li>
+            <li><Badge variant="destructive">Sin actividad reciente</Badge> — estaba activo, pero no ha mandado datos en mas de 48h. Se revisa cada hora y vuelve a Activo solo cuando lleguen eventos de nuevo.</li>
           </ul>
         </div>
         <p className="border-t border-[hsl(var(--border))] pt-2 text-xs text-[hsl(var(--muted-foreground))]">

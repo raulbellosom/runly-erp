@@ -32,6 +32,7 @@ import { createInvestmentsService as createPfmInvestmentsService } from '../../a
 import { createVisionService as createPfmVisionService } from '../../api/src/services/vision-service.js'
 import { createSupabaseAdminClient } from '../../api/src/services/supabase-admin.js'
 import { createGrowthAggregationWorker } from '../../api/src/services/growth-aggregation-worker.js'
+import { createGrowthPropertyHealthWorker } from '../../api/src/services/growth-property-health-worker.js'
 import { expireStaleGuestSessions } from '../../api/src/routes/chat/session-expiry-job.js'
 import { sweepOrphanChatAttachments } from '../../api/src/routes/chat/orphan-attachment-sweep-job.js'
 
@@ -106,6 +107,13 @@ const GROWTH_AGGREGATION_INTERVAL_MS = Number(
   process.env.RUNLY_GROWTH_AGGREGATION_INTERVAL_MS ??
     process.env.RUNLY_GROWTH_RETENTION_INTERVAL_MS ??
     60 * 60 * 1000,
+)
+const growthPropertyHealthWorker = createGrowthPropertyHealthWorker({
+  prisma,
+  notificationService: createNotificationService({ prisma }),
+})
+const GROWTH_HEALTH_INTERVAL_MS = Number(
+  process.env.RUNLY_GROWTH_HEALTH_INTERVAL_MS ?? 60 * 60 * 1000,
 )
 
 const googleCalendarConfig = resolveGoogleCalendarConfig(process.env)
@@ -251,6 +259,20 @@ async function runGrowthRetentionTick() {
   }
 }
 
+async function runGrowthHealthTick() {
+  try {
+    const result = await growthPropertyHealthWorker.runOnce()
+    if (result.flaggedInactive > 0 || result.recovered > 0) {
+      console.log(
+        `[worker] growth property health ${formatLogTimestamp()} checked=${result.checked} flaggedInactive=${result.flaggedInactive} recovered=${result.recovered}`,
+      )
+    }
+  } catch (err) {
+    console.error('[worker] growth property health tick failed:', err?.message ?? err)
+    if (isConnectionError(err)) await reconnect()
+  }
+}
+
 async function runGoogleImportRecoveryTick() {
   if (!googleImportRecoveryService) return
 
@@ -291,6 +313,10 @@ runGrowthRetentionTick()
 setInterval(() => {
   runGrowthRetentionTick()
 }, GROWTH_AGGREGATION_INTERVAL_MS)
+runGrowthHealthTick()
+setInterval(() => {
+  runGrowthHealthTick()
+}, GROWTH_HEALTH_INTERVAL_MS)
 runGoogleImportRecoveryTick()
 setInterval(() => {
   runGoogleImportRecoveryTick()
