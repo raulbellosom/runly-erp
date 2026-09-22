@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
   MarkdownViewer,
   ConfirmDialog,
   Skeleton,
@@ -50,6 +52,7 @@ export default function EventDetailModal({
     return (
       <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
         <DialogContent size="lg" className="px-0 pt-0 pb-0 md:p-0 gap-0 overflow-hidden">
+          <DialogTitle className="sr-only">Cargando evento</DialogTitle>
           <div className="h-1.5 bg-[hsl(var(--muted))]" />
           <div className="px-5 pt-4 pb-5 space-y-3">
             <Skeleton className="h-6 w-3/4" />
@@ -87,44 +90,49 @@ export default function EventDetailModal({
   return (
     <>
       <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-        <DialogContent size="lg" className="px-0 pt-0 pb-0 md:p-0 gap-0 overflow-hidden">
-          <div className="h-1.5" style={{ backgroundColor: calColor }} />
+        <DialogContent
+          size="lg"
+          scrollable
+          className="px-0 pt-0 pb-0 md:p-0 gap-0 overflow-hidden max-h-[85dvh] md:max-h-[85dvh]"
+        >
+          <div className="h-1.5 shrink-0" style={{ backgroundColor: calColor }} />
 
-          <div className="flex items-center justify-end gap-1 px-4 pt-3 pb-1 pr-12">
-            {canEdit && (
-              <button
-                onClick={() => onEdit(event)}
-                className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
-                title={event._isRecurrenceInstance ? "Editar serie" : "Editar"}
-              >
-                <Edit2
-                  size={15}
-                  className="text-[hsl(var(--muted-foreground))]"
-                />
-              </button>
-            )}
-            {canDelete && !event.sourceModule && (
-              <button
-                onClick={() => setConfirmOpen(true)}
-                disabled={deleteEvent.isPending}
-                className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
-                title={
-                  event._isRecurrenceInstance ? "Eliminar serie" : "Eliminar"
-                }
-              >
-                <Trash2
-                  size={15}
-                  className="text-[hsl(var(--muted-foreground))]"
-                />
-              </button>
-            )}
-          </div>
-
-          <div className="px-5 pb-5 space-y-3">
-            <h2 className="text-lg font-semibold text-[hsl(var(--foreground))] leading-tight">
+          <DialogHeader className="shrink-0 mb-0 space-y-0 px-5 pt-3 pb-3 pr-12">
+            <div className="flex items-center justify-end gap-1 -mt-1 -mr-1">
+              {canEdit && (
+                <button
+                  onClick={() => onEdit(event)}
+                  className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
+                  title={event._isRecurrenceInstance ? "Editar serie" : "Editar"}
+                >
+                  <Edit2
+                    size={15}
+                    className="text-[hsl(var(--muted-foreground))]"
+                  />
+                </button>
+              )}
+              {canDelete && !event.sourceModule && (
+                <button
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={deleteEvent.isPending}
+                  className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
+                  title={
+                    event._isRecurrenceInstance ? "Eliminar serie" : "Eliminar"
+                  }
+                >
+                  <Trash2
+                    size={15}
+                    className="text-[hsl(var(--muted-foreground))]"
+                  />
+                </button>
+              )}
+            </div>
+            <DialogTitle className="text-lg font-semibold leading-tight">
               {event.title}
-            </h2>
+            </DialogTitle>
+          </DialogHeader>
 
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-5 space-y-3">
             {isChatMeeting && callsEnabled && (
               <Button
                 type="button"

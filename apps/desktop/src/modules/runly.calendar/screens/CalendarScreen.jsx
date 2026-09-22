@@ -103,6 +103,20 @@ export default function CalendarScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNarrow]);
 
+  // Close both sidebars on mount when starting out narrow — the sidebar
+  // open/closed flags persist across reloads (useCalendarStore), so on a
+  // mobile load/reload the transition effect above never fires (isNarrow
+  // was already true at mount, no false->true edge to catch) and the
+  // persisted-open sidebars would render as full-screen overlays instead
+  // of the calendar.
+  useEffect(() => {
+    if (isNarrow) {
+      if (leftSidebarOpen) toggleLeftSidebar();
+      if (rightSidebarOpen) toggleRightSidebar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [detailEvent, setDetailEvent] = useState(null);
   const [formState, setFormState] = useState(null);
   const [calendarForm, setCalendarForm] = useState(null);
