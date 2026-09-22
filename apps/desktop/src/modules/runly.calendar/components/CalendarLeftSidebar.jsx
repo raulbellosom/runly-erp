@@ -6,6 +6,7 @@ import {
   Pencil,
   Users,
   Trash2,
+  Upload,
 } from "lucide-react";
 import {
   Button,
@@ -23,6 +24,7 @@ import { useCalendars } from "../hooks/useCalendarData";
 import { CalendarIcon } from "../calendarIcons";
 import GoogleCalendarConnectionCard from "./GoogleCalendarConnectionCard";
 import GoogleCalendarCalendarPickerDialog from "./GoogleCalendarCalendarPickerDialog";
+import ImportIcsDialog from "./ImportIcsDialog";
 import {
   canCreateCalendar,
   canDeleteCalendar,
@@ -171,6 +173,7 @@ export default function CalendarLeftSidebar({
   onDeleteCalendar,
 }) {
   const [googlePickerOpen, setGooglePickerOpen] = useState(false);
+  const [icsImportOpen, setIcsImportOpen] = useState(false);
   const { userProfile } = useAuth();
   const {
     selectedDate,
@@ -265,6 +268,15 @@ export default function CalendarLeftSidebar({
             <GoogleCalendarConnectionCard
               onOpen={() => setGooglePickerOpen(true)}
             />
+            <Button
+              onClick={() => setIcsImportOpen(true)}
+              variant="ghost"
+              size="sm"
+              className="mt-2 w-full justify-start text-[hsl(var(--muted-foreground))]"
+            >
+              <Upload size={14} className="mr-2" />
+              Importar .ics
+            </Button>
           </section>
         </div>
       </div>
@@ -272,6 +284,11 @@ export default function CalendarLeftSidebar({
       <GoogleCalendarCalendarPickerDialog
         open={googlePickerOpen}
         onClose={() => setGooglePickerOpen(false)}
+      />
+
+      <ImportIcsDialog
+        open={icsImportOpen}
+        onOpenChange={setIcsImportOpen}
       />
     </aside>
   );
