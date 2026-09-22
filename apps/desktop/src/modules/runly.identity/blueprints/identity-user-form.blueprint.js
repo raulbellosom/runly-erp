@@ -28,7 +28,7 @@ export const IDENTITY_USER_FORM = {
               { value: "other", label: "Otro" },
             ],
           },
-          { name: "enabled", label: "Activo", type: "checkbox", icon: "CircleCheck" },
+          { name: "enabled", label: "Activo", type: "boolean", icon: "CircleCheck" },
         ],
       },
       {

@@ -60,6 +60,14 @@ function inferRowActionKind(label) {
     return "edit";
   }
   if (
+    normalized.includes("activar") ||
+    normalized.includes("reactivar") ||
+    normalized.includes("habilitar") ||
+    normalized.includes("enable")
+  ) {
+    return "toggle";
+  }
+  if (
     normalized.includes("ver") ||
     normalized.includes("detalle") ||
     normalized.includes("view") ||
@@ -614,6 +622,13 @@ export function RunlyTable({
     const fallbackQueue = [
       onView ? { kind: "view", icon: Eye, run: () => onView(row) } : null,
       onEdit ? { kind: "edit", icon: Pencil, run: () => onEdit(row) } : null,
+      onToggleEnabled
+        ? {
+            kind: "toggle",
+            icon: row.enabled ? PowerOff : Power,
+            run: () => onToggleEnabled(row),
+          }
+        : null,
       deleteAllowed
         ? {
             kind: "delete",
@@ -635,6 +650,8 @@ export function RunlyTable({
           chosen = fallbackQueue.find((item) => item.kind === "view");
         else if (kind === "edit" && onEdit)
           chosen = fallbackQueue.find((item) => item.kind === "edit");
+        else if (kind === "toggle" && onToggleEnabled)
+          chosen = fallbackQueue.find((item) => item.kind === "toggle");
         else if (kind === "delete" && onDelete)
           chosen = fallbackQueue.find((item) => item.kind === "delete");
 
@@ -646,7 +663,10 @@ export function RunlyTable({
 
         usedKinds.add(chosen.kind);
         return {
-          label: label || "Accion",
+          label:
+            chosen.kind === "toggle"
+              ? (row.enabled ? "Desactivar" : "Activar")
+              : (label || "Accion"),
           icon: chosen.icon,
           variant: chosen.variant,
           onClick: chosen.run,

@@ -83,6 +83,17 @@ export default function UsersScreen() {
     onError: () => toast.error("No se pudo actualizar el estado de los usuarios"),
   });
 
+  const toggleEnabledMutation = useMutation({
+    mutationFn: ({ id, enabled }) => runly.identity.setUsersEnabled([id], enabled, token),
+    onSuccess: (_data, { enabled }) => {
+      setRefreshSignal((value) => value + 1);
+      toast.success(enabled ? "Usuario activado" : "Usuario desactivado");
+    },
+    onError: (error) => {
+      toast.error(error?.message || "No se pudo actualizar el estado del usuario");
+    },
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: (id) => runly.identity.deleteUser(id, token),
     onSuccess: () => {
@@ -224,6 +235,22 @@ export default function UsersScreen() {
                     return;
                   }
                   setDeleteTarget(row);
+                }
+              : undefined
+          }
+          onToggleEnabled={
+            canUpdateUsers
+              ? (row) => {
+                  const nextEnabled = !row.enabled;
+                  if (!nextEnabled && row.id === userProfile?.id) {
+                    toast.error("No puedes desactivar tu propia cuenta");
+                    return;
+                  }
+                  if (!nextEnabled && isProtectedAdminUser(row)) {
+                    toast.error("No puedes desactivar usuarios Runly Admin/System Admin");
+                    return;
+                  }
+                  toggleEnabledMutation.mutate({ id: row.id, enabled: nextEnabled });
                 }
               : undefined
           }

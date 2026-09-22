@@ -60,6 +60,7 @@ export const IDENTITY_USER_TABLE = {
     rowActions: [
       { label: "Ver detalle" },
       { label: "Editar" },
+      { label: "Activar" },
       { label: "Eliminar" },
     ],
   },

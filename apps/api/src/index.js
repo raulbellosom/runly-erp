@@ -2535,13 +2535,19 @@ app.get(
   async (c) => {
     try {
       const tenant = c.get("tenantContext");
+      // Holders of identity.users.update can already view/edit ANY company's
+      // memberships (see docs/superpowers/specs/2026-09-15-identity-module-redesign-design.md
+      // §Non-goal 4) — the role picker they use for that (MembershipsSection)
+      // needs roles from every company, not just their own active one, or
+      // reassigning a membership in another company shows no usable roles.
+      const canManageAnyCompany = tenant.isSystemAdmin || tenant.permissionSet?.has("identity.users.update");
       const roles = await prisma.role.findMany({
         // system.admin is a reserved platform role (meant for the instance's
         // first user, assigned outside this UI) — it never appears in the
         // Identity role list or picker, even for a system admin viewer.
         where: {
           key: { not: "system.admin" },
-          ...(tenant.isSystemAdmin ? {} : { OR: [{ companyId: null }, { companyId: tenant.companyId }] }),
+          ...(canManageAnyCompany ? {} : { OR: [{ companyId: null }, { companyId: tenant.companyId }] }),
         },
         include: {
           permissions: {
