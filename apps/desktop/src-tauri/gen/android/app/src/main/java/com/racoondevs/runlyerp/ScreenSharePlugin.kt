@@ -61,6 +61,21 @@ class ScreenSharePlugin(private val activity: Activity) : Plugin(activity) {
   }
 
   @Command
+  fun getOrigin(invoke: Invoke) {
+    val origin = activity.getSharedPreferences("runly_server", Context.MODE_PRIVATE).getString("origin", null)
+    invoke.resolve(JSObject().apply { put("origin", origin) })
+  }
+
+  @Command
+  fun setOrigin(invoke: Invoke) {
+    val args = invoke.getArgs()
+    val prefs = activity.getSharedPreferences("runly_server", Context.MODE_PRIVATE)
+    if (args.isNull("origin")) prefs.edit().remove("origin").apply()
+    else prefs.edit().putString("origin", args.getString("origin")).apply()
+    invoke.resolve()
+  }
+
+  @Command
   fun start(invoke: Invoke) {
     if (!activity.hasWindowFocus()) { invoke.reject("Abre Runly para compartir pantalla."); return }
     if (pending != null || room != null) { invoke.reject("Ya hay una solicitud de pantalla activa."); return }
