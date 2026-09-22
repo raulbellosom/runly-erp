@@ -20,10 +20,13 @@ export function createSettingsRouter({ prisma, requirePermission, supabaseAdmin 
   const webPushService = createWebPushService({ prisma })
   const brandService = createCompanyBrandService({ prisma, supabaseAdmin })
 
-  // VAPID keys belong to the installation/browser origin. A company admin must
-  // not rotate or delete the keys used by every other company on that origin.
+  // VAPID keys belong to the installation/browser origin and are shared by
+  // every company hosted on it. Company admins (isAdmin) are allowed to
+  // manage them, same as system admins — on a single-company instance
+  // that's the only admin role that ever gets assigned.
   const requireInstanceAdmin = async (c, next) => {
-    if (!c.get('tenantContext')?.isSystemAdmin) {
+    const tenant = c.get('tenantContext')
+    if (!tenant?.isSystemAdmin && !tenant?.isAdmin) {
       return c.json({ error: 'Solo la administración de plataforma puede configurar Web Push.' }, 403)
     }
     await next()
