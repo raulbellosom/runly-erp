@@ -30,8 +30,11 @@ import {
 } from "./ContextMenu.jsx";
 import { getOfficeFormat } from "@runly/core";
 import { getFileKind, getKindLabel, formatBytes } from "../lib/file-kind";
+import { useHlsPlayback } from "../lib/useHlsPlayback";
 import { FileVisual } from "./FileVisual";
 import { PDFViewer } from "./PDFViewer";
+
+const HLS_MIME_TYPES = new Set(["application/vnd.apple.mpegurl", "application/x-mpegurl"]);
 
 // Re-encodes an arbitrary image blob as PNG via an offscreen canvas. Some
 // browsers only accept image/png for navigator.clipboard.write, so this is
@@ -136,6 +139,7 @@ export function AdvancedFileViewer({
   const [mediaThumbUrls, setMediaThumbUrls] = useState({});
 
   const imageContainerRef = useRef(null);
+  const hlsVideoRef = useRef(null);
   const thumbRefs = useRef(new Map());
   const mediaThumbFetching = useRef(new Set());
   const pointersRef = useRef(new Map());
@@ -161,6 +165,13 @@ export function AdvancedFileViewer({
 
   const file = files?.[activeIndex] ?? null;
   const kind = useMemo(() => getFileKind(file), [file]);
+  // HLS sources (runly.chat call recordings, via a blob: URL wrapping a
+  // rewritten manifest — see ChatRecordingsGallery.jsx) can't use a plain
+  // <video src>: hls.js has to demux the stream itself. Everything else
+  // (regular mp4/webm attachments) keeps the existing <video src> below,
+  // untouched.
+  const isHlsSource = kind === "video" && HLS_MIME_TYPES.has(String(file?.mimeType ?? "").toLowerCase());
+  useHlsPlayback(hlsVideoRef, !loading && signedUrl && isHlsSource ? signedUrl : null);
   const officeOpenable = useMemo(() => {
     if (!onOpenInOffice || !file) return false;
     if (canOpenInOffice && !canOpenInOffice(file)) return false;
@@ -919,8 +930,23 @@ export function AdvancedFileViewer({
               <PDFViewer url={signedUrl} />
             )}
 
-            {/* Video player */}
-            {!loading && signedUrl && kind === "video" && (
+            {/* Video player (HLS: hls.js/native attaches via useHlsPlayback above, no src prop) */}
+            {!loading && signedUrl && kind === "video" && isHlsSource && (
+              <div className="h-full w-full flex items-center justify-center bg-black">
+                <video
+                  key={signedUrl}
+                  ref={hlsVideoRef}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="max-h-full max-w-full"
+                  style={{ outline: "none" }}
+                />
+              </div>
+            )}
+
+            {/* Video player (regular file — mp4/webm/etc.) */}
+            {!loading && signedUrl && kind === "video" && !isHlsSource && (
               <div className="h-full w-full flex items-center justify-center bg-black">
                 <video
                   key={signedUrl}

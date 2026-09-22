@@ -3,7 +3,13 @@
 
 export const FILE_KINDS = Object.freeze({
   image: { label: 'Imagen', accent: '#0d9488', accentDark: '#2dd4bf', mimePrefixes: ['image/'], mimeTypes: [], extensions: [] },
-  video: { label: 'Video', accent: '#7c3aed', accentDark: '#a78bfa', mimePrefixes: ['video/'], mimeTypes: [], extensions: [] },
+  // mimeTypes/extensions cover HLS manifests (runly.chat call recordings —
+  // ChatRecordingsGallery.jsx/AdvancedFileViewer.jsx), which aren't a
+  // video/* mime type themselves even though they render as video.
+  video: {
+    label: 'Video', accent: '#7c3aed', accentDark: '#a78bfa',
+    mimePrefixes: ['video/'], mimeTypes: ['application/vnd.apple.mpegurl', 'application/x-mpegurl'], extensions: ['m3u8'],
+  },
   audio: { label: 'Audio', accent: '#db2777', accentDark: '#f472b6', mimePrefixes: ['audio/'], mimeTypes: [], extensions: [] },
   pdf: { label: 'PDF', accent: '#dc2626', accentDark: '#f87171', mimePrefixes: [], mimeTypes: ['application/pdf'], extensions: ['pdf'] },
   csv: {

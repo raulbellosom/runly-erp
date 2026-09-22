@@ -19,6 +19,11 @@ test('fileKindOf resolves by mime prefix', () => {
   assert.equal(fileKindOf({ originalName: 'song.flac', mimeType: 'audio/flac' }), 'audio');
 });
 
+test('fileKindOf resolves HLS manifests (call recordings) as video', () => {
+  assert.equal(fileKindOf({ originalName: 'grabacion.m3u8', mimeType: 'application/vnd.apple.mpegurl' }), 'video');
+  assert.equal(fileKindOf({ originalName: 'grabacion.m3u8', mimeType: '' }), 'video');
+});
+
 test('fileKindOf falls back to extension when mime is generic or empty', () => {
   assert.equal(fileKindOf({ originalName: 'ledger.csv', mimeType: 'text/plain' }), 'csv');
   assert.equal(fileKindOf({ originalName: 'ledger.csv', mimeType: 'application/octet-stream' }), 'csv');

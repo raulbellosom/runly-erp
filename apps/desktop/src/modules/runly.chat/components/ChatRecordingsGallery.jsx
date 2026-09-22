@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ConfirmDialog, EmptyState, ErrorState, Skeleton,
+  AdvancedFileViewer, ConfirmDialog, EmptyState, ErrorState, Skeleton,
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@runly/ui";
-import { Loader2, AlertCircle, Play, Trash2, Video } from "lucide-react";
+import { AlertCircle, Loader2, Play, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useConversationRecordings, useDeleteRecording } from "../hooks/useConversationRecordings";
 
@@ -30,133 +30,8 @@ function formatFileSize(bytes) {
   return `${value.toFixed(unitIndex > 0 && value < 10 ? 1 : 0)} ${units[unitIndex]}`;
 }
 
-// Attaches `src` (a blob: URL wrapping the rewritten HLS manifest — see
-// RecordingRow's manifestBlobUrl) to the given video ref: hls.js
-// (lazy-loaded so it never enters the main bundle) wherever `Hls.isSupported()`
-// says MediaSource-based playback is available, native `<video>` src only as
-// the fallback for genuine Safari/iOS. This order matters and must not be
-// flipped: some Chromium builds report `canPlayType('application/vnd.apple.mpegurl')`
-// as truthy without actually being able to parse an HLS manifest — checking
-// that BEFORE Hls.isSupported() (as this used to) sends those browsers down
-// the native path, which then fails immediately with MediaError code 4
-// (SRC_NOT_SUPPORTED, confirmed against production on Windows/Chromium).
-// Matches hls.js's own documented integration snippet.
-// A real useEffect is required here (not useState's lazy initializer,
-// which only ever runs once at mount) because `src` only becomes non-null
-// after the row is expanded post-mount — the effect must re-run then.
-// `onFatalError` is invoked for hls.js fatal errors (network/media errors
-// that hls.js itself can't recover from) — the native-Safari path relies on
-// the `<video>` element's own `onError` prop instead (wired by the caller),
-// since hls.js's event bus doesn't apply there.
-function useHls(videoRef, src, onFatalError) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setReady(false);
-    if (!src || !videoRef.current) return undefined;
-    const video = videoRef.current;
-
-    let hls;
-    let cancelled = false;
-    import("hls.js").then(({ default: Hls }) => {
-      if (cancelled) return;
-
-      if (Hls.isSupported()) {
-        hls = new Hls();
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          // Nothing surfaced this to the console before — a fatal error just
-          // silently triggered the fallback UI with no way to tell network
-          // (fetch/CORS) apart from demux/buffer failures. Log every error
-          // hls.js reports, fatal or not, with its full detail.
-          console.warn("[ChatRecordingsGallery] hls.js error:", data?.type, data?.details, data?.fatal ? "(fatal)" : "(recoverable)", data);
-          if (data?.fatal) onFatalError?.();
-        });
-        hls.loadSource(src);
-        hls.attachMedia(video);
-        setReady(true);
-        return;
-      }
-
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = src;
-        setReady(true);
-        return;
-      }
-
-      onFatalError?.();
-    });
-
-    return () => {
-      cancelled = true;
-      hls?.destroy();
-      // Symmetric cleanup for the native-src branch — safe to call
-      // unconditionally even when hls.js managed playback instead.
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    };
-  }, [src, videoRef, onFatalError]);
-
-  return ready;
-}
-
-function RecordingRow({ recording, refetch, deleteRecording }) {
-  const [expanded, setExpanded] = useState(false);
-  const [playbackError, setPlaybackError] = useState(false);
+function RecordingRow({ recording, deleteRecording, onPlay }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const videoRef = useRef(null);
-  // Same one-retry-then-give-up convention as MessageAttachments.jsx's
-  // AudioCard: on the first playback error, refetch the recordings list
-  // (each segment's signed URL, baked into the manifest, has a 1-hour TTL,
-  // so a panel left open past that gets a fresh manifest) and let the
-  // effect above reattach with it; if it still fails, stop retrying and
-  // show an inline error instead of silently leaving a broken/blank player.
-  const retriedRef = useRef(false);
-
-  const handleFatalError = useCallback(() => {
-    // hls.js's own ERROR event is logged in useHls above; this also fires
-    // straight from the native <video> element's onError (Safari's native
-    // HLS path, and any decode error MSE surfaces onto the element itself),
-    // which carries its own MediaError with a numeric .code — log it too.
-    if (videoRef.current?.error) {
-      const { code, message } = videoRef.current.error;
-      console.warn("[ChatRecordingsGallery] <video> MediaError:", code, message);
-    }
-    if (!retriedRef.current) {
-      retriedRef.current = true;
-      refetch?.();
-      return;
-    }
-    setPlaybackError(true);
-  }, [refetch]);
-
-  // The backend hands us the rewritten manifest text (every segment line
-  // replaced with its own signed URL — see call-recording-service.js
-  // listRecordings/signManifestSegments), not a fetchable URL: a signed URL
-  // for the .m3u8 alone doesn't work, since hls.js/native HLS resolve each
-  // segment's bare relative filename against it and drop its signing token.
-  // A blob: URL lets hls.js (and Safari's native HLS engine) load that text
-  // as if it were a normal manifest fetch.
-  const hasPlaylist = Boolean(recording.playlistManifest);
-  const manifestBlobUrl = useMemo(() => {
-    if (!recording.playlistManifest) return null;
-    return URL.createObjectURL(new Blob([recording.playlistManifest], { type: "application/vnd.apple.mpegurl" }));
-  }, [recording.playlistManifest]);
-  useEffect(() => () => { if (manifestBlobUrl) URL.revokeObjectURL(manifestBlobUrl); }, [manifestBlobUrl]);
-
-  useHls(videoRef, expanded && manifestBlobUrl ? manifestBlobUrl : null, handleFatalError);
-
-  function toggleExpanded() {
-    setExpanded((wasExpanded) => {
-      const next = !wasExpanded;
-      if (next) {
-        // Fresh attempt each time the row is (re-)opened.
-        retriedRef.current = false;
-        setPlaybackError(false);
-      }
-      return next;
-    });
-  }
 
   const isReady = recording.status === "READY";
   const isFailed = recording.status === "FAILED";
@@ -165,6 +40,7 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
   // sign every segment it references (call-recording-service.js
   // listRecordings) — a READY recording can still have no manifest if any of
   // that failed.
+  const hasPlaylist = Boolean(recording.playlistManifest);
   const isUnavailable = isReady && !hasPlaylist;
   // The real reason, when the backend has one: failureReason is persisted on
   // FAILED rows (call-recording-service.js startRecording/reconcileActiveRecordings);
@@ -212,7 +88,7 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
           {isReady && hasPlaylist && (
             <button
               type="button"
-              onClick={toggleExpanded}
+              onClick={() => onPlay(recording)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]"
               aria-label="Reproducir"
             >
@@ -249,17 +125,6 @@ function RecordingRow({ recording, refetch, deleteRecording }) {
           )}
         </div>
       </div>
-      {expanded && isReady && hasPlaylist && (
-        playbackError ? (
-          <div className="mt-2 flex items-center gap-2 rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-            No se pudo reproducir la grabación.
-          </div>
-        ) : (
-          // react-doctor-disable-next-line media-has-caption -- internal call recording, no captions track produced by Egress.
-          <video ref={videoRef} controls onError={handleFatalError} className="mt-2 w-full rounded-lg bg-black" />
-        )
-      )}
       <ConfirmDialog
         open={confirmDeleteOpen}
         onOpenChange={setConfirmDeleteOpen}
@@ -277,6 +142,46 @@ export function ChatRecordingsGallery({ conversationId }) {
   const { data, isLoading, isError, refetch } = useConversationRecordings(conversationId);
   const deleteRecording = useDeleteRecording(conversationId);
   const recordings = data?.data ?? data ?? [];
+
+  // Reuses the same viewer the files module opens for images/PDF/audio/video
+  // (AdvancedFileViewer, in @runly/ui) instead of a bespoke inline player —
+  // same chrome, zoom/fullscreen, native controls. It only knows how to ask
+  // for "a signed URL" per file, so the HLS manifest (rewritten with signed
+  // segment URLs — see call-recording-service.js) is wrapped in a blob: URL
+  // here and handed back as if it were one; useHlsPlayback (@runly/ui)
+  // handles the actual hls.js attachment once the viewer renders the <video>.
+  const [viewerRecording, setViewerRecording] = useState(null);
+  const blobUrlRef = useRef(null);
+
+  const viewerFiles = useMemo(() => {
+    if (!viewerRecording) return [];
+    return [{
+      id: viewerRecording.id,
+      mimeType: "application/vnd.apple.mpegurl",
+      originalName: `Grabación ${formatRecordingDateTime(viewerRecording.startedAt)}`,
+      sizeBytes: viewerRecording.sizeBytes,
+    }];
+  }, [viewerRecording]);
+
+  const resolveRecordingUrl = useCallback(async () => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    if (!viewerRecording?.playlistManifest) return null;
+    const url = URL.createObjectURL(new Blob([viewerRecording.playlistManifest], { type: "application/vnd.apple.mpegurl" }));
+    blobUrlRef.current = url;
+    return url;
+  }, [viewerRecording]);
+
+  const closeViewer = useCallback((nextOpen) => {
+    if (nextOpen) return;
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setViewerRecording(null);
+  }, []);
 
   if (isLoading) {
     return (
@@ -309,8 +214,16 @@ export function ChatRecordingsGallery({ conversationId }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-2 p-3">
       {recordings.map((r) => (
-        <RecordingRow key={r.id} recording={r} refetch={refetch} deleteRecording={deleteRecording} />
+        <RecordingRow key={r.id} recording={r} deleteRecording={deleteRecording} onPlay={setViewerRecording} />
       ))}
+      <AdvancedFileViewer
+        open={Boolean(viewerRecording)}
+        onOpenChange={closeViewer}
+        files={viewerFiles}
+        activeIndex={0}
+        onResolveSignedUrl={resolveRecordingUrl}
+        zIndex={10000}
+      />
     </div>
   );
 }

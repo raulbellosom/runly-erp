@@ -31,6 +31,7 @@
     "clsx": "latest",
     "country-state-city": "^3.2.1",
     "date-fns": "^4.3.0",
+    "hls.js": "^1.7.3",
     "lucide-react": "latest",
     "react-hook-form": "^7.75.0",
     "react-markdown": "^10.1.0",
