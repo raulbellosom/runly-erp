@@ -455,7 +455,11 @@ export function useCreateComment(projectId, taskId) {
         reactions: [],
         _pending: true,
       }
-      qc.setQueryData(cKey, (old) => [...(old ?? []), tempComment])
+      qc.setQueryData(cKey, (old) => {
+        const list = old?.data ?? old ?? []
+        const updated = [...list, tempComment]
+        return old?.data ? { ...old, data: updated } : updated
+      })
       return { snapshot }
     },
     onError: (_, __, ctx) => {
@@ -478,9 +482,11 @@ export function useUpdateComment(projectId, taskId) {
     onMutate: async ({ commentId, body }) => {
       await qc.cancelQueries({ queryKey: cKey })
       const snapshot = qc.getQueryData(cKey)
-      qc.setQueryData(cKey, (old) =>
-        (old ?? []).map(c => c.id === commentId ? { ...c, body, editedAt: new Date().toISOString() } : c)
-      )
+      qc.setQueryData(cKey, (old) => {
+        const list = old?.data ?? old ?? []
+        const updated = list.map(c => c.id === commentId ? { ...c, body, editedAt: new Date().toISOString() } : c)
+        return old?.data ? { ...old, data: updated } : updated
+      })
       return { snapshot }
     },
     onError: (_, __, ctx) => {
@@ -500,7 +506,11 @@ export function useDeleteComment(projectId, taskId) {
     onMutate: async ({ commentId }) => {
       await qc.cancelQueries({ queryKey: cKey })
       const snapshot = qc.getQueryData(cKey)
-      qc.setQueryData(cKey, (old) => (old ?? []).filter(c => c.id !== commentId))
+      qc.setQueryData(cKey, (old) => {
+        const list = old?.data ?? old ?? []
+        const updated = list.filter(c => c.id !== commentId)
+        return old?.data ? { ...old, data: updated } : updated
+      })
       return { snapshot }
     },
     onError: (_, __, ctx) => {
@@ -523,8 +533,9 @@ export function useToggleTaskReaction(projectId, taskId) {
       await qc.cancelQueries({ queryKey: cKey })
       const snapshot = qc.getQueryData(cKey)
       const userId = userProfile?.id
-      qc.setQueryData(cKey, (old) =>
-        (old ?? []).map(c => {
+      qc.setQueryData(cKey, (old) => {
+        const list = old?.data ?? old ?? []
+        const updated = list.map(c => {
           if (c.id !== commentId) return c
           const mine = c.reactions?.some(r => r.userId === userId && r.emoji === emoji)
           const reactions = mine
@@ -532,7 +543,8 @@ export function useToggleTaskReaction(projectId, taskId) {
             : [...(c.reactions ?? []), { id: '_opt', commentId, userId, emoji, user: userProfile ?? null }]
           return { ...c, reactions }
         })
-      )
+        return old?.data ? { ...old, data: updated } : updated
+      })
       return { snapshot }
     },
     onError: (_, __, ctx) => {
