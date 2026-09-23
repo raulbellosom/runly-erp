@@ -100,6 +100,7 @@ export function ChatMessageList({
   ) : null;
   const bottomRef = useRef(null);
   const listRef = useRef(null);
+  const contentRef = useRef(null);
   const topSentinelRef = useRef(null);
   const prevScrollHeightRef = useRef(0);
   const restoreScrollRef = useRef(false);
@@ -271,6 +272,44 @@ export function ChatMessageList({
   useEffect(() => {
     handleScroll();
   }, [messages?.length, handleScroll]);
+
+  // Re-pin to the bottom when the list container's OWN height changes —
+  // typing a multi-line message (or sending one and the composer shrinking
+  // back down) resizes this flex-1 sibling without moving scrollTop, which
+  // otherwise reads as the conversation scrolling up on its own mid-chat.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (suppressAutoScrollRef.current || restoreScrollRef.current) return;
+      if (!atBottomRef.current) return;
+      el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Re-pin to the bottom when the rendered message column itself grows —
+  // a just-sent message's attachment/image finishing its load, a read
+  // receipt avatar mounting, or a grouping shift (isFirst/isLast) all add
+  // height AFTER the append-driven scrollIntoView above already fired, which
+  // otherwise leaves the newest message peeking out for a moment and then
+  // sliding below the fold as later content pushes it down. Content growth
+  // inside an overflow:auto container never changes listRef's own box, so it
+  // needs its own observer on the inner column rather than reusing the one
+  // above.
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (suppressAutoScrollRef.current || restoreScrollRef.current) return;
+      if (!atBottomRef.current) return;
+      const el = listRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
 
   const handleScrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -528,6 +567,7 @@ export function ChatMessageList({
           </div>
         )}
 
+        <div ref={contentRef}>
         {grouped.map((item, idx) => {
           if (item.type === "date_separator") {
             return (
@@ -608,6 +648,7 @@ export function ChatMessageList({
         {typingNames.length > 0 && <TypingIndicator names={typingNames} />}
 
         <div ref={bottomRef} />
+        </div>
       </div>
 
       {(pendingMentionIds.length > 0 || showScrollButton) && (

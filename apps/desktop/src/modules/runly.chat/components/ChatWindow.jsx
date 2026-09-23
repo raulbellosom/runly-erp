@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { MessageSquare } from "lucide-react";
+import { ArrowLeft, MessageSquare } from "lucide-react";
 import { runly } from "../../../lib/runly";
 import { ChatTemplatePopover } from "./ChatTemplatePopover";
 import { useConversationFiles } from "../hooks/useConversationFiles";
@@ -33,6 +33,24 @@ import { buildAllAttachments, buildMessagesTranscript } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useCalls } from "../calls/CallsProvider";
 import { ChatHeader } from "./ChatHeader";
+
+// Same pattern as ConversationProfilePanel's backHeader — an explicit,
+// always-visible way out of a view that replaces the message list in place.
+function ExchangeViewBackHeader({ title, onBack }) {
+  return (
+    <div className="flex items-center gap-2 px-3 pt-2 pb-1.5 border-b border-[hsl(var(--border))] shrink-0">
+      <button
+        type="button"
+        onClick={onBack}
+        title="Volver a mensajes"
+        className="h-7 w-7 flex items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors touch-manipulation"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </button>
+      <p className="text-sm font-semibold">{title}</p>
+    </div>
+  );
+}
 
 // ── Helpers for local "delete for me" ─────────────────────────────────────────
 
@@ -258,6 +276,15 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const closeProfile = useCallback(() => {
     setMembersView(false);
     setProfileInitialTab(null);
+  }, []);
+
+  // Files/recordings replace the message list in place, with no other visible
+  // way back besides re-finding the same header toggle/dropdown item that
+  // opened them — not obvious as a "close" action. An explicit back arrow
+  // (same pattern as ConversationProfilePanel's backHeader) fixes that.
+  const closeExchangeView = useCallback(() => {
+    setFilesView(false);
+    setRecordingsView(false);
   }, []);
 
   const showAllFiles = useCallback(() => {
@@ -599,10 +626,12 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
           {recordingsView ? (
             <div className="flex-1 min-h-0 flex flex-col">
+              <ExchangeViewBackHeader title="Grabaciones" onBack={closeExchangeView} />
               <ChatRecordingsGallery conversationId={conversationId} />
             </div>
           ) : filesView ? (
             <div className="flex-1 min-h-0 flex flex-col">
+              <ExchangeViewBackHeader title="Archivos" onBack={closeExchangeView} />
               {filesHistory.isError && <ErrorState title="No se pudieron cargar los archivos" onRetry={filesHistory.refetch} />}
               <ChatFilesGallery
                 messages={filesHistory.data ?? []}

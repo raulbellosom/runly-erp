@@ -142,45 +142,56 @@ export function ChatRecordingsGallery({ conversationId }) {
   const { data, isLoading, isError, refetch } = useConversationRecordings(conversationId);
   const deleteRecording = useDeleteRecording(conversationId);
   const recordings = data?.data ?? data ?? [];
+  // Only playable recordings are browsable in the viewer — FAILED/processing/
+  // unavailable rows have nothing to show and stay as their own row with a
+  // warning icon on the list side (see RecordingRow's errorDetail).
+  const playableRecordings = useMemo(
+    () => recordings.filter((r) => r.status === "READY" && r.playlistManifest),
+    [recordings],
+  );
 
   // Reuses the same viewer the files module opens for images/PDF/audio/video
   // (AdvancedFileViewer, in @runly/ui) instead of a bespoke inline player —
-  // same chrome, zoom/fullscreen, native controls. It only knows how to ask
-  // for "a signed URL" per file, so the HLS manifest (rewritten with signed
-  // segment URLs — see call-recording-service.js) is wrapped in a blob: URL
-  // here and handed back as if it were one; useHlsPlayback (@runly/ui)
-  // handles the actual hls.js attachment once the viewer renders the <video>.
-  const [viewerRecording, setViewerRecording] = useState(null);
-  const blobUrlRef = useRef(null);
+  // same chrome, zoom/fullscreen, native controls, and (since every playable
+  // recording of the conversation is passed in, not just the one clicked)
+  // the same prev/next filmstrip navigation as any other multi-file gallery.
+  // It only knows how to ask for "a signed URL" per file, so each recording's
+  // HLS manifest (rewritten with signed segment URLs — see
+  // call-recording-service.js) is wrapped in its own blob: URL here and
+  // handed back as if it were one; useHlsPlayback (@runly/ui) handles the
+  // actual hls.js attachment once the viewer renders the <video>.
+  const [viewerIndex, setViewerIndex] = useState(null);
+  // recordingId -> blob url, so paging back to an already-viewed recording
+  // (A -> B -> A) doesn't rebuild the Blob, and every entry can be revoked on close.
+  const blobUrlCacheRef = useRef(new Map());
 
-  const viewerFiles = useMemo(() => {
-    if (!viewerRecording) return [];
-    return [{
-      id: viewerRecording.id,
-      mimeType: "application/vnd.apple.mpegurl",
-      originalName: `Grabación ${formatRecordingDateTime(viewerRecording.startedAt)}`,
-      sizeBytes: viewerRecording.sizeBytes,
-    }];
-  }, [viewerRecording]);
+  const viewerFiles = useMemo(() => playableRecordings.map((r) => ({
+    id: r.id,
+    mimeType: "application/vnd.apple.mpegurl",
+    originalName: `Grabación ${formatRecordingDateTime(r.startedAt)}`,
+    sizeBytes: r.sizeBytes,
+  })), [playableRecordings]);
 
-  const resolveRecordingUrl = useCallback(async () => {
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
-    if (!viewerRecording?.playlistManifest) return null;
-    const url = URL.createObjectURL(new Blob([viewerRecording.playlistManifest], { type: "application/vnd.apple.mpegurl" }));
-    blobUrlRef.current = url;
+  const resolveRecordingUrl = useCallback(async (file) => {
+    const cached = blobUrlCacheRef.current.get(file.id);
+    if (cached) return cached;
+    const recording = playableRecordings.find((r) => r.id === file.id);
+    if (!recording?.playlistManifest) return null;
+    const url = URL.createObjectURL(new Blob([recording.playlistManifest], { type: "application/vnd.apple.mpegurl" }));
+    blobUrlCacheRef.current.set(file.id, url);
     return url;
-  }, [viewerRecording]);
+  }, [playableRecordings]);
+
+  function handlePlay(recording) {
+    const idx = playableRecordings.findIndex((r) => r.id === recording.id);
+    if (idx >= 0) setViewerIndex(idx);
+  }
 
   const closeViewer = useCallback((nextOpen) => {
     if (nextOpen) return;
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
-    setViewerRecording(null);
+    for (const url of blobUrlCacheRef.current.values()) URL.revokeObjectURL(url);
+    blobUrlCacheRef.current.clear();
+    setViewerIndex(null);
   }, []);
 
   if (isLoading) {
@@ -214,13 +225,14 @@ export function ChatRecordingsGallery({ conversationId }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-2 p-3">
       {recordings.map((r) => (
-        <RecordingRow key={r.id} recording={r} deleteRecording={deleteRecording} onPlay={setViewerRecording} />
+        <RecordingRow key={r.id} recording={r} deleteRecording={deleteRecording} onPlay={handlePlay} />
       ))}
       <AdvancedFileViewer
-        open={Boolean(viewerRecording)}
+        open={viewerIndex !== null}
         onOpenChange={closeViewer}
         files={viewerFiles}
-        activeIndex={0}
+        activeIndex={viewerIndex ?? 0}
+        onIndexChange={setViewerIndex}
         onResolveSignedUrl={resolveRecordingUrl}
         zIndex={10000}
       />

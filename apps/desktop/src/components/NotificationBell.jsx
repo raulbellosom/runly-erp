@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import {
   Bell,
+  BellOff,
   Info,
   AlertTriangle,
   AlertCircle,
   CheckCircle2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -13,6 +16,9 @@ import {
   DropdownMenuContent,
 } from "@runly/ui";
 import { runly } from "../lib/runly";
+import { getSystemNotificationPermission, isTauriRuntime } from "../lib/systemNotifications";
+import { isWebPushSupported } from "../lib/webPush";
+import { useNotificationSoundStore } from "../stores/notificationSound";
 
 function timeAgo(date) {
   const diff = Date.now() - new Date(date).getTime();
@@ -84,6 +90,28 @@ export function NotificationBell({
   });
 
   const [open, setOpen] = useState(false);
+  const [showEnableReminder, setShowEnableReminder] = useState(false);
+  const soundMuted = useNotificationSoundStore((s) => s.muted);
+  const toggleSound = useNotificationSoundStore((s) => s.toggle);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkPermission() {
+      const permission = isTauriRuntime()
+        ? await getSystemNotificationPermission().catch(() => "unsupported")
+        : isWebPushSupported()
+          ? (typeof Notification !== "undefined" ? Notification.permission : "unsupported")
+          : "unsupported";
+      if (!cancelled) setShowEnableReminder(permission !== "granted" && permission !== "unsupported");
+    }
+    checkPermission();
+    return () => { cancelled = true; };
+  }, []);
+
+  function handleEnableReminderClick() {
+    setOpen(false);
+    if (typeof onNavigate === "function") onNavigate("/m/runly.notifications/settings");
+  }
 
   function handleNotificationClick(notification) {
     if (!notification) return;
@@ -133,16 +161,36 @@ export function NotificationBell({
           <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
             Notificaciones
           </span>
-          {unreadCount > 0 && (
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+                className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Marcar todo como leído
+              </button>
+            )}
             <button
-              onClick={() => markAllRead.mutate()}
-              disabled={markAllRead.isPending}
-              className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={toggleSound}
+              title={soundMuted ? "Activar sonido de notificaciones" : "Silenciar sonido de notificaciones"}
+              className="h-6 w-6 flex items-center justify-center rounded-md text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors cursor-pointer shrink-0"
             >
-              Marcar todo como leído
+              {soundMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </button>
-          )}
+          </div>
         </div>
+        {showEnableReminder && (
+          <button
+            type="button"
+            onClick={handleEnableReminderClick}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 transition-colors cursor-pointer border-b border-[hsl(var(--border))] text-left"
+          >
+            <BellOff size={13} className="shrink-0" />
+            Activa las notificaciones para no perderte avisos
+          </button>
+        )}
         {/* Notification list */}
         <div className="max-h-80 overflow-y-auto">
           {recent.length === 0 ? (

@@ -200,15 +200,6 @@ export function createNotificationService({ prisma, broadcaster = null }) {
 
   async function isDuplicate({ tx, userId, dedupeKey }) {
     if (!dedupeKey) return false;
-    // Chat notifications deduplicate against any existing UNREAD notification
-    // for the same conversation — no time window — to prevent message spam.
-    if (dedupeKey.startsWith('chat.message.new:')) {
-      const row = await tx.notification.findFirst({
-        where: { userId, dedupeKey, readAt: null },
-        select: { id: true },
-      });
-      return Boolean(row);
-    }
     // Chat email throttle: skip if a prior chat email for this conversation is
     // still unread OR was created within the throttle window.
     if (dedupeKey.startsWith('chat.mail:')) {
@@ -267,6 +258,7 @@ export function createNotificationService({ prisma, broadcaster = null }) {
 
     const result = await prisma.$transaction(async (tx) => {
       const created = [];
+      const updated = [];
       const inAppRecipientIds = [];
       let deduped = 0;
 
@@ -274,7 +266,33 @@ export function createNotificationService({ prisma, broadcaster = null }) {
         const dedupeKey =
           parsed.dedupeKey ??
           `${parsed.eventType}:${parsed.sourceType ?? ""}:${parsed.sourceId ?? ""}:${userId}`;
-        if (await isDuplicate({ tx, userId, dedupeKey })) {
+
+        // Chat messages collapse into whatever unread notification already
+        // exists for this conversation instead of spawning one per message —
+        // otherwise a burst of messages (especially while the recipient is
+        // mid-conversation) floods the bell with one row each and re-fires
+        // push/FCM per message. The dedupeKey is per-conversation (not
+        // per-message) so every message after the first here just bumps the
+        // existing row's preview + count and skips creating new deliveries.
+        if (dedupeKey.startsWith('chat.message.new:')) {
+          const existing = await tx.notification.findFirst({
+            where: { userId, dedupeKey, readAt: null },
+          });
+          if (existing) {
+            const priorCount = typeof existing.metadata?.count === 'number' ? existing.metadata.count : 1;
+            const updatedNotification = await tx.notification.update({
+              where: { id: existing.id },
+              data: {
+                title: parsed.title,
+                body: parsed.body ?? existing.body,
+                metadata: { ...(existing.metadata ?? {}), ...(parsed.metadata ?? {}), count: priorCount + 1 },
+              },
+            });
+            inAppRecipientIds.push(userId);
+            updated.push(updatedNotification);
+            continue;
+          }
+        } else if (await isDuplicate({ tx, userId, dedupeKey })) {
           deduped += 1;
           continue;
         }
@@ -343,11 +361,12 @@ export function createNotificationService({ prisma, broadcaster = null }) {
         created.push(notification);
       }
 
-      return { created, deduped, inAppRecipientIds };
+      return { created, updated, deduped, inAppRecipientIds };
     });
 
     const publishResult = {
       created: result.created.length,
+      updated: result.updated.length,
       deduped: result.deduped,
       data: result.created.map(toNotificationView),
       actorId,

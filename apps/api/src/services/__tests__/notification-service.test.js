@@ -75,6 +75,12 @@ function buildPrismaMock() {
       notifications.push(row);
       return row;
     },
+    update: async ({ where, data }) => {
+      const idx = notifications.findIndex((row) => row.id === where.id);
+      if (idx < 0) throw new Error("not found");
+      notifications[idx] = { ...notifications[idx], ...data, updatedAt: new Date() };
+      return notifications[idx];
+    },
   };
 
   const prisma = {
@@ -553,6 +559,64 @@ describe('chat email throttle (chat.mail: dedupeKey)', () => {
     const again = await service.publish({ companyId: COMPANY_ID, respectChannelDefaults: false, input: mailInput() });
     assert.equal(again.created, 0);
     assert.equal(again.deduped, 1);
+  });
+});
+
+describe('chat message grouping (chat.message.new: dedupeKey)', () => {
+  const messageInput = (body, msgId) => ({
+    eventType: 'chat.message.new',
+    title: 'Nuevo mensaje de chat',
+    body,
+    recipients: { userIds: [RECIPIENT_A] },
+    channels: ['in_app', 'web_push'],
+    sourceType: 'chat_conversation',
+    sourceId: 'conv-1',
+    // Per-conversation, matching chat-service.js — NOT per-message, which is
+    // what let every message spawn its own unread bell row (and re-fire
+    // push/FCM) even while the recipient was actively in the conversation.
+    dedupeKey: 'chat.message.new:conv-1',
+  });
+
+  it('collapses a second unread message in the same conversation into one row', async () => {
+    const prisma = buildPrismaMock();
+    const service = createNotificationService({ prisma });
+
+    const first = await service.publish({ companyId: COMPANY_ID, input: messageInput('Hola', 'm1') });
+    const second = await service.publish({ companyId: COMPANY_ID, input: messageInput('¿Cómo estás?', 'm2') });
+
+    assert.equal(first.created, 1);
+    assert.equal(second.created, 0);
+    assert.equal(second.updated, 1);
+    assert.equal(prisma._notifications.length, 1);
+    assert.equal(prisma._notifications[0].body, '¿Cómo estás?');
+    assert.equal(prisma._notifications[0].metadata.count, 2);
+    // No second round of deliveries — the unread notification is reused, not
+    // re-created (and, when push is enabled, not re-pushed) per message.
+    assert.equal(prisma._deliveries.length, 1);
+  });
+
+  it('re-arms once the prior message notification is read', async () => {
+    const prisma = buildPrismaMock();
+    const service = createNotificationService({ prisma });
+
+    await service.publish({ companyId: COMPANY_ID, input: messageInput('Hola', 'm1') });
+    prisma._notifications[0].readAt = new Date();
+    const second = await service.publish({ companyId: COMPANY_ID, input: messageInput('¿Sigues ahí?', 'm2') });
+
+    assert.equal(second.created, 1);
+    assert.equal(prisma._notifications.length, 2);
+  });
+
+  it('still broadcasts in-app for a grouped (updated) notification', async () => {
+    const prisma = buildPrismaMock();
+    const broadcasts = [];
+    const service = createNotificationService({ prisma, broadcaster: { broadcastToUsers: async (...args) => broadcasts.push(args) } });
+
+    await service.publish({ companyId: COMPANY_ID, input: messageInput('Hola', 'm1') });
+    await service.publish({ companyId: COMPANY_ID, input: messageInput('Otra vez', 'm2') });
+
+    assert.equal(broadcasts.length, 2);
+    assert.deepEqual(broadcasts[1][0], [RECIPIENT_A]);
   });
 });
 

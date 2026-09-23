@@ -59,6 +59,28 @@ export function matchMiraiMention(body) {
 }
 
 export { stripMentionTokens };
+
+// The chat/live/channel/panel prompts all tell the model to answer in plain
+// text (only ```fences``` and `backticks` for code — see AssistantMarkdown.jsx,
+// which renders exactly those two and nothing else). The Groq compound model
+// used for `live` turns in particular doesn't reliably follow that instruction
+// and leaks **bold**/#headers/tables, which then show up as raw asterisks in
+// the UI. Strip those decorators before the reply is stored, leaving fenced
+// code blocks untouched.
+export function sanitizeAssistantText(text) {
+  if (!text) return text;
+  return String(text).split(/(```[\s\S]*?```)/g).map((part, i) => {
+    if (i % 2 === 1) return part; // fenced code block — leave as-is
+    return part
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/__(.+?)__/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/gm, "")
+      .replace(/^\s*\|\s?(.*?)\s?\|\s*$/gm, "$1")
+      .replace(/^([*+])\s+/gm, "- ");
+  }).join("");
+}
+
 const ROUTER_SYSTEM = [
   "Eres un clasificador. Clasifica la ULTIMA pregunta del usuario en exactamente una de estas tres palabras:",
   "chat  -> se responde leyendo los mensajes, archivos o conversaciones del propio usuario en Runly ERP (ej: 'resume mis ultimos mensajes', 'que dijo Juan ayer', 'que archivos compartimos').",
@@ -596,7 +618,7 @@ export function createMiraiService({
 
     let replyInsertError = null;
     try {
-      await insertAssistantMessage({ conversationId, body: finalText });
+      await insertAssistantMessage({ conversationId, body: sanitizeAssistantText(finalText) });
     } catch (err) {
       replyInsertError = String(err?.message ?? err).slice(0, 200);
       console.error("[runly.chat] mirai reply insert failed", err);
@@ -762,7 +784,7 @@ export function createMiraiService({
     }
 
     try {
-      await insertAssistantMessage({ conversationId, body: out.text, replyToMessageId: triggerMessageId ?? null });
+      await insertAssistantMessage({ conversationId, body: sanitizeAssistantText(out.text), replyToMessageId: triggerMessageId ?? null });
     } catch (err) {
       console.error("[runly.chat] mirai mention reply insert failed", err);
     }
@@ -912,9 +934,10 @@ export function createMiraiService({
       }
     }
 
+    finalText = sanitizeAssistantText(String(finalText)).slice(0, 4000);
     const [saved] = await prisma.$queryRaw`
       INSERT INTO chat_mirai_message (thread_id, role, content)
-      VALUES (${threadId}::uuid, 'assistant', ${String(finalText).slice(0, 4000)})
+      VALUES (${threadId}::uuid, 'assistant', ${finalText})
       RETURNING created_at AS "createdAt"
     `;
     await prisma.$executeRaw`UPDATE chat_mirai_thread SET updated_at = NOW() WHERE id = ${threadId}::uuid`;

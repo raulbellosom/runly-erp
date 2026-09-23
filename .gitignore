@@ -55,6 +55,10 @@ apps/desktop/src-tauri/**/*.keystore
 # Prisma generated client
 prisma/generated
 
+# ffmpeg.wasm core (~30MB binary) — copied from @ffmpeg/core by
+# apps/desktop's postinstall script on every `pnpm install`, never committed.
+apps/desktop/public/ffmpeg/
+
 # Database / logs
 *.db
 *.db-journal

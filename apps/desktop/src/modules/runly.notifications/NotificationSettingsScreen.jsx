@@ -27,18 +27,18 @@ import {
 } from "../../lib/webPush";
 
 const EVENT_CATALOG = [
-  { eventType: 'calendar.event.invite', title: 'Invitaci?n a evento', description: 'Cuando te invitan a un evento.', icon: CalendarClock },
+  { eventType: 'calendar.event.invite', title: 'Invitación a evento', description: 'Cuando te invitan a un evento.', icon: CalendarClock },
   { eventType: 'calendar.event.reschedule', title: 'Evento reprogramado', description: 'Cuando cambia la fecha de un evento al que asistes.', icon: CalendarClock },
   { eventType: 'calendar.event.cancel', title: 'Evento cancelado', description: 'Cuando cancelan un evento al que asistes.', icon: CalendarClock },
   { eventType: 'growth.lead.created', title: 'Nuevo lead asignado', description: 'Cuando se crea un lead a tu cargo.', icon: Users },
-  { eventType: 'growth.lead.assigned', title: 'Asignaci?n de lead', description: 'Cuando te asignan un lead existente.', icon: Users },
+  { eventType: 'growth.lead.assigned', title: 'Asignación de lead', description: 'Cuando te asignan un lead existente.', icon: Users },
   { eventType: 'ledger.account_invite', title: 'Cuenta compartida', description: 'Cuando te comparten una cuenta.', icon: Users },
   { eventType: 'ledger.group_invite', title: 'Grupo de cuentas compartido', description: 'Cuando te agregan a un grupo de cuentas.', icon: Users },
   { eventType: 'ledger.access_revoked', title: 'Acceso a cuentas retirado', description: 'Cuando retiran tu acceso a una cuenta o grupo.', icon: ShieldAlert },
-  { eventType: 'pfm.budget.threshold', title: 'Presupuesto pr?ximo al l?mite', description: 'Cuando tu presupuesto alcanza el umbral de alerta.', icon: ShieldAlert },
+  { eventType: 'pfm.budget.threshold', title: 'Presupuesto próximo al límite', description: 'Cuando tu presupuesto alcanza el umbral de alerta.', icon: ShieldAlert },
   { eventType: 'pfm.budget.overage', title: 'Presupuesto excedido', description: 'Cuando tus gastos superan el presupuesto.', icon: ShieldAlert },
-  { eventType: 'projects.task.reaction', title: 'Reacci?n en tarea', description: 'Cuando reaccionan a tu comentario en una tarea.', icon: CheckSquare2 },
-  { eventType: 'inventory.item.reaction', title: 'Reacci?n en inventario', description: 'Cuando reaccionan a tu comentario en inventario.', icon: CheckSquare2 },
+  { eventType: 'projects.task.reaction', title: 'Reacción en tarea', description: 'Cuando reaccionan a tu comentario en una tarea.', icon: CheckSquare2 },
+  { eventType: 'inventory.item.reaction', title: 'Reacción en inventario', description: 'Cuando reaccionan a tu comentario en inventario.', icon: CheckSquare2 },
   // runly.chat
   { eventType: 'chat.member.added', title: 'Invitación a un chat', description: 'Cuando te agregan a un canal o grupo.', icon: Users },
   { eventType: 'chat.mention.new', title: 'Mención en chat', description: 'Cuando te mencionan en una conversación.', icon: MessageCircle },

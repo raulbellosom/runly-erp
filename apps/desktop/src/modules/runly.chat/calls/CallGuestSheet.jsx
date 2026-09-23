@@ -10,8 +10,12 @@ function Initial({ name }) {
   );
 }
 
-// Host-only guest approval / roster as a bottom sheet. `guestsApi` is the
-// object from useCallGuests(); `onShare` opens the CallShareDialog.
+// Host-only guest approval / roster. `side="right"` — SheetContent
+// (@runly/ui) auto-falls-back to a bottom sheet below its own mobile
+// breakpoint, so this reads as a proper desktop side panel instead of a
+// bottom sheet floating over the call on large screens, without any
+// extra plumbing here. `guestsApi` is the object from useCallGuests();
+// `onShare` opens the CallShareDialog.
 export function CallGuestSheet({ open, onOpenChange, guestsApi, onShare }) {
   const { lobby, admitted, admit, deny, kick, mute } = guestsApi;
   const [muted, setMuted] = useState({});
@@ -20,7 +24,7 @@ export function CallGuestSheet({ open, onOpenChange, guestsApi, onShare }) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="gap-0 bg-[hsl(var(--popover,var(--background)))]" style={{ zIndex: 10002 }}>
+      <SheetContent side="right" className="gap-0 bg-[hsl(var(--popover,var(--background)))]" style={{ zIndex: 10002 }}>
         <SheetHeader className="pb-3">
           <SheetTitle className="flex items-center gap-2 text-sm">
             Invitados
@@ -32,7 +36,11 @@ export function CallGuestSheet({ open, onOpenChange, guestsApi, onShare }) {
           </SheetTitle>
         </SheetHeader>
 
-        <div className="max-h-[55vh] space-y-4 overflow-y-auto pb-2">
+        {/* flex-1/min-h-0 (not a fixed max-h) so this fills whatever height
+            the panel actually has — a tall desktop side panel or a capped
+            mobile bottom sheet (see BOTTOM_SHEET_SURFACE_CLASS) — instead of
+            an awkward fixed vh that's too short on desktop. */}
+        <div className="flex-1 min-h-0 space-y-4 overflow-y-auto pb-2">
           {empty && (
             <EmptyState
               title="Sin invitados"

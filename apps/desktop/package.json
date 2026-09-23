@@ -21,7 +21,7 @@
     "build:web": "vite build",
     "preview": "vite preview",
     "lint": "echo lint-pending",
-    "postinstall": "node -e \"try{const{cpSync,existsSync}=require('fs'),src=require.resolve('pdfjs-dist/build/pdf.worker.min.mjs');existsSync(src)&&cpSync(src,'public/pdf.worker.min.mjs');}catch{}\""
+    "postinstall": "node -e \"try{const{cpSync,existsSync,mkdirSync}=require('fs'),src=require.resolve('pdfjs-dist/build/pdf.worker.min.mjs');existsSync(src)&&cpSync(src,'public/pdf.worker.min.mjs');}catch{} try{const{cpSync,mkdirSync}=require('fs');mkdirSync('public/ffmpeg',{recursive:true});cpSync(require.resolve('@ffmpeg/core'),'public/ffmpeg/ffmpeg-core.js');cpSync(require.resolve('@ffmpeg/core/wasm'),'public/ffmpeg/ffmpeg-core.wasm');}catch{}\""
   },
   "dependencies": {
     "@atlas/core": "workspace:@runly/core@*",
@@ -32,6 +32,7 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@excalidraw/excalidraw": "0.18.1",
+    "@ffmpeg/core": "^0.12.10",
     "@hookform/resolvers": "^5.4.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@raulbellosom/atlas-web-builder": "^0.2.0",

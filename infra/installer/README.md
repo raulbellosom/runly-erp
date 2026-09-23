@@ -3,8 +3,8 @@
 Los comandos `runly:*` son los nombres principales; los atajos `atlas:*` siguen disponibles.
 Las instalaciones nuevas usan `custom-modules/_runly-devkit/`. Si ya existe `_atlas-devkit/`, el instalador lo reutiliza; si existen ambas carpetas, prefiere `_runly-devkit/`.
 
-Migraci?n Atlas ? Runly: las im?genes predeterminadas y las fuentes de descarga usan Runly.
-Los paquetes internos usan `@runly/*` con alias `@atlas/*`. Se conservan los overrides anteriores como respaldo y los nombres del proyecto, servicios y vol?menes Compose.
+Migración Atlas → Runly: las imágenes predeterminadas y las fuentes de descarga usan Runly.
+Los paquetes internos usan `@runly/*` con alias `@atlas/*`. Se conservan los overrides anteriores como respaldo y los nombres del proyecto, servicios y volúmenes Compose.
 Publicar las tres imágenes Runly antes de desplegar estos cambios del instalador.
 Las instalaciones con overrides explícitos de imágenes conservan su selección;
 actualizarlos al cambiar a las imágenes publicadas de Runly.

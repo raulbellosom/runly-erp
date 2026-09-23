@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { playCallSound } from "../modules/runly.chat/calls/callSounds.js";
 import { notificationKey, claimNotification } from "../lib/notificationDedup.js";
+import { useNotificationSoundStore } from "../stores/notificationSound.js";
 
 function resolveNotificationLink(href) {
   if (!href || typeof href !== "string") return null;
@@ -77,7 +78,7 @@ export function useServiceWorkerNotifications({ navigate, queryClient }) {
           return;
         }
 
-        playCallSound("notification", { volume: 0.6 });
+        if (!useNotificationSoundStore.getState().muted) playCallSound("notification", { volume: 0.6 });
         toast(title, {
           description: body || undefined,
           action: link

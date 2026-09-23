@@ -928,7 +928,10 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
                 priority: "medium",
                 sourceType: "chat_conversation",
                 sourceId: conversationId,
-                dedupeKey: `chat.message.new:${msg.id}`,
+                // Per-conversation, not per-message: notificationService.publish
+                // collapses repeat unread chat.message.new notifications sharing
+                // this key into a single updated row instead of one per message.
+                dedupeKey: `chat.message.new:${conversationId}`,
               },
             });
             await sendChatEmails(recipientIds, "chat_message");

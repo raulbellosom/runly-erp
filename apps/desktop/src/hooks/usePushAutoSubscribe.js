@@ -17,8 +17,10 @@ import { unlockCallSounds } from "../modules/runly.chat/calls/callSounds";
 import { native } from '../native/index.js';
 import { syncCurrentDeviceFcmToken } from '../lib/fcm.js';
 import { createNotificationPreparation } from '../lib/notificationPreparation.js';
+import { createNotificationPromptCooldown } from '../lib/notificationPromptCooldown.js';
 
 const ENABLE_NOTIFICATIONS_TOAST_ID = "runly-enable-notifications";
+const promptCooldown = createNotificationPromptCooldown();
 
 function getPwaLabel() {
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
@@ -34,7 +36,6 @@ function getPwaLabel() {
 
 function enableFromUserGesture(token) {
   const soundActivation = unlockCallSounds();
-  toast.dismiss(ENABLE_NOTIFICATIONS_TOAST_ID);
 
   const notificationActivation = isTauriRuntime()
     ? requestSystemNotificationPermission().then(async (permission) => {
@@ -49,11 +50,20 @@ function enableFromUserGesture(token) {
       toast.success(native.isMobile() ? "Notificaciones activadas." : "Notificaciones y sonidos activados.");
     })
     .catch((error) => {
+      // The OS/browser permission state stays "default" after a decline (Tauri
+      // can't tell "denied" from "never asked"), so without this the toast
+      // would keep reappearing on every focus/online/periodic check.
+      promptCooldown.markDismissed();
       toast.error(error?.message ?? "No se pudieron activar las notificaciones.");
     });
 }
 
+function declinePrompt() {
+  promptCooldown.markDismissed();
+}
+
 function showEnablePrompt(token) {
+  if (promptCooldown.isOnCooldown()) return;
   toast("Activa las notificaciones", {
     id: ENABLE_NOTIFICATIONS_TOAST_ID,
     description: native.isMobile()
@@ -64,6 +74,11 @@ function showEnablePrompt(token) {
       label: "Activar",
       onClick: () => enableFromUserGesture(token),
     },
+    cancel: {
+      label: "Ahora no",
+      onClick: declinePrompt,
+    },
+    onDismiss: declinePrompt,
   });
 }
 

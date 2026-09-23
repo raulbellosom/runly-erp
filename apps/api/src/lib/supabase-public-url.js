@@ -59,8 +59,11 @@ export function toPublicSupabaseUrl(url, env = process.env) {
 
 // Wraps a supabase-js client's Storage API so every signed/public URL it
 // mints is transparently rewritten for the browser via toPublicSupabaseUrl.
-// Upload/download/remove/list and every other storage operation are left
-// untouched, so the client still talks to Kong over SUPABASE_URL internally.
+// This includes createSignedUploadUrl — the signed PUT target handed to the
+// browser for direct-to-storage uploads (e.g. chat attachments) — not just
+// the signed/public GET URLs used for downloads. Upload/download/remove/list
+// and every other storage operation are left untouched, so the client still
+// talks to Kong over SUPABASE_URL internally.
 //
 // Centralizing this on the client instance — instead of patching every call
 // site that mints a signed or public URL — is what makes the fix auditable:
@@ -95,6 +98,15 @@ export function wrapStorageForPublicUrls(client, env = process.env) {
       const originalCreateSignedUrl = bucketApi.createSignedUrl.bind(bucketApi);
       bucketApi.createSignedUrl = async (...args) => {
         const result = await originalCreateSignedUrl(...args);
+        if (result?.data?.signedUrl) result.data.signedUrl = rewrite(result.data.signedUrl);
+        return result;
+      };
+    }
+
+    if (typeof bucketApi.createSignedUploadUrl === "function") {
+      const originalCreateSignedUploadUrl = bucketApi.createSignedUploadUrl.bind(bucketApi);
+      bucketApi.createSignedUploadUrl = async (...args) => {
+        const result = await originalCreateSignedUploadUrl(...args);
         if (result?.data?.signedUrl) result.data.signedUrl = rewrite(result.data.signedUrl);
         return result;
       };

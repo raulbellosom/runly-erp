@@ -8,8 +8,10 @@ import { isTauriRuntime, showSystemNotification } from '../lib/systemNotificatio
 import { toast } from 'sonner'
 import { playCallSound } from '../modules/runly.chat/calls/callSounds'
 import { useChatFloatStore } from '../modules/runly.chat/store/chatFloatStore'
+import { useNotificationSoundStore } from '../stores/notificationSound'
 import { notificationKey, claimNotification } from '../lib/notificationDedup'
 import { getStoredWebPushSubscriptionId } from '../lib/webPush'
+import { runly } from '../lib/runly'
 
 const RealtimeContext = createContext(null)
 
@@ -19,6 +21,18 @@ export function RealtimeProvider({ children }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const listenersRef = useRef({})
+  // Debounces the "clear this chat notification" call below, keyed by
+  // conversation id, so a burst of messages in an open conversation only
+  // fires one markReadBySource once things settle (see the chat.message.new
+  // handler).
+  const markConversationReadTimersRef = useRef(new Map())
+  // The channel effect below deliberately excludes session?.access_token from
+  // its deps (re-subscribing on every ~60min token refresh would drop
+  // broadcasts), so handlers that need the CURRENT token read it from this
+  // ref instead of closing over a `session` that can go stale for the life
+  // of the subscription.
+  const sessionRef = useRef(session)
+  sessionRef.current = session
   const [onlineUsers, setOnlineUsers] = useState({})
   const [lastSeenMap, setLastSeenMap] = useState({})
 
@@ -68,7 +82,7 @@ export function RealtimeProvider({ children }) {
           const href = payload.link.startsWith('/m/') ? `/app${payload.link}` : payload.link
           navigate(href)
         }
-        playCallSound('notification')
+        if (!useNotificationSoundStore.getState().muted) playCallSound('notification')
         // The service worker's `push` handler already raises the OS notification
         // whenever web-push is active on this device — firing one here too is the
         // desktop/Tauri double. Only take this path when there's no push
@@ -82,11 +96,18 @@ export function RealtimeProvider({ children }) {
             data: { link: payload.link ?? null },
           }).catch(() => {})
         }
-        toast(payload.title, {
-          description: payload.body ?? undefined,
-          duration: 6000,
-          action: payload.link ? { label: 'Ver', onClick: handleClick } : undefined,
-        })
+        // Regular chat messages already get a context-aware toast (mute and
+        // open-conversation checks) from the chat.message.new broadcast handler
+        // below — the API fires both this generic in-app notification and that
+        // raw broadcast for the same message, so showing this toast too would
+        // double it.
+        if (payload.eventType !== 'chat.message.new') {
+          toast(payload.title, {
+            description: payload.body ?? undefined,
+            duration: 6000,
+            action: payload.link ? { label: 'Ver', onClick: handleClick } : undefined,
+          })
+        }
       })
       .on('broadcast', { event: 'chat.message.new' }, ({ payload }) => {
         queryClient.invalidateQueries({ queryKey: ['chat-conversations'] })
@@ -109,6 +130,25 @@ export function RealtimeProvider({ children }) {
                 onClick: () => navigate(`/app/m/runly.chat/chat/inbox/${convId}`),
               } : undefined,
             })
+          }
+          // The recipient is actively looking at this conversation right now
+          // — clear its chat.message.new notification instead of leaving an
+          // unread bell entry for a message they're already reading. The
+          // notification row is created asynchronously on the server (fire-
+          // and-forget after sendMessage returns), so this is debounced and
+          // delayed rather than raced against it.
+          if ((isOpenAndVisible || isOnRoute) && !document.hidden && convId) {
+            const timers = markConversationReadTimersRef.current
+            clearTimeout(timers.get(convId))
+            timers.set(convId, setTimeout(() => {
+              timers.delete(convId)
+              const currentToken = sessionRef.current?.access_token
+              if (!currentToken) return
+              runly.notifications
+                .markReadBySource(currentToken, 'chat_conversation', convId)
+                .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+                .catch(() => {})
+            }, 1500))
           }
         }
       })
@@ -167,7 +207,11 @@ export function RealtimeProvider({ children }) {
       })
       .subscribe()
 
-    return () => { client.removeChannel(channel) }
+    return () => {
+      client.removeChannel(channel)
+      markConversationReadTimersRef.current.forEach((timer) => clearTimeout(timer))
+      markConversationReadTimersRef.current.clear()
+    }
   // session?.access_token intentionally omitted: Supabase manages auth for
   // Realtime internally; including it here re-opens the channel on every
   // token refresh (~60min) and drops broadcasts during the transition window.

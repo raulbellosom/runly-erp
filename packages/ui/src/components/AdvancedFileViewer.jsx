@@ -172,6 +172,7 @@ export function AdvancedFileViewer({
   // untouched.
   const isHlsSource = kind === "video" && HLS_MIME_TYPES.has(String(file?.mimeType ?? "").toLowerCase());
   useHlsPlayback(hlsVideoRef, !loading && signedUrl && isHlsSource ? signedUrl : null);
+  const [hlsDownloading, setHlsDownloading] = useState(false);
   const officeOpenable = useMemo(() => {
     if (!onOpenInOffice || !file) return false;
     if (canOpenInOffice && !canOpenInOffice(file)) return false;
@@ -622,6 +623,24 @@ export function AdvancedFileViewer({
   async function downloadCurrent() {
     if (!signedUrl || !file) return;
     const filename = file.originalName ?? file.name ?? "archivo";
+    // HLS sources need a real, single, playable file built first — see
+    // downloadHlsAsMp4's own header comment for why this is a lossless
+    // client-side remux, not server-side transcoding.
+    if (isHlsSource) {
+      setHlsDownloading(true);
+      const toastId = toast.loading("Preparando descarga (puede tardar según la duración)...");
+      try {
+        const { downloadHlsAsMp4 } = await import("../lib/downloadHlsAsMp4.js");
+        await downloadHlsAsMp4(signedUrl, filename);
+        toast.success("Descarga lista", { id: toastId });
+      } catch (err) {
+        console.warn("[files] HLS -> MP4 download failed", err);
+        toast.error("No se pudo generar la descarga", { id: toastId });
+      } finally {
+        setHlsDownloading(false);
+      }
+      return;
+    }
     try {
       const res = await fetch(signedUrl);
       if (!res.ok) throw new Error(`download fetch failed: ${res.status}`);
@@ -805,15 +824,25 @@ export function AdvancedFileViewer({
 
             {/* Right: actions + close */}
             <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                onClick={() => signedUrl && window.open(signedUrl, "_blank")}
-                disabled={!signedUrl}
-                aria-label="Abrir en pestaña nueva"
-                title="Abrir externo"
-                className="h-7 w-7 rounded-lg flex items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </button>
+              {/* Open-external/share assume `signedUrl` is a real, fetchable,
+                  shareable resource. For an HLS source it's a blob: URL
+                  wrapping manifest TEXT (see useHlsPlayback/ChatRecordingsGallery)
+                  — opening/sharing it would hand the user a few hundred
+                  bytes of "#EXTM3U..." mislabeled as a video. Download is
+                  different: downloadCurrent below routes HLS through
+                  downloadHlsAsMp4 (client-side remux to a real .mp4) instead
+                  of the plain fetch+save path, so it stays visible. */}
+              {!isHlsSource && (
+                <button
+                  onClick={() => signedUrl && window.open(signedUrl, "_blank")}
+                  disabled={!signedUrl}
+                  aria-label="Abrir en pestaña nueva"
+                  title="Abrir externo"
+                  className="h-7 w-7 rounded-lg flex items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              )}
               {kind === "image" && (
                 <button
                   onClick={copyCurrentImage}
@@ -827,14 +856,14 @@ export function AdvancedFileViewer({
               )}
               <button
                 onClick={downloadCurrent}
-                disabled={!signedUrl}
-                aria-label="Descargar archivo"
-                title="Descargar"
+                disabled={!signedUrl || hlsDownloading}
+                aria-label={isHlsSource ? "Descargar como MP4" : "Descargar archivo"}
+                title={isHlsSource ? "Descargar como MP4 (se genera en tu navegador)" : "Descargar"}
                 className="h-7 w-7 rounded-lg flex items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
               >
-                <Download className="h-3.5 w-3.5" />
+                {hlsDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               </button>
-              {canShare && (
+              {canShare && !isHlsSource && (
                 <button
                   onClick={shareCurrentFile}
                   disabled={!signedUrl}

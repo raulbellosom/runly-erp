@@ -12,8 +12,8 @@ const env = {
   RUNLY_SUPABASE_PUBLIC_URL: 'https://supabase.example.com',
 }
 
-function fakeSupabaseAdmin({ signedUrl, signedUrls = null, publicUrl } = {}) {
-  const calls = { createSignedUrl: [], createSignedUrls: [], getPublicUrl: [], upload: [] }
+function fakeSupabaseAdmin({ signedUrl, signedUrls = null, publicUrl, signedUploadUrl } = {}) {
+  const calls = { createSignedUrl: [], createSignedUrls: [], createSignedUploadUrl: [], getPublicUrl: [], upload: [] }
   return {
     calls,
     storage: {
@@ -26,6 +26,17 @@ function fakeSupabaseAdmin({ signedUrl, signedUrls = null, publicUrl } = {}) {
           async createSignedUrl(objectKey, expiresIn, options) {
             calls.createSignedUrl.push({ bucket, objectKey, expiresIn, options })
             return { data: { signedUrl: signedUrl ?? `${env.SUPABASE_URL}/storage/v1/object/sign/${bucket}/${objectKey}?token=abc.def.ghi` }, error: null }
+          },
+          async createSignedUploadUrl(objectKey, options) {
+            calls.createSignedUploadUrl.push({ bucket, objectKey, options })
+            return {
+              data: {
+                signedUrl: signedUploadUrl ?? `${env.SUPABASE_URL}/storage/v1/object/upload/sign/${bucket}/${objectKey}?token=upl.oad.tok`,
+                path: objectKey,
+                token: 'upl.oad.tok',
+              },
+              error: null,
+            }
           },
           async createSignedUrls(objectKeys, expiresIn, options) {
             calls.createSignedUrls.push({ bucket, objectKeys, expiresIn, options })
@@ -115,6 +126,15 @@ describe('wrapStorageForPublicUrls', () => {
     for (const entry of data) {
       assert.match(entry.signedUrl, /^https:\/\/supabase\.example\.com\//)
     }
+  })
+
+  it('rewrites createSignedUploadUrl results (direct-to-storage browser upload, e.g. chat attachments)', async () => {
+    const client = fakeSupabaseAdmin()
+    const wrapped = wrapStorageForPublicUrls(client, env)
+    const { data } = await wrapped.storage.from('runly-chat').createSignedUploadUrl('conversations/x/y.png', { expiresIn: 300 })
+    assert.match(data.signedUrl, /^https:\/\/supabase\.example\.com\//)
+    assert.doesNotMatch(data.signedUrl, /supabase-kong/)
+    assert.match(data.signedUrl, /token=upl\.oad\.tok$/)
   })
 
   it('rewrites getPublicUrl results (public bucket / logos / storefront)', () => {
