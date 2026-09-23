@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Button, useCoarsePointer } from "@runly/ui";
+import { Button } from "@runly/ui";
 import {
   Camera,
   CameraOff,
@@ -14,8 +14,6 @@ import {
   Minimize2,
   MonitorUp,
   PhoneOff,
-  Pin,
-  PinOff,
   PictureInPicture2,
   ScreenShareOff,
   StopCircle,
@@ -25,120 +23,20 @@ import {
 } from "lucide-react";
 import { Track } from "livekit-client";
 import { playCallSound } from "./callSounds";
-import { DraggablePip } from "./DraggablePip";
+import { ParticipantTile } from "./ParticipantTile";
+import { SpotlightLayout } from "./SpotlightLayout";
+import { DirectFocusLayout } from "./DirectFocusLayout";
 import { CallViewSwitcher } from "./CallViewSwitcher";
 import { CallReactionsOverlay } from "./CallReactionsOverlay";
 import { CallReactionButton } from "./CallReactionButton";
 import { RaisedHandsBar } from "./RaisedHandsBar";
 import { RecordingBanner } from "./RecordingBanner";
-import { resolvePinnedEntry } from "./lib/callLayout";
+import { resolveSpotlightMain } from "./lib/callLayout";
 
 function formatDuration(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function TrackRenderer({ participant, source, muted = false, mirror = false, fit = "cover" }) {
-  const elementRef = useRef(null);
-  const publication = participant?.getTrackPublication?.(source);
-  const track = publication?.track;
-
-  useEffect(() => {
-    const element = elementRef.current;
-    if (!track || !element) return undefined;
-    track.attach(element);
-    return () => track.detach(element);
-  }, [track]);
-
-  if (!track || publication?.isMuted) return null;
-  return (
-    // react-doctor-disable-next-line media-has-caption -- LiveKit attaches a video-only WebRTC track; remote audio is rendered separately.
-    <video
-      ref={elementRef}
-      autoPlay
-      playsInline
-      muted={muted}
-      className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${mirror ? "-scale-x-100" : ""}`}
-    />
-  );
-}
-
-function ParticipantTile({
-  participant,
-  isLocal,
-  handRaised = false,
-  pinned = false,
-  onPin = null,
-  mirrorLocalCamera = true,
-  className = "",
-  preferSource = "auto",
-  // "auto" = contain for screen-share, cover for camera. Pass "contain" to
-  // letterbox a camera feed too (used in the focus layout so a portrait phone
-  // camera in a landscape tile isn't cropped).
-  fit = "auto",
-}) {
-  const coarse = useCoarsePointer();
-  const screen = participant?.getTrackPublication?.(Track.Source.ScreenShare);
-  const camera = participant?.getTrackPublication?.(Track.Source.Camera);
-  const screenLive = Boolean(screen?.track && !screen.isMuted);
-  const cameraLive = Boolean(camera?.track && !camera.isMuted);
-  const source =
-    preferSource === "screen"
-      ? Track.Source.ScreenShare
-      : preferSource === "camera"
-        ? Track.Source.Camera
-        : screenLive
-          ? Track.Source.ScreenShare
-          : Track.Source.Camera;
-  const hasVideo =
-    source === Track.Source.ScreenShare ? screenLive : cameraLive || (preferSource === "auto" && screenLive);
-  const isScreen = source === Track.Source.ScreenShare;
-  const name = participant?.name || (isLocal ? "Tu" : participant?.identity) || "Participante";
-
-  return (
-    <div className={`group/tile relative h-full min-h-0 overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-white/10 ${className}`}>
-      {hasVideo ? (
-        <TrackRenderer
-          participant={participant}
-          source={source}
-          muted={isLocal}
-          fit={fit === "contain" || isScreen ? "contain" : "cover"}
-          mirror={isLocal && source === Track.Source.Camera && mirrorLocalCamera}
-        />
-      ) : (
-        <div className="flex h-full min-h-0 items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-violet-500/20 text-3xl font-semibold text-violet-100 ring-1 ring-violet-400/30">
-            {name.slice(0, 1).toUpperCase()}
-          </div>
-        </div>
-      )}
-      {handRaised && (
-        <div className="absolute left-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 shadow-lg backdrop-blur-sm">
-          <Hand className="h-5 w-5 text-amber-300" />
-        </div>
-      )}
-      {onPin && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onPin(participant?.identity); }}
-          title={pinned ? "Quitar de destacado" : "Destacar"}
-          className={[
-            "absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white/90 shadow-lg backdrop-blur-sm transition hover:bg-black/65",
-            pinned || coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100",
-          ].join(" ")}
-        >
-          {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-        </button>
-      )}
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8">
-        <span className="truncate text-sm font-medium text-white">
-          {isLocal ? `${name} (tu)` : name}
-        </span>
-        {!participant?.isMicrophoneEnabled && <MicOff className="h-4 w-4 text-white/70" />}
-      </div>
-    </div>
-  );
 }
 
 function RemoteAudio({ participant }) {
@@ -164,62 +62,6 @@ function OutgoingCallTone({ active }) {
   }, [active]);
 
   return null;
-}
-
-// Teams-style spotlight: the pinned participant fills the main area, everyone
-// else sits in a strip — vertical on the right on lg+, horizontal on top with
-// overflow-x on narrow. A screen share that isn't the pinned one becomes a
-// strip tile.
-function SpotlightLayout({ mainEntry, others, screenShareEntry, isMobile, raisedHands, myHandRaised, myLocalIdentity, mirrorLocalCamera, onPin }) {
-  const mainId = mainEntry.participant?.identity;
-  const mainIsSharing = Boolean(screenShareEntry && screenShareEntry.participant?.identity === mainId);
-  const showScreenTile = Boolean(screenShareEntry) && !mainIsSharing;
-  const tileCls = isMobile ? "relative aspect-video h-full shrink-0" : "relative aspect-video w-full shrink-0";
-  const handFor = (id) => (id === myLocalIdentity ? myHandRaised : raisedHands.has(id));
-  return (
-    <div className={`flex h-full gap-2 ${isMobile ? "flex-col" : "flex-row"}`}>
-      <div className="relative min-h-0 flex-1">
-        <ParticipantTile
-          participant={mainEntry.participant}
-          isLocal={mainEntry.isLocal}
-          handRaised={handFor(mainId)}
-          preferSource={mainIsSharing ? "screen" : "auto"}
-          pinned
-          onPin={onPin}
-          mirrorLocalCamera={mirrorLocalCamera}
-          className="rounded-[1.5rem]"
-          fit="contain"
-        />
-      </div>
-      <div className={`flex shrink-0 gap-2 ${isMobile ? "order-first h-24 flex-row overflow-x-auto" : "w-44 flex-col overflow-y-auto"}`}>
-        {showScreenTile && (
-          <div className={tileCls}>
-            <ParticipantTile
-              participant={screenShareEntry.participant}
-              isLocal={screenShareEntry.isLocal}
-              preferSource="screen"
-              onPin={onPin}
-              className="rounded-xl bg-black"
-              fit="contain"
-            />
-          </div>
-        )}
-        {others.map(({ participant, isLocal }) => (
-          <div key={participant.sid || participant.identity} className={tileCls}>
-            <ParticipantTile
-              participant={participant}
-              isLocal={isLocal}
-              handRaised={handFor(participant?.identity)}
-              preferSource="camera"
-              onPin={onPin}
-              mirrorLocalCamera={mirrorLocalCamera}
-              className="rounded-xl"
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export function CallRoomLayout({ view, actions, chat }) {
@@ -255,6 +97,7 @@ export function CallRoomLayout({ view, actions, chat }) {
     isHost = false,
     pinnedIdentity = null,
     myLocalIdentity = null,
+    directSwapped = false,
     canRecord = false,
     recordingActive = false,
     recordingBusy = false,
@@ -279,17 +122,11 @@ export function CallRoomLayout({ view, actions, chat }) {
   const showChatRail = !isMobile && !chatExpanded;
   const mobileChatOpen = isMobile && mobileView === "chat";
 
-  // While a screen share is live it becomes the full-viewport main view and
-  // every camera feed (local + remote) floats over it as a draggable,
-  // collapsible bubble.
-  const cameraPips = screenShareEntry
-    ? participants.filter(({ participant }) => {
-        const cam = participant?.getTrackPublication?.(Track.Source.Camera);
-        return Boolean(cam?.track && !cam.isMuted);
-      })
-    : [];
-
-  const pinnedEntry = resolvePinnedEntry(participants, pinnedIdentity);
+  // The spotlight main: a still-valid manual pin, or (with no pin) whoever is
+  // screen-sharing — see resolveSpotlightMain in lib/callLayout.js. Null
+  // means "no spotlight": 1:1 falls to DirectFocusLayout, everything else to
+  // the classic grid.
+  const spotlightMain = resolveSpotlightMain(participants, pinnedIdentity, screenShareEntry);
 
   return (
     <div className="fixed inset-0 z-[46] flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-slate-950 text-white">
@@ -351,7 +188,6 @@ export function CallRoomLayout({ view, actions, chat }) {
         <CallViewSwitcher
           view={mobileView}
           onChange={onMobileViewChange}
-          hasScreenShare={hasScreenShare}
           chatUnread={chatUnread}
         />
       )}
@@ -363,7 +199,7 @@ export function CallRoomLayout({ view, actions, chat }) {
             {hasScreenShare && (
               <button
                 type="button"
-                onClick={() => onMobileViewChange("screen")}
+                onClick={() => onMobileViewChange("video")}
                 className="flex items-center gap-2 bg-violet-600 px-4 py-2 text-left text-xs font-medium text-white"
               >
                 <MonitorUp className="h-4 w-4 shrink-0" />
@@ -377,10 +213,10 @@ export function CallRoomLayout({ view, actions, chat }) {
           </div>
         ) : (
           <>
-        {pinnedEntry ? (
+        {spotlightMain ? (
           <SpotlightLayout
-            mainEntry={pinnedEntry}
-            others={participants.filter((p) => p.participant?.identity !== pinnedIdentity)}
+            mainEntry={spotlightMain}
+            others={participants.filter((p) => p.participant?.identity !== spotlightMain.participant?.identity)}
             screenShareEntry={screenShareEntry}
             isMobile={isMobile}
             raisedHands={raisedHands}
@@ -389,44 +225,16 @@ export function CallRoomLayout({ view, actions, chat }) {
             mirrorLocalCamera={mirrorLocalCamera}
             onPin={actions.setPinned}
           />
-        ) : (!isMobile || mobileView === "screen") && screenShareEntry ? (
-          <div className="relative mx-auto h-full max-w-6xl">
-            <ParticipantTile
-              participant={screenShareEntry.participant}
-              isLocal={screenShareEntry.isLocal}
-              preferSource="screen"
-              onPin={actions.setPinned}
-              className="rounded-[1.5rem] bg-black"
-            />
-            {cameraPips.map(({ participant, isLocal }, index) => (
-              <DraggablePip
-                key={`pip-${participant.sid || participant.identity || "local"}`}
-                label={participant?.name || (isLocal ? "Tú" : participant?.identity) || "Participante"}
-                initial={(participant?.name || (isLocal ? "T" : participant?.identity) || "?").slice(0, 1).toUpperCase()}
-                anchorOffset={index * 12}
-              >
-                <ParticipantTile
-                  participant={participant}
-                  isLocal={isLocal}
-                  handRaised={raisedHands.has(participant?.identity)}
-                  preferSource="camera"
-                  onPin={actions.setPinned}
-                  mirrorLocalCamera={mirrorLocalCamera}
-                  className="rounded-2xl"
-                />
-              </DraggablePip>
-            ))}
-          </div>
         ) : useFocusLayout ? (
-          <div className="relative mx-auto h-full max-w-6xl">
-            <ParticipantTile participant={remoteEntries[0].participant} isLocal={false} handRaised={raisedHands.has(remoteEntries[0].participant?.identity)} onPin={actions.setPinned} className="rounded-[1.5rem]" fit="contain" />
-            <DraggablePip
-              label={localEntry.participant?.name || "Tú"}
-              initial={(localEntry.participant?.name || "T").slice(0, 1).toUpperCase()}
-            >
-              <ParticipantTile participant={localEntry.participant} isLocal handRaised={myHandRaised} onPin={actions.setPinned} mirrorLocalCamera={mirrorLocalCamera} className="rounded-2xl" />
-            </DraggablePip>
-          </div>
+          <DirectFocusLayout
+            localEntry={localEntry}
+            remoteEntry={remoteEntries[0]}
+            raisedHands={raisedHands}
+            myHandRaised={myHandRaised}
+            mirrorLocalCamera={mirrorLocalCamera}
+            swapped={isMobile ? directSwapped : false}
+            onToggleSwap={isMobile ? actions.toggleDirectSwap : null}
+          />
         ) : (
           <div className={`mx-auto grid h-full max-w-6xl gap-2 sm:gap-3 ${gridClass}`}>
             {participants.map(({ participant, isLocal }) => (

@@ -130,7 +130,17 @@ export function createCallRecordingService({
 
     let info;
     try {
-      info = await egressClient().startRoomCompositeEgress(call.livekitRoomName, { segments: output });
+      // "grid-dark" (rather than an omitted/empty layout) matters: LiveKit's
+      // own default composite template auto-upgrades grid->speaker the
+      // moment it sees a screen-share track (giving it the big tile + a
+      // camera carousel), but only when the layout string it receives starts
+      // with "grid" — an empty layout skips that upgrade entirely and every
+      // track renders as an equal-size grid cell, screen-share included.
+      info = await egressClient().startRoomCompositeEgress(
+        call.livekitRoomName,
+        { segments: output },
+        { layout: "grid-dark" },
+      );
     } catch (error) {
       console.warn(`${LOG_PREFIX} No se pudo iniciar el egress de grabación:`, record.id, error?.message ?? error);
       await prisma.callRecording

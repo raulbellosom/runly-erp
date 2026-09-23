@@ -13,6 +13,9 @@ export function DraggablePip({
   initial = "?",
   anchorOffset = 0,
   className = "",
+  // Called on a plain tap/click that wasn't a drag — used by the 1:1 focus
+  // layout to swap which participant is big vs. small (WhatsApp-style).
+  onTap = null,
 }) {
   const nodeRef = useRef(null);
   const dragRef = useRef(null); // { pointerId, startX, startY, originX, originY, moved }
@@ -126,7 +129,7 @@ export function DraggablePip({
       ref={nodeRef}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
+      onPointerUp={(e) => { if (!wasDrag()) onTap?.(); endDrag(e); }}
       onPointerCancel={endDrag}
       style={baseStyle}
       className={`absolute z-20 aspect-[3/4] w-[34%] max-w-56 touch-none select-none overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/20 sm:aspect-video sm:w-[28%] ${className}`}
@@ -135,6 +138,7 @@ export function DraggablePip({
       <button
         type="button"
         onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
         onClick={() => setCollapsed(true)}
         title="Ocultar"
         className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white/90 ring-1 ring-white/20 backdrop-blur transition hover:bg-black/70"

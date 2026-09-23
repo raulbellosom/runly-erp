@@ -96,6 +96,11 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
     (id) => setPinnedIdentity((cur) => (id && cur === id ? null : id || null)),
     [],
   );
+  // 1:1 mobile-only "who's big" swap (WhatsApp-style tap on the small PiP) —
+  // independent of pinnedIdentity, which drives the group/screen-share
+  // spotlight instead. See DirectFocusLayout.
+  const [directSwapped, setDirectSwapped] = useState(false);
+  const toggleDirectSwap = useCallback(() => setDirectSwapped((v) => !v), []);
   const [liveMessages, setLiveMessages] = useState([]);
   const [aloneDeadline, setAloneDeadline] = useState(() => Date.now() + ALONE_LIMIT_MS);
   const [aloneSecondsLeft, setAloneSecondsLeft] = useState(0);
@@ -458,6 +463,27 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
   const hasScreenShare = Boolean(screenShareEntry);
   const isDirectVideo = isVideoActive && participants.length === 2;
   const useFocusLayout = isDirectVideo && layoutMode === "focus" && !screenShareEntry;
+
+  // A screen share starting (or switching to a different presenter) always
+  // takes the spotlight, clearing any manual pin — see resolveSpotlightMain
+  // in lib/callLayout.js. Un-pinning afterwards falls back to following the
+  // share again; this only fires on an actual identity change, not every
+  // render.
+  const screenSharerIdentity = screenShareEntry?.participant?.identity ?? null;
+  const prevScreenSharerRef = useRef(null);
+  useEffect(() => {
+    if (screenSharerIdentity !== prevScreenSharerRef.current) {
+      prevScreenSharerRef.current = screenSharerIdentity;
+      if (screenSharerIdentity) setPinnedIdentity(null);
+    }
+  }, [screenSharerIdentity]);
+
+  // The 1:1 mobile swap only makes sense while DirectFocusLayout is actually
+  // showing (exactly 2 participants, no screen share) — reset it otherwise
+  // so it doesn't resurface stale once the call returns to 1:1.
+  useEffect(() => {
+    if (participants.length !== 2 || screenShareEntry) setDirectSwapped(false);
+  }, [participants.length, screenShareEntry]);
   const mirrorLocalCamera = cameraFacing !== "environment";
   const gridClass = participants.length === 1
     ? "grid-cols-1 grid-rows-1"
@@ -493,9 +519,9 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
   }, []);
 
   useEffect(() => {
-    const corrected = nextCallView(mobileView, { hasScreenShare });
+    const corrected = nextCallView(mobileView);
     if (corrected !== mobileView) setMobileView(corrected);
-  }, [mobileView, hasScreenShare]);
+  }, [mobileView]);
 
   const handleChatClose = useCallback(() => {
     if (isMobile) {
@@ -578,6 +604,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         isHost: isInitiator,
         pinnedIdentity,
         myLocalIdentity: room.localParticipant?.identity,
+        directSwapped,
         canRecord,
         recordingActive: recording.active,
         recordingBusy: recording.busy,
@@ -596,6 +623,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         toggleHand: ephemeral.toggleHand,
         lowerHand: ephemeral.lowerHand,
         setPinned,
+        toggleDirectSwap,
         toggleRecording: recording.active ? recording.stop : recording.start,
       }}
       chat={{

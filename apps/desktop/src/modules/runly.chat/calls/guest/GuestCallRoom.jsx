@@ -7,46 +7,10 @@ import { useCallEphemeral } from "../hooks/useCallEphemeral";
 import { CallReactionsOverlay } from "../CallReactionsOverlay";
 import { CallReactionButton } from "../CallReactionButton";
 import { RecordingBanner } from "../RecordingBanner";
-
-function Tile({ participant, mirror, handRaised = false }) {
-  const ref = useRef(null);
-  const camPub = participant?.getTrackPublication?.(Track.Source.Camera);
-  const screenPub = participant?.getTrackPublication?.(Track.Source.ScreenShare);
-  const isScreen = Boolean(screenPub?.track && !screenPub.isMuted);
-  const pub = isScreen ? screenPub : camPub;
-  const track = pub?.track && !pub.isMuted ? pub.track : null;
-  useEffect(() => {
-    const el = ref.current;
-    if (!track || !el) return undefined;
-    track.attach(el);
-    return () => track.detach(el);
-  }, [track]);
-  const name = participant?.name || participant?.identity || "Participante";
-  return (
-    <div className="relative min-h-0 overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-white/10">
-      {track ? (
-        // react-doctor-disable-next-line media-has-caption -- live WebRTC video track; remote audio rendered separately.
-        <video
-          ref={ref}
-          autoPlay
-          playsInline
-          muted={participant?.isLocal}
-          className={`h-full w-full ${isScreen ? "object-contain" : "object-cover"} ${mirror ? "-scale-x-100" : ""}`}
-        />
-      ) : (
-        <div className="flex h-full items-center justify-center text-2xl font-semibold text-violet-100">
-          {name.slice(0, 1).toUpperCase()}
-        </div>
-      )}
-      {handRaised && (
-        <div className="absolute left-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 shadow-lg backdrop-blur-sm">
-          <Hand className="h-5 w-5 text-amber-300" />
-        </div>
-      )}
-      <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">{name}</span>
-    </div>
-  );
-}
+import { ParticipantTile } from "../ParticipantTile";
+import { SpotlightLayout } from "../SpotlightLayout";
+import { DirectFocusLayout } from "../DirectFocusLayout";
+import { resolveSpotlightMain } from "../lib/callLayout";
 
 function RemoteAudio({ participant }) {
   const ref = useRef(null);
@@ -70,6 +34,15 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
   const [screen, setScreen] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [live, setLive] = useState([]);
+  // Same local (per-viewer) spotlight pin + 1:1 swap as CallRoom.jsx — see
+  // docs/superpowers/specs/2026-09-22-call-spotlight-pin-overhaul-design.md.
+  const [pinnedIdentity, setPinnedIdentity] = useState(null);
+  const setPinned = useCallback(
+    (id) => setPinnedIdentity((cur) => (id && cur === id ? null : id || null)),
+    [],
+  );
+  const [directSwapped, setDirectSwapped] = useState(false);
+  const toggleDirectSwap = useCallback(() => setDirectSwapped((v) => !v), []);
   const refresh = useCallback(() => force((n) => n + 1), []);
 
   useEffect(() => {
@@ -111,8 +84,41 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
     };
   }, [room, fetchLivekitToken, refresh]);
 
-  const remote = Array.from(room.remoteParticipants.values());
-  const tiles = [room.localParticipant, ...remote];
+  const allRemote = Array.from(room.remoteParticipants.values());
+  const remote = allRemote.filter((p) => !p.identity?.startsWith("screen:"));
+  const localEntry = { participant: room.localParticipant, isLocal: true };
+  const remoteEntries = remote.map((participant) => ({ participant, isLocal: false }));
+  const participants = [localEntry, ...remoteEntries];
+
+  useEffect(() => {
+    if (pinnedIdentity && !participants.some((p) => p.participant?.identity === pinnedIdentity)) {
+      setPinnedIdentity(null);
+    }
+  }, [pinnedIdentity, participants]);
+
+  const hasLiveTrack = (participant, source) => {
+    const pub = participant?.getTrackPublication?.(source);
+    return Boolean(pub?.track && !pub.isMuted);
+  };
+  const screenShareEntry =
+    [...participants, ...allRemote.filter((p) => p.identity?.startsWith("screen:")).map((participant) => ({ participant, isLocal: false }))]
+      .find(({ participant }) => hasLiveTrack(participant, Track.Source.ScreenShare)) ?? null;
+
+  const screenSharerIdentity = screenShareEntry?.participant?.identity ?? null;
+  const prevScreenSharerRef = useRef(null);
+  useEffect(() => {
+    if (screenSharerIdentity !== prevScreenSharerRef.current) {
+      prevScreenSharerRef.current = screenSharerIdentity;
+      if (screenSharerIdentity) setPinnedIdentity(null);
+    }
+  }, [screenSharerIdentity]);
+
+  useEffect(() => {
+    if (participants.length !== 2 || screenShareEntry) setDirectSwapped(false);
+  }, [participants.length, screenShareEntry]);
+
+  const useFocusLayout = participants.length === 2 && !screenShareEntry;
+  const spotlightMain = resolveSpotlightMain(participants, pinnedIdentity, screenShareEntry);
 
   const publishChat = useCallback((body) => {
     const echo = { type: "chat", body, senderName: myName, senderKind: "guest", createdAt: new Date().toISOString() };
@@ -152,14 +158,39 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
         <RecordingBanner active={recordingActive} />
         {showChat ? (
           <GuestRoomChat polled={messages} liveIncoming={live} onSend={publishChat} myName={myName} />
+        ) : spotlightMain ? (
+          <SpotlightLayout
+            mainEntry={spotlightMain}
+            others={participants.filter((p) => p.participant?.identity !== spotlightMain.participant?.identity)}
+            screenShareEntry={screenShareEntry}
+            isMobile
+            raisedHands={ephemeral.raisedHands}
+            myHandRaised={ephemeral.myHandRaised}
+            myLocalIdentity={room.localParticipant?.identity}
+            mirrorLocalCamera
+            onPin={setPinned}
+          />
+        ) : useFocusLayout ? (
+          <DirectFocusLayout
+            localEntry={localEntry}
+            remoteEntry={remoteEntries[0]}
+            raisedHands={ephemeral.raisedHands}
+            myHandRaised={ephemeral.myHandRaised}
+            mirrorLocalCamera
+            swapped={directSwapped}
+            onToggleSwap={toggleDirectSwap}
+          />
         ) : (
-          <div className={`mx-auto grid h-full max-w-5xl gap-2 ${tiles.length <= 1 ? "grid-cols-1" : tiles.length === 2 ? "sm:grid-cols-2" : "grid-cols-2"}`}>
-            {tiles.map((p, i) => (
-              <Tile
-                key={p?.sid || p?.identity || i}
-                participant={p}
-                mirror={p?.isLocal && cam}
-                handRaised={ephemeral.raisedHands.has(p?.identity)}
+          <div className={`mx-auto grid h-full max-w-5xl gap-2 ${participants.length <= 1 ? "grid-cols-1" : participants.length === 2 ? "sm:grid-cols-2" : "grid-cols-2"}`}>
+            {participants.map(({ participant, isLocal }) => (
+              <ParticipantTile
+                key={participant?.sid || participant?.identity}
+                participant={participant}
+                isLocal={isLocal}
+                handRaised={ephemeral.raisedHands.has(participant?.identity)}
+                onPin={participants.length > 1 ? setPinned : null}
+                mirrorLocalCamera
+                fit="contain"
               />
             ))}
           </div>
