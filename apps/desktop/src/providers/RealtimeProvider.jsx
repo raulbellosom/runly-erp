@@ -66,7 +66,7 @@ export function RealtimeProvider({ children }) {
     // exact user can ever join their own events channel.
     const channel = client
       .channel(`user:${userProfile.id}:events`, { config: { private: true } })
-      .on('broadcast', { event: 'notification.new' }, ({ payload }) => {
+      .on('broadcast', { event: 'notification.new' }, async ({ payload }) => {
         queryClient.invalidateQueries({ queryKey: ['notifications'] })
         dispatch('notification.new', payload)
         if (!payload?.title) return
@@ -82,13 +82,35 @@ export function RealtimeProvider({ children }) {
           const href = payload.link.startsWith('/m/') ? `/app${payload.link}` : payload.link
           navigate(href)
         }
-        if (!useNotificationSoundStore.getState().muted) playCallSound('notification')
+        // A chat message this device already knows is read — either because
+        // it's the one actively showing that conversation, or because
+        // another of the user's own sessions (e.g. a phone mid-conversation)
+        // already marked it read and this device's chat-conversations cache
+        // has caught up — shouldn't ding or raise an OS notification. Other
+        // event types have no such per-conversation read state, so this only
+        // applies to chat.message.new.
+        let chatAlreadyRead = false
+        if (payload.eventType === 'chat.message.new' && payload.sourceId) {
+          const convId = payload.sourceId
+          const openChats = useChatFloatStore.getState().openChats
+          const isOpenAndVisible = openChats.some((c) => c.id === convId && !c.minimized)
+          const isOnRoute = window.location.pathname.includes(`/runly.chat/chat/inbox/${convId}`)
+          // Must be freshly refetched, not the cache as of right before this
+          // message: unread_count from a moment ago reflects the state
+          // BEFORE this message existed, which would read as "0 unread" for
+          // every brand-new message and wrongly suppress it every time.
+          await queryClient.invalidateQueries({ queryKey: ['chat-conversations'] })
+          const cachedConversations = queryClient.getQueryData(['chat-conversations'])?.data ?? []
+          const alreadyReadElsewhere = cachedConversations.some((c) => c.id === convId && c.unread_count === 0)
+          chatAlreadyRead = alreadyReadElsewhere || ((isOpenAndVisible || isOnRoute) && !document.hidden)
+        }
+        if (!chatAlreadyRead && !useNotificationSoundStore.getState().muted) playCallSound('notification')
         // The service worker's `push` handler already raises the OS notification
         // whenever web-push is active on this device — firing one here too is the
         // desktop/Tauri double. Only take this path when there's no push
         // subscription to do it for us (or under Tauri, which has no SW push).
         const hasPushSub = Boolean(getStoredWebPushSubscriptionId())
-        if ((document.hidden || isTauriRuntime()) && (isTauriRuntime() || !hasPushSub)) {
+        if (!chatAlreadyRead && (document.hidden || isTauriRuntime()) && (isTauriRuntime() || !hasPushSub)) {
           showSystemNotification({
             title: payload.title,
             body: payload.body ?? '',
@@ -109,47 +131,73 @@ export function RealtimeProvider({ children }) {
           })
         }
       })
-      .on('broadcast', { event: 'chat.message.new' }, ({ payload }) => {
-        queryClient.invalidateQueries({ queryKey: ['chat-conversations'] })
-        dispatch('chat.message.new', payload)
+      .on('broadcast', { event: 'chat.message.new' }, async ({ payload }) => {
         const isSelf = payload?.senderId && payload.senderId === userProfile?.id
-        if (!isSelf && payload?.senderName) {
-          const convId = payload?.conversationId
-          const openChats = useChatFloatStore.getState().openChats
-          const isOpenAndVisible = convId && openChats.some((c) => c.id === convId && !c.minimized)
-          const isOnRoute = convId && window.location.pathname.includes(`/runly.chat/chat/inbox/${convId}`)
-          const cachedConversations = queryClient.getQueryData(['chat-conversations'])?.data ?? []
-          const isMuted = convId && cachedConversations.some((c) => c.id === convId && c.is_muted)
-          const dupKey = convId ? `c:chat.message.new|${payload.senderName}|${convId}` : null
-          if (!isOpenAndVisible && !isOnRoute && !isMuted && claimNotification(dupKey)) {
-            toast(payload.senderName, {
-              description: 'Nuevo mensaje',
-              duration: 5000,
-              action: convId ? {
-                label: 'Ver',
-                onClick: () => navigate(`/app/m/runly.chat/chat/inbox/${convId}`),
-              } : undefined,
-            })
-          }
-          // The recipient is actively looking at this conversation right now
-          // — clear its chat.message.new notification instead of leaving an
-          // unread bell entry for a message they're already reading. The
-          // notification row is created asynchronously on the server (fire-
-          // and-forget after sendMessage returns), so this is debounced and
-          // delayed rather than raced against it.
-          if ((isOpenAndVisible || isOnRoute) && !document.hidden && convId) {
-            const timers = markConversationReadTimersRef.current
-            clearTimeout(timers.get(convId))
-            timers.set(convId, setTimeout(() => {
-              timers.delete(convId)
-              const currentToken = sessionRef.current?.access_token
-              if (!currentToken) return
-              runly.notifications
-                .markReadBySource(currentToken, 'chat_conversation', convId)
-                .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
-                .catch(() => {})
-            }, 1500))
-          }
+        // Own message echoed back, or a malformed payload — just refresh the
+        // list preview, nothing to decide about toasting/muting below.
+        if (isSelf || !payload?.senderName) {
+          queryClient.invalidateQueries({ queryKey: ['chat-conversations'] })
+          dispatch('chat.message.new', payload)
+          return
+        }
+        const convId = payload?.conversationId
+        // Must be freshly refetched, not whatever was cached right before
+        // this message: unread_count from a moment ago reflects the state
+        // BEFORE this message existed, which would read as "0 unread" for
+        // every brand-new message and wrongly suppress its toast every time.
+        await queryClient.invalidateQueries({ queryKey: ['chat-conversations'] })
+        dispatch('chat.message.new', payload)
+        const openChats = useChatFloatStore.getState().openChats
+        const isOpenAndVisible = convId && openChats.some((c) => c.id === convId && !c.minimized)
+        const isOnRoute = convId && window.location.pathname.includes(`/runly.chat/chat/inbox/${convId}`)
+        const cachedConversations = queryClient.getQueryData(['chat-conversations'])?.data ?? []
+        const isMuted = convId && cachedConversations.some((c) => c.id === convId && c.is_muted)
+        // unread_count is computed server-side against this user's own
+        // last_read_at (one watermark per user, not per device) — once
+        // another of the user's own sessions marks the conversation read
+        // (below) and this device's refetch (above) picks it up, that's
+        // the signal this device is already caught up too, even though it
+        // never opened the conversation itself.
+        const alreadyReadElsewhere = convId
+          && cachedConversations.some((c) => c.id === convId && c.unread_count === 0)
+        const dupKey = convId ? `c:chat.message.new|${payload.senderName}|${convId}` : null
+        if (!isOpenAndVisible && !isOnRoute && !isMuted && !alreadyReadElsewhere && claimNotification(dupKey)) {
+          toast(payload.senderName, {
+            description: 'Nuevo mensaje',
+            duration: 5000,
+            action: convId ? {
+              label: 'Ver',
+              onClick: () => navigate(`/app/m/runly.chat/chat/inbox/${convId}`),
+            } : undefined,
+          })
+        }
+        // The recipient is actively looking at this conversation right now
+        // — clear its chat.message.new notification instead of leaving an
+        // unread bell entry for a message they're already reading, AND
+        // bump last_read_at so any OTHER session of this same account
+        // (e.g. a desktop tab left open while chatting on a phone) learns
+        // — on its next chat-conversations refetch — that this
+        // conversation is already read and stays quiet too (see
+        // alreadyReadElsewhere above / in the notification.new handler).
+        // The notification row is created asynchronously on the server
+        // (fire-and-forget after sendMessage returns), so this is
+        // debounced and delayed rather than raced against it.
+        if ((isOpenAndVisible || isOnRoute) && !document.hidden && convId) {
+          const timers = markConversationReadTimersRef.current
+          clearTimeout(timers.get(convId))
+          timers.set(convId, setTimeout(() => {
+            timers.delete(convId)
+            const currentToken = sessionRef.current?.access_token
+            if (!currentToken) return
+            runly.notifications
+              .markReadBySource(currentToken, 'chat_conversation', convId)
+              .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+              .catch(() => {})
+            runly.chat
+              .markRead(convId, currentToken)
+              .then(() => queryClient.invalidateQueries({ queryKey: ['chat-conversations'] }))
+              .catch(() => {})
+          }, 1500))
         }
       })
       .on('broadcast', { event: 'chat.conversation.new' }, ({ payload }) => {
