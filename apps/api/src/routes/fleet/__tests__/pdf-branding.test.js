@@ -1,10 +1,10 @@
 // apps/api/src/routes/fleet/__tests__/pdf-branding.test.js
 //
 // Guards the 2026 branding convergence: fleet PDFs and Excel exports must be
-// authored by the real company, with "Atlas ERP" only as a discreet watermark.
+// authored by the real company, with "Runly ERP" only as a discreet watermark.
 //   - report-pdf.js / vehicle-pdf.js must delegate to the shared
 //     services/pdf-branding-service.js and keep no private branding resolver.
-//   - Excel workbooks must set `creator` to the company name, not "Atlas ERP".
+//   - Excel workbooks must set `creator` to the company name, not "Runly ERP".
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

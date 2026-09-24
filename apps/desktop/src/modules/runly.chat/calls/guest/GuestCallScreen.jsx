@@ -6,7 +6,7 @@ import { useGuestCall } from "./useGuestCall";
 import { endedReason } from "./lib/guestCall";
 import { GuestCallRoom } from "./GuestCallRoom";
 
-const ATLAS_LOGO = "/runly/runly-logo-horizontal-light.png";
+const RUNLY_LOGO = "/runly/runly-logo-horizontal-light.png";
 
 function CompanyHeader({ branding }) {
   if (!branding?.companyName && !branding?.logoUrl) return null;
@@ -34,9 +34,9 @@ function CompanyHeader({ branding }) {
 function Shell({ children }) {
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gray-50 p-4">
-      {/* Atlas ERP watermark */}
+      {/* Runly ERP watermark */}
       <img
-        src={ATLAS_LOGO}
+        src={RUNLY_LOGO}
         alt=""
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 w-[min(70vw,520px)] max-w-none -translate-x-1/2 -translate-y-1/2 opacity-[0.04] select-none"
@@ -44,7 +44,7 @@ function Shell({ children }) {
       <div className="relative z-10 w-full max-w-sm">
         {children}
         <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-gray-400">
-          <img src={ATLAS_LOGO} alt="" className="h-3 opacity-60" /> Reunión con tecnología de Runly ERP
+          <img src={RUNLY_LOGO} alt="" className="h-3 opacity-60" /> Reunión con tecnología de Runly ERP
         </p>
       </div>
     </div>

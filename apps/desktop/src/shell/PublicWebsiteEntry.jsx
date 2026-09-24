@@ -622,7 +622,7 @@ function EditorEmptyRoute({ routePath, onCreatePage, isCreating }) {
   )
 }
 
-// ── ERP beacon — floating shortcut for logged-in Atlas ERP users ──────────────
+// ── ERP beacon — floating shortcut for logged-in Runly ERP users ──────────────
 
 function ErpBeacon({ erpPath = '/app/' }) {
   const [expanded, setExpanded] = useState(false)

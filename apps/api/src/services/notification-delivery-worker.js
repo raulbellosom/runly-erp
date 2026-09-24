@@ -205,7 +205,7 @@ function labelForSourceType(raw) {
 
 // `brand` is resolved per company from BrandingConfig (see resolveCompanyBrand):
 // { logoUrl, companyName }. With a logo we show it; otherwise a text wordmark
-// using the company name, falling back to "Atlas ERP".
+// using the company name, falling back to the "RunlyERP" wordmark.
 function brandHeaderHtml(brand) {
   const logoUrl = brand?.logoUrl ?? null;
   if (logoUrl) {
@@ -219,7 +219,9 @@ function brandHeaderHtml(brand) {
   return `<div style="font-size:18px;font-weight:700;letter-spacing:-.01em;color:#0f172a;margin-bottom:8px">Runly<span style="color:#2563eb">ERP</span></div>`;
 }
 
-const EMAIL_FOOTER_HTML = `<tr><td style="padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;font-size:12px;color:#64748b">Este correo fue generado automaticamente por Runly ERP.</td></tr>`;
+// Same footer as email-templates.js's renderRunlyEmailLayout: a single plain
+// link to our own root domain, styled visible but not spam-bait.
+const EMAIL_FOOTER_HTML = `<tr><td style="padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;font-size:12px;color:#64748b">Este correo fue generado automaticamente por <a href="https://runly.mx" style="color:#2563eb;font-weight:600;text-decoration:none">Runly ERP</a>.</td></tr>`;
 
 function buildChatEmail({ notification, link, brand, createdAt }) {
   const meta = notification?.metadata ?? {};
@@ -369,7 +371,7 @@ export function createNotificationDeliveryWorker({
   const fcm = fcmService ?? createFcmService({});
 
   // company id -> { logoUrl, companyName } for the email header. Logo comes from
-  // BrandingConfig; falls back to the company name, then the Atlas wordmark.
+  // BrandingConfig; falls back to the company name, then the Runly wordmark.
   async function resolveCompanyBrands(companyIds) {
     const ids = [...new Set(companyIds.filter(Boolean))];
     const brands = new Map();

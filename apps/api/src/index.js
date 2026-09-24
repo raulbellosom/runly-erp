@@ -4917,7 +4917,7 @@ app.post(
       // requirePermission() already resolved and set companyId on the context —
       // querying Membership again with authUserId (the Supabase auth id, not a
       // Membership.userId, which is a userProfile.id) would always miss and
-      // silently fall back to generic "Atlas ERP" branding instead of the
+      // silently fall back to generic "Runly ERP" branding instead of the
       // real company's logo/name (same bug class as the ledger export fix).
       const companyId = c.get("companyId");
       const branding = await resolveCompanyBranding({ prisma, companyId: companyId ?? "" });
@@ -5222,7 +5222,7 @@ app.get(
       // requirePermission() already resolved and set companyId on the context —
       // querying Membership again with authUserId (the Supabase auth id, not a
       // Membership.userId, which is a userProfile.id) would always miss and
-      // silently fall back to generic "Atlas ERP" branding instead of the
+      // silently fall back to generic "Runly ERP" branding instead of the
       // real company's logo/name (same bug class as the ledger export fix).
       const companyId = c.get("companyId");
       const branding = await resolveCompanyBranding({ prisma, companyId: companyId ?? "" });

@@ -1,9 +1,12 @@
-// Shared branded Atlas ERP email shell + concrete templates.
+// Shared branded Runly ERP email shell + concrete templates.
 // Same visual language as buildNotificationEmail in notification-delivery-worker.js
 // (logo header, white card, blue CTA, footer). Keep new transactional emails
-// going through renderAtlasEmailLayout so they stay on-brand.
+// going through renderRunlyEmailLayout so they stay on-brand.
 
 const CTA_COLOR = "#2563eb";
+
+// Runly's own site — the footer link on every outbound email points here.
+const RUNLY_SITE_URL = "https://runly.mx";
 
 export function escapeHtml(value) {
   return String(value ?? "")
@@ -59,16 +62,17 @@ function safeHexColor(value, fallback) {
 // own interpolations (use escapeHtml). `cta` is `{ label, url }` or null.
 // `brand` is optional company branding — `{ name, logoUrl, primaryColor }` —
 // resolved by the caller from BrandingConfig. Any field it omits falls back
-// to the plain Runly look, and a small "Con tecnología de Runly ERP" line is
-// always kept in the footer so a company-branded email still nods to Runly.
-export function renderAtlasEmailLayout({ kicker, heading, bodyHtml = "", cta = null, footnote, brand = null, env = process.env }) {
+// to the plain Runly look. A "Runly ERP" credit line, linked to runly.mx, is
+// always kept in the footer — visible enough to read, but a single plain-text
+// link to our own root domain, not the kind of pattern spam filters flag.
+export function renderRunlyEmailLayout({ kicker, heading, bodyHtml = "", cta = null, footnote, brand = null, env = process.env }) {
   const apiBaseUrl = resolveApiBaseUrl(env);
   const runlyLogoUrl = apiBaseUrl ? `${apiBaseUrl}/brand/runly-logo-horizontal.png` : null;
   const logoUrl = brand?.logoUrl || runlyLogoUrl;
   const logoAlt = brand?.logoUrl ? (brand?.name ?? "Empresa") : "Runly ERP";
   const accentColor = safeHexColor(brand?.primaryColor, CTA_COLOR);
   const foot = footnote ?? "Este correo fue generado automaticamente por Runly ERP.";
-  const showRunlyWink = Boolean(brand?.logoUrl || brand?.name);
+  const runlyCreditHtml = `<a href="${RUNLY_SITE_URL}" style="color:${accentColor};font-weight:600;text-decoration:none">Runly ERP</a>`;
 
   return `
 <div style="background:#f3f4f6;padding:24px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#111827">
@@ -93,7 +97,7 @@ export function renderAtlasEmailLayout({ kicker, heading, bodyHtml = "", cta = n
     <tr>
       <td style="padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;font-size:12px;color:#64748b">
         ${escapeHtml(foot)}
-        ${showRunlyWink ? `<div style="margin-top:6px;color:#94a3b8">Con tecnología de Runly ERP</div>` : ""}
+        <div style="margin-top:6px;color:#94a3b8">Con tecnología de ${runlyCreditHtml}</div>
       </td>
     </tr>
   </table>
@@ -105,7 +109,7 @@ export function renderAtlasEmailLayout({ kicker, heading, bodyHtml = "", cta = n
 
 // `brand` — optional `{ name, logoUrl, primaryColor }` resolved by the caller
 // from the inviting company's BrandingConfig. Omit it (or leave fields out)
-// and the email renders with plain Runly branding — see renderAtlasEmailLayout.
+// and the email renders with plain Runly branding — see renderRunlyEmailLayout.
 // `es-MX`, no explicit timeZone — matches the existing convention in
 // notification-delivery-worker.js's formatDateTime for the same reason
 // (kept simple; not instance-timezone-aware).
@@ -158,7 +162,7 @@ export function buildCallInviteEmail({ joinUrl, inviterName = null, conversation
           <span style="word-break:break-all;color:#334155">${escapeHtml(joinUrl)}</span>
         </p>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: whenText ? "Invitación a reunión" : "Invitacion a llamada",
     heading,
     bodyHtml,
@@ -182,7 +186,7 @@ export function buildCallInviteEmail({ joinUrl, inviterName = null, conversation
 
 // `brand` — optional `{ name, logoUrl, primaryColor }` resolved by the caller
 // from the recipient's company BrandingConfig. Omit it (or leave fields out)
-// and the email renders with plain Runly branding — see renderAtlasEmailLayout.
+// and the email renders with plain Runly branding — see renderRunlyEmailLayout.
 export function buildPasswordResetEmail({ resetUrl, requestedByAdmin = false, brand = null, env = process.env }) {
   const heading = "Restablecer tu contraseña";
   const orgName = brand?.name ? brand.name : "Runly ERP";
@@ -203,7 +207,7 @@ export function buildPasswordResetEmail({ resetUrl, requestedByAdmin = false, br
           Este enlace expira pronto por seguridad.
         </p>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: "Seguridad de la cuenta",
     heading,
     bodyHtml,
@@ -246,7 +250,7 @@ export function buildChatGuestExpiryEmail({ resumeUrl, guestName = null, brand =
           Este enlace es de un solo uso y expira en 24 horas.
         </p>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: "Chat en sitio web",
     heading,
     bodyHtml,
@@ -286,7 +290,7 @@ export function buildCompanyInvitationEmail({ invitationUrl, brand = null, env =
           <span style="word-break:break-all;color:#334155">${escapeHtml(invitationUrl)}</span>
         </p>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: "Invitación",
     heading,
     bodyHtml,
@@ -324,7 +328,7 @@ export function buildUserWelcomeEmail({ loginUrl, email, brand = null, env = pro
           <span style="word-break:break-all;color:#334155">${escapeHtml(loginUrl)}</span>
         </p>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: "Cuenta activa",
     heading,
     bodyHtml,
@@ -364,7 +368,7 @@ export function buildFormSubmissionEmail({ formName, values, fields = [], brand 
         </p>
         <table style="border-collapse:collapse;width:100%">${rows}</table>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: "Formulario",
     heading: "Nuevo envio de formulario",
     bodyHtml,
@@ -395,7 +399,7 @@ export function buildSmtpTestEmail({ brand = null, env = process.env }) {
           Este es un correo de prueba. Si lo estás viendo, la configuración SMTP de <strong>${escapeHtml(orgName)}</strong> puede enviar correo correctamente.
         </p>`;
 
-  const html = renderAtlasEmailLayout({
+  const html = renderRunlyEmailLayout({
     kicker: "Prueba de SMTP",
     heading,
     bodyHtml,

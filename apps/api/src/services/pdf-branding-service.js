@@ -368,7 +368,7 @@ export function drawPdfHeader(doc, { branding, title, subtitle, folio }) {
 
 // ─── PDF footer renderer ───────────────────────────────────────────────────────
 // Draws a standard footer: "Generado por <empresa> · fecha" on the left,
-// a discreet "Atlas ERP" watermark centered, and page numbers on the right.
+// a discreet "Runly ERP" watermark centered, and page numbers on the right.
 
 export function drawPdfFooter(doc, { branding, pageNumber, totalPages }) {
   const pageWidth = doc.page.width;
@@ -395,7 +395,7 @@ export function drawPdfFooter(doc, { branding, pageNumber, totalPages }) {
       { width: colW, align: "left", lineBreak: false, ellipsis: true },
     );
 
-  // Discreet Atlas ERP watermark, centered
+  // Discreet Runly ERP watermark, centered
   doc
     .font("Helvetica")
     .fontSize(7)

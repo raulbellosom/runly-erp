@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   escapeHtml,
   resolveAppBaseUrl,
-  renderAtlasEmailLayout,
+  renderRunlyEmailLayout,
   buildCallInviteEmail,
 } from "../email-templates.js";
 
@@ -25,9 +25,9 @@ describe("resolveAppBaseUrl", () => {
   });
 });
 
-describe("renderAtlasEmailLayout", () => {
+describe("renderRunlyEmailLayout", () => {
   it("escapes the heading and renders the CTA with the raw url", () => {
-    const html = renderAtlasEmailLayout({
+    const html = renderRunlyEmailLayout({
       heading: "Hola <script>",
       cta: { label: "Ir", url: "https://x.test/p/call/abc?i=1" },
       env: {},
@@ -37,8 +37,12 @@ describe("renderAtlasEmailLayout", () => {
     assert.doesNotMatch(html, /<script>/);
   });
   it("omits the logo img when no api base url resolves", () => {
-    const html = renderAtlasEmailLayout({ heading: "x", env: { NODE_ENV: "production" } });
+    const html = renderRunlyEmailLayout({ heading: "x", env: { NODE_ENV: "production" } });
     assert.doesNotMatch(html, /runly-logo-horizontal/);
+  });
+  it("always links the footer credit to runly.mx", () => {
+    const html = renderRunlyEmailLayout({ heading: "x", env: {} });
+    assert.match(html, /href="https:\/\/runly\.mx"[^>]*>Runly ERP<\/a>/);
   });
 });
 
