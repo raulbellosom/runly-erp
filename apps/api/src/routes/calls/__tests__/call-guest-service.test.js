@@ -141,10 +141,10 @@ describe("createCallGuestService.getGuestState", () => {
         update: async () => ({}),
         findMany: async () => [{ id: guest.id, displayName: guest.displayName }],
       },
-      callMessage: { findMany: async () => [] },
       $queryRaw: async (strings) => {
         const sql = Array.isArray(strings) ? strings.join("?") : String(strings);
         if (sql.includes('FROM "call"')) return callRow ? [callRow] : [];
+        if (sql.includes("FROM chat_messages")) return [];
         return [];
       },
     };
@@ -183,6 +183,32 @@ describe("createCallGuestService.getGuestState", () => {
     const out = await svc.getGuestState({ guestToken: "gt" });
     assert.deepEqual(out.recording, { active: true });
     assert.equal(JSON.stringify(out).includes("EG_secret"), false);
+  });
+
+  it("reads chat history from chat_messages (not call_message) for an admitted guest", async () => {
+    let queriedChatMessages = false;
+    const guest = { id: GUEST, status: "ADMITTED", callId: CALL, livekitIdentity: "guest_x", displayName: "Ana", sessionTokenHash: "h" };
+    const prisma = {
+      callGuest: {
+        findFirst: async () => guest,
+        update: async () => ({}),
+        findMany: async () => [{ id: guest.id, displayName: guest.displayName }],
+      },
+      $queryRaw: async (strings) => {
+        const text = Array.isArray(strings) ? strings.join("?") : String(strings);
+        if (text.includes('FROM "call"')) return [liveCall];
+        if (text.includes("FROM chat_messages")) {
+          queriedChatMessages = true;
+          return [{ id: "msg-1", senderKind: "guest", senderName: "Ana", body: "hola", createdAt: new Date() }];
+        }
+        return [];
+      },
+    };
+    const callService = { getRecordingActiveStatus: async () => false };
+    const svc = createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService(), callService });
+    const out = await svc.getGuestState({ guestToken: "gt" });
+    assert.equal(queriedChatMessages, true);
+    assert.deepEqual(out.messages, [{ id: "msg-1", senderKind: "guest", senderName: "Ana", body: "hola", createdAt: out.messages[0].createdAt }]);
   });
 });
 

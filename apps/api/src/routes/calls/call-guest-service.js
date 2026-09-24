@@ -287,12 +287,22 @@ export function createCallGuestService({
         select: { id: true, displayName: true },
       });
       roster = guests.map((g) => ({ name: g.displayName, isYou: g.id === guest.id }));
-      const rows = await prisma.callMessage.findMany({
-        where: { callId: guest.callId },
-        orderBy: { createdAt: "asc" }, take: 200,
-        select: { id: true, senderKind: true, senderName: true, body: true, createdAt: true },
-      });
-      messages = rows;
+      // Full history of the call's real conversation (not call-scoped) — see
+      // docs/superpowers/specs/2026-09-23-call-spotlight-polish-round2-design.md §8.2.
+      messages = await prisma.$queryRaw`
+        SELECT
+          m.id,
+          m.sender_type AS "senderKind",
+          COALESCE(up.display_name, cg.display_name) AS "senderName",
+          m.body,
+          m.created_at AS "createdAt"
+        FROM chat_messages m
+        LEFT JOIN user_profile up ON up.id = m.sender_user_id
+        LEFT JOIN call_guest cg ON cg.id = m.sender_call_guest_id
+        WHERE m.conversation_id = ${call.conversationId} AND m.deleted_at IS NULL
+        ORDER BY m.created_at ASC
+        LIMIT 200
+      `;
     }
 
     // Shared with call-service.js's getCall/getCurrentCall — one definition
