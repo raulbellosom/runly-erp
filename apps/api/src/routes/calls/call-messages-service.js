@@ -15,29 +15,13 @@ function cleanBody(body) {
   return b;
 }
 
-export function createCallMessagesService({ prisma, guestService = null, broadcaster = null, now = () => new Date() }) {
+export function createCallMessagesService({ prisma, guestService = null, broadcaster = null }) {
   async function loadCall(callId) {
     const rows = await prisma.$queryRaw`
       SELECT id, conversation_id AS "conversationId", status FROM "call" WHERE id = ${callId} LIMIT 1
     `;
     if (!rows.length) throw new CallMessageError("Llamada no encontrada.", 404);
     return rows[0];
-  }
-
-  async function assertMember(conversationId, profileId) {
-    const rows = await prisma.$queryRaw`
-      SELECT m.id FROM chat_conversation_members m
-      JOIN chat_conversations c ON c.id = m.conversation_id
-      WHERE m.conversation_id = ${conversationId} AND m.user_id = ${profileId}
-        AND m.left_at IS NULL AND c.deleted_at IS NULL
-      LIMIT 1
-    `;
-    if (!rows.length) throw new CallMessageError("No formas parte de esta conversación.", 403);
-  }
-
-  async function displayName(profileId) {
-    const rows = await prisma.$queryRaw`SELECT display_name AS "displayName" FROM user_profile WHERE id = ${profileId} LIMIT 1`;
-    return rows[0]?.displayName ?? "Usuario";
   }
 
   function shape(m) {
@@ -51,42 +35,51 @@ export function createCallMessagesService({ prisma, guestService = null, broadca
     };
   }
 
-  async function postMemberMessage({ profileId, callId, body }) {
-    const clean = cleanBody(body);
-    const call = await loadCall(callId);
-    await assertMember(call.conversationId, profileId);
-    const name = await displayName(profileId);
-    const created = await prisma.callMessage.create({
-      data: { callId, senderKind: "user", senderUserId: profileId, senderName: name, body: clean },
-    });
-    return { message: shape(created) };
-  }
-
+  // Posts a call guest's chat message into the call's real conversation
+  // (chat_messages) — the same conversation members see in runly.chat. See
+  // docs/superpowers/specs/2026-09-23-call-spotlight-polish-round2-design.md
+  // §8.2. Mirrors the insert+bump+broadcast pattern already used for call
+  // system messages in call-service.js's postSystemMessage.
   async function postGuestMessage({ guestToken, body }) {
     const clean = cleanBody(body);
     if (!guestService?.resolveAdmittedGuestForMessage) throw new CallMessageError("No disponible.", 500);
     const { guestId, callId, displayName: name } = await guestService.resolveAdmittedGuestForMessage({ guestToken });
-    const created = await prisma.callMessage.create({
-      data: { callId, senderKind: "guest", senderGuestId: guestId, senderName: name, body: clean },
-    });
-    return { message: shape(created) };
-  }
-
-  async function listMessages({ callId, sinceId = null, limit = 200 }) {
-    const where = { callId };
-    if (sinceId) where.id = { gt: sinceId };
-    const rows = await prisma.callMessage.findMany({
-      where, orderBy: { createdAt: "asc" }, take: Math.min(limit, 500),
-      select: { id: true, senderKind: true, senderName: true, body: true, createdAt: true, senderUserId: true },
-    });
-    return { messages: rows.map(shape) };
-  }
-
-  async function listMessagesGuarded({ profileId, callId, sinceId = null }) {
     const call = await loadCall(callId);
-    await assertMember(call.conversationId, profileId);
-    return listMessages({ callId, sinceId });
+
+    const rows = await prisma.$queryRaw`
+      INSERT INTO chat_messages (conversation_id, sender_type, sender_call_guest_id, body)
+      VALUES (${call.conversationId}, 'guest', ${guestId}, ${clean})
+      RETURNING id, created_at
+    `;
+    const messageId = rows[0].id;
+    const createdAt = rows[0].created_at;
+
+    await prisma.$executeRaw`
+      UPDATE chat_conversations
+      SET last_message_id = ${messageId}, last_message_at = ${createdAt}, updated_at = NOW()
+      WHERE id = ${call.conversationId}
+    `;
+
+    if (broadcaster) {
+      const members = await prisma.$queryRaw`
+        SELECT user_id FROM chat_conversation_members
+        WHERE conversation_id = ${call.conversationId} AND left_at IS NULL AND user_id IS NOT NULL
+      `;
+      const memberIds = members.map((r) => r.user_id).filter(Boolean);
+      if (memberIds.length) {
+        await broadcaster.broadcastToUsers(memberIds, "chat.message.new", {
+          conversationId: call.conversationId,
+          messageId,
+          senderId: null,
+          senderName: name,
+          threadRootId: null,
+          replyToMessageId: null,
+        }).catch(() => {});
+      }
+    }
+
+    return { message: shape({ id: messageId, senderKind: "guest", senderName: name, senderUserId: null, body: clean, createdAt }) };
   }
 
-  return { postMemberMessage, postGuestMessage, listMessages, listMessagesGuarded };
+  return { postGuestMessage };
 }
