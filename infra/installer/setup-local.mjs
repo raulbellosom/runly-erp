@@ -960,7 +960,7 @@ ${supabaseComposeSecrets}
   try { await fs.chmod(composeEnvFile, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
   const office = await configureOffice({ envFile: localEnvFile, composeEnvFile });
   await configureFirebase({ envFile: localEnvFile });
-  return { liveKit, office, supabase };
+  return { liveKit, office, supabase, transcriptionMode };
 }
 
 async function main() {
@@ -1032,7 +1032,7 @@ async function main() {
     console.log("[4/8] (no external status call needed — secrets are generated locally)");
   }
 
-  const { liveKit, office, supabase } = await writeLocalEnv(supabaseInput, identity);
+  const { liveKit, office, supabase, transcriptionMode } = await writeLocalEnv(supabaseInput, identity);
   await validateLiveKitDns(liveKit);
   console.log(`Generated ${localEnvFile}`);
   if (supabase.mode === "selfhosted") {
