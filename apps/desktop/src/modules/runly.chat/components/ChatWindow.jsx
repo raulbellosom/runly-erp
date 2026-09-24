@@ -28,6 +28,8 @@ import { useChatPresence } from "../hooks/useChatPresence";
 import { useChatConversations, useArchiveConversation, useUnarchiveConversation } from "../hooks/useChatConversations";
 import { useChatConversationDetail } from "../hooks/useChatConversationDetail";
 import { useMiraiStatus } from "../hooks/useMirAI";
+import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
+import { TtsNowPlayingBar } from "./TtsNowPlayingBar";
 import { roleHasPermission, findOwnMember, CHAT_PERMISSIONS } from "../lib/chatPermissions";
 import { buildAllAttachments, buildMessagesTranscript } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -122,6 +124,12 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const isMirai = conversation?.type === "mirai";
   const { data: miraiStatus } = useMiraiStatus();
   const miraiAvailable = !isMirai || miraiStatus?.available !== false;
+  // "Leer en voz alta" — one shared instance for this whole chat window, so
+  // both the per-message buttons (ChatMessageList) and the persistent "now
+  // playing"/"generando audio" bar right under the header stay in sync.
+  const { data: ttsStatus } = useTtsStatus();
+  const ttsEnabled = Boolean(ttsStatus?.enabled);
+  const speech = useSpeakText();
   const ownMemberForComposer = findOwnMember(detailMembers ?? conversation?.members ?? [], userProfile?.id);
   const canSendMessages = !isChannelOrGroupType || roleHasPermission(ownMemberForComposer, CHAT_PERMISSIONS.MESSAGES_SEND);
   // Pinned messages also drive the anchored strip above the message list (not
@@ -623,6 +631,8 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
           : undefined}
       />
 
+      <TtsNowPlayingBar speech={speech} />
+
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
           {recordingsView ? (
             <div className="flex-1 min-h-0 flex flex-col">
@@ -667,6 +677,8 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
               key={conversationId}
               messages={messages}
               isLoading={isLoading}
+              ttsEnabled={ttsEnabled}
+              speech={speech}
               currentUserId={userProfile?.id}
               typingUsers={chatData.typingUsers}
               onAttachmentClick={handleAttachmentClick}

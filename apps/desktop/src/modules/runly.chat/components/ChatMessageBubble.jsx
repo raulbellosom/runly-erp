@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   CheckCheck, MoreHorizontal, Copy, Trash2, Forward, EyeOff, CheckSquare,
-  Pin, PinOff, Smile, MessageSquare, CornerUpLeft, Sparkles, Volume2, Square,
+  Pin, PinOff, Smile, MessageSquare, CornerUpLeft, Sparkles, Volume2, Square, Loader2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -108,12 +108,12 @@ function SwipeReplyHint({ translateX, isOwn }) {
 function MessageActions({
   isOwn, hasBody, onCopy, onDelete, onHideForMe, onForward, onEnterSelection,
   canPin, isPinned, onPin, onReact, canReply, onOpenThread, onReply, onAskMirai, onShowReceipt,
-  onSpeak, isSpeaking,
+  onSpeak, isSpeaking, isLoadingSpeak,
 }) {
   const actions = buildMessageActions({
     hasBody, isOwn, canPin, isPinned, canReply,
     onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-    onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking,
+    onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking, isLoadingSpeak,
   });
   const primary = actions.filter((a) => a.group === "primary");
   const danger = actions.filter((a) => a.group === "danger");
@@ -151,11 +151,13 @@ function MessageActions({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onSpeak(); }}
-          title={isSpeaking ? "Detener lectura" : "Leer en voz alta"}
-          aria-label={isSpeaking ? "Detener lectura" : "Leer en voz alta"}
+          title={isLoadingSpeak ? "Generando audio…" : isSpeaking ? "Detener lectura" : "Leer en voz alta"}
+          aria-label={isLoadingSpeak ? "Generando audio" : isSpeaking ? "Detener lectura" : "Leer en voz alta"}
           className={`${revealCls} h-6 w-6 flex items-center justify-center rounded-full hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-opacity shrink-0 self-center touch-manipulation`}
         >
-          {isSpeaking ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+          {isLoadingSpeak
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : isSpeaking ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         </button>
       )}
       <DropdownMenu>
@@ -185,7 +187,7 @@ function MessageActions({
                 else a.onSelect?.();
               }}
             >
-              <a.icon className="h-3.5 w-3.5 mr-2" />
+              <a.icon className={`h-3.5 w-3.5 mr-2 ${a.iconClassName ?? ""}`} />
               {a.label}
             </DropdownMenuItem>
           ))}
@@ -196,7 +198,7 @@ function MessageActions({
               onSelect={() => a.onSelect?.()}
               className={a.danger ? "text-red-500 focus:text-red-500" : undefined}
             >
-              <a.icon className="h-3.5 w-3.5 mr-2" />
+              <a.icon className={`h-3.5 w-3.5 mr-2 ${a.iconClassName ?? ""}`} />
               {a.label}
             </DropdownMenuItem>
           ))}
@@ -326,6 +328,7 @@ export function ChatMessageBubble({
   onShowReceipt,
   onSpeak,
   isSpeaking = false,
+  isLoadingSpeak = false,
 }) {
   const [avatarErr, setAvatarErr] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -686,6 +689,7 @@ export function ChatMessageBubble({
             onShowReceipt={onShowReceipt ? () => onShowReceipt(message) : undefined}
             onSpeak={onSpeak ? () => onSpeak(message) : undefined}
             isSpeaking={isSpeaking}
+            isLoadingSpeak={isLoadingSpeak}
           />
         )}
         <MessageActionSheet
@@ -704,6 +708,7 @@ export function ChatMessageBubble({
             onShowReceipt: onShowReceipt ? () => onShowReceipt(message) : undefined,
             onSpeak: onSpeak ? () => onSpeak(message) : undefined,
             isSpeaking,
+            isLoadingSpeak,
           }}
           onQuickReact={(emoji) => onToggleReaction?.(message.id, emoji)}
           onOpenFullPicker={() => setReactionPickerOpen(true)}
@@ -910,6 +915,7 @@ export function ChatMessageBubble({
           onAskMirai: onAskMirai ? () => onAskMirai(message) : undefined,
           onSpeak: onSpeak ? () => onSpeak(message) : undefined,
           isSpeaking,
+          isLoadingSpeak,
         }}
         onQuickReact={(emoji) => onToggleReaction?.(message.id, emoji)}
         onOpenFullPicker={() => setReactionPickerOpen(true)}
@@ -1099,6 +1105,7 @@ export function ChatMessageBubble({
           onAskMirai={onAskMirai ? () => onAskMirai(message) : undefined}
           onSpeak={onSpeak ? () => onSpeak(message) : undefined}
           isSpeaking={isSpeaking}
+          isLoadingSpeak={isLoadingSpeak}
         />
       )}
     </div>

@@ -21,6 +21,7 @@ import { useChatFloatStore } from "../store/chatFloatStore";
 import { roleHasPermission, findOwnMember, CHAT_PERMISSIONS } from "../lib/chatPermissions";
 import { getConversationDisplayName, getConversationTitleLabel, buildAllAttachments } from "../lib/chatUtils";
 import { ChatPreferencesProvider, useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
+import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useCalls } from "../calls/CallsProvider";
 
@@ -74,6 +75,13 @@ function MiniChatWindowInner({ entry, index, edge, zIndex = 45, onClose, onMinim
   const { mutate: deleteMessageMutate } = useDeleteMessage(id);
   const { mutate: deleteAttachmentMutate, isPending: isDeletingAttachment, variables: deletingAttachmentId } = useDeleteAttachment(id);
   const { mutate: pinMutate } = usePinMessage(id);
+  // Own instance, independent of any main ChatWindow.jsx open elsewhere —
+  // this is a separate floating popup, no shared "now playing" bar here (too
+  // small a surface to spare the space for one; the per-message icon in
+  // ChatMessageList is enough).
+  const { data: ttsStatus } = useTtsStatus();
+  const ttsEnabled = Boolean(ttsStatus?.enabled);
+  const speech = useSpeakText();
   const { mutate: toggleReactionMutate } = useToggleReaction(id);
   // `conversation` here is whatever was passed to openChat() — usually the
   // list-preview shape (5-member slice, no role/permission fields). The
@@ -363,6 +371,8 @@ function MiniChatWindowInner({ entry, index, edge, zIndex = 45, onClose, onMinim
               key={id}
               messages={data?.data ?? []}
               isLoading={isLoading}
+              ttsEnabled={ttsEnabled}
+              speech={speech}
               currentUserId={userProfile?.id}
               typingUsers={[]}
               onAttachmentClick={handleAttachmentClick}

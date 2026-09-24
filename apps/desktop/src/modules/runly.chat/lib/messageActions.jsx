@@ -1,26 +1,30 @@
-import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, EyeOff, CornerUpLeft, Sparkles, Info, Volume2, Square } from "lucide-react";
+import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, EyeOff, CornerUpLeft, Sparkles, Info, Volume2, Square, Loader2 } from "lucide-react";
 
 // Single source of truth for the per-message action list. Consumed by the
 // desktop hover menu (MessageActions in ChatMessageBubble) and the mobile /
 // right-click MessageActionSheet. Each entry:
-//   { key, label, icon, onSelect, danger?, group }
-// `group` is "primary" | "danger" — drives separator placement.
+//   { key, label, icon, iconClassName?, onSelect, danger?, group }
+// `group` is "primary" | "danger" — drives separator placement. `iconClassName`
+// is optional extra classes appended to the icon's own (e.g. "animate-spin"
+// for the speak action while loading) — every render site must apply it.
 export function buildMessageActions({
   hasBody, isOwn, canPin, isPinned, canReply,
   onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-  onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking,
+  onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking, isLoadingSpeak,
 }) {
   const items = [];
   if (onReply) items.push({ key: "reply", label: "Responder", icon: CornerUpLeft, onSelect: onReply, group: "primary" });
   if (hasBody && onCopy) items.push({ key: "copy", label: "Copiar", icon: Copy, onSelect: onCopy, group: "primary" });
   // "Leer en voz alta" — any message with text, from anyone, not just MirAI
   // (see hooks/useTextToSpeech.js). Toggles to "Detener lectura" while this
-  // specific message's audio is the one currently playing.
+  // specific message's audio is the one currently playing, and shows a
+  // spinner while it's being synthesized — clicking it either way cancels.
   if (hasBody && onSpeak) {
     items.push({
       key: "speak",
-      label: isSpeaking ? "Detener lectura" : "Leer en voz alta",
-      icon: isSpeaking ? Square : Volume2,
+      label: isLoadingSpeak ? "Generando audio…" : isSpeaking ? "Detener lectura" : "Leer en voz alta",
+      icon: isLoadingSpeak ? Loader2 : isSpeaking ? Square : Volume2,
+      iconClassName: isLoadingSpeak ? "animate-spin" : undefined,
       onSelect: onSpeak,
       group: "primary",
     });

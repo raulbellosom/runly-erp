@@ -9,7 +9,6 @@ import { TypingIndicator } from "./TypingIndicator";
 import { groupMessagesByDate, formatDateSeparator } from "../lib/chatUtils";
 import { findOwnMember, isMentioned } from "../lib/chatPermissions";
 import { useChatPreferences } from "../hooks/useChatPreferences";
-import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
 import { MIRAI_NAME } from "../lib/mirai";
 
 function senderKey(msg) {
@@ -88,14 +87,14 @@ export function ChatMessageList({
   // to land the initial scroll on the first unread message instead of the
   // bottom, and to scope the mention jump button to unread mentions only.
   unreadCountAtOpen = 0,
+  // "Leer en voz alta" — owned by the parent (ChatWindow.jsx/MiniChatWindow.jsx),
+  // not here: the parent also renders a persistent "now playing" indicator
+  // (TtsNowPlayingBar) driven by this same `speech` instance, which only
+  // works if there's exactly one instance shared between both places.
+  ttsEnabled = false,
+  speech = null,
 }) {
   const { prefs } = useChatPreferences();
-  // "Leer en voz alta" — one shared instance for the whole visible list, so
-  // clicking a second message's speak action stops whatever was already
-  // playing instead of overlapping it (see hooks/useTextToSpeech.js).
-  const { data: ttsStatus } = useTtsStatus();
-  const ttsEnabled = Boolean(ttsStatus?.enabled);
-  const speech = useSpeakText();
   // Tileable line-art wallpaper — a masked, tinted layer painted BEHIND the
   // scrolling column (z-index:-1 inside an `isolate`d, `chat-wallpaper`
   // container). See chat-theme.css. Rendered only when the pref is on.
@@ -625,10 +624,11 @@ export function ChatMessageList({
               onCopy={!isDeleted && !isPending && item.body
                 ? () => navigator.clipboard.writeText(item.body).catch(() => {})
                 : undefined}
-              onSpeak={ttsEnabled && !isDeleted && !isPending && item.body && item.sender_type === "assistant"
+              onSpeak={ttsEnabled && speech && !isDeleted && !isPending && item.body && item.sender_type === "assistant"
                 ? () => speech.speak(item.body).catch((err) => toast.error(err?.message ?? "No se pudo generar el audio."))
                 : undefined}
-              isSpeaking={item.sender_type === "assistant" && Boolean(item.body) && speech.isPlaying(item.body)}
+              isLoadingSpeak={item.sender_type === "assistant" && Boolean(item.body) && Boolean(speech?.isLoading(item.body))}
+              isSpeaking={item.sender_type === "assistant" && Boolean(item.body) && Boolean(speech?.isPlaying(item.body))}
               onDelete={isOwn && !isDeleted && !isPending && onDeleteMessage
                 ? () => onDeleteMessage(item.id)
                 : undefined}

@@ -198,7 +198,7 @@ export function MessageActionSheet({
         extra,
       ].join(" ")}
     >
-      <a.icon className="h-4 w-4 mr-3 shrink-0" />{a.label}
+      <a.icon className={`h-4 w-4 mr-3 shrink-0 ${a.iconClassName ?? ""}`} />{a.label}
     </button>
   );
 

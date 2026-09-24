@@ -48,6 +48,11 @@ export function useSpeakText() {
       urlRef.current = null;
     }
     setPlayingText(null);
+    // Also clears an in-flight "loading" state immediately on stop, rather
+    // than waiting for the network request to actually resolve — the
+    // request itself keeps running in the background, but its result gets
+    // discarded (see the `audioRef.current !== audio` guard in speak()).
+    setLoadingText(null);
   }, []);
 
   const mutation = useMutation({
@@ -55,8 +60,9 @@ export function useSpeakText() {
   });
 
   const speak = useCallback(async (text) => {
-    // Clicking the button that's already playing just stops it.
-    if (playingText === text) { cleanup(); return; }
+    // Clicking the button again while it's already playing OR still loading
+    // just stops/cancels it, instead of firing a second, redundant request.
+    if (playingText === text || loadingText === text) { cleanup(); return; }
     cleanup();
 
     // iOS Safari (and other WebKit-based mobile browsers) only allows
@@ -90,12 +96,17 @@ export function useSpeakText() {
     } finally {
       setLoadingText(null);
     }
-  }, [cleanup, mutation, playingText]);
+  }, [cleanup, mutation, playingText, loadingText]);
 
   return {
     speak,
     stop: cleanup,
     isPlaying: (text) => playingText === text,
     isLoading: (text) => loadingText === text,
+    // For a global "now playing" indicator (TtsNowPlayingBar) that doesn't
+    // know or care WHICH message's text is involved, only whether something
+    // is happening right now.
+    isAnyLoading: loadingText !== null,
+    isAnyPlaying: playingText !== null,
   };
 }
