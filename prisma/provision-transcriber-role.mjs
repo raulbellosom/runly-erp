@@ -34,6 +34,24 @@ export function quoteRolePassword(password) {
   return `'${password}'`;
 }
 
+// Tablas de solo lectura que necesita este rol (ver GRANT SELECT mas abajo).
+// La migracion 20260919140000_user_resource_isolation activo RLS en TODAS
+// las tablas de `public` que ya existian en ese momento (incluida
+// call_recording, call, call_participant, call_guest, user_profile) sin
+// crear una politica para cada rol futuro — con RLS activo y sin politica,
+// Postgres devuelve 0 filas en silencio a cualquier rol no-superusuario, aun
+// con el GRANT SELECT correcto (confirmado contra una base de datos real:
+// psql -U postgres veia la fila sin problema por ser superusuario y saltarse
+// RLS, mientras runly_transcriber recibia 0 filas y el codigo Python lo
+// interpretaba como "grabacion sin archivo"). call_transcript y
+// call_transcript_segment nacieron despues de esa migracion, por lo que
+// nunca quedaron con RLS activo y no necesitan politica aqui.
+const TRANSCRIBER_READ_TABLES = ["call", "call_participant", "call_guest", "call_recording", "user_profile"];
+
+function transcriberSelectPolicyName(table) {
+  return `${table}_transcriber_select`;
+}
+
 export async function ensureTranscriberRole(pool, password) {
   const literal = quoteRolePassword(password);
   const { rows } = await pool.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [TRANSCRIBER_ROLE_NAME]);
@@ -50,11 +68,25 @@ export async function ensureTranscriberRole(pool, password) {
     `GRANT SELECT, INSERT, UPDATE, DELETE ON call_transcript, call_transcript_segment TO ${TRANSCRIBER_ROLE_NAME}`,
   );
   await pool.query(
-    `GRANT SELECT ON call, call_participant, call_guest, call_recording, user_profile TO ${TRANSCRIBER_ROLE_NAME}`,
+    `GRANT SELECT ON ${TRANSCRIBER_READ_TABLES.join(", ")} TO ${TRANSCRIBER_ROLE_NAME}`,
   );
+  // DROP + CREATE (no "IF NOT EXISTS" — Postgres no lo soporta para POLICY)
+  // para que aprovisionar de nuevo (ej. rotacion de password) sea idempotente.
+  for (const table of TRANSCRIBER_READ_TABLES) {
+    const policy = transcriberSelectPolicyName(table);
+    await pool.query(`DROP POLICY IF EXISTS "${policy}" ON ${table}`);
+    await pool.query(
+      `CREATE POLICY "${policy}" ON ${table} FOR SELECT TO ${TRANSCRIBER_ROLE_NAME} USING (true)`,
+    );
+  }
 }
 
 export async function dropTranscriberRole(pool) {
+  // Las politicas deben eliminarse antes que el rol — Postgres no permite
+  // DROP ROLE mientras una politica lo siga referenciando en su TO.
+  for (const table of TRANSCRIBER_READ_TABLES) {
+    await pool.query(`DROP POLICY IF EXISTS "${transcriberSelectPolicyName(table)}" ON ${table}`).catch(() => {});
+  }
   await pool.query(
     `REVOKE ALL PRIVILEGES ON call_transcript, call_transcript_segment, call, call_participant, call_guest, call_recording, user_profile FROM ${TRANSCRIBER_ROLE_NAME}`,
   ).catch(() => {});

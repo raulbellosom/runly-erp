@@ -55,6 +55,29 @@ describe("ensureTranscriberRole", () => {
     assert.ok(!pool.calls.some((c) => /finance|ledger|hr_|contacts/i.test(c.sql)));
   });
 
+  it("creates a permissive SELECT policy for each read table — GRANT alone is not enough once RLS is on", async () => {
+    // Real bug found in production: 20260919140000_user_resource_isolation
+    // force-enabled RLS on every pre-existing public table (call_recording
+    // included) with zero policies. A GRANT SELECT still returns 0 rows
+    // silently to a non-superuser role without a matching policy — the
+    // transcriber saw "no playlist_object_key" for a recording that was
+    // actually READY, because Postgres never told it "permission denied", it
+    // just returned nothing.
+    const pool = fakePool(false);
+    await ensureTranscriberRole(pool, "secret-pw");
+
+    for (const table of ["call", "call_participant", "call_guest", "call_recording", "user_profile"]) {
+      const policyName = `${table}_transcriber_select`;
+      const dropIdx = pool.calls.findIndex((c) => c.sql === `DROP POLICY IF EXISTS "${policyName}" ON ${table}`);
+      const createIdx = pool.calls.findIndex(
+        (c) => c.sql === `CREATE POLICY "${policyName}" ON ${table} FOR SELECT TO ${TRANSCRIBER_ROLE_NAME} USING (true)`,
+      );
+      assert.ok(dropIdx !== -1, `expected a DROP POLICY IF EXISTS for ${table}`);
+      assert.ok(createIdx !== -1, `expected a CREATE POLICY for ${table}`);
+      assert.ok(dropIdx < createIdx, `expected DROP POLICY before CREATE POLICY for ${table}`);
+    }
+  });
+
   it("idempotently rotates the password via ALTER ROLE instead of a duplicate CREATE ROLE", async () => {
     const pool = fakePool(true);
     await ensureTranscriberRole(pool, "new-pw");
@@ -70,5 +93,20 @@ describe("dropTranscriberRole", () => {
     assert.ok(pool.calls.some((c) => c.sql.startsWith("REVOKE ALL PRIVILEGES")));
     assert.ok(pool.calls.some((c) => c.sql === `REVOKE USAGE ON SCHEMA public FROM ${TRANSCRIBER_ROLE_NAME}`));
     assert.ok(pool.calls.some((c) => c.sql === `DROP ROLE IF EXISTS ${TRANSCRIBER_ROLE_NAME}`));
+  });
+
+  it("drops every read-table policy before dropping the role — Postgres refuses DROP ROLE while a policy still references it", async () => {
+    const pool = fakePool(true);
+    await dropTranscriberRole(pool);
+
+    const dropRoleIdx = pool.calls.findIndex((c) => c.sql === `DROP ROLE IF EXISTS ${TRANSCRIBER_ROLE_NAME}`);
+    for (const table of ["call", "call_participant", "call_guest", "call_recording", "user_profile"]) {
+      const policyName = `${table}_transcriber_select`;
+      const dropPolicyIdx = pool.calls.findIndex(
+        (c) => c.sql === `DROP POLICY IF EXISTS "${policyName}" ON ${table}`,
+      );
+      assert.ok(dropPolicyIdx !== -1, `expected a DROP POLICY IF EXISTS for ${table}`);
+      assert.ok(dropPolicyIdx < dropRoleIdx, `expected policy ${policyName} dropped before the role`);
+    }
   });
 });
