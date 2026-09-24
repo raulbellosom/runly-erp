@@ -1,7 +1,7 @@
 # Especificación técnica: transcripción de llamadas (runly.chat)
 
-**Fecha:** 2026-09-24 (revisión 3 — V1 ya implementado y verificado, ver `docs/TASKS.md`; esta revisión solo completa el diseño de V2 pendiente de la Etapa 3, sin código nuevo)
-**Estado:** V1 implementado. V2 (esta revisión): diseño de datos y arquitectura completo y listo para la Etapa 0/1 de validación contra LiveKit real — ver el registro de cambios de la revisión 3 para qué sigue genuinamente bloqueado por esa validación y qué ya se resolvió por análisis del contrato documentado de la API de LiveKit Egress
+**Fecha:** 2026-09-24 (revisión 4 — V1 ya implementado y verificado, ver `docs/TASKS.md`; revisión 3 completó el diseño de V2 (Etapa 3); esta revisión completa el diseño de la Etapa 5 (§7, integración con MirAI); ninguna de las dos añade código nuevo, solo documento)
+**Estado:** V1 implementado. V2 (revisión 3) y Etapa 5 (revisión 4): diseño de datos y arquitectura completo y listo para implementarse — ver el registro de cambios de cada revisión para qué sigue genuinamente bloqueado por una prueba en vivo (V2, contra LiveKit real) o por iteración empírica (Etapa 5, el prompt exacto de Groq) y qué ya se resolvió por análisis
 **Depende de:** `docs/TRANSCRIPTION_CURRENT_STATE.md` (auditoría del estado real del repositorio)
 **Módulo:** `runly.chat` (extensión de `runly.calls`, no un módulo RME3 nuevo — ver §0.3)
 
@@ -361,8 +361,9 @@ Se introducen dos permisos nuevos en `apps/api/src/permission-catalog.js`, grupo
 
 | Permiso | Gatea |
 |---|---|
-| `chat.calls.transcript.request` | Solicitar (`POST .../request`) y reintentar (`POST .../retry`) una transcripción — análogo a `chat.calls.record` para grabación |
+| `chat.calls.transcript.request` | Solicitar (`POST .../request`), reintentar (`POST .../retry`) y regenerar (`POST .../regenerate`) una transcripción — análogo a `chat.calls.record` para grabación |
 | `chat.calls.transcript.manage` | Borrar cualquier transcripción de una conversación que administra, y **leer** cualquier transcripción de esa conversación aunque no haya sido participante de esa llamada puntual (ver §5.1 punto 3) — pensado para roles de administración/cumplimiento, no para el usuario común |
+| `chat.calls.transcript.analyze` (nuevo, revisión 4, §7.3) | Pedir el análisis de IA (`POST .../analyze`) y confirmar tareas/eventos propuestos (`POST .../commit-proposals`) — permiso propio y no una reutilización de `.request`, porque dispara un costo de Groq y puede terminar escribiendo `Task`/`CalendarEvent` reales, un nivel de confianza distinto al de simplemente pedir que se transcriba el audio |
 
 Un usuario sin ningún permiso especial, pero que sí participó en la llamada, puede leer su propia transcripción sin necesitar `chat.calls.transcript.manage` (criterio §5.1 punto 2) — el permiso de gestión es solo para el caso de acceso *ampliado*, no para el acceso *básico* de un participante real.
 
@@ -430,7 +431,63 @@ Añadido en la revisión 2 — la revisión 1 usaba `FOR UPDATE SKIP LOCKED` par
 
 ## 7. Integración futura con MirAI (preparación, no implementación)
 
-Basado en el precedente real más fuerte encontrado (§4.5 de `TRANSCRIPTION_CURRENT_STATE.md`): el flujo `recognize`/`commit` de importación de estados de cuenta en `runly.ledger`.
+**Actualización 2026-09-24 (revisión 4, mismo día que la revisión 3 de V2 más arriba)**: a petición explícita del usuario, tras probar la función de texto a voz de MirAI ("no veo funciones de IA como para que analice la transcripción y poder crear reuniones o hacer algún resumen"), esta sección deja de ser solo un boceto y resuelve las dos preguntas que la Etapa 5 del plan de implementación dejaba explícitamente abiertas: si el borrador de análisis se persiste, y si el mecanismo de prueba firmada de `runly.ledger` vale la pena generalizarlo. Sigue siendo **documento únicamente, sin código** — mismo trato pedido para V2.
+
+Basado en el precedente real más fuerte encontrado (§4.5 de `TRANSCRIPTION_CURRENT_STATE.md`): el flujo `recognize`/`commit` de importación de estados de cuenta en `runly.ledger`. Verificado leyendo el código real, no solo la documentación previa de este mismo spec: `signImportProof`/`verifyImportProof` (`apps/api/src/routes/ledger/ai-import-token.js`) firma `{companyId, actorId, rowsHash}` con HMAC + expiración de 2h, pero **no es un candado de integridad sobre el contenido** — `rowsHash` en el código real de hoy es literalmente `String(JSON.stringify(rows).length)` (la longitud, no un hash criptográfico), y `commit()` nunca lo recalcula para comparar contra las filas recibidas. Su función real es más simple y sigue siendo la correcta para reusar aquí: probar que ese actor/empresa pasó recientemente por el paso costoso de IA antes de poder ejecutar la acción que escribe datos reales, evitando que alguien llame directamente al endpoint de "confirmar" sin haber pagado el costo/latencia de Groq primero. Esa es exactamente la garantía que se necesita aquí también, ni más ni menos.
+
+### 7.1. Persistencia del borrador — resuelto: sí se persiste, a diferencia de `runly.ledger`
+
+El plan de implementación dejaba esto abierto ("a decidir en esta etapa según necesidad real de UX"). Se resuelve aquí: **el borrador de análisis se persiste**, en un nuevo modelo `CallTranscriptAnalysis` — a propósito, diferente de la decisión de `runly.ledger` (que nunca persiste las filas reconocidas de un estado de cuenta hasta el commit). La diferencia de contexto que justifica no copiar ese precedente sin más: un estado de cuenta se analiza una vez y se decide en el momento (aceptar o descartar); una minuta de reunión es algo a lo que un usuario querrá volver — reabrir la transcripción una semana después y seguir viendo el resumen ya generado, sin volver a pagar el costo y la latencia de una llamada a Groq solo por abrir la pantalla de nuevo.
+
+```prisma
+// Una fila por transcripción (no un historial de versiones) — analizar de
+// nuevo REEMPLAZA el borrador anterior, mismo principio de "reutilizar la
+// fila" que ya usa CallTranscript.regenerateTranscript. Si ya se habían
+// confirmado tareas/eventos de un borrador anterior, esos NO se borran ni se
+// deshacen al volver a analizar — analizar de nuevo solo genera un borrador
+// nuevo para lo que todavía esté pendiente de decidir; committedAt vuelve a
+// null porque hay un borrador nuevo otra vez pendiente de revisión, pero
+// committedTaskIds/committedEventIds conservan el historial de lo ya creado.
+model CallTranscriptAnalysis {
+  id                String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  transcriptId      String    @unique @db.Uuid @map("transcript_id")
+  companyId         String    @db.Uuid @map("company_id")
+  summary           String    @map("summary")
+  decisions         Json      @map("decisions")        // string[]
+  actionItems       Json      @map("action_items")      // [{ text: string }] — sin projectId aqui: el usuario lo elige en la pantalla de revision, no lo propone el modelo
+  proposedEvents    Json      @map("proposed_events")   // [{ title: string, startsAt: string, endsAt?: string, description?: string }]
+  model             String    @map("model")             // modelo de Groq usado, igual que CallTranscript.model registra el de faster-whisper
+  generatedByUserId String    @db.Uuid @map("generated_by_user_id")
+  generatedAt       DateTime  @default(now()) @map("generated_at")
+  committedTaskIds  Json?     @map("committed_task_ids")  // uuid[] — Task.id ya creados de borradores anteriores o de este
+  committedEventIds Json?     @map("committed_event_ids") // uuid[] — CalendarEvent.id ya creados
+  committedAt       DateTime? @map("committed_at")        // null = hay un borrador pendiente de revision ahora mismo
+
+  transcript CallTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("call_transcript_analysis")
+}
+```
+
+Retención: hereda la de `CallTranscript` vía `onDelete: Cascade` — no tiene una política propia independiente (a diferencia de por qué `CallTranscript` sí la tiene separada de `CallRecording`, spec §5.7): un análisis sin su transcripción de origen no tiene sentido de conservar, mientras que una transcripción sí puede tener más valor de consulta que el video del que salió.
+
+### 7.2. Mecanismo de prueba firmada — resuelto: sí se generaliza
+
+El plan dejaba esto como "evaluar en esta etapa si vale la pena generalizar `ai-import-token.js`". Se resuelve: **sí** — no hay nada específico de `runly.ledger` en su implementación real (firma/verifica un payload genérico `{companyId, actorId, ...}` con HMAC+TTL). Se extrae a `apps/api/src/lib/ai-proof-token.js` (mismas dos funciones, mismo comportamiento, sin cambios de lógica) y `ai-import-token.js` pasa a ser un re-export desde ahí — cero cambio de comportamiento para `runly.ledger`, cero riesgo de regresión, solo mueve el código a un lugar que ya no miente sobre pertenecer únicamente a `runly.ledger`. El nuevo servicio de análisis de transcripciones importa desde la ubicación compartida directamente, nunca desde `routes/ledger/`.
+
+### 7.3. Contrato de API (nuevo en esta revisión)
+
+| Método y ruta | Permiso | Gate adicional | Descripción |
+|---|---|---|---|
+| `POST /calls/transcripts/:id/analyze` | `chat.calls.transcript.analyze` (nuevo, ver §5.2) | `assertMember` + `wasParticipantOrRequester` (mismo nivel que `getTranscript` — más estricto que grabaciones) | Requiere `transcript.status === 'READY'` (409 si no). Llama a Groq, guarda/reemplaza `CallTranscriptAnalysis`, devuelve el borrador completo + `proofToken` |
+| `POST /calls/transcripts/:id/commit-proposals` | `chat.calls.transcript.analyze` | igual que arriba | Body: `{ proofToken, acceptedActionItems: [{ index, projectId, assigneeUserId?, dueDate? }], acceptedEvents: [{ index }] }`. Crea un `Task` por cada `actionItem` aceptado (con el `projectId` elegido — obligatorio por ítem, spec §7 revisión 2) y un `CalendarEvent` por cada evento aceptado (`sourceModule='runly.chat'`, `sourceEntityId=transcriptId`). Actualiza `committedTaskIds`/`committedEventIds`/`committedAt`. 409 si `proofToken` inválido/expirado (mismo TTL de 2h que `runly.ledger`) o si no hay un borrador pendiente para esta transcripción |
+
+Igual que en `runly.ledger`, ninguna de las dos rutas expone lectura del borrador sin haberlo generado primero en esa misma llamada — el borrador vive en la respuesta de `/analyze` y en `CallTranscriptAnalysis` (para que un `GET /calls/transcripts/:id` normal pueda incluirlo si ya existe, sin necesitar volver a llamar a Groq solo para reabrir la pantalla — ver §7.1).
+
+### 7.4. Genuinamente pendiente — no se inventa aquí
+
+El prompt exacto para Groq (system prompt + esquema JSON exacto de la respuesta) **no se fija en este documento** — a diferencia del resto de este spec, esto sí necesita iterarse contra transcripciones reales (mismo principio de "medir, no asumir" que ya rigió la elección de `small` sobre `base` en la Etapa 1 de V1): la calidad de un resumen/extracción de acuerdos depende del modelo configurado (`CHAT_MIRAI_MODEL` u otro dedicado, a decidir en la Etapa 5) y de cómo se redacte el prompt, y equivocarse aquí por escribirlo a ciegas costaría más que dejarlo como trabajo de la propia Etapa 5.
 
 ```mermaid
 sequenceDiagram
