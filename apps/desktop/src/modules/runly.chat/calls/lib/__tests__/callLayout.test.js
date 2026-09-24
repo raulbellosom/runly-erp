@@ -39,6 +39,22 @@ describe("spotlightStrip", () => {
     assert.deepEqual(out.others.map((e) => e.participant.identity), ["me", "a"]);
     assert.equal(out.showScreenTile, false);
   });
+  it("keeps the screen-sharer's own camera as a strip tile when their screen is the spotlight", () => {
+    const two = [p("a"), p("b")];
+    const screenA = { ...p("a"), hasCamera: true };
+    const out = spotlightStrip({ participants: two, pinnedIdentity: null, screenShareEntry: screenA });
+    assert.equal(out.mainEntry, screenA);
+    const identities = out.others.map((e) => e.participant.identity);
+    assert.deepEqual(identities.sort(), ["a", "b"]);
+    assert.equal(out.showScreenTile, false);
+  });
+  it("does not add an extra tile for the sharer when they have no live camera", () => {
+    const two = [p("a"), p("b")];
+    const screenA = { ...p("a"), hasCamera: false };
+    const out = spotlightStrip({ participants: two, pinnedIdentity: null, screenShareEntry: screenA });
+    const identities = out.others.map((e) => e.participant.identity);
+    assert.deepEqual(identities, ["b"]);
+  });
 });
 
 describe("resolveSpotlightMain", () => {

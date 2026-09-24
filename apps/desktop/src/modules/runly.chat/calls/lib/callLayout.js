@@ -19,12 +19,22 @@ export function resolveSpotlightMain(participants, pinnedIdentity, screenShareEn
 // Given the participant entries and the local pin, return the spotlight layout:
 // the main tile, the strip (everyone else), and whether the screen share needs
 // its own strip tile (present and not already the main).
+//
+// Camera and screen share are independent LiveKit tracks for the same
+// participant — when that participant's screen is the spotlight (automatic,
+// no manual pin), their own camera (if live) still gets a strip tile instead
+// of disappearing. `screenShareEntry.hasCamera` tells us whether to add it —
+// callers compute this from the sharer's own Track.Source.Camera publication.
+// See docs/superpowers/specs/2026-09-23-call-spotlight-polish-round2-design.md §8.3.
 export function spotlightStrip({ participants = [], pinnedIdentity = null, screenShareEntry = null }) {
   const mainEntry = resolveSpotlightMain(participants, pinnedIdentity, screenShareEntry);
   if (!mainEntry) return { mainEntry: null, others: [], showScreenTile: false };
   const mainId = mainEntry.participant?.identity;
-  const others = participants.filter((e) => e.participant?.identity !== mainId);
   const mainIsSharing = Boolean(screenShareEntry && screenShareEntry.participant?.identity === mainId);
+  const others = participants.filter((e) => {
+    if (e.participant?.identity !== mainId) return true;
+    return mainIsSharing && Boolean(screenShareEntry?.hasCamera);
+  });
   return { mainEntry, others, showScreenTile: Boolean(screenShareEntry) && !mainIsSharing };
 }
 
