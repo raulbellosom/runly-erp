@@ -31,7 +31,7 @@ import { CallReactionsOverlay } from "./CallReactionsOverlay";
 import { CallReactionButton } from "./CallReactionButton";
 import { RaisedHandsBar } from "./RaisedHandsBar";
 import { RecordingBanner } from "./RecordingBanner";
-import { resolveSpotlightMain } from "./lib/callLayout";
+import { spotlightStrip } from "./lib/callLayout";
 
 function formatDuration(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -125,8 +125,17 @@ export function CallRoomLayout({ view, actions, chat }) {
   // The spotlight main: a still-valid manual pin, or (with no pin) whoever is
   // screen-sharing — see resolveSpotlightMain in lib/callLayout.js. Null
   // means "no spotlight": 1:1 falls to DirectFocusLayout, everything else to
-  // the classic grid.
-  const spotlightMain = resolveSpotlightMain(participants, pinnedIdentity, screenShareEntry);
+  // the classic grid. `spotlightStrip` also resolves the strip ("everyone
+  // else", including the sharer's own camera tile if they have one live).
+  const screenShareHasCamera = Boolean(
+    screenShareEntry?.participant?.getTrackPublication?.(Track.Source.Camera)?.track
+      && !screenShareEntry.participant.getTrackPublication(Track.Source.Camera).isMuted,
+  );
+  const { mainEntry: spotlightMain, others: spotlightOthers } = spotlightStrip({
+    participants,
+    pinnedIdentity,
+    screenShareEntry: screenShareEntry ? { ...screenShareEntry, hasCamera: screenShareHasCamera } : null,
+  });
 
   return (
     <div className="fixed inset-0 z-[46] flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-slate-950 text-white">
@@ -216,7 +225,7 @@ export function CallRoomLayout({ view, actions, chat }) {
         {spotlightMain ? (
           <SpotlightLayout
             mainEntry={spotlightMain}
-            others={participants.filter((p) => p.participant?.identity !== spotlightMain.participant?.identity)}
+            others={spotlightOthers}
             screenShareEntry={screenShareEntry}
             isMobile={isMobile}
             raisedHands={raisedHands}

@@ -10,7 +10,7 @@ import { RecordingBanner } from "../RecordingBanner";
 import { ParticipantTile } from "../ParticipantTile";
 import { SpotlightLayout } from "../SpotlightLayout";
 import { DirectFocusLayout } from "../DirectFocusLayout";
-import { resolveSpotlightMain } from "../lib/callLayout";
+import { spotlightStrip } from "../lib/callLayout";
 
 function RemoteAudio({ participant }) {
   const ref = useRef(null);
@@ -118,7 +118,15 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
   }, [participants.length, screenShareEntry]);
 
   const useFocusLayout = participants.length === 2 && !screenShareEntry;
-  const spotlightMain = resolveSpotlightMain(participants, pinnedIdentity, screenShareEntry);
+  const screenShareHasCamera = Boolean(
+    screenShareEntry?.participant?.getTrackPublication?.(Track.Source.Camera)?.track
+      && !screenShareEntry.participant.getTrackPublication(Track.Source.Camera).isMuted,
+  );
+  const { mainEntry: spotlightMain, others: spotlightOthers } = spotlightStrip({
+    participants,
+    pinnedIdentity,
+    screenShareEntry: screenShareEntry ? { ...screenShareEntry, hasCamera: screenShareHasCamera } : null,
+  });
 
   const publishChat = useCallback((body) => {
     const echo = { type: "chat", body, senderName: myName, senderKind: "guest", createdAt: new Date().toISOString() };
@@ -161,7 +169,7 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
         ) : spotlightMain ? (
           <SpotlightLayout
             mainEntry={spotlightMain}
-            others={participants.filter((p) => p.participant?.identity !== spotlightMain.participant?.identity)}
+            others={spotlightOthers}
             screenShareEntry={screenShareEntry}
             isMobile
             raisedHands={ephemeral.raisedHands}
