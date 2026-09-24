@@ -1,5 +1,6 @@
 import { ParticipantTile } from "./ParticipantTile";
 import { stripRowCount } from "./lib/callLayout";
+import { useSpeakingOrder } from "./hooks/useSpeakingOrder";
 
 // Teams-style spotlight: the main entry (a manual pin, or an active screen
 // share when there's no pin — see resolveSpotlightMain in lib/callLayout.js)
@@ -7,10 +8,11 @@ import { stripRowCount } from "./lib/callLayout";
 // on lg+, horizontal on top on narrow screens (2 rows past a tile-count
 // threshold so a bigger call doesn't force one long scroll). A screen share
 // that isn't the main entry becomes a strip tile.
-export function SpotlightLayout({ mainEntry, others, screenShareEntry, isMobile, raisedHands, myHandRaised, myLocalIdentity, mirrorLocalCamera, onPin }) {
+export function SpotlightLayout({ mainEntry, others, screenShareEntry, isMobile, raisedHands, myHandRaised, myLocalIdentity, mirrorLocalCamera, onPin, speakingIds = new Set() }) {
   const mainId = mainEntry.participant?.identity;
   const mainIsSharing = Boolean(screenShareEntry && screenShareEntry.participant?.identity === mainId);
   const showScreenTile = Boolean(screenShareEntry) && !mainIsSharing;
+  const orderedOthers = useSpeakingOrder(others, speakingIds);
   const tileCls = isMobile ? "relative aspect-video h-full shrink-0" : "relative aspect-video w-full shrink-0";
   const handFor = (id) => (id === myLocalIdentity ? myHandRaised : raisedHands.has(id));
   const stripTileCount = others.length + (showScreenTile ? 1 : 0);
@@ -33,6 +35,7 @@ export function SpotlightLayout({ mainEntry, others, screenShareEntry, isMobile,
           mirrorLocalCamera={mirrorLocalCamera}
           className="rounded-[1.5rem]"
           fit="contain"
+          speaking={!mainIsSharing && speakingIds.has(mainId)}
         />
       </div>
       <div className={`shrink-0 ${stripContainerCls}`}>
@@ -48,7 +51,7 @@ export function SpotlightLayout({ mainEntry, others, screenShareEntry, isMobile,
             />
           </div>
         )}
-        {others.map(({ participant, isLocal }) => (
+        {orderedOthers.map(({ participant, isLocal }) => (
           <div key={participant.sid || participant.identity} className={tileCls}>
             <ParticipantTile
               participant={participant}
@@ -58,6 +61,7 @@ export function SpotlightLayout({ mainEntry, others, screenShareEntry, isMobile,
               onPin={onPin}
               mirrorLocalCamera={mirrorLocalCamera}
               className="rounded-xl"
+              speaking={speakingIds.has(participant?.identity)}
             />
           </div>
         ))}

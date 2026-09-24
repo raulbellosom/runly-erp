@@ -5,7 +5,7 @@ import { DraggablePip } from "./DraggablePip";
 // corner. `swapped`/`onToggleSwap` let mobile tap the small pip to invert
 // who's big — desktop leaves this untouched (onToggleSwap stays null there,
 // see CallRoomLayout.jsx) and keeps its own focus/50-50 toggle button.
-export function DirectFocusLayout({ localEntry, remoteEntry, raisedHands, myHandRaised, mirrorLocalCamera, swapped = false, onToggleSwap = null }) {
+export function DirectFocusLayout({ localEntry, remoteEntry, raisedHands, myHandRaised, mirrorLocalCamera, swapped = false, onToggleSwap = null, speakingIds = new Set() }) {
   const mainEntry = swapped ? localEntry : remoteEntry;
   const pipEntry = swapped ? remoteEntry : localEntry;
   const mainIsLocal = swapped;
@@ -20,6 +20,7 @@ export function DirectFocusLayout({ localEntry, remoteEntry, raisedHands, myHand
         mirrorLocalCamera={mirrorLocalCamera}
         className="rounded-[1.5rem]"
         fit="contain"
+        speaking={speakingIds.has(mainEntry.participant?.identity)}
       />
       <DraggablePip label={pipName} initial={pipName.slice(0, 1).toUpperCase()} onTap={onToggleSwap}>
         <ParticipantTile
@@ -28,6 +29,7 @@ export function DirectFocusLayout({ localEntry, remoteEntry, raisedHands, myHand
           handRaised={pipEntry.isLocal ? myHandRaised : raisedHands.has(pipEntry.participant?.identity)}
           mirrorLocalCamera={mirrorLocalCamera}
           className="rounded-2xl"
+          speaking={speakingIds.has(pipEntry.participant?.identity)}
         />
       </DraggablePip>
     </div>

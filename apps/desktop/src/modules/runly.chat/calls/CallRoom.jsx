@@ -468,6 +468,9 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
   useEffect(() => {
     if (participants.length !== 2 || screenShareEntry) setDirectSwapped(false);
   }, [participants.length, screenShareEntry]);
+  // room.activeSpeakers is already kept fresh by the RoomEvent.ActiveSpeakersChanged
+  // listener above (it calls refresh()) — derive the identity set on every render.
+  const speakingIds = new Set(room.activeSpeakers.map((p) => p.identity));
   const mirrorLocalCamera = cameraFacing !== "environment";
   const gridClass = participants.length === 1
     ? "grid-cols-1 grid-rows-1"
@@ -580,6 +583,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         pinnedIdentity,
         myLocalIdentity: room.localParticipant?.identity,
         directSwapped,
+        speakingIds,
         canRecord,
         recordingActive: recording.active,
         recordingBusy: recording.busy,

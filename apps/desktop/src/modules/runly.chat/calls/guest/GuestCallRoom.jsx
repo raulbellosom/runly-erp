@@ -118,6 +118,7 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
   }, [participants.length, screenShareEntry]);
 
   const useFocusLayout = participants.length === 2 && !screenShareEntry;
+  const speakingIds = new Set(room.activeSpeakers.map((p) => p.identity));
   const screenShareHasCamera = Boolean(
     screenShareEntry?.participant?.getTrackPublication?.(Track.Source.Camera)?.track
       && !screenShareEntry.participant.getTrackPublication(Track.Source.Camera).isMuted,
@@ -177,6 +178,7 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
             myLocalIdentity={room.localParticipant?.identity}
             mirrorLocalCamera
             onPin={setPinned}
+            speakingIds={speakingIds}
           />
         ) : useFocusLayout ? (
           <DirectFocusLayout
@@ -187,6 +189,7 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
             mirrorLocalCamera
             swapped={directSwapped}
             onToggleSwap={toggleDirectSwap}
+            speakingIds={speakingIds}
           />
         ) : (
           <div className={`mx-auto grid h-full max-w-5xl gap-2 ${participants.length <= 1 ? "grid-cols-1" : participants.length === 2 ? "sm:grid-cols-2" : "grid-cols-2"}`}>
@@ -199,6 +202,7 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
                 onPin={participants.length > 1 ? setPinned : null}
                 mirrorLocalCamera
                 fit="contain"
+                speaking={speakingIds.has(participant?.identity)}
               />
             ))}
           </div>

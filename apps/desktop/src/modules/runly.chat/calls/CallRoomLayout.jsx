@@ -98,6 +98,7 @@ export function CallRoomLayout({ view, actions, chat }) {
     pinnedIdentity = null,
     myLocalIdentity = null,
     directSwapped = false,
+    speakingIds = new Set(),
     canRecord = false,
     recordingActive = false,
     recordingBusy = false,
@@ -233,6 +234,7 @@ export function CallRoomLayout({ view, actions, chat }) {
             myLocalIdentity={myLocalIdentity}
             mirrorLocalCamera={mirrorLocalCamera}
             onPin={actions.setPinned}
+            speakingIds={speakingIds}
           />
         ) : useFocusLayout ? (
           <DirectFocusLayout
@@ -243,6 +245,7 @@ export function CallRoomLayout({ view, actions, chat }) {
             mirrorLocalCamera={mirrorLocalCamera}
             swapped={isMobile ? directSwapped : false}
             onToggleSwap={isMobile ? actions.toggleDirectSwap : null}
+            speakingIds={speakingIds}
           />
         ) : (
           <div className={`mx-auto grid h-full max-w-6xl gap-2 sm:gap-3 ${gridClass}`}>
@@ -255,6 +258,7 @@ export function CallRoomLayout({ view, actions, chat }) {
                 onPin={participants.length > 1 ? actions.setPinned : null}
                 mirrorLocalCamera={mirrorLocalCamera}
                 fit={participants.length <= 2 ? "contain" : "auto"}
+                speaking={speakingIds.has(participant?.identity)}
               />
             ))}
           </div>

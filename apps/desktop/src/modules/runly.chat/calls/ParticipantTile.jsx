@@ -62,10 +62,14 @@ export function ParticipantTile({
   mirrorLocalCamera = true,
   className = "",
   preferSource = "auto",
-  // "auto" = contain for screen-share, cover for camera. Pass "contain" to
-  // letterbox a camera feed too (used in the focus layout so a portrait phone
-  // camera in a landscape tile isn't cropped).
+  // "auto" = contain for screen-share, cover-or-contain for camera depending
+  // on its decoded orientation (see resolveAutoFit above). Pass "contain" to
+  // force letterboxing regardless of orientation (used by the main spotlight
+  // tile).
   fit = "auto",
+  // Whether this participant is a currently active speaker (LiveKit
+  // room.activeSpeakers) — shows a subtle ring, Teams/Meet-style.
+  speaking = false,
 }) {
   const coarse = useCoarsePointer();
   const screen = participant?.getTrackPublication?.(Track.Source.ScreenShare);
@@ -86,7 +90,7 @@ export function ParticipantTile({
   const name = participant?.name || (isLocal ? "Tu" : participant?.identity) || "Participante";
 
   return (
-    <div className={`group/tile relative h-full min-h-0 overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-white/10 ${className}`}>
+    <div className={`group/tile relative h-full min-h-0 overflow-hidden rounded-2xl bg-slate-900 ring-1 transition-shadow ${speaking ? "ring-2 ring-emerald-400" : "ring-white/10"} ${className}`}>
       {hasVideo ? (
         <TrackRenderer
           participant={participant}
