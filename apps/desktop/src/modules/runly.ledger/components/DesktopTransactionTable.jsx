@@ -3,17 +3,32 @@ import CategoryOptions from './CategoryOptions.jsx'
 import { fmtDecimal, toDateValue } from '../lib/spreadsheet-helpers.js'
 
 const colClass = 'px-2 py-0 h-8 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-[hsl(var(--ring))] rounded w-full'
-const thClass = 'px-2 py-1.5 text-xs font-semibold text-[hsl(var(--muted-foreground))] text-left whitespace-nowrap border-b border-r border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] select-none last:border-r-0'
-const tdClass = 'border-b border-r border-[hsl(var(--border)/0.5)] p-0 align-middle last:border-r-0'
+const thClass = 'px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] text-left whitespace-nowrap border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))] select-none'
+const tdClass = 'border-b border-[hsl(var(--border)/0.5)] p-0 align-middle'
 
 // Desktop spreadsheet-style register: inline-editable grid with keyboard
 // navigation (arrow up/down, tab-like Enter, Escape) across cells, plus an
 // always-last "new row" for adding a movement without opening a dialog.
+// `visibleRowIds` only hides rows (CSS `hidden`) for the search/type/category
+// filter strip — it never changes `rows`' array indices, which
+// data-row/keyboard navigation in SpreadsheetRegister depends on staying stable.
 export default function DesktopTransactionTable({
-  tableRef, rows, types, categories, canEdit,
+  tableRef, rows, visibleRowIds, types, categories, canEdit,
   getDraft, setDraft, handleKeyDown, handleRowBlur, saveRow,
   newRow, setNewRow, onDelete,
 }) {
+  const totals = rows.reduce(
+    (acc, row) => {
+      if (!visibleRowIds || visibleRowIds.has(row.id)) {
+        acc.deposito += Number(row.deposito ?? 0)
+        acc.retiro += Number(row.retiro ?? 0)
+      }
+      return acc
+    },
+    { deposito: 0, retiro: 0 },
+  )
+  const lastRow = rows[rows.length - 1]
+
   return (
     <table
       ref={tableRef}
@@ -51,11 +66,12 @@ export default function DesktopTransactionTable({
         )}
         {rows.map((row, rowIdx) => {
           const draft = getDraft(row, rowIdx)
+          const hiddenByFilter = visibleRowIds && !visibleRowIds.has(row.id)
           return (
             <tr
               key={row.id}
               onBlur={(event) => handleRowBlur(event, row, rowIdx)}
-              className="hover:bg-[hsl(var(--muted)/0.2)]"
+              className={`hover:bg-[hsl(var(--muted)/0.4)] odd:bg-[hsl(var(--muted)/0.12)] transition-colors ${hiddenByFilter ? 'hidden' : ''}`}
             >
               <td className={`${tdClass} text-center text-xs text-[hsl(var(--muted-foreground))]`}>
                 {row.consecutive}
@@ -153,7 +169,7 @@ export default function DesktopTransactionTable({
                   step="0.01"
                   inputMode="decimal"
                   enterKeyHint="next"
-                  className={`${colClass} text-right`}
+                  className={`${colClass} text-right tabular-nums ${Number(draft.deposito) > 0 ? 'text-success font-semibold' : ''}`}
                   data-row={rowIdx}
                   data-col="deposito"
                   disabled={!canEdit}
@@ -170,7 +186,7 @@ export default function DesktopTransactionTable({
                   step="0.01"
                   inputMode="decimal"
                   enterKeyHint="next"
-                  className={`${colClass} text-right`}
+                  className={`${colClass} text-right tabular-nums ${Number(draft.retiro) > 0 ? 'text-destructive font-semibold' : ''}`}
                   data-row={rowIdx}
                   data-col="retiro"
                   disabled={!canEdit}
@@ -193,7 +209,7 @@ export default function DesktopTransactionTable({
                   <CategoryOptions categories={categories} />
                 </select>
               </td>
-              <td className={`${tdClass} text-right pr-3 text-xs font-mono font-semibold`}>
+              <td className={`${tdClass} text-right pr-3 text-xs font-mono font-semibold tabular-nums`}>
                 {fmtDecimal(row.saldo_actual)}
               </td>
               <td className={`${tdClass} text-center`}>
@@ -300,7 +316,7 @@ export default function DesktopTransactionTable({
                 step="0.01"
                 inputMode="decimal"
                 enterKeyHint="next"
-                className={`${colClass} text-right`}
+                className={`${colClass} text-right tabular-nums ${Number(newRow.deposito) > 0 ? 'text-success font-semibold' : ''}`}
                 disabled={!canEdit}
                 value={newRow.deposito}
                 onChange={(event) => setNewRow((row) => ({ ...row, deposito: event.target.value, _dirty: true }))}
@@ -314,7 +330,7 @@ export default function DesktopTransactionTable({
                 step="0.01"
                 inputMode="decimal"
                 enterKeyHint="next"
-                className={`${colClass} text-right`}
+                className={`${colClass} text-right tabular-nums ${Number(newRow.retiro) > 0 ? 'text-destructive font-semibold' : ''}`}
                 disabled={!canEdit}
                 value={newRow.retiro}
                 onChange={(event) => setNewRow((row) => ({ ...row, retiro: event.target.value, _dirty: true }))}
@@ -340,6 +356,26 @@ export default function DesktopTransactionTable({
           </tr>
         )}
       </tbody>
+      {rows.length > 0 && (
+        <tfoot>
+          <tr className="bg-[hsl(var(--muted))] font-semibold">
+            <td className={`${tdClass} text-right border-b-0`} colSpan={7}>
+              Totales
+            </td>
+            <td className={`${tdClass} text-right border-b-0 text-xs tabular-nums text-success`}>
+              {fmtDecimal(totals.deposito)}
+            </td>
+            <td className={`${tdClass} text-right border-b-0 text-xs tabular-nums text-destructive`}>
+              {fmtDecimal(totals.retiro)}
+            </td>
+            <td className={`${tdClass} border-b-0`} />
+            <td className={`${tdClass} text-right border-b-0 pr-3 text-xs font-mono tabular-nums`}>
+              {fmtDecimal(lastRow?.saldo_actual)}
+            </td>
+            <td className={`${tdClass} border-b-0`} />
+          </tr>
+        </tfoot>
+      )}
     </table>
   )
 }

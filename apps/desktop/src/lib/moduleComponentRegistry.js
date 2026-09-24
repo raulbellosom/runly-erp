@@ -28,6 +28,7 @@ import { AddressFieldsSection } from "@runly/ui";
 import MembershipsSection from "../modules/runly.identity/components/MembershipsSection.jsx";
 import PermissionGrantsSection from "../modules/runly.identity/components/PermissionGrantsSection.jsx";
 import UserActivitySection from "../modules/runly.identity/components/UserActivitySection.jsx";
+import UserSessionSection from "../modules/runly.identity/components/UserSessionSection.jsx";
 import PermissionTreeSection from "../modules/runly.identity/components/PermissionTreeSection.jsx";
 import RoleMembersSection from "../modules/runly.identity/components/RoleMembersSection.jsx";
 
@@ -105,6 +106,10 @@ componentRegistry.register(
 componentRegistry.register(
   "runly.identity:UserActivitySection",
   UserActivitySection,
+);
+componentRegistry.register(
+  "runly.identity:UserSessionSection",
+  UserSessionSection,
 );
 componentRegistry.register(
   "runly.identity:PermissionTreeSection",

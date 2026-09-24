@@ -15,7 +15,7 @@ import {
 // Same protected-role set /identity/users/:id/memberships* guards against —
 // kept local rather than imported since it's a one-line literal, not worth a
 // shared constant module for.
-const PROTECTED_MEMBER_ROLE_KEYS = new Set(["runly.admin", "atlas.admin", "system.admin"]);
+const PROTECTED_MEMBER_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
 
 export class CompanyServiceError extends Error {
   constructor(message, status = 500) {

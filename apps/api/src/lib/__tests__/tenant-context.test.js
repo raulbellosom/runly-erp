@@ -56,7 +56,7 @@ describe("resolveActiveMembership", () => {
   });
 
   it("activates the requested company when the header matches an enabled membership", () => {
-    const a = membership({ companyId: "A", roleKey: "atlas.admin" });
+    const a = membership({ companyId: "A", roleKey: "runly.admin" });
     const b = membership({ companyId: "B", roleKey: "viewer" });
     const result = resolveActiveMembership({ memberships: [a, b], requestedCompanyId: "B" });
     assert.equal(result.ok, true);
@@ -104,7 +104,7 @@ describe("computeScopedPermissions", () => {
   });
 
   it("company admin gets every provided permission key, scoped to the active company only", () => {
-    const activeMembership = membership({ companyId: "A", roleKey: "atlas.admin", permissions: [] });
+    const activeMembership = membership({ companyId: "A", roleKey: "runly.admin", permissions: [] });
     const { permissionSet, isCompanyAdmin } = computeScopedPermissions({
       activeMembership,
       grantKeysForCompany: [],
@@ -152,15 +152,15 @@ describe("isSystemAdminMembership", () => {
   });
 
   it("is false when no membership has system.admin", () => {
-    const a = membership({ companyId: "A", roleKey: "atlas.admin" });
+    const a = membership({ companyId: "A", roleKey: "runly.admin" });
     assert.equal(isSystemAdminMembership([a]), false);
   });
 });
 
 describe("role key sets", () => {
-  it("atlas.admin is a company-admin key, not a system-admin key", () => {
-    assert.equal(COMPANY_ADMIN_ROLE_KEYS.has("atlas.admin"), true);
-    assert.equal(SYSTEM_ADMIN_ROLE_KEYS.has("atlas.admin"), false);
+  it("runly.admin is a company-admin key, not a system-admin key", () => {
+    assert.equal(COMPANY_ADMIN_ROLE_KEYS.has("runly.admin"), true);
+    assert.equal(SYSTEM_ADMIN_ROLE_KEYS.has("runly.admin"), false);
   });
   it("system.admin is a system-admin key, not a company-admin key", () => {
     assert.equal(SYSTEM_ADMIN_ROLE_KEYS.has("system.admin"), true);

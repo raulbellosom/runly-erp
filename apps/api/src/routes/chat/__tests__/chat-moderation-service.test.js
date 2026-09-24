@@ -213,7 +213,7 @@ describe("chat-moderation-service — reports", () => {
       [{ id: PROFILE_ID }], // resolveUserProfileId for reviewer
     ]);
     prisma.userProfile.findUnique = async () => ({
-      memberships: [{ enabled: true, role: { key: "atlas.admin" } }],
+      memberships: [{ enabled: true, role: { key: "runly.admin" } }],
     });
     const service = createChatModerationService({ prisma });
     await assert.rejects(

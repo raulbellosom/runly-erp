@@ -3,11 +3,11 @@
 // rows in the live database and tears them all down in a `finally` block —
 // never leaves orphaned data behind, even on assertion failure.
 //
-// Deliberately reuses the existing seeded `atlas.admin` system role (rather
+// Deliberately reuses the existing seeded `runly.admin` system role (rather
 // than creating new Role rows) for "full permissions in this company" test
 // subjects, and `roleId: null` for "no special permissions" ones — Role.key
 // is now company-scoped (see the 20260911000000_multi_tenant_schema_hardening
-// migration) but atlas.admin (companyId: null) still applies in whatever
+// migration) but runly.admin (companyId: null) still applies in whatever
 // company is active, which is exactly what a real company-admin test subject
 // needs.
 
@@ -30,12 +30,12 @@ export function mintTestJwt(authUserId, secret) {
 }
 
 export async function createCrossTenantFixture(prisma) {
-  const atlasAdminRole = await prisma.role.findFirst({
-    where: { companyId: null, key: "atlas.admin" },
+  const runlyAdminRole = await prisma.role.findFirst({
+    where: { companyId: null, key: "runly.admin" },
   });
-  if (!atlasAdminRole) {
+  if (!runlyAdminRole) {
     throw new Error(
-      "Seeded atlas.admin system role not found — run `pnpm db:seed` before running this suite.",
+      "Seeded runly.admin system role not found — run `pnpm db:seed` before running this suite.",
     );
   }
   const hrReadPermission = await prisma.permission.findUnique({
@@ -121,16 +121,16 @@ export async function createCrossTenantFixture(prisma) {
   });
 
   await prisma.membership.create({
-    data: { companyId: companyA.id, userId: userA.id, roleId: atlasAdminRole.id },
+    data: { companyId: companyA.id, userId: userA.id, roleId: runlyAdminRole.id },
   });
   await prisma.membership.create({
-    data: { companyId: companyB.id, userId: userB.id, roleId: atlasAdminRole.id },
+    data: { companyId: companyB.id, userId: userB.id, roleId: runlyAdminRole.id },
   });
   await prisma.membership.create({
     data: { companyId: companyB.id, userId: userAB.id, roleId: hrReaderRoleB.id },
   });
   await prisma.membership.create({
-    data: { companyId: companyA.id, userId: userAB.id, roleId: atlasAdminRole.id },
+    data: { companyId: companyA.id, userId: userAB.id, roleId: runlyAdminRole.id },
   });
 
   const employeeA = await prisma.hrEmployee.create({
@@ -169,7 +169,7 @@ export async function createCrossTenantFixture(prisma) {
     userAB,
     employeeA,
     fileA,
-    atlasAdminRoleId: atlasAdminRole.id,
+    runlyAdminRoleId: runlyAdminRole.id,
     hrReaderRoleBId: hrReaderRoleB.id,
   };
 }

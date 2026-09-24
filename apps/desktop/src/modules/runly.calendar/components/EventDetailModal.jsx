@@ -95,47 +95,44 @@ export default function EventDetailModal({
           scrollable={false}
           className="px-0 pt-0 pb-0 md:p-0 gap-0 overflow-hidden"
         >
-          {/* Sticky header — color bar, edit/delete actions and title stay
-              pinned while the section below scrolls. DialogContent itself is
-              the scroll container (native overflow-y-auto), so `sticky` (not
-              a flex/overflow-hidden split) is what actually pins this against
+          {/* Sticky header — color bar and title stay pinned while the
+              section below scrolls. DialogContent itself is the scroll
+              container (native overflow-y-auto), so `sticky` (not a
+              flex/overflow-hidden split) is what actually pins this against
               its own base scroll classes. Needs an opaque-ish background
               since .glass-strong is translucent — otherwise scrolled content
-              would show through. */}
+              would show through. Edit/delete sit to the left of the
+              dialog's own close (X), which is `z-20` (see Dialog.jsx) so it
+              always paints above this `z-10` header instead of being hidden
+              under it. */}
           <div className="sticky top-0 z-10 bg-[hsl(var(--card))]/95 backdrop-blur-sm rounded-t-2xl">
             <div className="h-1.5 rounded-t-2xl" style={{ backgroundColor: calColor }} />
 
-            <DialogHeader className="mb-0 space-y-0 px-5 pt-3 pb-3 pr-12">
-              <div className="flex items-center justify-end gap-1 -mt-1 -mr-1">
+            <DialogHeader className="mb-0 space-y-1 px-5 pt-4 pb-3 pr-28">
+              <div className="absolute right-12 top-4 flex items-center gap-0.5">
                 {canEdit && (
                   <button
                     onClick={() => onEdit(event)}
-                    className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
+                    className="rounded-lg p-1.5 text-[hsl(var(--muted-foreground))] opacity-70 transition-opacity hover:opacity-100 hover:bg-[hsl(var(--muted))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/40"
                     title={event._isRecurrenceInstance ? "Editar serie" : "Editar"}
                   >
-                    <Edit2
-                      size={15}
-                      className="text-[hsl(var(--muted-foreground))]"
-                    />
+                    <Edit2 size={15} />
                   </button>
                 )}
                 {canDelete && !event.sourceModule && (
                   <button
                     onClick={() => setConfirmOpen(true)}
                     disabled={deleteEvent.isPending}
-                    className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"
+                    className="rounded-lg p-1.5 text-[hsl(var(--muted-foreground))] opacity-70 transition-opacity hover:opacity-100 hover:bg-[hsl(var(--muted))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/40 disabled:pointer-events-none disabled:opacity-40"
                     title={
                       event._isRecurrenceInstance ? "Eliminar serie" : "Eliminar"
                     }
                   >
-                    <Trash2
-                      size={15}
-                      className="text-[hsl(var(--muted-foreground))]"
-                    />
+                    <Trash2 size={15} />
                   </button>
                 )}
               </div>
-              <DialogTitle className="text-lg font-semibold leading-tight">
+              <DialogTitle className="text-lg font-semibold leading-snug">
                 {event.title}
               </DialogTitle>
             </DialogHeader>
@@ -147,11 +144,14 @@ export default function EventDetailModal({
                 type="button"
                 className="w-full"
                 disabled={callPending}
-                onClick={() => startCall({
-                  conversationId: event.sourceEntityId,
-                  calendarEventId: event._baseEventId ?? event.id,
-                  kind: "VIDEO",
-                })}
+                onClick={async () => {
+                  const started = await startCall({
+                    conversationId: event.sourceEntityId,
+                    calendarEventId: event._baseEventId ?? event.id,
+                    kind: "VIDEO",
+                  });
+                  if (started) onClose();
+                }}
               >
                 <Video className="mr-2 h-4 w-4" />
                 Iniciar llamada

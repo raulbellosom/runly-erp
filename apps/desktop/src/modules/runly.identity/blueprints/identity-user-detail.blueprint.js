@@ -83,6 +83,14 @@ export const IDENTITY_USER_DETAIL = {
         column: "aside",
         component: "runly.identity:UserActivitySection",
       },
+      {
+        id: "session-info",
+        type: "component",
+        label: "Sesión (Supabase)",
+        icon: "LogIn",
+        column: "aside",
+        component: "runly.identity:UserSessionSection",
+      },
     ],
   },
 };

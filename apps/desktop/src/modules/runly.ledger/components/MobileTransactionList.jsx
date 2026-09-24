@@ -15,7 +15,7 @@ export default function MobileTransactionList({ rows, canEdit, onEdit, onDelete 
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium truncate">{row.nombre}</span>
-              <span className={`text-sm font-mono font-semibold shrink-0 ${Number(row.deposito) > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              <span className={`text-sm font-mono font-semibold shrink-0 tabular-nums ${Number(row.deposito) > 0 ? 'text-success' : 'text-destructive'}`}>
                 {Number(row.deposito) > 0 ? '+' : '-'}{fmtDecimal(row.deposito || row.retiro)}
               </span>
             </div>

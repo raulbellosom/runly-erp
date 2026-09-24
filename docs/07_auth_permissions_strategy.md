@@ -60,7 +60,7 @@ HREmployee           ← HR/business record (runly.hr module)
 Current behavior (v1):
 
 - API is the source of truth for authorization.
-- Admin bypass only for roles `runly.admin` (or the legacy `atlas.admin`) and `system.admin`.
+- Admin bypass only for roles `runly.admin` and `system.admin`. (The legacy `atlas.admin` key was retired 2026-09-23 — see `docs/superpowers/specs/2026-09-23-identity-user-sessions-design.md` — any persisted rows were merged/renamed into `runly.admin` by migration `20260923120000_retire_atlas_admin_role_key`.)
 - Every authenticated active user gets base permission `profile.self.read`.
 - If a permission is not explicitly granted, access is denied.
 

@@ -94,13 +94,13 @@ test("search_inventory: admin in Company A does NOT leak admin access into a too
   // Regression test for the exact bug this fix closes: erpContext used to
   // read uctx.isAdmin/uctx.permissionSet, which getUserContextByAuthId built
   // by UNIONING every membership's role across every company the user
-  // belongs to — so an atlas.admin role in Company A leaked admin access
+  // belongs to — so a runly.admin role in Company A leaked admin access
   // into any tool call, regardless of which company ctx.companyId (the
   // caller's actual active company) named.
   const resolveUserContext = async () => ({
     profile: { id: "p1" },
     memberships: [
-      membership({ companyId: "companyA", roleKey: "atlas.admin" }),
+      membership({ companyId: "companyA", roleKey: "runly.admin" }),
       membership({ companyId: "companyB", permissions: [] }), // no special role in B
     ],
   });
@@ -121,7 +121,7 @@ test("search_inventory: admin in Company A does NOT leak admin access into a too
     { query: "laptop" },
     { actorAuthUserId: "a", companyId: "companyA" },
   );
-  assert.equal(asAdminInA.error, undefined, "atlas.admin in the active company must be allowed");
+  assert.equal(asAdminInA.error, undefined, "runly.admin in the active company must be allowed");
 
   const asPlainInB = await runners.search_inventory(
     { query: "laptop" },

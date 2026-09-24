@@ -1,18 +1,27 @@
 // apps/desktop/src/modules/runly.ledger/screens/SpreadsheetRegister.jsx
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useOfflineStatus } from '@runly/offline'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
-import { Button, ConfirmDialog, ErrorState } from '@runly/ui'
+import { Plus, Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
-import { useAccountTransactions, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
+import { useAccountTransactions, useAccountSummary, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
 import { useTransactionMutations } from '../hooks/useTransactionMutations.js'
 import { EDITABLE_COLS, PAGE_STEP, emptyRow, buildTransactionPayload, toDateValue } from '../lib/spreadsheet-helpers.js'
 import MobileTransactionList from '../components/MobileTransactionList.jsx'
 import MobileTransactionSheet from '../components/MobileTransactionSheet.jsx'
 import DesktopTransactionTable from '../components/DesktopTransactionTable.jsx'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
-export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types = [], categories = [], canWrite = true }) {
+function fmtCurrency(amount, currency = 'MXN') {
+  return Number(amount ?? 0).toLocaleString('es-MX', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+  })
+}
+
+export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types = [], categories = [], canWrite = true, currency = 'MXN' }) {
   const { session } = useAuth()
   const { isOnline } = useOfflineStatus()
   const { isUsingLocalLedger } = useLedgerSQLite()
@@ -21,15 +30,62 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
   const [limit, setLimit] = useState(PAGE_STEP)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [mobileSheet, setMobileSheet] = useState(null) // { mode: 'new' | 'edit', draft }
+  const [search, setSearch] = useState('')
+  const [filterValue, setFilterValue] = useState({ tipo: '', categoria: '' })
   const tableRef = useRef(null)
   const canEdit = isOnline && !!token && canWrite
 
   const queryKey = ['ledger-transactions', accountId, dateFrom ?? null, dateTo ?? null, limit, isUsingLocalLedger ? 'local' : 'remote']
   const { data, isLoading, isError, refetch } = useAccountTransactions(accountId, { dateFrom, dateTo, limit })
+  // Reused by the account's "Resumen" tab too (useAccountSummary) — React Query
+  // dedupes the identical queryKey, so switching tabs is a cache hit, not a
+  // second network call.
+  const { data: summaryData } = useAccountSummary(accountId, { dateFrom, dateTo })
 
   const rows = data?.data ?? []
   const total = data?.pagination?.total ?? rows.length
   const hasMore = total > rows.length
+
+  const normalizedSearch = search.trim().toLowerCase()
+  const filtersActive = Boolean(normalizedSearch || filterValue.tipo || filterValue.categoria)
+
+  function rowMatchesFilters(row) {
+    if (filterValue.tipo && String(row.tipo_id ?? '') !== String(filterValue.tipo)) return false
+    if (filterValue.categoria && String(row.category_id ?? '') !== String(filterValue.categoria)) return false
+    if (normalizedSearch) {
+      const haystack = [row.nombre, row.concepto, row.referencia, row.numero]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      if (!haystack.includes(normalizedSearch)) return false
+    }
+    return true
+  }
+
+  // Filtering hides rows via CSS (visibleRowIds), it never removes them from
+  // `rows` — DesktopTransactionTable's keyboard navigation (ArrowUp/Down,
+  // data-row indices) depends on `rows`' original indices staying stable.
+  const visibleRowIds = useMemo(
+    () => new Set(rows.filter(rowMatchesFilters).map((row) => row.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, normalizedSearch, filterValue.tipo, filterValue.categoria],
+  )
+  const visibleRows = useMemo(() => rows.filter((row) => visibleRowIds.has(row.id)), [rows, visibleRowIds])
+  const noFilterMatches = filtersActive && rows.length > 0 && visibleRowIds.size === 0
+
+  const kpis = summaryData?.kpis
+  const statItems = kpis
+    ? [
+        { key: 'balance', label: 'Saldo actual', value: fmtCurrency(kpis.current_balance, currency), icon: Wallet, tone: 'brand' },
+        { key: 'income', label: 'Ingresos', value: fmtCurrency(kpis.total_deposito, currency), icon: ArrowDownLeft, tone: 'success' },
+        { key: 'expense', label: 'Egresos', value: fmtCurrency(kpis.total_retiro, currency), icon: ArrowUpRight, tone: 'destructive' },
+      ]
+    : []
+
+  const filterBarFilters = [
+    { key: 'tipo', label: 'Tipo', options: types.map((t) => ({ value: t.id, label: t.code })) },
+    { key: 'categoria', label: 'Categoría', options: categories.map((c) => ({ value: c.id, label: c.name })) },
+  ].filter((f) => f.options.length > 0)
 
   const { saveMutation, deleteMutation, getDraft, setDraft, clearDraft, saveRow } = useTransactionMutations({
     accountId,
@@ -125,18 +181,32 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[hsl(var(--border))]">
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">
-          {rows.length === total
-            ? `${total} movimiento${total !== 1 ? 's' : ''}`
-            : `${rows.length} de ${total}`}
-        </span>
+      {statItems.length > 0 && (
+        <div className="px-3 pt-3">
+          <LedgerStatStrip items={statItems} />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[hsl(var(--border))] gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0 whitespace-nowrap">
+            {rows.length === total
+              ? `${total} movimiento${total !== 1 ? 's' : ''}`
+              : `${rows.length} de ${total}`}
+          </span>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, concepto, referencia..."
+            className="flex-1 max-w-md"
+          />
+        </div>
         <>
           {/* Desktop: inline new row. Mobile: sheet form. */}
           <Button
             variant="ghost"
             size="sm"
-            className="hidden sm:inline-flex"
+            className="hidden sm:inline-flex shrink-0"
             onClick={() => setNewRow({ ...emptyRow(accountId), numero: String(total + 1) })}
             disabled={!!newRow || !canEdit}
           >
@@ -146,7 +216,7 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
           <Button
             variant="ghost"
             size="sm"
-            className="sm:hidden"
+            className="sm:hidden shrink-0"
             onClick={openMobileNew}
             disabled={!canEdit}
           >
@@ -155,6 +225,17 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
           </Button>
         </>
       </div>
+
+      {filterBarFilters.length > 0 && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[hsl(var(--border))] flex-wrap">
+          <FilterBar filters={filterBarFilters} value={filterValue} onChange={setFilterValue} />
+          {noFilterMatches && (
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              Sin movimientos que coincidan con los filtros.
+            </span>
+          )}
+        </div>
+      )}
 
       {!canEdit && (
         <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.2)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
@@ -174,7 +255,7 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
         )}
 
         <MobileTransactionList
-          rows={rows}
+          rows={visibleRows}
           canEdit={canEdit}
           onEdit={openMobileEdit}
           onDelete={setDeleteTarget}
@@ -183,6 +264,7 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
         <DesktopTransactionTable
           tableRef={tableRef}
           rows={rows}
+          visibleRowIds={visibleRowIds}
           types={types}
           categories={categories}
           canEdit={canEdit}

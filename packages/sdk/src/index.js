@@ -391,6 +391,10 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/identity/users/${encodeURIComponent(id)}`, {
           headers: withAuthHeaders(token),
         }),
+      getUserSession: (id, token) =>
+        request(`/identity/users/${encodeURIComponent(id)}/session`, {
+          headers: withAuthHeaders(token),
+        }),
       updateMembership: (userId, membershipId, data, token) =>
         request(
           `/identity/users/${encodeURIComponent(userId)}/memberships/${encodeURIComponent(membershipId)}`,

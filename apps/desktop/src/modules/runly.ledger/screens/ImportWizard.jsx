@@ -4,10 +4,11 @@ import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Badge, Button, DistDropZone, PageHeader, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@runly/ui'
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { Button, Card, DistDropZone, PageHeader, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@runly/ui'
+import { ArrowLeft, ArrowRight, Check, Upload, ListChecks, Eye, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -26,7 +27,11 @@ const STEP_UPLOAD  = 0
 const STEP_MAPPING = 1
 const STEP_PREVIEW = 2
 
-const STEPS = ['Subir archivo', 'Mapear columnas', 'Previsualizar']
+const STEPS = [
+  { label: 'Subir archivo', icon: Upload },
+  { label: 'Mapear columnas', icon: ListChecks },
+  { label: 'Previsualizar', icon: Eye },
+]
 
 function fmtCurrency(amount, currency = 'MXN') {
   return Number(amount ?? 0).toLocaleString('es-MX', {
@@ -177,9 +182,10 @@ export default function ImportWizard() {
     <div className="flex flex-col h-full">
 
       {/* ── Account context header (matches AccountScreen layout) ──────── */}
-      <div className="px-6 pt-5 pb-4 border-b border-[hsl(var(--border))] shrink-0">
+      <div className="px-6 pt-5 pb-4 border-b border-[hsl(var(--border))] shrink-0 space-y-4">
         <PageHeader
           className="pb-0"
+          eyebrow="Runly Ledger · Importación CSV"
           onBack={() => navigate(`/app/m/runly.ledger/accounts/${accountId}`)}
           backLabel={account ? account.name : 'Cuenta'}
           title="Importar movimientos"
@@ -190,46 +196,47 @@ export default function ImportWizard() {
                 <span className="mx-1.5 opacity-40">·</span>
                 {account.currency}
                 <span className="mx-1.5 opacity-40">·</span>
-                <span
-                  className="font-semibold tabular-nums"
-                  style={{ color: 'var(--module-accent, #16a34a)' }}
-                >
+                <span className="font-semibold tabular-nums text-(--brand-primary)">
                   {fmtCurrency(account.current_balance, account.currency)}
                 </span>
               </>
             )
           }
         />
-      </div>
 
-      {/* ── Step indicators ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-6 py-3 border-b border-[hsl(var(--border))] shrink-0">
-        {STEPS.map((label, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span
-              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-              style={
-                step >= i
-                  ? { backgroundColor: 'var(--module-accent, #16a34a)', color: '#fff' }
-                  : { border: '1px solid hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }
-              }
-            >
-              {step > i ? <Check size={12} /> : i + 1}
-            </span>
-            <span
-              className={`text-sm whitespace-nowrap ${
-                step === i
-                  ? 'font-semibold text-[hsl(var(--foreground))]'
-                  : 'text-[hsl(var(--muted-foreground))]'
-              }`}
-            >
-              {label}
-            </span>
-            {i < STEPS.length - 1 && (
-              <span className="text-[hsl(var(--muted-foreground))] mx-1">›</span>
-            )}
-          </div>
-        ))}
+        {/* ── Step indicators ────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {STEPS.map((s, i) => {
+            const Icon = s.icon
+            const state = step > i ? 'done' : step === i ? 'active' : 'pending'
+            return (
+              <div
+                key={s.label}
+                className={[
+                  'flex items-center gap-2 rounded-lg border px-3 py-2 min-w-44',
+                  state === 'active' && 'border-(--brand-primary) bg-(--brand-soft)',
+                  state === 'done' && 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)]',
+                  state === 'pending' && 'border-[hsl(var(--border))] bg-transparent opacity-60',
+                ].filter(Boolean).join(' ')}
+              >
+                <span
+                  className={[
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                    state === 'active' && 'bg-(--brand-primary) text-(--brand-primary-foreground)',
+                    state === 'done' && 'bg-[hsl(var(--muted-foreground)/0.25)] text-[hsl(var(--foreground))]',
+                    state === 'pending' && 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]',
+                  ].filter(Boolean).join(' ')}
+                >
+                  {state === 'done' ? <Check size={13} /> : i + 1}
+                </span>
+                <span className="text-xs font-medium flex items-center gap-1 truncate">
+                  <Icon size={12} className="shrink-0" />
+                  {s.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Content ────────────────────────────────────────────────────── */}
@@ -307,25 +314,21 @@ export default function ImportWizard() {
         {/* Step 2: Preview */}
         {step === STEP_PREVIEW && preview && (
           <div className="max-w-2xl mx-auto space-y-4">
-            <div className="flex gap-3">
-              <Badge variant="success" className="text-sm px-3.5 py-1.5 gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0" />
-                {preview.valid_count} filas validas
-              </Badge>
-              {preview.error_count > 0 && (
-                <Badge variant="destructive" className="text-sm px-3.5 py-1.5 gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0" />
-                  {preview.error_count} filas con error
-                </Badge>
-              )}
-            </div>
+            <LedgerStatStrip
+              items={[
+                { key: 'valid', label: 'Filas válidas', value: preview.valid_count, icon: CheckCircle2, tone: 'success' },
+                ...(preview.error_count > 0
+                  ? [{ key: 'errors', label: 'Filas con error', value: preview.error_count, icon: AlertTriangle, tone: 'destructive' }]
+                  : []),
+              ]}
+            />
 
             {preview.errors?.length > 0 && (
-              <div className="border border-red-200 dark:border-red-800 rounded-xl overflow-hidden">
-                <div className="px-3 py-2 bg-red-500 dark:bg-red-950/40 text-xs font-semibold text-white dark:text-red-300">
-                  Errores detectados
+              <Card variant="solid" className="rounded-xl overflow-hidden border-rose-500/30">
+                <div className="px-3 py-2 bg-rose-500 text-xs font-semibold text-white flex items-center gap-1.5">
+                  <AlertTriangle size={13} /> Errores detectados
                 </div>
-                <div className="max-h-40 overflow-auto divide-y divide-red-100 dark:divide-red-900">
+                <div className="max-h-40 overflow-auto divide-y divide-[hsl(var(--border)/0.5)]">
                   {preview.errors.map((e) => (
                     <div key={e.rowIndex} className="px-3 py-2 text-xs">
                       <span className="font-semibold">Fila {e.rowIndex}:</span>{' '}
@@ -333,27 +336,27 @@ export default function ImportWizard() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
 
             {preview.valid?.length > 0 && (
               <div className="border border-[hsl(var(--border))] rounded-xl overflow-auto max-h-64">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-[hsl(var(--muted)/0.4)] border-b border-[hsl(var(--border))]">
-                      <th className="px-3 py-2 text-left font-semibold">Fecha</th>
-                      <th className="px-3 py-2 text-left font-semibold">Nombre</th>
-                      <th className="px-3 py-2 text-right font-semibold">Deposito</th>
-                      <th className="px-3 py-2 text-right font-semibold">Retiro</th>
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
+                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fecha</th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Nombre</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Deposito</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Retiro</th>
                     </tr>
                   </thead>
                   <tbody>
                     {preview.valid.slice(0, 20).map((row, i) => (
-                      <tr key={i} className="border-t border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--muted)/0.2)]">
+                      <tr key={i} className={`border-t border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--muted)/0.4)] transition-colors ${i % 2 === 1 ? 'bg-[hsl(var(--muted)/0.12)]' : ''}`}>
                         <td className="px-3 py-1.5">{row.fecha}</td>
                         <td className="px-3 py-1.5 truncate max-w-50">{row.nombre}</td>
-                        <td className="px-3 py-1.5 text-right text-emerald-700 dark:text-emerald-400 font-mono">{row.deposito ?? '—'}</td>
-                        <td className="px-3 py-1.5 text-right text-red-600 dark:text-red-400 font-mono">{row.retiro ?? '—'}</td>
+                        <td className="px-3 py-1.5 text-right text-success font-mono tabular-nums">{row.deposito ?? '—'}</td>
+                        <td className="px-3 py-1.5 text-right text-destructive font-mono tabular-nums">{row.retiro ?? '—'}</td>
                       </tr>
                     ))}
                     {preview.valid.length > 20 && (

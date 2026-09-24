@@ -9,9 +9,10 @@
 //
 // Spec: docs/superpowers/specs/2026-09-10-multi-tenant-architecture-design.md
 
-// Both spellings are accepted: fresh installs seed "runly.admin"; existing
-// installs seeded before the Runly rebrand still have "atlas.admin" persisted.
-export const COMPANY_ADMIN_ROLE_KEYS = new Set(["runly.admin", "atlas.admin"]);
+// "atlas.admin" (the pre-rebrand role key) was retired 2026-09-23: migration
+// 20260923120000_retire_atlas_admin_role_key renamed/merged any persisted
+// rows into "runly.admin", so only the current key is checked here.
+export const COMPANY_ADMIN_ROLE_KEYS = new Set(["runly.admin"]);
 export const SYSTEM_ADMIN_ROLE_KEYS = new Set(["system.admin"]);
 
 export const TENANT_ERROR = {

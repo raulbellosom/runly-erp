@@ -263,7 +263,7 @@ export function createFilesWorkspace({
         role: {
           enabled: true,
           OR: [
-            { key: { in: ["runly.admin", "atlas.admin", "system.admin"] } },
+            { key: { in: ["runly.admin", "system.admin"] } },
             {
               permissions: {
                 some: {
@@ -342,7 +342,7 @@ export function createFilesWorkspace({
               .filter((p) => p.permission.active)
               .map((p) => p.permission.key),
           );
-          const admin = ["runly.admin", "atlas.admin", "system.admin"].includes(
+          const admin = ["runly.admin", "system.admin"].includes(
             member?.role.key,
           );
           if (

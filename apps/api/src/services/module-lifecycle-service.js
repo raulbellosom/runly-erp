@@ -161,7 +161,7 @@ export function createModuleLifecycleService({ prisma }) {
 
   async function syncAdminPermissions(db) {
     const adminRoles = await db.role.findMany({
-      where: { key: { in: ['runly.admin', 'atlas.admin', 'system.admin'] } },
+      where: { key: { in: ['runly.admin', 'system.admin'] } },
       select: { id: true },
     })
     if (!adminRoles.length) return

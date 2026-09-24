@@ -1381,6 +1381,22 @@ Not done in this pass: AI-suggested category/type per row (spec allowed it; defe
 
 Still not run: the full browser upload → review → commit flow against a running dev server (needs interactive auth). The underlying AI calls, dedup, and account-matching that flow depends on are now verified against the live API.
 
+## runly.identity — User Session Info + atlas.admin Retirement
+
+Spec: `docs/superpowers/specs/2026-09-23-identity-user-sessions-design.md`
+Plan: `docs/superpowers/plans/2026-09-23-identity-user-sessions.md`
+
+- [x] Forward migration `20260923120000_retire_atlas_admin_role_key`: idempotent merge-or-rename of any persisted `Role.key = 'atlas.admin'` into `runly.admin`, plus `CREATE OR REPLACE FUNCTION public.runly_member_active` dropping the `atlas.admin` branch from the Realtime/RLS admin-bypass check (discovered during implementation — a live DB function embedded in an earlier migration, not caught by the original text-only grep)
+- [x] `atlas.admin` literal purged from all live guards: `apps/api/src/lib/tenant-context.js`, `apps/api/src/index.js` (`ADMIN_ROLE_KEYS`, `PROTECTED_IDENTITY_ROLE_KEYS`, `ensureSetupAdminRole`, `syncAdminRolesPermissions`), `files-service.js`, `company-service.js`, `collaboration-invitations-service.js`, `files/workspace.js`, `module-lifecycle-service.js`, `office/access.js`, `chat-moderation-service.js`, and the frontend `UserDetailScreen.jsx` — plus every test/fixture that asserted the literal (`cross-tenant` suite, `tenant-context.test.js`, `mirai-tools.test.js`, `chat-moderation-service.test.js`)
+- [x] New permission `identity.users.sessions.read` declared in `identityMap` (manifest + ACL) and `permission-catalog.js`; no navigation change (gates a detail-screen section, not a route)
+- [x] `GET /identity/users/:id/session` (new `routes/identity/identity-sessions-routes.js`, mounted via one `app.route()` call rather than adding inline routes to the already-oversized `index.js`): company-scoped lookup, live Supabase Admin API (`auth.admin.getUserById`) call with a 60s in-memory cache, graceful `{ data: null }` degrade when Supabase admin client or the auth user is unavailable
+- [x] SDK: `runly.identity.getUserSession(id, token)`
+- [x] Frontend: `UserSessionSection.jsx` (new) + `session-info` blueprint section on `identity-user-detail.blueprint.js` + registered in `moduleComponentRegistry.js` — renders nothing on a 403 (permission-gated, backend-authoritative), shows "Información de sesión no disponible." when data is null
+
+Not done in this pass (explicit non-goals, see spec §6): session-by-session IP/device history via `auth.sessions`; a "last login" column on the paginated users list; force-logout/session revocation; wiring the existing unused `audit.read` permission to a viewer.
+
+Verified: 2026-09-23 (`pnpm db:migrate` applied the new migration against the live dev DB with 0 pre-existing `atlas.admin` rows, confirmed no-op-safe; ad-hoc query confirmed `identity.users.sessions.read` seeded+active and 0 `Role` rows with `key = 'atlas.admin'` after `pnpm db:seed`; `node --test` green — `tenant-context.test.js` 15/15, `cross-tenant-security.test.js` 17/17 run live against the dev DB with `RUN_CROSS_TENANT_TESTS=1`, `mirai-tools.test.js` + `chat-moderation-service.test.js` 27/27; `pnpm build` clean (Vite + Tauri native bundle, no errors); `pnpm lint` clean; repo-wide `atlas.admin` grep sweep confirmed the only remaining matches are historical specs/plans, immutable migration files, and two intentional one-time retirement-note comments; manual `curl` confirmed the new route is mounted and returns 401 unauthenticated). Not verified: the rendered UI in an actual browser session (no interactive auth available this session) — `pnpm build` proves the JSX compiles and the component registers, but the live-rendered "Sesión (Supabase)" card layout was not visually confirmed.
+
 Verified: 2026-09-20 (`node --test apps/api/src/routes/ledger/__tests__/*.test.js` → 42 passing; `npx eslint` clean across all touched backend/frontend files; `pnpm build:web` clean, `AiImportScreen` emitted as its own lazy chunk; live `GROQ_API_KEY` manual script runs against real statement text and CSV headers, see above)
 
 ## runly.chat — Call spotlight polish, round 2

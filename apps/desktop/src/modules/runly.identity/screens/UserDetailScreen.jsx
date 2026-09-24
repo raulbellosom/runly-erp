@@ -22,7 +22,7 @@ const API_BASE = getApiUrl();
 // hasProtectedIdentityAdminRole (checked 2026-09-16): any ENABLED membership
 // with one of these role keys makes the user undeletable from the UI. Keep
 // this set and the enabled-membership check in sync with the API.
-const PROTECTED_ROLE_KEYS = new Set(["runly.admin", "atlas.admin", "system.admin"]);
+const PROTECTED_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
 
 function isProtectedAdminUser(user) {
   const memberships = Array.isArray(user?.memberships) ? user.memberships : [];

@@ -3,12 +3,13 @@ import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { PageHeader, Button, EmptyState, ErrorState, TextField } from '@runly/ui'
+import { PageHeader, Button, EmptyState, ErrorState, TextField, Card, Badge } from '@runly/ui'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@runly/ui'
-import { Plus, FolderOpen } from 'lucide-react'
+import { Plus, FolderOpen, ChevronRight, Users, Landmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -76,6 +77,17 @@ export default function GroupsScreen() {
             </Button>
           }
         />
+
+        {groups.length > 0 && (
+          <LedgerStatStrip
+            className="mb-2"
+            items={[
+              { key: 'groups', label: 'Grupos', value: groups.length, icon: FolderOpen, tone: 'brand' },
+              { key: 'members', label: 'Miembros totales', value: groups.reduce((sum, g) => sum + Number(g.member_count ?? 0), 0), icon: Users, tone: 'violet' },
+              { key: 'accounts', label: 'Cuentas en grupos', value: groups.reduce((sum, g) => sum + Number(g.account_count ?? 0), 0), icon: Landmark, tone: 'amber' },
+            ]}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
@@ -89,20 +101,29 @@ export default function GroupsScreen() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((group) => (
-              <button
+              <Card
                 key={group.id}
+                variant="interactive"
+                className="rounded-xl p-4 flex flex-col gap-2 border-l-4 border-(--brand-primary)/40 hover:border-(--brand-primary)"
                 onClick={() => navigate(`/app/m/runly.ledger/groups/${group.id}`)}
-                className="text-left p-4 rounded-xl border border-[hsl(var(--border))] hover:border-[hsl(var(--ring))] hover:bg-[hsl(var(--muted)/0.4)] transition-colors"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/app/m/runly.ledger/groups/${group.id}`)}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <FolderOpen size={14} className="text-[hsl(var(--muted-foreground))]" />
-                  <span className="text-xs text-[hsl(var(--muted-foreground))] capitalize">{group.my_role}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                    <FolderOpen size={16} />
+                  </div>
+                  <ChevronRight size={16} className="text-[hsl(var(--muted-foreground))] shrink-0 mt-2" />
                 </div>
-                <div className="font-semibold text-sm truncate">{group.name}</div>
-                <div className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                  {group.member_count} miembro{Number(group.member_count) !== 1 ? 's' : ''} · {group.account_count} cuenta{Number(group.account_count) !== 1 ? 's' : ''}
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm truncate">{group.name}</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+                    {group.member_count} miembro{Number(group.member_count) !== 1 ? 's' : ''} · {group.account_count} cuenta{Number(group.account_count) !== 1 ? 's' : ''}
+                  </div>
                 </div>
-              </button>
+                <Badge variant="secondary" className="w-fit capitalize text-[10px] px-1.5 py-0 h-4">{group.my_role}</Badge>
+              </Card>
             ))}
           </div>
         )}

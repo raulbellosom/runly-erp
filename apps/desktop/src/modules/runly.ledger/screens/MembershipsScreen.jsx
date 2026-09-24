@@ -3,11 +3,12 @@ import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { PageHeader, EmptyState, ErrorState, ConfirmDialog, Button } from '@runly/ui'
+import { PageHeader, EmptyState, ErrorState, ConfirmDialog, Button, Card } from '@runly/ui'
 import { LogOut, FolderOpen, Landmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -76,6 +77,16 @@ export default function MembershipsScreen() {
           title="Mis membresías"
           description="Grupos y cuentas a los que fuiste invitado."
         />
+
+        {!isEmpty && (
+          <LedgerStatStrip
+            className="mb-2 max-w-2xl"
+            items={[
+              { key: 'groups', label: 'Grupos', value: groups.length, icon: FolderOpen, tone: 'amber' },
+              { key: 'accounts', label: 'Cuentas compartidas', value: accounts.length, icon: Landmark, tone: 'violet' },
+            ]}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-8 max-w-2xl">
@@ -94,17 +105,22 @@ export default function MembershipsScreen() {
             </h3>
             <div className="space-y-2">
               {groups.map((g) => (
-                <div key={g.id} className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] px-3 py-2">
-                  <button className="text-left" onClick={() => navigate(`/app/m/runly.ledger/groups/${g.id}`)}>
-                    <div className="text-sm font-medium">{g.name}</div>
-                    <div className="text-xs text-[hsl(var(--muted-foreground))] capitalize">
-                      {g.role} · {g.member_count} miembro{Number(g.member_count) !== 1 ? 's' : ''}
-                    </div>
+                <Card key={g.id} variant="solid" className="rounded-xl flex items-center justify-between px-3 py-2">
+                  <button className="flex items-center gap-3 text-left min-w-0" onClick={() => navigate(`/app/m/runly.ledger/groups/${g.id}`)}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--brand-soft) text-(--brand-primary)">
+                      <FolderOpen size={14} />
+                    </span>
+                    <span className="min-w-0">
+                      <div className="text-sm font-medium truncate">{g.name}</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))] capitalize">
+                        {g.role} · {g.member_count} miembro{Number(g.member_count) !== 1 ? 's' : ''}
+                      </div>
+                    </span>
                   </button>
                   <Button variant="ghost" size="sm" onClick={() => setLeaveGroup(g)}>
                     <LogOut size={14} className="mr-1" /> Salir
                   </Button>
-                </div>
+                </Card>
               ))}
             </div>
           </section>
@@ -117,17 +133,22 @@ export default function MembershipsScreen() {
             </h3>
             <div className="space-y-2">
               {accounts.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] px-3 py-2">
-                  <button className="text-left" onClick={() => navigate(`/app/m/runly.ledger/accounts/${a.id}`)}>
-                    <div className="text-sm font-medium">{a.name}</div>
-                    <div className="text-xs text-[hsl(var(--muted-foreground))]">
-                      {a.bank} · <span className="capitalize">{a.role}</span> · Propietario: {a.owner_name}
-                    </div>
+                <Card key={a.id} variant="solid" className="rounded-xl flex items-center justify-between px-3 py-2">
+                  <button className="flex items-center gap-3 text-left min-w-0" onClick={() => navigate(`/app/m/runly.ledger/accounts/${a.id}`)}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                      <Landmark size={14} />
+                    </span>
+                    <span className="min-w-0">
+                      <div className="text-sm font-medium truncate">{a.name}</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                        {a.bank} · <span className="capitalize">{a.role}</span> · Propietario: {a.owner_name}
+                      </div>
+                    </span>
                   </button>
                   <Button variant="ghost" size="sm" onClick={() => setLeaveAccount(a)}>
                     <LogOut size={14} className="mr-1" /> Salir
                   </Button>
-                </div>
+                </Card>
               ))}
             </div>
           </section>

@@ -4,15 +4,16 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, EyeOff } from 'lucide-react'
+import { Plus, Pencil, EyeOff, Tag, ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from 'lucide-react'
 import {
-  PageHeader, Badge, Button, EmptyState, ErrorState, ConfirmDialog,
+  PageHeader, Badge, Button, EmptyState, ErrorState, ConfirmDialog, Card,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   TextField, SelectField,
 } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useLedgerCategories, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -21,6 +22,8 @@ const KIND_OPTIONS = [
   { value: 'expense', label: 'Egreso'  },
   { value: 'both',    label: 'Ambos'   },
 ]
+
+const KIND_BADGE_VARIANT = { income: 'success', expense: 'destructive', both: 'secondary' }
 
 const categorySchema = z.object({
   name:  z.string().min(1, 'El nombre es requerido'),
@@ -94,25 +97,27 @@ export default function CategoriesScreen() {
 
   function renderRows(rows, showActions) {
     return rows.map(cat => (
-      <tr key={cat.id} className="border-b border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--muted)/0.15)]">
-        <td className="px-4 py-2.5 w-8">
-          <span
-            className="inline-block w-4 h-4 rounded-full border border-[hsl(var(--border)/0.5)] shrink-0"
-            style={{ backgroundColor: cat.color ?? '#94a3b8' }}
-          />
-        </td>
-        <td className="px-4 py-2.5 text-sm font-medium">
-          <span className="flex items-center gap-2">
-            {cat.name}
-            {cat.is_system && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">Sistema</Badge>
-            )}
+      <tr key={cat.id} className="border-b border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--muted)/0.3)] transition-colors">
+        <td className="px-4 py-3">
+          <span className="flex items-center gap-3">
+            <span
+              className="inline-block h-6 w-6 shrink-0 rounded-lg border border-[hsl(var(--border)/0.5)] shadow-sm"
+              style={{ backgroundColor: cat.color ?? '#94a3b8' }}
+            />
+            <span className="flex items-center gap-2 font-medium text-sm">
+              {cat.name}
+              {cat.is_system && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">Sistema</Badge>
+              )}
+            </span>
           </span>
         </td>
-        <td className="px-4 py-2.5 text-sm text-[hsl(var(--muted-foreground))]">
-          {KIND_OPTIONS.find(o => o.value === cat.kind)?.label ?? cat.kind}
+        <td className="px-4 py-3">
+          <Badge variant={KIND_BADGE_VARIANT[cat.kind] ?? 'secondary'}>
+            {KIND_OPTIONS.find(o => o.value === cat.kind)?.label ?? cat.kind}
+          </Badge>
         </td>
-        <td className="px-4 py-2.5 text-right">
+        <td className="px-4 py-3 text-right">
           {showActions && (
             <span className="flex justify-end gap-1">
               <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(cat)}>
@@ -122,7 +127,7 @@ export default function CategoriesScreen() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-[hsl(var(--muted-foreground))] hover:text-red-500"
+                className="h-7 px-2 text-[hsl(var(--muted-foreground))] hover:text-destructive"
                 onClick={() => setDeactivateTarget(cat)}
               >
                 <EyeOff size={13} className="mr-1" />
@@ -138,6 +143,7 @@ export default function CategoriesScreen() {
   return (
     <div className="p-4 md:p-6 min-h-dvh">
       <PageHeader
+        eyebrow="Runly Ledger"
         title="Categorias"
         description="Agrupa movimientos por naturaleza. Las categorias de sistema son visibles para todos; las personales solo para ti."
         actions={
@@ -147,6 +153,18 @@ export default function CategoriesScreen() {
           </Button>
         }
       />
+
+      {!isLoading && !isError && categories.length > 0 && (
+        <LedgerStatStrip
+          className="mb-4"
+          items={[
+            { key: 'total', label: 'Total', value: categories.length, icon: Tag, tone: 'brand' },
+            { key: 'income', label: 'Ingreso', value: categories.filter(c => c.kind === 'income').length, icon: ArrowDownLeft, tone: 'success' },
+            { key: 'expense', label: 'Egreso', value: categories.filter(c => c.kind === 'expense').length, icon: ArrowUpRight, tone: 'destructive' },
+            { key: 'both', label: 'Ambos', value: categories.filter(c => c.kind === 'both').length, icon: ArrowLeftRight, tone: 'violet' },
+          ]}
+        />
+      )}
 
       {isLoading && (
         <div className="space-y-2 mt-4">
@@ -174,21 +192,20 @@ export default function CategoriesScreen() {
       )}
 
       {!isLoading && !isError && categories.length > 0 && (
-        <div className="mt-4 rounded-xl border border-[hsl(var(--border))] overflow-hidden">
+        <Card variant="solid" className="rounded-xl mt-4 p-0 overflow-hidden">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-[hsl(var(--muted)/0.3)] border-b border-[hsl(var(--border))]">
-                <th className="px-4 py-2.5 w-8" />
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-[hsl(var(--muted-foreground))]">Nombre</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-[hsl(var(--muted-foreground))]">Tipo</th>
+              <tr className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Nombre</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Tipo</th>
                 <th className="px-4 py-2.5 w-48" />
               </tr>
             </thead>
             <tbody>
               {system.length > 0 && (
                 <>
-                  <tr className="bg-[hsl(var(--muted)/0.15)]">
-                    <td colSpan={4} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                  <tr className="bg-[hsl(var(--muted)/0.4)]">
+                    <td colSpan={3} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                       Sistema
                     </td>
                   </tr>
@@ -197,8 +214,8 @@ export default function CategoriesScreen() {
               )}
               {personal.length > 0 && (
                 <>
-                  <tr className="bg-[hsl(var(--muted)/0.15)]">
-                    <td colSpan={4} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                  <tr className="bg-[hsl(var(--muted)/0.4)]">
+                    <td colSpan={3} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                       Mis categorias
                     </td>
                   </tr>
@@ -207,7 +224,7 @@ export default function CategoriesScreen() {
               )}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
       {/* Create / Edit dialog */}

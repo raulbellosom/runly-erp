@@ -12,7 +12,7 @@ const prisma = new PrismaClient({ adapter: prismaAdapter })
 // Prisma does not accept `null` inside a compound-unique `where`
 // ({ companyId_key: { companyId: null, key } }) for upsert/findUnique, even
 // though companyId is nullable at the DB level — so system roles
-// (companyId IS NULL, e.g. atlas.admin/system.admin) are upserted by hand via
+// (companyId IS NULL, e.g. runly.admin/system.admin) are upserted by hand via
 // findFirst + create/update.
 async function upsertSystemRole({ key, name, description, system = true, enabled = true }) {
   const existing = await prisma.role.findFirst({ where: { companyId: null, key } })

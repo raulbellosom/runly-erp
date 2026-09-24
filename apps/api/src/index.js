@@ -5,6 +5,7 @@ import { createOfficeService } from "./services/office/service.js";
 import { createUserAccessService } from "./services/user-access-service.js";
 import { createOfficeRouter } from "./routes/office.js";
 import { createFilesRouter } from "./routes/files.js";
+import { createIdentitySessionsRouter } from "./routes/identity/identity-sessions-routes.js";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -314,7 +315,7 @@ async function authMiddleware(c, next) {
   await next();
 }
 
-const ADMIN_ROLE_KEYS = new Set(["runly.admin", "atlas.admin", "system.admin"]);
+const ADMIN_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
 const BASE_PERMISSION_KEYS = new Set(["profile.self.read"]);
 
 const _userContextInFlight = new Map();
@@ -653,7 +654,7 @@ function requireModuleAccess(moduleKey) {
 
 async function syncAdminRolesPermissions(db) {
   const adminRoles = await db.role.findMany({
-    where: { key: { in: ["runly.admin", "atlas.admin", "system.admin"] } },
+    where: { key: { in: ["runly.admin", "system.admin"] } },
     select: { id: true },
   });
   if (adminRoles.length === 0) return;
@@ -683,7 +684,7 @@ async function ensureSetupAdminRole(db) {
   // Prisma rejects `null` inside a compound-unique where (companyId_key), so
   // this system role (companyId IS NULL) is upserted by hand via findFirst.
   const existing = await db.role.findFirst({
-    where: { companyId: null, key: { in: ["runly.admin", "atlas.admin"] } },
+    where: { companyId: null, key: "runly.admin" },
   });
   const data = {
     enabled: true,
@@ -770,7 +771,7 @@ function parseIdentityUserIds(value) {
     );
 }
 
-const PROTECTED_IDENTITY_ROLE_KEYS = new Set(["runly.admin", "atlas.admin", "system.admin"]);
+const PROTECTED_IDENTITY_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
 
 function hasProtectedIdentityAdminRole(user) {
   const memberships = Array.isArray(user?.memberships) ? user.memberships : [];
@@ -2476,6 +2477,7 @@ app.patch(
 
 app.route("/", createOfficeRouter({ officeService, authMiddleware, requirePermission }));
 app.route("/", createFilesRouter({ prisma, supabaseAdmin, filesService, authMiddleware, requirePermission }));
+app.route("/", createIdentitySessionsRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission }));
 
 app.get(
   "/identity/permissions",

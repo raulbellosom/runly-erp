@@ -27,7 +27,7 @@ export function createOfficeAccess({ prisma }) {
     if (!role?.enabled) throw new OfficeError('No tienes acceso al documento.', 403, 'forbidden');
     const permissions = new Set();
     for (const { permission } of role.permissions) if (permission.active) permissions.add(permission.key);
-    const admin = ['runly.admin', 'atlas.admin', 'system.admin'].includes(role.key);
+    const admin = ['runly.admin', 'system.admin'].includes(role.key);
     const can = key => admin || permissions.has(key);
     const requireAccess = key => { if (!can(key)) throw new OfficeError('No tienes permiso para abrir o editar este documento.', 403, 'forbidden'); };
     requireAccess('files.assets.read');

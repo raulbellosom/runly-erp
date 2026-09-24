@@ -226,7 +226,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
     return {
       profileId: profile.id,
       companyId: membership.companyId,
-      admin: ["runly.admin", "atlas.admin", "system.admin"].includes(membership.role.key),
+      admin: ["runly.admin", "system.admin"].includes(membership.role.key),
       permissions: new Set(membership.role.permissions.filter(p => p.permission.active).map(p => p.permission.key)),
     };
   }

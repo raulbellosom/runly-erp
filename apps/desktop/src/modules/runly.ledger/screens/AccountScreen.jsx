@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
+  Badge,
   DatePickerField,
   UserSearchModal,
   ConfirmDialog,
@@ -16,6 +17,14 @@ import {
   SheetTitle,
   TextField,
   SelectField,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Card,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from "@runly/ui";
 import { toast } from "sonner";
 import {
@@ -27,6 +36,14 @@ import {
   Trash2,
   FolderOpen,
   Pencil,
+  Landmark,
+  Receipt,
+  BarChart3,
+  ShieldCheck,
+  ChevronUp,
+  ChevronDown,
+  Sparkles,
+  FileSpreadsheet,
 } from "lucide-react";
 import SpreadsheetRegister from "./SpreadsheetRegister.jsx";
 import AccountSummary from "./AccountSummary.jsx";
@@ -43,10 +60,12 @@ import {
 const API_BASE = getApiUrl();
 
 const TABS = [
-  { key: "registro", label: "Registro" },
-  { key: "resumen", label: "Resumen" },
-  { key: "acceso", label: "Acceso" },
+  { key: "registro", label: "Registro", icon: Receipt },
+  { key: "resumen", label: "Resumen", icon: BarChart3 },
+  { key: "acceso", label: "Acceso", icon: ShieldCheck },
 ];
+
+const MEMBER_ROLE_BADGE_VARIANT = { editor: "secondary", viewer: "outline" };
 
 function fmtCurrency(amount, currency = "MXN") {
   return Number(amount ?? 0).toLocaleString("es-MX", {
@@ -66,6 +85,7 @@ export default function AccountScreen() {
   const { isUsingLocalLedger } = useLedgerSQLite();
 
   const [activeTab, setActiveTab] = useState("registro");
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -257,95 +277,136 @@ export default function AccountScreen() {
           onBack={() => navigate("/app/m/runly.ledger/accounts")}
           backLabel="Cuentas bancarias"
           loading={accountLoading}
-          title={account?.name ?? "Cuenta"}
+          title={
+            <span className="inline-flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                <Landmark size={18} />
+              </span>
+              {account?.name ?? "Cuenta"}
+            </span>
+          }
           description={
-            account && (
-              <>
-                {account.bank}
-                <span className="mx-1.5 opacity-40">·</span>
-                {account.currency}
-                <span className="mx-1.5 opacity-40">·</span>
-                <span
-                  className="font-semibold tabular-nums"
-                  style={{ color: "var(--module-accent, #16a34a)" }}
-                >
-                  {fmtCurrency(account.current_balance, account.currency)}
-                </span>
-              </>
+            account && !headerCollapsed && (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                <Badge variant="secondary">{account.bank}</Badge>
+                {account.account_number && (
+                  <Badge variant="outline">
+                    •••• {String(account.account_number).slice(-4)}
+                  </Badge>
+                )}
+                <Badge variant="outline">{account.currency}</Badge>
+              </span>
             )
           }
           actions={
-            canEdit && (
-              <Button variant="outline" size="sm" onClick={openEdit}>
-                <Pencil size={12} /> Editar
-              </Button>
+            account && (
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                    Saldo actual
+                  </div>
+                  <div className="text-xl font-bold tabular-nums text-(--brand-primary)">
+                    {fmtCurrency(account.current_balance, account.currency)}
+                  </div>
+                </div>
+                {canEdit && (
+                  <Button variant="outline" size="sm" onClick={openEdit}>
+                    <Pencil size={12} /> Editar
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setHeaderCollapsed((v) => !v)}
+                  title={headerCollapsed ? "Expandir encabezado" : "Colapsar encabezado"}
+                >
+                  {headerCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </Button>
+              </div>
             )
           }
         />
 
-        {/* Export actions row — only on Registro tab */}
-        {activeTab === "registro" && (
-          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExport("pdf")}
-              disabled={isUsingLocalLedger}
-            >
-              <FileText size={12} />
-              PDF
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExport("xlsx")}
-              disabled={isUsingLocalLedger}
-            >
-              <Table size={12} />
-              Excel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExport("csv")}
-              disabled={isUsingLocalLedger}
-            >
-              <Download size={12} />
-              CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isUsingLocalLedger}
-              onClick={() =>
-                navigate(`/app/m/runly.ledger/accounts/${accountId}/import`)
-              }
-            >
-              <Upload size={12} />
-              Importar
-            </Button>
+        {/* Export actions row — only on Registro tab, hidden while collapsed */}
+        {activeTab === "registro" && !headerCollapsed && (
+          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+            <div className="inline-flex items-center gap-0.5 rounded-lg bg-[hsl(var(--muted))] p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 hover:bg-[hsl(var(--card))] hover:text-(--brand-primary) hover:shadow-sm"
+                onClick={() => handleExport("pdf")}
+                disabled={isUsingLocalLedger}
+              >
+                <FileText size={12} />
+                PDF
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 hover:bg-[hsl(var(--card))] hover:text-(--brand-primary) hover:shadow-sm"
+                onClick={() => handleExport("xlsx")}
+                disabled={isUsingLocalLedger}
+              >
+                <Table size={12} />
+                Excel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 hover:bg-[hsl(var(--card))] hover:text-(--brand-primary) hover:shadow-sm"
+                onClick={() => handleExport("csv")}
+                disabled={isUsingLocalLedger}
+              >
+                <Download size={12} />
+                CSV
+              </Button>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={isUsingLocalLedger}>
+                  <Upload size={12} />
+                  Importar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onSelect={() =>
+                    navigate('/app/m/runly.ledger/accounts/import-ai', {
+                      state: { accountId, accountName: account?.name },
+                    })
+                  }
+                >
+                  <Sparkles size={13} className="mr-2 text-(--brand-primary)" /> Importar con IA
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    navigate(`/app/m/runly.ledger/accounts/${accountId}/import`)
+                  }
+                >
+                  <FileSpreadsheet size={13} className="mr-2" /> Importar CSV manual
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
 
-      <div className="border-b border-[hsl(var(--border))] px-4 sm:px-6 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.key
-                    ? "border-(--module-accent,#16a34a) text-[hsl(var(--foreground))]"
-                    : "border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      <div className="border-b border-[hsl(var(--border))] px-4 sm:px-6 py-2.5 shrink-0">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              {TABS.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <TabsTrigger key={tab.key} value={tab.key} className="gap-1.5">
+                    <Icon size={14} />
+                    {tab.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
 
           {activeTab === "registro" && (
             <div className="hidden sm:flex items-center gap-2 py-2">
@@ -424,6 +485,7 @@ export default function AccountScreen() {
             types={types}
             categories={categories}
             canWrite={canWriteRegister}
+            currency={account?.currency ?? "MXN"}
           />
         )}
 
@@ -437,16 +499,19 @@ export default function AccountScreen() {
         )}
 
         {activeTab === "acceso" && account && (
-          <div className="px-6 pb-6 space-y-6 max-w-2xl mx-auto">
+          <div className="px-6 pb-6 pt-4 space-y-6 max-w-2xl mx-auto">
             {isUsingLocalLedger ? (
-              <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.25)] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+              <Card variant="solid" className="rounded-xl p-4 text-sm text-[hsl(var(--muted-foreground))]">
                 Los accesos, invitaciones y movimientos entre grupos siguen
                 siendo online-only. Reconecta para administrarlos.
-              </div>
+              </Card>
             ) : account.group_id ? (
-              <div className="rounded-lg border border-[hsl(var(--border))] p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <FolderOpen size={14} /> Pertenece a un grupo
+              <Card variant="solid" className="rounded-xl p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-(--brand-soft) text-(--brand-primary)">
+                    <FolderOpen size={18} />
+                  </span>
+                  <span className="text-sm font-semibold">Pertenece a un grupo</span>
                 </div>
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">
                   El acceso a esta cuenta está controlado por el grupo. Para
@@ -454,21 +519,24 @@ export default function AccountScreen() {
                 </p>
                 {isOwner && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => handleMoveGroup(null)}
                   >
                     Mover a personal
                   </Button>
                 )}
-              </div>
+              </Card>
             ) : (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold">Colaboradores</h3>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <ShieldCheck size={15} className="text-[hsl(var(--muted-foreground))]" />
+                    Colaboradores
+                  </h3>
                   {canEdit && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => setInviteOpen(true)}
                     >
@@ -493,28 +561,39 @@ export default function AccountScreen() {
                 ) : (
                   <div className="space-y-2">
                     {members.map((member) => (
-                      <div
+                      <Card
                         key={member.id}
-                        className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] px-3 py-2"
+                        variant="solid"
+                        className="rounded-xl flex items-center justify-between px-3 py-2.5"
                       >
-                        <div>
-                          <div className="text-sm font-medium">
-                            {member.display_name}
-                          </div>
-                          <div className="text-xs text-[hsl(var(--muted-foreground))]">
-                            {member.email} · {member.role}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--muted))] text-xs font-bold text-[hsl(var(--muted-foreground))]">
+                            {(member.display_name ?? "?").slice(0, 1).toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {member.display_name}
+                            </div>
+                            <div className="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                              {member.email}
+                            </div>
                           </div>
                         </div>
-                        {canEdit && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setRevokeTarget(member)}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        )}
-                      </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant={MEMBER_ROLE_BADGE_VARIANT[member.role] ?? "outline"} className="capitalize">
+                            {member.role}
+                          </Badge>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setRevokeTarget(member)}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          )}
+                        </div>
+                      </Card>
                     ))}
                   </div>
                 )}

@@ -4,17 +4,21 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  PageHeader, Button, EmptyState, ErrorState,
+  PageHeader, Button, EmptyState, ErrorState, Badge,
+  Tabs, TabsList, TabsTrigger, SearchInput,
+  ViewModeSwitch, getStoredViewMode,
   Sheet, SheetContent, SheetHeader, SheetTitle,
-  Dialog, DialogContent, DialogHeader, DialogTitle,
   TextField, NumberField, SelectField,
 } from '@runly/ui'
 import { useOfflineStatus } from '@runly/offline'
-import { Plus, Landmark, Users, FolderOpen, Pencil, Sparkles } from 'lucide-react'
+import { Plus, Landmark, Users, FolderOpen, Sparkles, Pencil, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useAccountList, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
+import AccountCard from '../components/AccountCard.jsx'
+import { splitCurrency } from '../lib/account-visuals.js'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -26,7 +30,6 @@ const CURRENCY_OPTIONS = [
 const TABS = [
   { key: 'own', label: 'Mis cuentas', icon: Landmark },
   { key: 'shared', label: 'Compartidas conmigo', icon: Users },
-  { key: 'groups', label: 'Grupos', icon: FolderOpen },
 ]
 
 const EMPTY_ACCOUNT = { name: '', bank: '', account_number: '', currency: 'MXN', opening_balance: 0 }
@@ -39,22 +42,16 @@ export default function AccountsScreen() {
   const { isOnline } = useOfflineStatus()
   const { isUsingLocalLedger } = useLedgerSQLite()
   const [activeTab, setActiveTab] = useState('own')
+  const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState(() => getStoredViewMode('ledger-accounts', 'cards'))
 
   const [newAccOpen, setNewAccOpen] = useState(false)
   const [accForm, setAccForm] = useState(EMPTY_ACCOUNT)
   const [accSaving, setAccSaving] = useState(false)
 
-  const [newGrpOpen, setNewGrpOpen] = useState(false)
-  const [newGrpName, setNewGrpName] = useState('')
-  const [grpSaving, setGrpSaving] = useState(false)
-
   const [editAccount, setEditAccount] = useState(null)
   const [editForm, setEditForm] = useState({ name: '', bank: '', account_number: '', currency: 'MXN' })
   const [editSaving, setEditSaving] = useState(false)
-
-  const [renameGroup, setRenameGroup] = useState(null)
-  const [renameGroupValue, setRenameGroupValue] = useState('')
-  const [renameGroupSaving, setRenameGroupSaving] = useState(false)
 
   const headers = { Authorization: `Bearer ${token}` }
   const { data: allData, isLoading: allLoading, isError: allError, refetch: refetchAccounts } = useAccountList()
@@ -69,6 +66,8 @@ export default function AccountsScreen() {
     enabled: !!token && isOnline,
   })
 
+  // Fetched (not rendered as its own tab) purely to resolve group names for
+  // the badge on grouped account cards below — see spec Task 1 / edge case #7.
   const { data: groupsData, isLoading: grpLoading } = useQuery({
     queryKey: ['ledger-groups', token],
     queryFn: async () => {
@@ -91,6 +90,27 @@ export default function AccountsScreen() {
   const offlineAccounts = allData?.data ?? []
 
   const isLoading = allLoading || mbLoading || grpLoading
+
+  // Real per-currency totals (sums balances only within the same currency —
+  // never mixes MXN/USD into one misleading number).
+  const balancesByCurrency = ownAccounts.reduce((acc, account) => {
+    const code = account.currency ?? 'MXN'
+    acc[code] = (acc[code] ?? 0) + Number(account.current_balance ?? 0)
+    return acc
+  }, {})
+  const currencyCodes = Object.keys(balancesByCurrency)
+
+  const normalizedSearch = search.trim().toLowerCase()
+  function filterBySearch(list) {
+    if (!normalizedSearch) return list
+    return list.filter((account) =>
+      [account.name, account.bank, account.account_number]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedSearch),
+    )
+  }
 
   async function handleCreateAccount(event) {
     event.preventDefault()
@@ -122,61 +142,6 @@ export default function AccountsScreen() {
       queryClient.invalidateQueries({ queryKey: ['ledger-accounts'] })
     } finally {
       setAccSaving(false)
-    }
-  }
-
-  async function handleCreateGroup(event) {
-    event.preventDefault()
-    if (!newGrpName.trim()) return
-
-    setGrpSaving(true)
-    try {
-      const res = await companyFetch(`${API_BASE}/ledger/groups`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newGrpName.trim() }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err.error ?? 'No se pudo crear el grupo.')
-        return
-      }
-
-      toast.success('Grupo creado.')
-      setNewGrpName('')
-      setNewGrpOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['ledger-groups'] })
-    } finally {
-      setGrpSaving(false)
-    }
-  }
-
-  function openRenameGroup(group) {
-    setRenameGroupValue(group.name ?? '')
-    setRenameGroup(group)
-  }
-
-  async function handleRenameGroup(e) {
-    e.preventDefault()
-    if (!renameGroupValue.trim()) return
-    setRenameGroupSaving(true)
-    try {
-      const res = await companyFetch(`${API_BASE}/ledger/groups/${renameGroup.id}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: renameGroupValue.trim() }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err.error ?? 'No se pudo renombrar el grupo.')
-        return
-      }
-      toast.success('Grupo renombrado.')
-      setRenameGroup(null)
-      queryClient.invalidateQueries({ queryKey: ['ledger-groups'] })
-    } finally {
-      setRenameGroupSaving(false)
     }
   }
 
@@ -232,6 +197,25 @@ export default function AccountsScreen() {
     return <ErrorState title="No se pudieron cargar las cuentas." onRetry={refetchAccounts} />
   }
 
+  const filteredOwn = filterBySearch(ownAccounts)
+  const filteredShared = filterBySearch(sharedAccounts)
+  const filteredOffline = filterBySearch(offlineAccounts)
+
+  const balanceStatValue = currencyCodes.length === 0
+    ? '—'
+    : (
+        <span className="flex flex-col gap-0.5">
+          {currencyCodes.map((code) => {
+            const { intPart, decPart } = splitCurrency(balancesByCurrency[code], code)
+            return (
+              <span key={code} className="tabular-nums">
+                {intPart}<span className="text-xs opacity-70">.{decPart}</span>
+              </span>
+            )
+          })}
+        </span>
+      )
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 pt-5">
@@ -242,45 +226,59 @@ export default function AccountsScreen() {
           actions={
             offlineLedgerView
               ? null
-              : effectiveTab !== 'groups'
-                ? (
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => navigate('/app/m/runly.ledger/accounts/import-ai')}>
-                        <Sparkles size={14} className="mr-1" /> Importar con IA
-                      </Button>
-                      <Button variant="primary" size="sm" onClick={() => setNewAccOpen(true)}>
-                        <Plus size={14} className="mr-1" /> Nueva cuenta
-                      </Button>
-                    </div>
-                  )
-                : (
-                    <Button variant="primary" size="sm" onClick={() => setNewGrpOpen(true)}>
-                      <Plus size={14} className="mr-1" /> Nuevo grupo
+              : (
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => navigate('/app/m/runly.ledger/accounts/import-ai')}>
+                      <Sparkles size={14} className="mr-1" /> Importar con IA
                     </Button>
-                  )
+                    <Button variant="primary" size="sm" onClick={() => setNewAccOpen(true)}>
+                      <Plus size={14} className="mr-1" /> Nueva cuenta
+                    </Button>
+                  </div>
+                )
           }
         />
 
-        <div className="flex gap-1 mt-4 border-b border-[hsl(var(--border))]">
-          {tabs.map((tab) => {
-            const Icon = tab.icon
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={[
-                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                  effectiveTab === tab.key
-                    ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]'
-                    : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
-                ].join(' ')}
-              >
-                <Icon size={14} />
-                {tab.label}
-              </button>
-            )
-          })}
+        {!offlineLedgerView && (
+          <LedgerStatStrip
+            className="mb-4"
+            items={[
+              { key: 'balance', label: currencyCodes.length > 1 ? 'Saldo total por moneda' : 'Saldo total', value: balanceStatValue, icon: Wallet, tone: 'brand' },
+              { key: 'own', label: 'Cuentas propias', value: ownAccounts.length, icon: Landmark, tone: 'success' },
+              { key: 'shared', label: 'Compartidas conmigo', value: sharedAccounts.length, icon: Users, tone: 'violet' },
+              { key: 'groups', label: 'Grupos', value: groups.length, icon: FolderOpen, tone: 'amber' },
+            ]}
+          />
+        )}
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Tabs value={effectiveTab} onValueChange={(v) => setActiveTab(v)} className="shrink-0">
+            <TabsList>
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <TabsTrigger key={tab.key} value={tab.key} className="gap-1.5">
+                    <Icon size={14} />
+                    {tab.label}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
+          </Tabs>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, banco o número..."
+            className="flex-1"
+          />
+          {!offlineLedgerView && (
+            <ViewModeSwitch
+              modes={['cards', 'table']}
+              value={viewMode}
+              onChange={setViewMode}
+              storageKey="ledger-accounts"
+            />
+          )}
         </div>
       </div>
 
@@ -292,59 +290,25 @@ export default function AccountsScreen() {
         )}
 
         {effectiveTab === 'offline' && (
-          offlineAccounts.length === 0
+          filteredOffline.length === 0
             ? <EmptyState icon={Landmark} title="Sin cuentas en cache" description="Sincroniza ledger mientras estés conectado para consultarlo offline después." />
-            : <AccountGrid accounts={offlineAccounts} onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)} />
+            : <AccountList accounts={filteredOffline} groups={groups} viewMode="cards" onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)} onGroupClick={(id) => navigate(`/app/m/runly.ledger/groups/${id}`)} />
         )}
 
         {effectiveTab === 'own' && (
           ownAccounts.length === 0
             ? <EmptyState icon={Landmark} title="Sin cuentas personales" description="Crea una cuenta para registrar tus movimientos." action={{ label: 'Nueva cuenta', onClick: () => setNewAccOpen(true) }} />
-            : <AccountGrid accounts={ownAccounts} onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)} onEdit={openEdit} />
+            : filteredOwn.length === 0
+              ? <EmptyState icon={Landmark} title="Sin resultados" description="Ninguna cuenta coincide con tu búsqueda." />
+              : <AccountList accounts={filteredOwn} groups={groups} viewMode={viewMode} onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)} onEdit={openEdit} onGroupClick={(id) => navigate(`/app/m/runly.ledger/groups/${id}`)} />
         )}
 
         {effectiveTab === 'shared' && (
           sharedAccounts.length === 0
             ? <EmptyState icon={Users} title="Sin cuentas compartidas" description="Nadie ha compartido cuentas contigo todavía." />
-            : <AccountGrid accounts={sharedAccounts} onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)} />
-        )}
-
-        {effectiveTab === 'groups' && (
-          groups.length === 0
-            ? <EmptyState icon={FolderOpen} title="Sin grupos" description="No perteneces a ningún grupo todavía." action={{ label: 'Nuevo grupo', onClick: () => setNewGrpOpen(true) }} />
-            : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {groups.map((group) => (
-                    <div
-                      key={group.id}
-                      className="relative group p-4 rounded-xl border border-[hsl(var(--border))] hover:border-[hsl(var(--ring))] hover:bg-[hsl(var(--muted)/0.4)] transition-colors cursor-pointer"
-                      onClick={() => navigate(`/app/m/runly.ledger/groups/${group.id}`)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && navigate(`/app/m/runly.ledger/groups/${group.id}`)}
-                    >
-                      {group.my_role === 'admin' && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); openRenameGroup(group) }}
-                          className="absolute top-2 right-2 p-1 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                          title="Renombrar grupo"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      )}
-                      <div className="flex items-center gap-2 mb-1">
-                        <FolderOpen size={14} className="text-[hsl(var(--muted-foreground))]" />
-                        <span className={`text-xs text-[hsl(var(--muted-foreground))] capitalize ${group.my_role === 'admin' ? 'pr-6' : ''}`}>{group.my_role}</span>
-                      </div>
-                      <div className="font-semibold text-sm truncate">{group.name}</div>
-                      <div className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                        {group.member_count} miembro{Number(group.member_count) !== 1 ? 's' : ''} · {group.account_count} cuenta{Number(group.account_count) !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
+            : filteredShared.length === 0
+              ? <EmptyState icon={Users} title="Sin resultados" description="Ninguna cuenta coincide con tu búsqueda." />
+              : <AccountList accounts={filteredShared} groups={groups} viewMode={viewMode} onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)} onGroupClick={(id) => navigate(`/app/m/runly.ledger/groups/${id}`)} />
         )}
       </div>
 
@@ -416,68 +380,6 @@ export default function AccountsScreen() {
         </SheetContent>
       </Sheet>
 
-      <Dialog
-        open={newGrpOpen && !offlineLedgerView}
-        onOpenChange={(open) => {
-          if (!open) {
-            setNewGrpOpen(false)
-            setNewGrpName('')
-          }
-        }}
-      >
-        <DialogContent size="sm" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle>Nuevo grupo</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateGroup} className="space-y-4 pt-2">
-            <TextField
-              label="Nombre del grupo"
-              id="grp-name"
-              required
-              value={newGrpName}
-              onChange={(event) => setNewGrpName(event.target.value)}
-              placeholder="Ej. Finanzas Q2"
-              autoFocus
-              maxLength={128}
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => { setNewGrpOpen(false); setNewGrpName('') }}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="primary" size="sm" disabled={grpSaving || !newGrpName.trim()}>
-                {grpSaving ? 'Creando...' : 'Crear'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Sheet open={!!renameGroup} onOpenChange={(open) => { if (!open) setRenameGroup(null) }}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Renombrar grupo</SheetTitle>
-          </SheetHeader>
-          <form onSubmit={handleRenameGroup} className="space-y-4 pt-4">
-            <TextField
-              label="Nombre del grupo"
-              id="rename-grp-name"
-              required
-              value={renameGroupValue}
-              onChange={(e) => setRenameGroupValue(e.target.value)}
-              maxLength={255}
-            />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setRenameGroup(null)}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="primary" size="sm" disabled={renameGroupSaving || !renameGroupValue.trim()}>
-                {renameGroupSaving ? 'Guardando...' : 'Guardar cambios'}
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-
       <Sheet open={!!editAccount} onOpenChange={(open) => { if (!open) setEditAccount(null) }}>
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
@@ -530,48 +432,97 @@ export default function AccountsScreen() {
   )
 }
 
-function AccountGrid({ accounts, onSelect, onEdit }) {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {accounts.map((account) => (
-        <div
-          key={account.id}
-          className="relative group p-4 rounded-xl border border-[hsl(var(--border))] hover:border-[hsl(var(--ring))] hover:bg-[hsl(var(--muted)/0.4)] transition-colors cursor-pointer"
-          onClick={() => onSelect(account.id)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onSelect(account.id)}
-        >
-          {onEdit && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onEdit(account) }}
-              className="absolute top-2 right-2 p-1 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-              title="Editar cuenta"
-            >
-              <Pencil size={13} />
-            </button>
-          )}
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-[hsl(var(--muted-foreground))] truncate">{account.bank}</span>
-            <span className={`text-xs text-[hsl(var(--muted-foreground))] ${onEdit ? 'pr-6' : ''}`}>{account.currency}</span>
-          </div>
-          <div className="font-semibold text-sm truncate">{account.name}</div>
-          {account.account_number && (
-            <div className="text-xs text-[hsl(var(--muted-foreground))] truncate">{account.account_number}</div>
-          )}
-          <div className="mt-2 font-mono text-sm font-semibold">
-            {Number(account.current_balance ?? 0).toLocaleString('es-MX', {
-              style: 'currency',
-              currency: account.currency ?? 'MXN',
-              minimumFractionDigits: 2,
+function AccountList({ accounts, groups, viewMode, onSelect, onEdit, onGroupClick }) {
+  if (viewMode === 'table') {
+    return (
+      <div className="rounded-xl border border-[hsl(var(--border))] overflow-hidden">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Cuenta</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] hidden sm:table-cell">Banco</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Etiquetas</th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((account) => {
+              const group = account.group_id ? groups.find((g) => g.id === account.group_id) : null
+              return (
+                <tr
+                  key={account.id}
+                  onClick={() => onSelect(account.id)}
+                  className="border-b border-[hsl(var(--border)/0.5)] last:border-b-0 hover:bg-[hsl(var(--muted)/0.4)] transition-colors cursor-pointer"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--brand-soft) text-(--brand-primary)">
+                        <Landmark size={14} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{account.name}</div>
+                        <div className="text-xs text-[hsl(var(--muted-foreground))] truncate sm:hidden">{account.bank}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-[hsl(var(--muted-foreground))] hidden sm:table-cell">
+                    {account.bank}
+                    {account.account_number && ` · •••• ${String(account.account_number).slice(-4)}`}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {account.role && (
+                        <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0 h-5">{account.role}</Badge>
+                      )}
+                      {account.group_id && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onGroupClick(account.group_id) }}
+                          className="inline-flex"
+                          title="Ver grupo"
+                        >
+                          <Badge variant="secondary" className="gap-1 text-[10px] px-1.5 py-0 h-5">
+                            <FolderOpen size={10} />
+                            {group?.name ?? 'En grupo'}
+                          </Badge>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums whitespace-nowrap">
+                    {Number(account.current_balance ?? 0).toLocaleString('es-MX', {
+                      style: 'currency',
+                      currency: account.currency ?? 'MXN',
+                      minimumFractionDigits: 2,
+                    })}
+                    <span className="ml-1 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{account.currency}</span>
+                  </td>
+                </tr>
+              )
             })}
-          </div>
-          {account.role && (
-            <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))] capitalize">{account.role}</div>
-          )}
-        </div>
-      ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  const actions = onEdit ? [{ label: 'Editar cuenta', icon: Pencil, onSelect: onEdit }] : []
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {accounts.map((account) => {
+        const group = account.group_id ? groups.find((g) => g.id === account.group_id) : null
+        return (
+          <AccountCard
+            key={account.id}
+            account={account}
+            group={group}
+            onSelect={onSelect}
+            actions={actions}
+            onGroupClick={onGroupClick}
+          />
+        )
+      })}
     </div>
   )
 }

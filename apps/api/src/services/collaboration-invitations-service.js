@@ -35,7 +35,7 @@ export function createCollaborationInvitationsService({ prisma }) {
       if (roleId) {
         const role = await prisma.role.findFirst({ where: { id: roleId, enabled: true, OR: [{ companyId: null }, { companyId }] } });
         if (!role) throw new UserAccessError();
-        if (['runly.admin', 'atlas.admin', 'system.admin'].includes(role.key)) {
+        if (['runly.admin', 'system.admin'].includes(role.key)) {
           const actor = await createUserAccessService({ prisma }).assertCompanyMember(companyId, actorId, 'identity.roles.update');
           if (role.key === 'system.admin' && (actor.role?.key !== 'system.admin' || actor.role?.companyId !== null)) throw new UserAccessError();
         }
@@ -63,7 +63,7 @@ export function createCollaborationInvitationsService({ prisma }) {
         if (invite.role_id) {
           const role = await tx.role.findFirst({ where: { id: invite.role_id, enabled: true, OR: [{ companyId: null }, { companyId: invite.company_id }] } });
           if (!role) throw new UserAccessError();
-          if (['runly.admin', 'atlas.admin', 'system.admin'].includes(role.key)) {
+          if (['runly.admin', 'system.admin'].includes(role.key)) {
             const inviter = await createUserAccessService({ prisma: tx }).assertCompanyMember(invite.company_id, invite.created_by, 'identity.roles.update');
             if (role.key === 'system.admin' && (inviter.role?.key !== 'system.admin' || inviter.role?.companyId !== null)) throw new UserAccessError();
           }

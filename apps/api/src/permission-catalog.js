@@ -292,6 +292,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "identity",
     order: 50,
   },
+  "identity.users.sessions.read": {
+    displayNameEs: "Ver sesión de usuarios",
+    descriptionEs: "Permite ver el último inicio de sesión y estado de cuenta de un usuario en Supabase.",
+    groupKey: "identity",
+    order: 55,
+  },
   "identity.roles.read": {
     displayNameEs: "Ver roles",
     descriptionEs: "Permite consultar roles de la instancia.",

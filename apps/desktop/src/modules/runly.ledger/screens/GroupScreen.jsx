@@ -7,9 +7,12 @@ import {
   PageHeader, Button, EmptyState, ErrorState, ConfirmDialog, UserSearchModal,
   Sheet, SheetContent, SheetHeader, SheetTitle,
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  TextField, NumberField, SelectField,
+  TextField, NumberField, SelectField, Card, Badge,
+  Tabs, TabsList, TabsTrigger,
 } from '@runly/ui'
-import { ArrowLeft, Plus, UserPlus, Trash2, Landmark, Link2, Unlink2, Pencil } from 'lucide-react'
+import { Plus, UserPlus, Trash2, Landmark, Link2, Unlink2, Pencil, FolderOpen, Users } from 'lucide-react'
+import AccountCard from '../components/AccountCard.jsx'
+import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -18,9 +21,11 @@ import { getApiUrl } from '../../../lib/runtimeConfig.js'
 const API_BASE = getApiUrl()
 
 const TABS = [
-  { key: 'cuentas',  label: 'Cuentas'  },
-  { key: 'miembros', label: 'Miembros' },
+  { key: 'cuentas',  label: 'Cuentas',  icon: Landmark },
+  { key: 'miembros', label: 'Miembros', icon: Users },
 ]
+
+const ROLE_LABEL = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' }
 
 const ROLE_OPTIONS = [
   { value: 'viewer', label: 'Viewer — solo ver' },
@@ -32,6 +37,8 @@ const CURRENCY_OPTIONS = [
   { value: 'MXN', label: 'MXN — Peso mexicano' },
   { value: 'USD', label: 'USD — Dólar estadounidense' },
 ]
+
+const ROLE_BADGE_VARIANT = { admin: 'default', editor: 'secondary', viewer: 'outline' }
 
 const EMPTY_ACCOUNT = { name: '', bank: '', account_number: '', currency: 'MXN', opening_balance: 0 }
 
@@ -245,16 +252,23 @@ export default function GroupScreen() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 pt-5">
-        <button
-          onClick={() => navigate('/app/m/runly.ledger/accounts')}
-          className="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] mb-3 transition-colors"
-        >
-          <ArrowLeft size={14} /> Cuentas
-        </button>
         <PageHeader
           eyebrow="Runly Ledger"
-          title={group.name}
-          description={`${members.length} miembro${members.length !== 1 ? 's' : ''} · ${accounts.length} cuenta${accounts.length !== 1 ? 's' : ''}`}
+          onBack={() => navigate('/app/m/runly.ledger/groups')}
+          backLabel="Grupos"
+          title={
+            <span className="inline-flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-(--brand-soft) text-(--brand-primary)">
+                <FolderOpen size={18} />
+              </span>
+              {group.name}
+            </span>
+          }
+          description={
+            <Badge variant={ROLE_BADGE_VARIANT[myRole] ?? 'outline'} className="capitalize">
+              {ROLE_LABEL[myRole] ?? myRole}
+            </Badge>
+          }
           actions={
             <div className="flex flex-wrap gap-2">
               {myRole === 'admin' && (
@@ -281,22 +295,27 @@ export default function GroupScreen() {
           }
         />
 
-        <div className="flex gap-1 mt-4 border-b border-[hsl(var(--border))]">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={[
-                'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                activeTab === tab.key
-                  ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]'
-                  : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
-              ].join(' ')}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <LedgerStatStrip
+          className="mb-4"
+          items={[
+            { key: 'members', label: 'Miembros', value: members.length, icon: Users, tone: 'violet' },
+            { key: 'accounts', label: 'Cuentas', value: accounts.length, icon: Landmark, tone: 'brand' },
+          ]}
+        />
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            {TABS.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <TabsTrigger key={tab.key} value={tab.key} className="gap-1.5">
+                  <Icon size={14} />
+                  {tab.label}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
@@ -320,31 +339,18 @@ export default function GroupScreen() {
                 )}
               </EmptyState>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {accounts.map((account) => (
-                  <div key={account.id} className="relative group/card">
-                    <button
-                      onClick={() => navigate(`/app/m/runly.ledger/accounts/${account.id}`)}
-                      className="w-full text-left p-4 rounded-xl border border-[hsl(var(--border))] hover:border-[hsl(var(--ring))] hover:bg-[hsl(var(--muted)/0.4)] transition-colors"
-                    >
-                      <div className="font-semibold text-sm truncate pr-8">{account.name}</div>
-                      <div className="text-xs text-[hsl(var(--muted-foreground))] truncate">{account.bank}</div>
-                      <div className="mt-2 font-mono text-sm font-semibold">
-                        {Number(account.current_balance ?? 0).toLocaleString('es-MX', {
-                          style: 'currency', currency: account.currency ?? 'MXN', minimumFractionDigits: 2,
-                        })}
-                      </div>
-                    </button>
-                    {account.owner_id === actorId && (
-                      <button
-                        onClick={() => setUnassignTarget(account)}
-                        title="Quitar del grupo"
-                        className="absolute top-3 right-3 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 transition-opacity p-1 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
-                      >
-                        <Unlink2 size={14} />
-                      </button>
-                    )}
-                  </div>
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    onSelect={(id) => navigate(`/app/m/runly.ledger/accounts/${id}`)}
+                    actions={
+                      account.owner_id === actorId
+                        ? [{ label: 'Quitar del grupo', icon: Unlink2, destructive: true, onSelect: () => setUnassignTarget(account) }]
+                        : []
+                    }
+                  />
                 ))}
               </div>
             )
@@ -356,19 +362,20 @@ export default function GroupScreen() {
             : (
               <div className="space-y-2 max-w-xl">
                 {members.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] px-3 py-2">
-                    <div>
-                      <div className="text-sm font-medium">{m.display_name}</div>
-                      <div className="text-xs text-[hsl(var(--muted-foreground))]">
-                        {m.email} · <span className="capitalize">{m.role}</span>
-                      </div>
+                  <Card key={m.id} variant="solid" className="rounded-xl flex items-center justify-between px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{m.display_name}</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))] truncate">{m.email}</div>
                     </div>
-                    {myRole === 'admin' && (
-                      <Button variant="ghost" size="icon" onClick={() => setRemoveTarget(m)}>
-                        <Trash2 size={14} />
-                      </Button>
-                    )}
-                  </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={ROLE_BADGE_VARIANT[m.role] ?? 'outline'} className="capitalize">{m.role}</Badge>
+                      {myRole === 'admin' && (
+                        <Button variant="ghost" size="icon" onClick={() => setRemoveTarget(m)}>
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
                 ))}
               </div>
             )
@@ -397,7 +404,7 @@ export default function GroupScreen() {
                       className={[
                         'w-full text-left p-3 rounded-lg border transition-colors',
                         assignTarget?.id === acc.id
-                          ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)]'
+                          ? 'border-(--brand-primary) bg-(--brand-soft)'
                           : 'border-[hsl(var(--border))] hover:border-[hsl(var(--ring))]',
                       ].join(' ')}
                     >

@@ -115,7 +115,7 @@ export function WalletFormSheet({ open, onOpenChange, wallet }) {
       kind: values.kind,
       currency: values.currency,
       color: values.color ?? null,
-      icon: values.icon || null,
+      icon: values.icon || "Wallet",
       ledgerAccountId:
         values.ledgerAccountId && values.ledgerAccountId !== NO_LEDGER
           ? values.ledgerAccountId
@@ -347,10 +347,10 @@ export function WalletFormSheet({ open, onOpenChange, wallet }) {
             name="icon"
             render={({ field }) => (
               <IconPickerField
-                label="Icono"
+                label="Icono (opcional)"
                 value={field.value || ""}
                 onChange={field.onChange}
-                placeholder="Sin icono"
+                placeholder="Billetera (por defecto)"
               />
             )}
           />

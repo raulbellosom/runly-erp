@@ -6,15 +6,18 @@ import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
-import { ErrorState } from '@runly/ui'
+import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight, LineChart, PieChart as PieChartIcon, BarChart3 } from 'lucide-react'
+import { ErrorState, Card } from '@runly/ui'
 import { useAccountSummary } from '../hooks/use-ledger-queries.js'
+import { LedgerStatCard } from '../components/LedgerStatCard.jsx'
 
-const C_INCOME = '#22c55e'
-const C_EXPENSE = '#f43f5e'
-const C_BALANCE = '#16a34a'
-// Theme-aware neutrals — resolve against the app's CSS custom properties so the
-// charts read correctly in both light and dark mode.
+// Theme-aware — resolve against the app's own brand/semantic CSS custom
+// properties (styles.css) so charts and KPI cards read correctly in both
+// light and dark mode, and match the rest of Runly's brand system instead of
+// a one-off palette.
+const C_INCOME = 'var(--color-success)'
+const C_EXPENSE = 'var(--color-destructive)'
+const C_BALANCE = 'var(--brand-primary-computed, var(--brand-primary))'
 const C_MUTED = 'hsl(var(--muted-foreground))'
 const C_GRID = 'hsl(var(--border) / 0.6)'
 const C_BORDER = 'hsl(var(--border))'
@@ -91,40 +94,31 @@ function PieTip({ active, payload, currency }) {
   )
 }
 
-const ACCENTS = {
-  green: 'text-green-600 bg-green-50',
-  red: 'text-rose-500 bg-rose-50',
-  blue: 'text-blue-600 bg-blue-50',
-  neutral: 'text-slate-500 bg-slate-100',
-}
-
-function KpiCard({ label, value, currency, icon: Icon, accent = 'neutral', valueClass = '' }) {
+function KpiCard({ label, value, currency, icon, tone }) {
   return (
-    <div className="p-4 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] flex items-center gap-3">
-      {Icon && (
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${ACCENTS[accent]}`}>
-          <Icon size={18} />
-        </div>
-      )}
-      <div className="min-w-0">
-        <div className="text-xs text-[hsl(var(--muted-foreground))] mb-0.5 whitespace-nowrap">{label}</div>
-        <div className={`text-sm font-bold font-mono tabular-nums truncate ${valueClass}`}>
-          {fmt(value, currency)}
-        </div>
-      </div>
-    </div>
+    <LedgerStatCard
+      label={label}
+      icon={icon}
+      tone={tone}
+      value={<span className="font-mono">{fmt(value, currency)}</span>}
+    />
   )
 }
 
-function Section({ title, children, aside }) {
+function Section({ title, icon: Icon, children, aside }) {
   return (
-    <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
-      <div className="flex items-center gap-2 mb-5">
+    <Card variant="solid" className="rounded-xl p-5">
+      <div className="flex items-center gap-2.5 mb-5">
+        {Icon && (
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--brand-soft) text-(--brand-primary)">
+            <Icon size={14} />
+          </span>
+        )}
         <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">{title}</h3>
         {aside && <div className="ml-auto">{aside}</div>}
       </div>
       {children}
-    </div>
+    </Card>
   )
 }
 
@@ -183,16 +177,16 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
   return (
     <div className="p-6 overflow-y-auto h-full space-y-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiCard label="Saldo inicial" value={kpis.opening_balance} currency={currency} icon={Wallet} accent="neutral" />
-        <KpiCard label="Saldo actual" value={kpis.current_balance} currency={currency} icon={TrendingUp} accent="blue" valueClass="text-blue-700" />
-        <KpiCard label="Total ingresos" value={kpis.total_deposito} currency={currency} icon={ArrowDownLeft} accent="green" valueClass="text-green-700" />
-        <KpiCard label="Total egresos" value={kpis.total_retiro} currency={currency} icon={ArrowUpRight} accent="red" valueClass="text-rose-600" />
+        <KpiCard label="Saldo inicial" value={kpis.opening_balance} currency={currency} icon={Wallet} tone="neutral" />
+        <KpiCard label="Saldo actual" value={kpis.current_balance} currency={currency} icon={TrendingUp} tone="brand" />
+        <KpiCard label="Total ingresos" value={kpis.total_deposito} currency={currency} icon={ArrowDownLeft} tone="success" />
+        <KpiCard label="Total egresos" value={kpis.total_retiro} currency={currency} icon={ArrowUpRight} tone="destructive" />
       </div>
 
       {!hasData && (
-        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-16 text-center text-sm text-[hsl(var(--muted-foreground))]">
+        <Card variant="solid" className="rounded-xl py-16 text-center text-sm text-[hsl(var(--muted-foreground))]">
           Agrega movimientos para ver estadísticas.
-        </div>
+        </Card>
       )}
 
       {(areaData.length > 1 || pieData.length > 0) && (
@@ -200,8 +194,9 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
           {areaData.length > 1 && (
             <Section
               title="Saldo en el tiempo"
+              icon={LineChart}
               aside={(
-                <span className="text-xs font-mono font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+                <span className="text-xs font-mono font-bold text-(--brand-primary) bg-(--brand-soft) px-2.5 py-1 rounded-full">
                   {fmt(kpis.current_balance, currency)}
                 </span>
               )}
@@ -250,7 +245,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
           )}
 
           {pieData.length > 0 && (
-            <Section title="Distribucion">
+            <Section title="Distribucion" icon={PieChartIcon}>
               <ResponsiveContainer width="100%" height={210}>
                 <PieChart>
                   <Pie
@@ -278,7 +273,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
                       style={{
                         fontSize: 12,
                         fontWeight: 700,
-                        fill: totalIng >= totalEgr ? '#15803d' : '#e11d48',
+                        fill: totalIng >= totalEgr ? C_INCOME : C_EXPENSE,
                         fontFamily: 'monospace',
                       }}
                     >
@@ -297,6 +292,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
       {barData.length > 0 && (
         <Section
           title="Por categoria"
+          icon={BarChart3}
           aside={(
             <div className="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
               <span className="flex items-center gap-1.5"><Dot color={C_INCOME} />Ingreso</span>

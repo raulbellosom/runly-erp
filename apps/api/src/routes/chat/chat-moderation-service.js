@@ -13,8 +13,8 @@ export class ChatModerationServiceError extends Error {
 // (used by the identity user-delete endpoint). Kept as a local copy here because
 // resolveReport is reachable via the narrower identity.chat_reports.manage permission
 // (not identity.users.update), so someone granted only "review chat reports" must not
-// be able to disable an Atlas Admin / System Admin account through this side door.
-const PROTECTED_IDENTITY_ROLE_KEYS = new Set(["runly.admin", "atlas.admin", "system.admin"]);
+// be able to disable a Runly Admin / System Admin account through this side door.
+const PROTECTED_IDENTITY_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
 
 function hasProtectedIdentityAdminRole(user) {
   const memberships = Array.isArray(user?.memberships) ? user.memberships : [];

@@ -257,13 +257,13 @@ describe("cross-tenant security", { skip: !RUN && "set RUN_CROSS_TENANT_TESTS=1 
     assert.ok(Array.isArray(json?.data?.grantedKeys));
   });
 
-  it("User A, a company-scoped atlas.admin (NOT system.admin), CAN create a new company", async () => {
+  it("User A, a company-scoped runly.admin (NOT system.admin), CAN create a new company", async () => {
     // Regression control for a real design gap found 2026-09-11: POST
     // /companies was originally gated to system.admin only, which made it
     // unreachable for the common case of a single-company instance whose
-    // owner account is an atlas.admin (never system.admin — that role is
+    // owner account is a runly.admin (never system.admin — that role is
     // seeded separately and often held by nobody). fixture.userA is exactly
-    // that shape: atlas.admin in Company A only.
+    // that shape: runly.admin in Company A only.
     let createdCompanyId;
     try {
       const { status, json } = await callApi({
@@ -281,7 +281,7 @@ describe("cross-tenant security", { skip: !RUN && "set RUN_CROSS_TENANT_TESTS=1 
         where: { companyId: createdCompanyId, userId: fixture.userA.id },
         select: { role: { select: { key: true } } },
       });
-      assert.equal(membership?.role?.key, "atlas.admin");
+      assert.equal(membership?.role?.key, "runly.admin");
     } finally {
       if (createdCompanyId) {
         await prisma.membership.deleteMany({ where: { companyId: createdCompanyId } });
