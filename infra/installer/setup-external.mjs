@@ -75,6 +75,7 @@ const liveKitRedisImage = process.env.LIVEKIT_REDIS_IMAGE ?? "redis:7-alpine";
 const liveKitCaddyImage = process.env.LIVEKIT_CADDY_IMAGE ?? "caddy:2-alpine";
 const liveKitEgressImage = process.env.LIVEKIT_EGRESS_IMAGE ?? "livekit/egress:v1.9.0";
 const transcriberImage = process.env.RUNLY_TRANSCRIBER_IMAGE ?? "raulbellosom/runlyerp:transcriber-latest";
+const ttsImage = process.env.RUNLY_TTS_IMAGE ?? "raulbellosom/runlyerp:tts-latest";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -312,6 +313,18 @@ const OPTIONAL_VAR_GROUPS = [
   },
   {
     header: [
+      "# ── MirAI text-to-speech (Piper, optional) ───────────────────────────────────",
+      "# local: instala y ejecuta runly-tts en un contenedor propio en esta VPS.",
+      "# disabled: no se instala ni activa ningun contenedor ni boton en la UI.",
+    ],
+    vars: [
+      { key: "MIRAI_TTS_MODE",   placeholder: "disabled", comment: null },
+      { key: "TTS_CPU_THREADS",  placeholder: "2",        comment: null },
+      { key: "MIRAI_TTS_URL",    placeholder: "", comment: "# Derivada automaticamente — no editar a mano" },
+    ],
+  },
+  {
+    header: [
       "# ── runly.chat MirAI assistant + runly.pfm/inventory AI extras (optional) ───",
       "# All reuse GROQ_API_KEY. Without it, the model overrides below are unused.",
     ],
@@ -492,6 +505,18 @@ function removeInactiveTranscriptionServices(mode) {
   ]);
 }
 
+// Single shared service (no "-external" suffix) — runly-tts is stateless
+// and identical regardless of deployment mode, see its comment in
+// docker-compose.yml.
+function removeInactiveMiraiTtsServices(mode) {
+  if (mode === "local") return;
+  tryRun("docker", [
+    "compose", ...composeFiles,
+    "--profile", "mirai-tts",
+    "rm", "--stop", "--force", "runly-tts",
+  ]);
+}
+
 async function promptForLiveKitDomain() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error(
@@ -585,6 +610,31 @@ async function configureTranscription(filePath) {
     ["WHISPER_CPU_THREADS", whisperCpuThreads],
     ["TRANSCRIBER_DB_PASSWORD", dbPassword],
     ["TRANSCRIBER_DATABASE_URL", transcriberDatabaseUrl],
+  ]) {
+    content = setEnvValue(content, key, value);
+  }
+  await fs.writeFile(filePath, content, { encoding: "utf8", mode: 0o600 });
+  try { await fs.chmod(filePath, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+
+  return { mode };
+}
+
+// Same read-modify-write-in-place pattern as configureTranscription, but
+// simpler: runly-tts is stateless, so there is no password to generate and
+// no derived URL besides the fixed internal Compose service hostname.
+async function configureMiraiTts(filePath) {
+  let content = await fs.readFile(filePath, "utf8");
+  const mode = String(parseEnvValue(content, "MIRAI_TTS_MODE") || "disabled").trim().toLowerCase();
+  if (!["local", "disabled"].includes(mode)) {
+    throw new Error(`MIRAI_TTS_MODE must be "local" or "disabled" (got "${mode}").`);
+  }
+  const cpuThreads = parseEnvValue(content, "TTS_CPU_THREADS") || "2";
+  const ttsUrl = mode === "local" ? "http://runly-tts:8090" : "";
+
+  for (const [key, value] of [
+    ["MIRAI_TTS_MODE", mode],
+    ["TTS_CPU_THREADS", cpuThreads],
+    ["MIRAI_TTS_URL", ttsUrl],
   ]) {
     content = setEnvValue(content, key, value);
   }
@@ -794,8 +844,10 @@ async function main() {
     await writeComposeEnv(envFile);
   }
   let transcription = { mode: "disabled" };
+  let miraiTts = { mode: "disabled" };
   if (!upOnly) {
     transcription = await configureTranscription(envFile);
+    miraiTts = await configureMiraiTts(envFile);
   }
 
   // When --up-only skips the env check above, still regenerate the compose .env
@@ -806,6 +858,7 @@ async function main() {
     await validateLiveKitDns(liveKit);
     await writeComposeEnv(envFile);
     transcription = await configureTranscription(envFile);
+    miraiTts = await configureMiraiTts(envFile);
   }
 
   // ── 2. Validate Docker ─────────────────────────────────────────────────────
@@ -842,6 +895,7 @@ async function main() {
       if (liveKit.recordingEnabled) pullWithRetry(liveKitEgressImage, "LiveKit Egress");
     }
     if (transcription.mode === "local") pullWithRetry(transcriberImage, "Transcriber");
+    if (miraiTts.mode === "local") pullWithRetry(ttsImage, "TTS");
     // Remove dangling layers left behind when `latest` tags are re-pulled.
     // This prevents disk accumulation on every deploy without touching other projects.
     console.log("     Pruning dangling images...");
@@ -872,18 +926,21 @@ async function main() {
   if (!office.enabled) run("docker", ["compose", ...composeFiles, "--profile", "office", "stop", "collabora"]);
   removeInactiveLiveKitServices(liveKit);
   removeInactiveTranscriptionServices(transcription.mode);
+  removeInactiveMiraiTtsServices(miraiTts.mode);
   const liveKitProfiles = getLiveKitComposeProfiles(liveKit, { recordingEnabled: liveKit.recordingEnabled })
     .flatMap((profile) => ["--profile", profile]);
   const transcriptionProfiles = transcription.mode === "local" ? ["--profile", "transcription-external"] : [];
+  const miraiTtsProfiles = miraiTts.mode === "local" ? ["--profile", "mirai-tts"] : [];
   // Limit forced restarts to Runly/Calls: an unchanged editor must keep its sessions.
   const services = ["runly-api-external", "runly-worker-external", "runly-web-external",
     ...(liveKit.mode === "embedded" ? ["livekit-redis", "livekit",
       ...(liveKit.managedTls ? ["livekit-caddy"] : []),
       ...(liveKit.recordingEnabled ? ["egress"] : [])] : []),
-    ...(transcription.mode === "local" ? ["runly-transcriber-external"] : [])];
+    ...(transcription.mode === "local" ? ["runly-transcriber-external"] : []),
+    ...(miraiTts.mode === "local" ? ["runly-tts"] : [])];
   run(
     "docker",
-    ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...transcriptionProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
+    ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...transcriptionProfiles, ...miraiTtsProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
     {
       env: {
         ...process.env,

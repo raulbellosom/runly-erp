@@ -24,6 +24,7 @@ import {
 } from "@runly/validators";
 import { createChatService, ChatServiceError, resolveUserProfileId } from "./chat-service.js";
 import { createMiraiService } from "./mirai-service.js";
+import { createMiraiTtsService } from "./mirai-tts-service.js";
 import { createMiraiRoutes } from "./mirai-routes.js";
 import { createVisionService } from "../../services/vision-service.js";
 import { createChatExternalInboxService } from "./chat-external-inbox-service.js";
@@ -168,6 +169,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     projectsService,
     tasksService,
   });
+  const miraiTtsService = createMiraiTtsService();
 
   // ================================================================
   // INTERNAL CHAT — all routes require authentication
@@ -1249,6 +1251,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   mirai.route("", createMiraiRoutes({
     requirePermission,
     miraiService,
+    miraiTtsService,
     resolveProfileId: (authUserId) => resolveUserProfileId(prisma, authUserId),
     // listMessages membership-checks the caller and throws if they're not in.
     assertConversationMember: async (authUserId, conversationId) => {

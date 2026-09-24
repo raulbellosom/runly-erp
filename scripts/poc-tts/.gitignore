@@ -1,0 +1,5 @@
+# Artefactos generados localmente — regenerables via synth_test.py.
+models/*.onnx
+models/*.bin
+output/*.wav
+output/*.json

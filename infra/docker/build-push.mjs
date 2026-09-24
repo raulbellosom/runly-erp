@@ -20,6 +20,8 @@
 //   pnpm docker:release:web    # multi-platform build + push web only
 //   pnpm docker:release:api    # multi-platform build + push api only
 //   pnpm docker:release:worker # multi-platform build + push worker only
+//   pnpm docker:release:transcriber # multi-platform build + push transcriber only
+//   pnpm docker:release:tts    # multi-platform build + push tts only
 //
 // NOTE: Multi-platform builds (--push / default) use docker buildx and require
 // you to be logged in to Docker Hub (`docker login`). Building for linux/arm64
@@ -66,6 +68,12 @@ const ALL_IMAGES = [
     tag:        `${REGISTRY}:transcriber-latest`,
     dockerfile: "infra/docker/transcriber.Dockerfile",
     label:      "Transcriber",
+  },
+  {
+    key:        "tts",
+    tag:        `${REGISTRY}:tts-latest`,
+    dockerfile: "infra/docker/tts.Dockerfile",
+    label:      "TTS",
   },
 ];
 

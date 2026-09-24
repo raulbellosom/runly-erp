@@ -247,6 +247,30 @@ services:
           memory: ${TRANSCRIBER_MEMORY_LIMIT:-3g}
     restart: unless-stopped
 
+  # Servicio de texto a voz para "leer en voz alta" en MirAI (apps/tts/main.py,
+  # scripts/poc-piper/RESULTS.md). A diferencia del transcriptor de arriba, es
+  # SIN ESTADO — no toca Postgres ni Supabase Storage, no hay credencial de
+  # minimo privilegio que aprovisionar — asi que un unico servicio compartido
+  # por setup-local.mjs y setup-external.mjs es suficiente, sin el split
+  # "-local"/"-external" que el transcriptor si necesita (ese existe porque
+  # TRANSCRIBER_DATABASE_URL apunta a un Supabase distinto segun el modo de
+  # instalacion; aqui no hay ninguna URL de base de datos que distinga). Sin
+  # `build:` por la misma razon que runly-api-*/transcriber-*: se publica via
+  # `pnpm docker:release:tts` y bootstrap-local.sh no descarga el monorepo
+  # completo, solo una lista curada de archivos del instalador.
+  runly-tts:
+    image: ${RUNLY_TTS_IMAGE:-raulbellosom/runlyerp:tts-latest}
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-tts
+    profiles: ["mirai-tts"]
+    environment:
+      TTS_CPU_THREADS: ${TTS_CPU_THREADS:-2}
+    deploy:
+      resources:
+        limits:
+          cpus: "${TTS_CPU_LIMIT:-1}"
+          memory: ${TTS_MEMORY_LIMIT:-512m}
+    restart: unless-stopped
+
   livekit-caddy:
     image: ${LIVEKIT_CADDY_IMAGE:-caddy:2-alpine}
     container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-caddy

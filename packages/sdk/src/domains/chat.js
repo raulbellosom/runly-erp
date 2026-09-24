@@ -1,4 +1,4 @@
-export function createChatDomain(request, withAuthHeaders, toQueryString) {
+export function createChatDomain(request, withAuthHeaders, toQueryString, requestBlob) {
   return {
     // ----------------------------------------------------------------
     // Conversations (internal)
@@ -462,6 +462,14 @@ export function createChatDomain(request, withAuthHeaders, toQueryString) {
       panelClear: (conversationId, token) =>
         request(`/chat/mirai/panel/${encodeURIComponent(conversationId)}`, {
           method: "DELETE", headers: withAuthHeaders(token),
+        }),
+      // "Leer en voz alta" — returns a Blob (audio/wav), not JSON, hence
+      // requestBlob instead of request.
+      speak: (text, token) =>
+        requestBlob("/chat/mirai/tts", {
+          method: "POST",
+          headers: { ...withAuthHeaders(token), "content-type": "application/json" },
+          body: JSON.stringify({ text }),
         }),
     },
   };

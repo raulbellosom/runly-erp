@@ -1788,7 +1788,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       withAuthHeaders,
       toQueryString,
     }),
-    chat: createChatDomain(request, withAuthHeaders, toQueryString),
+    chat: createChatDomain(request, withAuthHeaders, toQueryString, requestBlob),
     calls: createCallsDomain(request, withAuthHeaders),
     calendar: {
       getGoogleStatus: (token) =>

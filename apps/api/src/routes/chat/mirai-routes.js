@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { ChatServiceError } from "./chat-service-error.js";
 
-export function createMiraiRoutes({ requirePermission, miraiService, resolveProfileId, assertConversationMember }) {
+export function createMiraiRoutes({ requirePermission, miraiService, resolveProfileId, assertConversationMember, miraiTtsService }) {
   const r = new Hono();
 
   r.get("/chat/mirai", requirePermission("chat.mirai.use"), async (c) => {
@@ -23,7 +23,24 @@ export function createMiraiRoutes({ requirePermission, miraiService, resolveProf
     return c.json({ data: {
       available: Boolean(miraiService.isConfigured()),
       web: Boolean(miraiService.isWebEnabled?.()),
+      tts: Boolean(miraiTtsService?.isConfigured?.()),
     } });
+  });
+
+  // "Leer en voz alta" — text is whatever MirAI text the client already has
+  // on screen (its own reply), not looked up by message id: there is no
+  // extra fact to authorize beyond chat.mirai.use, which already gated
+  // showing that text to this same user (see mirai-tts-service.js).
+  r.post("/chat/mirai/tts", requirePermission("chat.mirai.use"), async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    try {
+      const { buffer, contentType } = await miraiTtsService.synthesize(body?.text);
+      return new Response(buffer, { status: 200, headers: { "content-type": contentType } });
+    } catch (err) {
+      if (err instanceof ChatServiceError) return c.json({ error: err.message }, err.status);
+      console.error("[runly.chat] mirai tts", err?.message ?? err);
+      return c.json({ error: "No se pudo generar el audio." }, 500);
+    }
   });
 
   // ---- Spec 2: private assistant panel ---------------------------------

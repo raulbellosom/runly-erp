@@ -420,6 +420,52 @@ desactivar — es una accion deliberada, separada:
 docker run --rm --env-file .env.local <imagen-api> pnpm db:provision-transcriber-role --drop
 ```
 
+## MirAI Text-to-Speech (Piper, opcional)
+
+> Evidencia de validacion (medida en el mismo VPS 4 vCPU real que la
+> transcripcion) en
+> [scripts/poc-piper/RESULTS.md](../../scripts/poc-piper/RESULTS.md).
+
+Agrega un boton "leer en voz alta" a las respuestas de MirAI en el panel
+lateral del asistente, usando Piper TTS en CPU en un contenedor propio
+(`runly-tts`). A diferencia de `runly-transcriber`, es **sin estado** — no
+toca Postgres ni Supabase Storage, no hay rol de base de datos que
+aprovisionar ni credencial que generar, y el audio se genera de nuevo en
+cada clic (toma ~0.5s de CPU real, no vale la pena cachearlo).
+
+```bash
+MIRAI_TTS_MODE=disabled
+TTS_CPU_THREADS=2
+MIRAI_TTS_URL=
+```
+
+| Modo | Comportamiento |
+|------|----------------|
+| `local` | Instala y ejecuta `runly-tts` en esta VPS; deriva `MIRAI_TTS_URL` automaticamente (`http://runly-tts:8090`, DNS interno de Compose). |
+| `disabled` (default) | No se instala ni activa ningun contenedor ni boton en la UI — ninguna instalacion existente se ve afectada al actualizar. |
+
+`MIRAI_TTS_URL` es **derivada automaticamente** por el instalador — no se
+edita a mano. `TTS_CPU_THREADS` casi nunca necesita ajustarse: a diferencia
+de Whisper, la sesion por defecto de Piper ya rinde muy por debajo de tiempo
+real en el KVM4 real sin ningun ajuste (ver RESULTS.md, "Tercera ronda").
+
+### Activar en una instalacion `local` ya existente
+
+1. Edita `.env.local` a mano: agrega `MIRAI_TTS_MODE=local`. El script de
+   actualizacion nunca edita `.env.local` por si solo — este paso es siempre
+   manual.
+2. Ejecuta `pnpm runly:update:local` (o `node setup-local.mjs` directamente).
+   El script descarga la imagen de `runly-tts` (la voz ya viene horneada en
+   la imagen, sin descarga adicional en el primer arranque) y la agrega al
+   `docker compose up` sin reiniciar los servicios que no cambiaron.
+
+### Desactivar
+
+Poner `MIRAI_TTS_MODE=disabled` en `.env.local`/`.env.external` y volver a
+correr el instalador detiene y elimina el contenedor `runly-tts`
+automaticamente. No hay ningun rol de base de datos ni credencial que limpiar
+por separado — a diferencia de la transcripcion, no se creo ninguno.
+
 ---
 
 ## Multiples instancias de Runly en el mismo host

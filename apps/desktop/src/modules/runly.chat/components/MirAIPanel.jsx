@@ -4,9 +4,10 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
   Button, EmptyState, Skeleton, ConfirmDialog, Textarea, AssistantWordmark,
 } from "@runly/ui";
-import { Sparkles, Send, Trash2 } from "lucide-react";
+import { Sparkles, Send, Trash2, Volume2, Square, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
-import { useMiraiStatus } from "../hooks/useMirAI";
+import { useMiraiStatus, useSpeakMirai } from "../hooks/useMirAI";
 import { useMiraiPanelThread, useSendMiraiPanel, useClearMiraiPanel } from "../hooks/useMirAIPanel";
 import { MIRAI_NAME } from "../lib/mirai";
 import { AssistantMarkdown } from "./AssistantMarkdown";
@@ -25,10 +26,21 @@ function BotAvatar() {
   );
 }
 
-function Bubble({ role, content }) {
+function Bubble({ role, content, ttsEnabled, speech }) {
   const isUser = role === "user";
+  const playing = !isUser && speech?.isPlaying(content);
+  const loading = !isUser && speech?.isLoading(content);
+
+  async function handleSpeak() {
+    try {
+      await speech.speak(content);
+    } catch (err) {
+      toast.error(err?.message ?? "No se pudo generar el audio.");
+    }
+  }
+
   return (
-    <div className={["flex gap-2", isUser ? "justify-end" : "justify-start"].join(" ")}>
+    <div className={["group/bubble flex gap-2", isUser ? "justify-end" : "justify-start"].join(" ")}>
       {!isUser && <BotAvatar />}
       <div
         className={[
@@ -40,6 +52,20 @@ function Bubble({ role, content }) {
       >
         {isUser ? content : <AssistantMarkdown text={content} />}
       </div>
+      {!isUser && ttsEnabled && (
+        <button
+          type="button"
+          onClick={handleSpeak}
+          title={playing ? "Detener" : "Leer en voz alta"}
+          className="flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-[hsl(var(--muted-foreground))] opacity-0 transition hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] group-hover/bubble:opacity-100 focus-visible:opacity-100"
+        >
+          {loading
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : playing
+              ? <Square className="h-3.5 w-3.5" />
+              : <Volume2 className="h-3.5 w-3.5" />}
+        </button>
+      )}
     </div>
   );
 }
@@ -48,6 +74,8 @@ export function MirAIPanel({ open, onOpenChange, conversationId, focusMessage })
   const { prefs } = useChatPreferences();
   const { data: status } = useMiraiStatus();
   const available = status?.available !== false;
+  const ttsEnabled = Boolean(status?.tts);
+  const speech = useSpeakMirai();
 
   const { data, isLoading } = useMiraiPanelThread(conversationId, { enabled: open });
   const send = useSendMiraiPanel(conversationId);
@@ -71,7 +99,8 @@ export function MirAIPanel({ open, onOpenChange, conversationId, focusMessage })
   }, [open, focusMessage?.id]);
 
   useEffect(() => {
-    if (!open) { setDraft(""); pendingFocusId.current = null; }
+    if (!open) { setDraft(""); pendingFocusId.current = null; speech.stop(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
@@ -130,7 +159,9 @@ export function MirAIPanel({ open, onOpenChange, conversationId, focusMessage })
             />
           )}
 
-          {messages.map((m, i) => <Bubble key={m.createdAt ?? i} role={m.role} content={m.content} />)}
+          {messages.map((m, i) => (
+            <Bubble key={m.createdAt ?? i} role={m.role} content={m.content} ttsEnabled={ttsEnabled} speech={speech} />
+          ))}
 
           {send.isPending && (
             <div className="flex items-center gap-2 px-1">
