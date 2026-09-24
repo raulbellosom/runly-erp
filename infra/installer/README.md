@@ -354,6 +354,74 @@ sala de corta duracion desde la API.
 
 ---
 
+## Runly Transcription (faster-whisper, opcional)
+
+> Diseno completo en [docs/TRANSCRIPTION_SPEC.md](../../docs/TRANSCRIPTION_SPEC.md);
+> evidencia de la Etapa 1 (medida en un VPS 4 vCPU/16GB real) en
+> [scripts/poc-transcription/RESULTS.md](../../scripts/poc-transcription/RESULTS.md).
+
+Transcribe llamadas ya grabadas (requiere que la grabacion de LiveKit Egress
+este activada y una grabacion en estado `READY` — ver la seccion de LiveKit
+arriba) usando faster-whisper en CPU, en un contenedor propio (`runly-transcriber`).
+No requiere GPU ni ningun servicio externo de pago.
+
+```bash
+TRANSCRIPTION_MODE=disabled
+WHISPER_MODEL=small
+WHISPER_COMPUTE_TYPE=int8
+WHISPER_CPU_THREADS=2
+TRANSCRIBER_DB_PASSWORD=
+TRANSCRIBER_DATABASE_URL=
+```
+
+| Modo | Comportamiento |
+|------|----------------|
+| `local` | Instala y ejecuta `runly-transcriber` en esta VPS; aprovisiona un rol de PostgreSQL de minimo privilegio (`runly_transcriber`) con acceso de escritura solo a las tablas de transcripcion. |
+| `disabled` (default) | No se instala ni activa ningun contenedor ni UI de transcripcion — ninguna instalacion existente se ve afectada al actualizar. |
+
+`TRANSCRIBER_DB_PASSWORD`/`TRANSCRIBER_DATABASE_URL` son **autogenerados y
+persistidos** por el instalador (mismo patron que `LIVEKIT_API_KEY`/`_SECRET`)
+— no se editan a mano. `WHISPER_CPU_THREADS` **si** debe revisarse a mano en
+una VPS con un numero de nucleos distinto al recomendado (2): un hallazgo real
+de la Etapa 1 mostro que dejar este valor en automatico puede inflar el uso de
+RAM y el tiempo de procesamiento cuando el numero de nucleos visibles dentro
+del contenedor no coincide con el limite real de CPU asignado
+(`TRANSCRIBER_CPU_LIMIT`, `docker-compose.yml`).
+
+### Activar en una instalacion `local` ya existente
+
+No es una instalacion nueva — es una actualizacion sobre la instancia viva,
+usando el mismo mecanismo que ya tienes (`update-local.sh`/`runly:update:local`):
+
+1. Edita `.env.local` a mano: agrega `TRANSCRIPTION_MODE=local` (y ajusta
+   `WHISPER_CPU_THREADS` si tu VPS no tiene ~2 nucleos disponibles para este
+   contenedor). El script de actualizacion nunca edita `.env.local` por si
+   solo — este paso es siempre manual.
+2. Ejecuta `pnpm runly:update:local` (o `node setup-local.mjs` directamente).
+   El script: aplica la migracion aditiva nueva, aprovisiona el rol de
+   PostgreSQL de forma idempotente (segura de re-ejecutar), descarga la
+   imagen de `runly-transcriber`, y la agrega al `docker compose up` sin
+   reiniciar los servicios que no cambiaron (API, worker, LiveKit, Egress,
+   Supabase, Collabora siguen corriendo sin interrupcion).
+3. La primera vez que se solicita una transcripcion real, el contenedor
+   descarga el modelo de Whisper (`WHISPER_MODEL`) y lo cachea en el volumen
+   con nombre `whisper-model-cache` — las actualizaciones posteriores no
+   vuelven a descargarlo.
+
+### Desactivar
+
+Poner `TRANSCRIPTION_MODE=disabled` en `.env.local`/`.env.external` y volver a
+correr el instalador detiene y elimina el contenedor `runly-transcriber`
+automaticamente (mismo patron que LiveKit Egress al desactivar grabacion). El
+rol de PostgreSQL `runly_transcriber` **no** se elimina automaticamente al
+desactivar — es una accion deliberada, separada:
+
+```bash
+docker run --rm --env-file .env.local <imagen-api> pnpm db:provision-transcriber-role --drop
+```
+
+---
+
 ## Multiples instancias de Runly en el mismo host
 
 Cada carpeta de instalador (copia de `infra/installer`) es **una instancia**

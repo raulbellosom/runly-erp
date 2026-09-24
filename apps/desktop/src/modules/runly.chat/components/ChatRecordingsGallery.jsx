@@ -6,6 +6,8 @@ import {
 import { AlertCircle, Loader2, Play, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useConversationRecordings, useDeleteRecording } from "../hooks/useConversationRecordings";
+import { useConversationTranscripts } from "../hooks/useConversationTranscripts";
+import { RecordingTranscriptAction } from "./RecordingTranscriptAction";
 
 // Always shows the full date, unlike chatUtils' formatMessageTime (which
 // collapses "today" down to just a time) — recordings are reviewed well
@@ -30,7 +32,7 @@ function formatFileSize(bytes) {
   return `${value.toFixed(unitIndex > 0 && value < 10 ? 1 : 0)} ${units[unitIndex]}`;
 }
 
-function RecordingRow({ recording, deleteRecording, onPlay }) {
+function RecordingRow({ recording, deleteRecording, onPlay, transcript, conversationId }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const isReady = recording.status === "READY";
@@ -113,6 +115,9 @@ function RecordingRow({ recording, deleteRecording, onPlay }) {
           {!isReady && !isFailed && (
             <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" aria-label="Procesando" />
           )}
+          {isReady && (
+            <RecordingTranscriptAction recording={recording} transcript={transcript} conversationId={conversationId} />
+          )}
           {!isActive && (
             <button
               type="button"
@@ -142,6 +147,14 @@ export function ChatRecordingsGallery({ conversationId }) {
   const { data, isLoading, isError, refetch } = useConversationRecordings(conversationId);
   const deleteRecording = useDeleteRecording(conversationId);
   const recordings = data?.data ?? data ?? [];
+  const { data: transcriptsData } = useConversationTranscripts(conversationId);
+  const transcriptsByRecordingId = useMemo(() => {
+    const map = new Map();
+    for (const t of (transcriptsData?.data ?? transcriptsData ?? [])) {
+      if (t.recordingId) map.set(t.recordingId, t);
+    }
+    return map;
+  }, [transcriptsData]);
   // Only playable recordings are browsable in the viewer — FAILED/processing/
   // unavailable rows have nothing to show and stay as their own row with a
   // warning icon on the list side (see RecordingRow's errorDetail).
@@ -225,7 +238,14 @@ export function ChatRecordingsGallery({ conversationId }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-2 p-3">
       {recordings.map((r) => (
-        <RecordingRow key={r.id} recording={r} deleteRecording={deleteRecording} onPlay={handlePlay} />
+        <RecordingRow
+          key={r.id}
+          recording={r}
+          deleteRecording={deleteRecording}
+          onPlay={handlePlay}
+          transcript={transcriptsByRecordingId.get(r.id)}
+          conversationId={conversationId}
+        />
       ))}
       <AdvancedFileViewer
         open={viewerIndex !== null}

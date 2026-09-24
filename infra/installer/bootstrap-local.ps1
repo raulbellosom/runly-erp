@@ -34,6 +34,7 @@ $files = @(
   "lib/office-config.mjs",
   "lib/firebase-config.mjs",
   "lib/livekit-config.mjs",
+  "lib/transcriber-db.mjs",
   "lib/instance-identity.mjs",
   "lib/supabase-selfhosted-config.mjs",
   "package.json",

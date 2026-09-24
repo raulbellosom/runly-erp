@@ -191,6 +191,62 @@ services:
       livekit:
         condition: service_started
 
+  # Servicio de transcripcion (docs/TRANSCRIPTION_SPEC.md) — perfil separado
+  # por modo de despliegue ("transcription-local"/"transcription-external",
+  # no un unico "transcription") porque Compose activa un servicio si
+  # CUALQUIERA de sus perfiles esta en la lista pasada a `up`, no si TODOS lo
+  # estan: un solo perfil "transcription" arrancaria ambas variantes local Y
+  # external a la vez si alguna vez coincidieran en la misma invocacion.
+  # setup-local.mjs/setup-external.mjs agregan el perfil correspondiente solo
+  # cuando TRANSCRIPTION_MODE=local, igual que ya hacen con "livekit-egress"
+  # para grabacion. Limites de CPU/RAM explicitos — primer precedente de este
+  # patron en este compose (ver docs/TRANSCRIPTION_IMPLEMENTATION_PLAN.md,
+  # Etapa 4): sin esto, un contenedor de Whisper sin acotar podria competir
+  # por CPU con LiveKit/Egress en una VPS con pocos nucleos.
+  # Sin `build:` a proposito — igual que runly-api-*/worker-*/web-*, se
+  # publica via `pnpm docker:release:transcriber` (infra/docker/build-push.mjs)
+  # y se referencia solo por imagen, nunca se construye localmente: el flujo
+  # de instalacion real (bootstrap-local.sh) descarga una lista curada de
+  # archivos del instalador, no el monorepo completo — un `build:` con
+  # contexto ../.. no encontraria apps/transcriber/ en una instalacion real.
+  runly-transcriber-local:
+    image: ${RUNLY_TRANSCRIBER_IMAGE:-raulbellosom/runlyerp:transcriber-latest}
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-transcriber-local
+    profiles: ["transcription-local"]
+    env_file:
+      - ./.env.local
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-2}
+    volumes:
+      - whisper-model-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          cpus: "${TRANSCRIBER_CPU_LIMIT:-1.5}"
+          memory: ${TRANSCRIBER_MEMORY_LIMIT:-3g}
+    restart: unless-stopped
+
+  runly-transcriber-external:
+    image: ${RUNLY_TRANSCRIBER_IMAGE:-raulbellosom/runlyerp:transcriber-latest}
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-transcriber-external
+    profiles: ["transcription-external"]
+    env_file:
+      - ./.env.external
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-2}
+    volumes:
+      - whisper-model-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          cpus: "${TRANSCRIBER_CPU_LIMIT:-1.5}"
+          memory: ${TRANSCRIBER_MEMORY_LIMIT:-3g}
+    restart: unless-stopped
+
   livekit-caddy:
     image: ${LIVEKIT_CADDY_IMAGE:-caddy:2-alpine}
     container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-caddy
@@ -213,3 +269,8 @@ services:
 volumes:
   livekit-caddy-data:
   livekit-caddy-config:
+  # Cache del modelo de faster-whisper entre actualizaciones — sin esto, cada
+  # `docker compose up --force-recreate` volveria a descargarlo desde
+  # Hugging Face. Primer volumen con nombre de este tipo en el repo (ningun
+  # otro servicio cachea un activo grande descargado en tiempo de ejecucion).
+  whisper-model-cache:

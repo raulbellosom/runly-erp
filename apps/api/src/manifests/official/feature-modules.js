@@ -861,6 +861,8 @@ export const chatMap = createModuleManifest({
     { key: 'chat.support.manage',       name: 'Gestionar soporte externo' },
     { key: 'chat.mirai.use',            name: 'Usar MirAI' },
     { key: 'chat.calls.record',         name: 'Grabar llamadas' },
+    { key: 'chat.calls.transcript.request', name: 'Solicitar transcripción de llamadas' },
+    { key: 'chat.calls.transcript.manage',  name: 'Administrar transcripciones de llamadas' },
   ],
   acl: {
     module: 'chat.access',
@@ -870,6 +872,8 @@ export const chatMap = createModuleManifest({
       'chat.support.manage':       'chat.support.manage',
       'chat.mirai.use':            'chat.mirai.use',
       'chat.calls.record':         'chat.calls.record',
+      'chat.calls.transcript.request': 'chat.calls.transcript.request',
+      'chat.calls.transcript.manage':  'chat.calls.transcript.manage',
     },
   },
   blueprints: [],

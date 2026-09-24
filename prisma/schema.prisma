@@ -410,6 +410,8 @@ model UserProfile {
   callGuestsAdmitted     CallGuest[]               @relation("CallGuestAdmittedBy")
   callMessagesSent       CallMessage[]             @relation("CallMessageSenderUser")
   callRecordingsStarted  CallRecording[]           @relation("CallRecordingStartedBy")
+  callTranscriptsRequested CallTranscript[]         @relation("CallTranscriptRequestedBy")
+  callTranscriptSegmentsSpoken CallTranscriptSegment[] @relation("CallTranscriptSegmentSpeaker")
 
   projectsOwned      Project[]       @relation("ProjectOwner")
   projectMemberships ProjectMember[] @relation("ProjectMemberUser")
@@ -1838,6 +1840,11 @@ enum CallStatus {
   ENDED
 }
 
+enum CallTranscriptSourceKind {
+  MIXED // Alternativa A: audio de la grabacion de sala completa (room composite)
+  PER_TRACK // Alternativa B: pistas individuales por participante (no implementado aun, ver V2)
+}
+
 enum CallParticipantStatus {
   INVITED
   RINGING
@@ -2014,6 +2021,7 @@ model Call {
   guests        CallGuest[]
   messages      CallMessage[]
   recordings    CallRecording[]
+  transcripts   CallTranscript[]
 
   @@index([conversationId])
   @@index([calendarEventId])
@@ -2098,11 +2106,12 @@ model CallGuest {
   lastSeenAt       DateTime? @map("last_seen_at")
   createdAt        DateTime  @default(now()) @map("created_at")
 
-  call       Call          @relation(fields: [callId], references: [id], onDelete: Cascade)
-  link       CallLink?     @relation(fields: [linkId], references: [id])
-  invite     CallInvite?   @relation(fields: [inviteId], references: [id])
-  admittedBy UserProfile?  @relation("CallGuestAdmittedBy", fields: [admittedByUserId], references: [id])
-  messages   CallMessage[]
+  call              Call                     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  link              CallLink?                @relation(fields: [linkId], references: [id])
+  invite            CallInvite?              @relation(fields: [inviteId], references: [id])
+  admittedBy        UserProfile?             @relation("CallGuestAdmittedBy", fields: [admittedByUserId], references: [id])
+  messages          CallMessage[]
+  transcriptSegments CallTranscriptSegment[]
 
   @@unique([callId, livekitIdentity])
   @@index([callId, status])
@@ -2155,14 +2164,70 @@ model CallRecording {
   expiresAt         DateTime? @map("expires_at")
   createdAt         DateTime  @default(now()) @map("created_at")
 
-  call      Call        @relation(fields: [callId], references: [id], onDelete: Cascade)
-  startedBy UserProfile @relation("CallRecordingStartedBy", fields: [startedByUserId], references: [id])
+  call        Call             @relation(fields: [callId], references: [id], onDelete: Cascade)
+  startedBy   UserProfile      @relation("CallRecordingStartedBy", fields: [startedByUserId], references: [id])
+  transcripts CallTranscript[]
 
   @@index([callId])
   @@index([conversationId])
   @@index([status])
   @@index([expiresAt])
   @@map("call_recording")
+}
+
+model CallTranscript {
+  id                String                   @id @default(uuid(7)) @db.Uuid
+  callId            String                   @db.Uuid @map("call_id")
+  conversationId    String                   @db.Uuid @map("conversation_id")
+  companyId         String                   @db.Uuid @map("company_id")
+  recordingId       String?                  @db.Uuid @map("recording_id")
+  sourceKind        CallTranscriptSourceKind @default(MIXED) @map("source_kind")
+  status            String                   @default("PENDING") @map("status") // PENDING | PROCESSING | READY | FAILED
+  requestedByUserId String                   @db.Uuid @map("requested_by_user_id")
+  model             String?                  @map("model")
+  language          String?                  @map("language")
+  attempts          Int                      @default(0) @map("attempts")
+  failureReason     String?                  @map("failure_reason")
+  startedAt         DateTime?                @map("started_at")
+  completedAt       DateTime?                @map("completed_at")
+  durationMs        Int?                     @map("duration_ms")
+  expiresAt         DateTime?                @map("expires_at")
+  leaseExpiresAt    DateTime?                @map("lease_expires_at")
+  workerInstanceId  String?                  @map("worker_instance_id")
+  finalizedAt       DateTime?                @map("finalized_at") // API-side sweep set expiresAt + posted the system chat message
+  createdAt         DateTime                 @default(now()) @map("created_at")
+
+  call        Call            @relation(fields: [callId], references: [id], onDelete: Cascade)
+  recording   CallRecording?  @relation(fields: [recordingId], references: [id], onDelete: SetNull)
+  requestedBy UserProfile     @relation("CallTranscriptRequestedBy", fields: [requestedByUserId], references: [id])
+  segments    CallTranscriptSegment[]
+
+  @@index([callId])
+  @@index([conversationId])
+  @@index([companyId, createdAt])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("call_transcript")
+}
+
+model CallTranscriptSegment {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  transcriptId   String   @db.Uuid @map("transcript_id")
+  startMs        Int      @map("start_ms")
+  endMs          Int      @map("end_ms")
+  text           String
+  speakerLabel   String?  @map("speaker_label")
+  speakerUserId  String?  @db.Uuid @map("speaker_user_id")
+  speakerGuestId String?  @db.Uuid @map("speaker_guest_id")
+  confidence     Float?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  transcript   CallTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  speakerUser  UserProfile?   @relation("CallTranscriptSegmentSpeaker", fields: [speakerUserId], references: [id])
+  speakerGuest CallGuest?     @relation(fields: [speakerGuestId], references: [id])
+
+  @@index([transcriptId, startMs])
+  @@map("call_transcript_segment")
 }
 
 model CalendarEventFile {

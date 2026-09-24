@@ -33,6 +33,7 @@ import {
   resolveLiveKitConfig,
   toLiveKitHttpUrl,
 } from "./lib/livekit-config.mjs";
+import { buildTranscriberDatabaseUrl, generateTranscriberPassword } from "./lib/transcriber-db.mjs";
 
 const argv = new Set(process.argv.slice(2));
 const skipPull    = argv.has("--skip-pull");
@@ -73,6 +74,7 @@ const liveKitImage = process.env.LIVEKIT_IMAGE ?? "livekit/livekit-server:v1.12.
 const liveKitRedisImage = process.env.LIVEKIT_REDIS_IMAGE ?? "redis:7-alpine";
 const liveKitCaddyImage = process.env.LIVEKIT_CADDY_IMAGE ?? "caddy:2-alpine";
 const liveKitEgressImage = process.env.LIVEKIT_EGRESS_IMAGE ?? "livekit/egress:v1.9.0";
+const transcriberImage = process.env.RUNLY_TRANSCRIBER_IMAGE ?? "raulbellosom/runlyerp:transcriber-latest";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -295,6 +297,21 @@ const OPTIONAL_VAR_GROUPS = [
   },
   {
     header: [
+      "# ── Runly Transcription (faster-whisper, optional) ──────────────────────────",
+      "# local: instala y ejecuta faster-whisper en un contenedor propio en esta VPS.",
+      "# disabled: no se instala ni activa ningun contenedor ni UI de transcripcion.",
+    ],
+    vars: [
+      { key: "TRANSCRIPTION_MODE",    placeholder: "disabled", comment: null },
+      { key: "WHISPER_MODEL",         placeholder: "small",    comment: null },
+      { key: "WHISPER_COMPUTE_TYPE",  placeholder: "int8",     comment: null },
+      { key: "WHISPER_CPU_THREADS",   placeholder: "2",        comment: "# Fijar explicitamente segun el limite real de CPU del contenedor" },
+      { key: "TRANSCRIBER_DB_PASSWORD", placeholder: "", comment: "# Autogenerada — no editar a mano" },
+      { key: "TRANSCRIBER_DATABASE_URL", placeholder: "", comment: "# Derivada automaticamente de DATABASE_URL" },
+    ],
+  },
+  {
+    header: [
       "# ── runly.chat MirAI assistant + runly.pfm/inventory AI extras (optional) ───",
       "# All reuse GROQ_API_KEY. Without it, the model overrides below are unused.",
     ],
@@ -466,6 +483,15 @@ function removeInactiveLiveKitServices(config) {
   }
 }
 
+function removeInactiveTranscriptionServices(mode) {
+  if (mode === "local") return;
+  tryRun("docker", [
+    "compose", ...composeFiles,
+    "--profile", "transcription-external",
+    "rm", "--stop", "--force", "runly-transcriber-external",
+  ]);
+}
+
 async function promptForLiveKitDomain() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error(
@@ -529,6 +555,43 @@ async function configureLiveKit(filePath) {
 
   await writeLiveKitArtifacts(config);
   return config;
+}
+
+// Mismo patron read-modify-write-in-place que configureLiveKit — el operador
+// edita .env.external a mano (incluyendo DATABASE_URL, ya presente para modo
+// external), este helper solo completa/preserva los valores auto-generados
+// (TRANSCRIBER_DB_PASSWORD) y deriva TRANSCRIBER_DATABASE_URL a partir de
+// DATABASE_URL. docs/TRANSCRIPTION_SPEC.md §6 — enum de solo 2 valores.
+async function configureTranscription(filePath) {
+  let content = await fs.readFile(filePath, "utf8");
+  const mode = String(parseEnvValue(content, "TRANSCRIPTION_MODE") || "disabled").trim().toLowerCase();
+  if (!["local", "disabled"].includes(mode)) {
+    throw new Error(`TRANSCRIPTION_MODE must be "local" or "disabled" (got "${mode}").`);
+  }
+  const whisperModel = parseEnvValue(content, "WHISPER_MODEL") || "small";
+  const whisperComputeType = parseEnvValue(content, "WHISPER_COMPUTE_TYPE") || "int8";
+  const whisperCpuThreads = parseEnvValue(content, "WHISPER_CPU_THREADS") || "2";
+  let dbPassword = parseEnvValue(content, "TRANSCRIBER_DB_PASSWORD") || "";
+  if (mode === "local") dbPassword ||= generateTranscriberPassword();
+  const databaseUrl = parseEnvValue(content, "DATABASE_URL") || "";
+  const transcriberDatabaseUrl = mode === "local" && dbPassword && databaseUrl
+    ? buildTranscriberDatabaseUrl(databaseUrl, dbPassword)
+    : "";
+
+  for (const [key, value] of [
+    ["TRANSCRIPTION_MODE", mode],
+    ["WHISPER_MODEL", whisperModel],
+    ["WHISPER_COMPUTE_TYPE", whisperComputeType],
+    ["WHISPER_CPU_THREADS", whisperCpuThreads],
+    ["TRANSCRIBER_DB_PASSWORD", dbPassword],
+    ["TRANSCRIBER_DATABASE_URL", transcriberDatabaseUrl],
+  ]) {
+    content = setEnvValue(content, key, value);
+  }
+  await fs.writeFile(filePath, content, { encoding: "utf8", mode: 0o600 });
+  try { await fs.chmod(filePath, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+
+  return { mode };
 }
 
 function tryCapture(command, args, { cwd = installerDir, env = process.env } = {}) {
@@ -730,6 +793,10 @@ async function main() {
     await validateLiveKitDns(liveKit);
     await writeComposeEnv(envFile);
   }
+  let transcription = { mode: "disabled" };
+  if (!upOnly) {
+    transcription = await configureTranscription(envFile);
+  }
 
   // When --up-only skips the env check above, still regenerate the compose .env
   // if .env.external already exists (ensures ATLAS_API_URL is always up to date).
@@ -738,6 +805,7 @@ async function main() {
     liveKit = await configureLiveKit(envFile);
     await validateLiveKitDns(liveKit);
     await writeComposeEnv(envFile);
+    transcription = await configureTranscription(envFile);
   }
 
   // ── 2. Validate Docker ─────────────────────────────────────────────────────
@@ -773,6 +841,7 @@ async function main() {
       if (liveKit.managedTls) pullWithRetry(liveKitCaddyImage, "LiveKit Caddy");
       if (liveKit.recordingEnabled) pullWithRetry(liveKitEgressImage, "LiveKit Egress");
     }
+    if (transcription.mode === "local") pullWithRetry(transcriberImage, "Transcriber");
     // Remove dangling layers left behind when `latest` tags are re-pulled.
     // This prevents disk accumulation on every deploy without touching other projects.
     console.log("     Pruning dangling images...");
@@ -793,22 +862,28 @@ async function main() {
     ];
     run("docker", [...dockerRunBase, resolvedApiImage, "pnpm", "db:migrate"]);
     run("docker", [...dockerRunBase, resolvedApiImage, "pnpm", "db:seed"]);
+    if (transcription.mode === "local") {
+      run("docker", [...dockerRunBase, resolvedApiImage, "pnpm", "db:provision-transcriber-role"]);
+    }
   }
 
   // ── 6. Start containers ────────────────────────────────────────────────────
   console.log("\nStarting Runly (external profile)...");
   if (!office.enabled) run("docker", ["compose", ...composeFiles, "--profile", "office", "stop", "collabora"]);
   removeInactiveLiveKitServices(liveKit);
+  removeInactiveTranscriptionServices(transcription.mode);
   const liveKitProfiles = getLiveKitComposeProfiles(liveKit, { recordingEnabled: liveKit.recordingEnabled })
     .flatMap((profile) => ["--profile", profile]);
+  const transcriptionProfiles = transcription.mode === "local" ? ["--profile", "transcription-external"] : [];
   // Limit forced restarts to Runly/Calls: an unchanged editor must keep its sessions.
   const services = ["runly-api-external", "runly-worker-external", "runly-web-external",
     ...(liveKit.mode === "embedded" ? ["livekit-redis", "livekit",
       ...(liveKit.managedTls ? ["livekit-caddy"] : []),
-      ...(liveKit.recordingEnabled ? ["egress"] : [])] : [])];
+      ...(liveKit.recordingEnabled ? ["egress"] : [])] : []),
+    ...(transcription.mode === "local" ? ["runly-transcriber-external"] : [])];
   run(
     "docker",
-    ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
+    ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...transcriptionProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
     {
       env: {
         ...process.env,

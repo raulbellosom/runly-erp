@@ -62,6 +62,17 @@ export function createCallsDomain(request, withAuthHeaders) {
     deleteRecording: (recordingId, token) =>
       json(`/calls/recordings/${encodeURIComponent(recordingId)}`, "DELETE", undefined, token),
 
+    // --- transcripts (V1 — audio mezclado de una grabación existente) ---
+    requestTranscript: (callId, token) => json(`/calls/${callId}/transcript/request`, "POST", {}, token),
+    retryTranscript: (transcriptId, token) =>
+      json(`/calls/transcripts/${encodeURIComponent(transcriptId)}/retry`, "POST", {}, token),
+    listTranscripts: (conversationId, token) =>
+      json(`/calls/conversations/${encodeURIComponent(conversationId)}/transcripts`, "GET", undefined, token),
+    getTranscript: (transcriptId, token) =>
+      json(`/calls/transcripts/${encodeURIComponent(transcriptId)}`, "GET", undefined, token),
+    deleteTranscript: (transcriptId, token) =>
+      json(`/calls/transcripts/${encodeURIComponent(transcriptId)}`, "DELETE", undefined, token),
+
     // --- guest (unauthenticated) ---
     guest: {
       join: (payload) => guestJson("/calls/guest/join", "POST", payload),

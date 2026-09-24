@@ -1,0 +1,5 @@
+# Artefactos generados localmente — regenerables via generate_sample_audio.ps1
+# y transcribe_test.py. No se versiona audio (aunque sea sintetico) ni salidas
+# JSON crudas; la evidencia narrativa vive en RESULTS.md.
+sample-audio/*.wav
+output/*.json

@@ -61,6 +61,12 @@ const ALL_IMAGES = [
     dockerfile: "infra/docker/web.Dockerfile",
     label:      "Web",
   },
+  {
+    key:        "transcriber",
+    tag:        `${REGISTRY}:transcriber-latest`,
+    dockerfile: "infra/docker/transcriber.Dockerfile",
+    label:      "Transcriber",
+  },
 ];
 
 // Filter by --web / --api / --worker flags; default to all.

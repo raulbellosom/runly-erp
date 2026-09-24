@@ -10,12 +10,14 @@ import { createCallLinksService, CallLinkError } from "./call-links-service.js";
 import { createCallGuestService, CallGuestError } from "./call-guest-service.js";
 import { createCallMessagesService, CallMessageError } from "./call-messages-service.js";
 import { createCallRecordingService, CallRecordingError } from "./call-recording-service.js";
-import { buildRecordingReadyMessage } from "./call-system-messages.js";
+import { createCallTranscriptService, CallTranscriptError } from "./call-transcript-service.js";
+import { buildRecordingReadyMessage, buildTranscriptReadyMessage } from "./call-system-messages.js";
 import { createGuestCallRouter } from "./guest-routes.js";
 
 const callIdSchema = z.string().uuid();
 const conversationIdSchema = z.string().uuid();
 const recordingIdSchema = z.string().uuid();
+const transcriptIdSchema = z.string().uuid();
 
 function handleError(c, error, fallback) {
   if (
@@ -24,6 +26,7 @@ function handleError(c, error, fallback) {
     || error instanceof CallGuestError
     || error instanceof CallMessageError
     || error instanceof CallRecordingError
+    || error instanceof CallTranscriptError
   ) {
     return c.json(
       {
@@ -52,6 +55,7 @@ export function createCallsRouter({
   smtpService = null,
   service = null,
   recordingService: recordingServiceOverride = null,
+  transcriptService: transcriptServiceOverride = null,
 }) {
   const app = new Hono();
   const internal = new Hono();
@@ -72,6 +76,16 @@ export function createCallsRouter({
       await calls.postSystemMessage(rec.conversationId, msg);
     },
   });
+  async function logAudit({ companyId, actorId, entityType, entityId, action, before = null, after = null }) {
+    await prisma.auditLog.create({ data: { companyId, actorId, entityType, entityId, action, before, after } });
+  }
+  const transcriptService = transcriptServiceOverride ?? createCallTranscriptService({
+    prisma, supabaseAdmin, logAudit,
+    onTranscriptReady: async (t) => {
+      const msg = buildTranscriptReadyMessage({ transcriptId: t.id, durationMs: t.durationMs });
+      await calls.postSystemMessage(t.conversationId, msg);
+    },
+  });
 
   if (!service) {
     calls.startExpirySweeper();
@@ -81,6 +95,10 @@ export function createCallsRouter({
     rt.unref?.();
     const ct = setInterval(() => { recordingService.cleanupExpiredRecordings().catch(() => {}); }, 60 * 60 * 1000);
     ct.unref?.();
+    const trt = setInterval(() => { transcriptService.reconcileReadyTranscripts().catch(() => {}); }, 20_000);
+    trt.unref?.();
+    const tct = setInterval(() => { transcriptService.cleanupExpiredTranscripts().catch(() => {}); }, 60 * 60 * 1000);
+    tct.unref?.();
   }
 
   // ---- unauthenticated guest routes (no authMiddleware) ----
@@ -214,6 +232,56 @@ export function createCallsRouter({
         await recordingService.deleteRecording({ recordingId, profileId: c.get("userId") });
         return c.json({ data: { id: recordingId } });
       } catch (error) { return handleError(c, error, "Error eliminando la grabación."); }
+    },
+  );
+
+  // ---- transcripts (V1 — audio mezclado de una grabación existente) ----
+  internal.post(
+    "/:callId/transcript/request",
+    requirePermission("chat.calls.transcript.request"),
+    async (c) => {
+      try {
+        const callId = callIdSchema.parse(c.req.param("callId"));
+        const profileId = c.get("userId");
+        const data = await transcriptService.requestTranscript({ callId, requestedByUserId: profileId, profileId });
+        return c.json({ data }, 201);
+      } catch (error) { return handleError(c, error, "Error solicitando la transcripción."); }
+    },
+  );
+  internal.post(
+    "/transcripts/:transcriptId/retry",
+    requirePermission("chat.calls.transcript.request"),
+    async (c) => {
+      try {
+        const transcriptId = transcriptIdSchema.parse(c.req.param("transcriptId"));
+        const data = await transcriptService.retryTranscript({ transcriptId, profileId: c.get("userId") });
+        return c.json({ data });
+      } catch (error) { return handleError(c, error, "Error reintentando la transcripción."); }
+    },
+  );
+  internal.get("/conversations/:conversationId/transcripts", async (c) => {
+    try {
+      const conversationId = conversationIdSchema.parse(c.req.param("conversationId"));
+      const data = await transcriptService.listTranscripts({ conversationId, profileId: await profileId(c) });
+      return c.json({ data });
+    } catch (error) { return handleError(c, error, "Error obteniendo transcripciones."); }
+  });
+  internal.get("/transcripts/:transcriptId", async (c) => {
+    try {
+      const transcriptId = transcriptIdSchema.parse(c.req.param("transcriptId"));
+      const data = await transcriptService.getTranscript({ transcriptId, profileId: await profileId(c) });
+      return c.json({ data });
+    } catch (error) { return handleError(c, error, "Error obteniendo la transcripción."); }
+  });
+  internal.delete(
+    "/transcripts/:transcriptId",
+    requirePermission("chat.calls.transcript.manage"),
+    async (c) => {
+      try {
+        const transcriptId = transcriptIdSchema.parse(c.req.param("transcriptId"));
+        await transcriptService.deleteTranscript({ transcriptId, profileId: c.get("userId") });
+        return c.json({ data: { id: transcriptId } });
+      } catch (error) { return handleError(c, error, "Error eliminando la transcripción."); }
     },
   );
 

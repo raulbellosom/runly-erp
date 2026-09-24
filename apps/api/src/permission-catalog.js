@@ -1455,6 +1455,18 @@ export const PERMISSION_CATALOG = {
     groupKey: "chat",
     order: 60,
   },
+  "chat.calls.transcript.request": {
+    displayNameEs: "Solicitar transcripción de llamadas",
+    descriptionEs: "Permite solicitar y reintentar la transcripción de una llamada grabada.",
+    groupKey: "chat",
+    order: 61,
+  },
+  "chat.calls.transcript.manage": {
+    displayNameEs: "Administrar transcripciones de llamadas",
+    descriptionEs: "Permite eliminar cualquier transcripción y leer transcripciones de llamadas en las que no participó, dentro de una conversación que administra.",
+    groupKey: "chat",
+    order: 62,
+  },
   // -----------------------------------------------------------------------
   // runly.inventory
   // -----------------------------------------------------------------------

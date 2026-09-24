@@ -58,3 +58,12 @@ export function buildRecordingReadyMessage({ recordingId, durationMs }) {
     metadata: { recording: { recordingId, durationMs: durationMs ?? null } },
   };
 }
+
+// spec: { transcriptId: string, durationMs: number|null }
+export function buildTranscriptReadyMessage({ transcriptId, durationMs }) {
+  const totalSeconds = Number.isFinite(durationMs) && durationMs > 0 ? Math.round(durationMs / 1000) : 0;
+  return {
+    body: `Transcripción lista · ${formatCallDuration(totalSeconds)}`,
+    metadata: { transcript: { transcriptId, durationMs: durationMs ?? null } },
+  };
+}
