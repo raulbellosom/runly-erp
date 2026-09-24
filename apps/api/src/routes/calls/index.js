@@ -259,6 +259,17 @@ export function createCallsRouter({
       } catch (error) { return handleError(c, error, "Error reintentando la transcripción."); }
     },
   );
+  internal.post(
+    "/transcripts/:transcriptId/regenerate",
+    requirePermission("chat.calls.transcript.request"),
+    async (c) => {
+      try {
+        const transcriptId = transcriptIdSchema.parse(c.req.param("transcriptId"));
+        const data = await transcriptService.regenerateTranscript({ transcriptId, profileId: c.get("userId") });
+        return c.json({ data });
+      } catch (error) { return handleError(c, error, "Error regenerando la transcripción."); }
+    },
+  );
   internal.get("/conversations/:conversationId/transcripts", async (c) => {
     try {
       const conversationId = conversationIdSchema.parse(c.req.param("conversationId"));

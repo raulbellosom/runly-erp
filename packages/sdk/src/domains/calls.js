@@ -66,6 +66,8 @@ export function createCallsDomain(request, withAuthHeaders) {
     requestTranscript: (callId, token) => json(`/calls/${callId}/transcript/request`, "POST", {}, token),
     retryTranscript: (transcriptId, token) =>
       json(`/calls/transcripts/${encodeURIComponent(transcriptId)}/retry`, "POST", {}, token),
+    regenerateTranscript: (transcriptId, token) =>
+      json(`/calls/transcripts/${encodeURIComponent(transcriptId)}/regenerate`, "POST", {}, token),
     listTranscripts: (conversationId, token) =>
       json(`/calls/conversations/${encodeURIComponent(conversationId)}/transcripts`, "GET", undefined, token),
     getTranscript: (transcriptId, token) =>

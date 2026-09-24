@@ -164,6 +164,59 @@ export function createCallTranscriptService({
     return { id: updated.id, status: updated.status };
   }
 
+  // Explicit "generar de nuevo" over an already-READY transcript — reuses
+  // the same row instead of creating a second one, so there is never more
+  // than one transcript per call to disambiguate between (spec §5.1 access
+  // checks and the UI both assume that 1:1 shape). The Python worker's
+  // write_result() already does an idempotent DELETE+INSERT of segments
+  // keyed by transcript_id (see apps/transcriber/main.py), so resetting this
+  // row back to PENDING and letting it get claimed again is enough to
+  // "replace the previous version" — no separate supersede/versioning model.
+  async function regenerateTranscript({ transcriptId, profileId }) {
+    const transcript = await prisma.callTranscript.findUnique({ where: { id: transcriptId } });
+    if (!transcript) throw new CallTranscriptError("Transcripción no encontrada.", 404);
+    await assertMember(transcript.conversationId, profileId);
+    if (transcript.status !== "READY") {
+      throw new CallTranscriptError("Solo se puede regenerar una transcripción lista.", 409);
+    }
+
+    // Deleted up front (rather than left for the worker to clear once it
+    // claims the job) so a client polling getTranscript() during the brief
+    // PENDING window never sees the outgoing segments next to a status that
+    // says they're stale.
+    await prisma.callTranscriptSegment.deleteMany({ where: { transcriptId } });
+    const updated = await prisma.callTranscript.update({
+      where: { id: transcriptId },
+      data: {
+        status: "PENDING",
+        attempts: 0,
+        failureReason: null,
+        leaseExpiresAt: null,
+        workerInstanceId: null,
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+        model: null,
+        language: null,
+        finalizedAt: null,
+        expiresAt: null,
+      },
+    });
+
+    if (logAudit) {
+      await logAudit({
+        companyId: transcript.companyId,
+        actorId: profileId,
+        entityType: "CallTranscript",
+        entityId: transcriptId,
+        action: "chat.call_transcript.regenerate",
+        after: { id: transcriptId, status: "PENDING" },
+      }).catch((error) => console.warn(`${LOG_PREFIX} No se pudo escribir el audit log:`, error?.message ?? error));
+    }
+
+    return { id: updated.id, status: updated.status };
+  }
+
   async function listTranscripts({ conversationId, profileId }) {
     await assertMember(conversationId, profileId);
     const rows = await prisma.callTranscript.findMany({
@@ -280,6 +333,7 @@ export function createCallTranscriptService({
   return {
     requestTranscript,
     retryTranscript,
+    regenerateTranscript,
     listTranscripts,
     getTranscript,
     deleteTranscript,

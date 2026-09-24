@@ -142,6 +142,55 @@ describe("createCallTranscriptService.retryTranscript", () => {
   });
 });
 
+describe("createCallTranscriptService.regenerateTranscript", () => {
+  it("rejects regenerating a transcript that is not READY", async () => {
+    const prisma = {
+      callTranscript: { findUnique: async () => ({ id: TRANSCRIPT, conversationId: CONV, status: "PROCESSING" }) },
+      $queryRaw: async () => memberRows(),
+    };
+    const svc = createCallTranscriptService({ prisma });
+    await assert.rejects(
+      svc.regenerateTranscript({ transcriptId: TRANSCRIPT, profileId: USER }),
+      (e) => e instanceof CallTranscriptError && e.status === 409,
+    );
+  });
+
+  it("clears the old segments and resets a READY transcript back to PENDING, reusing the same row", async () => {
+    let updateData;
+    let deletedWhere;
+    const prisma = {
+      callTranscript: {
+        findUnique: async () => ({ id: TRANSCRIPT, conversationId: CONV, companyId: COMPANY, status: "READY" }),
+        update: async ({ data }) => { updateData = data; return { id: TRANSCRIPT, ...data }; },
+      },
+      callTranscriptSegment: {
+        deleteMany: async ({ where }) => { deletedWhere = where; return { count: 0 }; },
+      },
+      $queryRaw: async () => memberRows(),
+    };
+    const svc = createCallTranscriptService({ prisma });
+    const out = await svc.regenerateTranscript({ transcriptId: TRANSCRIPT, profileId: USER });
+    assert.equal(out.status, "PENDING");
+    assert.equal(deletedWhere.transcriptId, TRANSCRIPT);
+    assert.equal(updateData.attempts, 0);
+    assert.equal(updateData.failureReason, null);
+    assert.equal(updateData.finalizedAt, null);
+    assert.equal(updateData.expiresAt, null);
+  });
+
+  it("rejects for a caller who is not a member of the conversation (IDOR guard)", async () => {
+    const prisma = {
+      callTranscript: { findUnique: async () => ({ id: TRANSCRIPT, conversationId: CONV, status: "READY" }) },
+      $queryRaw: async () => [], // not a member
+    };
+    const svc = createCallTranscriptService({ prisma });
+    await assert.rejects(
+      svc.regenerateTranscript({ transcriptId: TRANSCRIPT, profileId: OTHER_USER }),
+      (e) => e instanceof CallTranscriptError && e.status === 404,
+    );
+  });
+});
+
 describe("createCallTranscriptService access control — stricter than recordings", () => {
   // Central behavior of docs/TRANSCRIPTION_SPEC.md §5.1: unlike recordings
   // (assertMember only), reading a transcript requires having REQUESTED it

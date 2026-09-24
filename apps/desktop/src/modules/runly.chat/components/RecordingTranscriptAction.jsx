@@ -10,9 +10,18 @@ import { TranscriptViewerDialog } from "./TranscriptViewerDialog";
 // 409 on a duplicate request for the same call). V1 only ever transcribes
 // audio already captured by an existing READY recording — see
 // docs/TRANSCRIPTION_SPEC.md §0.1 for why this dependency exists.
+function formatCallTitle(dateStr) {
+  if (!dateStr) return "Transcripción de llamada";
+  const formatted = new Date(dateStr).toLocaleString("es-MX", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  return `Transcripción — ${formatted}`;
+}
+
 export function RecordingTranscriptAction({ recording, transcript, conversationId }) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const requestTranscript = useRequestTranscript(conversationId);
+  const callTitle = formatCallTitle(recording.startedAt);
 
   if (recording.status !== "READY") return null;
 
@@ -83,6 +92,7 @@ export function RecordingTranscriptAction({ recording, transcript, conversationI
           open={viewerOpen}
           onOpenChange={setViewerOpen}
           conversationId={conversationId}
+          callTitle={callTitle}
         />
       </>
     );
@@ -111,6 +121,7 @@ export function RecordingTranscriptAction({ recording, transcript, conversationI
         open={viewerOpen}
         onOpenChange={setViewerOpen}
         conversationId={conversationId}
+        callTitle={callTitle}
       />
     </>
   );

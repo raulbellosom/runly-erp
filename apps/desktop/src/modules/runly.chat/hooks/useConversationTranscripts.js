@@ -50,7 +50,26 @@ export function useRetryTranscript(conversationId) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (transcriptId) => runly.calls.retryTranscript(transcriptId, session.access_token),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-transcripts", conversationId] }),
+    onSuccess: (_data, transcriptId) => {
+      qc.invalidateQueries({ queryKey: ["chat-transcripts", conversationId] });
+      // Without this, an open TranscriptViewerDialog keeps showing the old
+      // FAILED status until its own 15s staleTime lapses — its
+      // refetchInterval only re-polls once the cached row already reads
+      // PENDING/PROCESSING, so the transition itself needs an explicit nudge.
+      qc.invalidateQueries({ queryKey: ["chat-transcript", transcriptId] });
+    },
+  });
+}
+
+export function useRegenerateTranscript(conversationId) {
+  const { session } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (transcriptId) => runly.calls.regenerateTranscript(transcriptId, session.access_token),
+    onSuccess: (_data, transcriptId) => {
+      qc.invalidateQueries({ queryKey: ["chat-transcripts", conversationId] });
+      qc.invalidateQueries({ queryKey: ["chat-transcript", transcriptId] });
+    },
   });
 }
 
