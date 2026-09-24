@@ -2153,6 +2153,7 @@ model CallRecording {
   callId            String    @db.Uuid @map("call_id")
   conversationId    String    @db.Uuid @map("conversation_id")
   status            String    @default("STARTING") // STARTING | ACTIVE | PROCESSING | READY | FAILED
+  title             String?   @map("title") // custom display name; null = use the date/time label
   startedByUserId   String    @db.Uuid @map("started_by_user_id")
   egressId          String?   @map("egress_id")
   playlistObjectKey String?   @map("playlist_object_key")

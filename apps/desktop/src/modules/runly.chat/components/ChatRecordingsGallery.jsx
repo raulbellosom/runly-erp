@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AdvancedFileViewer, ConfirmDialog, EmptyState, ErrorState, Skeleton,
+  AdvancedFileViewer, ConfirmDialog, EmptyState, ErrorState, Input, Skeleton,
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@runly/ui";
-import { AlertCircle, Loader2, Play, Trash2, Video } from "lucide-react";
+import { AlertCircle, Check, Loader2, Pencil, Play, Trash2, Video, X } from "lucide-react";
 import { toast } from "sonner";
-import { useConversationRecordings, useDeleteRecording } from "../hooks/useConversationRecordings";
+import { useConversationRecordings, useDeleteRecording, useRenameRecording } from "../hooks/useConversationRecordings";
 import { useConversationTranscripts } from "../hooks/useConversationTranscripts";
 import { RecordingTranscriptAction } from "./RecordingTranscriptAction";
 
@@ -32,7 +32,89 @@ function formatFileSize(bytes) {
   return `${value.toFixed(unitIndex > 0 && value < 10 ? 1 : 0)} ${units[unitIndex]}`;
 }
 
-function RecordingRow({ recording, deleteRecording, onPlay, transcript, conversationId }) {
+// Click the pencil to edit in place; Enter/blur saves, Escape cancels. An
+// empty/whitespace-only save clears the custom title back to the default
+// date/time label (renameRecording treats that the same way server-side).
+function RecordingTitle({ recording, renameRecording }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(recording.title ?? "");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function startEditing() {
+    setDraft(recording.title ?? "");
+    setEditing(true);
+  }
+
+  async function save() {
+    const next = draft.trim();
+    if (next === (recording.title ?? "").trim()) { setEditing(false); return; }
+    try {
+      await renameRecording.mutateAsync({ recordingId: recording.id, title: next });
+      setEditing(false);
+    } catch (err) {
+      toast.error(err?.message ?? "No se pudo renombrar la grabación.");
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            else if (e.key === "Escape") setEditing(false);
+          }}
+          maxLength={120}
+          placeholder={formatRecordingDateTime(recording.startedAt)}
+          className="h-7 text-sm"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={renameRecording.isPending}
+          title="Guardar"
+          aria-label="Guardar nombre"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.1)]"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          title="Cancelar"
+          aria-label="Cancelar"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group/title flex items-center gap-1.5 min-w-0">
+      <p className="truncate text-sm font-medium">{recording.title || formatRecordingDateTime(recording.startedAt)}</p>
+      <button
+        type="button"
+        onClick={startEditing}
+        title="Renombrar"
+        aria-label="Renombrar grabación"
+        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-opacity"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+function RecordingRow({ recording, deleteRecording, renameRecording, onPlay, transcript, conversationId }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const isReady = recording.status === "READY";
@@ -60,6 +142,9 @@ function RecordingRow({ recording, deleteRecording, onPlay, transcript, conversa
   // beyond a vague icon (the bug reported: recordings with a real S3 object
   // and real metadata still can't be signed into a playable URL).
   const metaParts = [];
+  // The date is the primary title when there's no custom name — once a
+  // recording is renamed, it would otherwise disappear from the row entirely.
+  if (recording.title) metaParts.push(formatRecordingDateTime(recording.startedAt));
   if (errorDetail) {
     metaParts.push(errorDetail);
   } else {
@@ -83,7 +168,7 @@ function RecordingRow({ recording, deleteRecording, onPlay, transcript, conversa
     <div className="rounded-xl border border-[hsl(var(--border))] p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{formatRecordingDateTime(recording.startedAt)}</p>
+          <RecordingTitle recording={recording} renameRecording={renameRecording} />
           <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">{metaParts.join(" · ")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -146,6 +231,7 @@ function RecordingRow({ recording, deleteRecording, onPlay, transcript, conversa
 export function ChatRecordingsGallery({ conversationId }) {
   const { data, isLoading, isError, refetch } = useConversationRecordings(conversationId);
   const deleteRecording = useDeleteRecording(conversationId);
+  const renameRecording = useRenameRecording(conversationId);
   const recordings = data?.data ?? data ?? [];
   const { data: transcriptsData } = useConversationTranscripts(conversationId);
   const transcriptsByRecordingId = useMemo(() => {
@@ -181,7 +267,7 @@ export function ChatRecordingsGallery({ conversationId }) {
   const viewerFiles = useMemo(() => playableRecordings.map((r) => ({
     id: r.id,
     mimeType: "application/vnd.apple.mpegurl",
-    originalName: `Grabación ${formatRecordingDateTime(r.startedAt)}`,
+    originalName: r.title || `Grabación ${formatRecordingDateTime(r.startedAt)}`,
     sizeBytes: r.sizeBytes,
   })), [playableRecordings]);
 
@@ -242,6 +328,7 @@ export function ChatRecordingsGallery({ conversationId }) {
           key={r.id}
           recording={r}
           deleteRecording={deleteRecording}
+          renameRecording={renameRecording}
           onPlay={handlePlay}
           transcript={transcriptsByRecordingId.get(r.id)}
           conversationId={conversationId}

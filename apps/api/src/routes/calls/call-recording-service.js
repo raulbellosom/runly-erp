@@ -382,6 +382,27 @@ export function createCallRecordingService({
     return all;
   }
 
+  // Same access level as delete (conversation member, chat.calls.record at
+  // the route level) — renaming is a much lower-stakes action, so no reason
+  // to require anything stricter. Empty/whitespace-only title clears it back
+  // to null, which the UI then renders as the auto-generated date/time label
+  // (ChatRecordingsGallery.jsx) instead of an empty string.
+  const MAX_TITLE_LENGTH = 120;
+  async function renameRecording({ recordingId, profileId, title }) {
+    const rec = await prisma.callRecording.findUnique({ where: { id: recordingId } });
+    if (!rec) throw new CallRecordingError("Grabación no encontrada.", 404);
+    await assertMember(rec.conversationId, profileId);
+    const trimmed = String(title ?? "").trim();
+    if (trimmed.length > MAX_TITLE_LENGTH) {
+      throw new CallRecordingError(`El nombre no puede superar ${MAX_TITLE_LENGTH} caracteres.`, 400);
+    }
+    const updated = await prisma.callRecording.update({
+      where: { id: recordingId },
+      data: { title: trimmed || null },
+    });
+    return { id: updated.id, title: updated.title };
+  }
+
   // Manual delete (conversation member, any terminal status) — distinct from
   // cleanupExpiredRecordings' automatic 90-day sweep, which only ever
   // touches READY rows past their own expiresAt. FAILED rows (a bad egress
@@ -453,5 +474,5 @@ export function createCallRecordingService({
     return cleaned;
   }
 
-  return { startRecording, stopRecording, listRecordings, deleteRecording, reconcileActiveRecordings, cleanupExpiredRecordings };
+  return { startRecording, stopRecording, listRecordings, renameRecording, deleteRecording, reconcileActiveRecordings, cleanupExpiredRecordings };
 }

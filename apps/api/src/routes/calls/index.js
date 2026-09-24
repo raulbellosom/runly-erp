@@ -223,6 +223,18 @@ export function createCallsRouter({
       return c.json({ data });
     } catch (error) { return handleError(c, error, "Error obteniendo grabaciones."); }
   });
+  internal.patch(
+    "/recordings/:recordingId",
+    requirePermission("chat.calls.record"),
+    async (c) => {
+      try {
+        const recordingId = recordingIdSchema.parse(c.req.param("recordingId"));
+        const body = await c.req.json().catch(() => ({}));
+        const data = await recordingService.renameRecording({ recordingId, profileId: c.get("userId"), title: body?.title });
+        return c.json({ data });
+      } catch (error) { return handleError(c, error, "Error renombrando la grabación."); }
+    },
+  );
   internal.delete(
     "/recordings/:recordingId",
     requirePermission("chat.calls.record"),

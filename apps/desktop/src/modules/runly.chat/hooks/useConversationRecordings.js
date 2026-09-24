@@ -31,3 +31,12 @@ export function useDeleteRecording(conversationId) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-recordings", conversationId] }),
   });
 }
+
+export function useRenameRecording(conversationId) {
+  const { session } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recordingId, title }) => runly.calls.renameRecording(recordingId, title, session.access_token),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-recordings", conversationId] }),
+  });
+}

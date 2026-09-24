@@ -612,3 +612,72 @@ describe("createCallRecordingService.deleteRecording", () => {
     assert.equal(deleteCalled, false);
   });
 });
+
+describe("createCallRecordingService.renameRecording", () => {
+  it("trims the title and saves it", async () => {
+    let updateData;
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findUnique: async () => ({ id: REC, conversationId: CONV, status: "READY" }),
+        update: async ({ data }) => { updateData = data; return { id: REC, ...data }; },
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    const out = await svc.renameRecording({ recordingId: REC, profileId: USER, title: "  Reunión de cierre Q3  " });
+    assert.equal(updateData.title, "Reunión de cierre Q3");
+    assert.equal(out.title, "Reunión de cierre Q3");
+  });
+
+  it("clears the title back to null on an empty/whitespace-only string", async () => {
+    let updateData;
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: {
+        findUnique: async () => ({ id: REC, conversationId: CONV, status: "READY" }),
+        update: async ({ data }) => { updateData = data; return { id: REC, ...data }; },
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await svc.renameRecording({ recordingId: REC, profileId: USER, title: "   " });
+    assert.equal(updateData.title, null);
+  });
+
+  it("rejects a title over the length cap", async () => {
+    const prisma = {
+      $queryRaw: async () => [{ id: "member-row" }],
+      callRecording: { findUnique: async () => ({ id: REC, conversationId: CONV, status: "READY" }) },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await assert.rejects(
+      svc.renameRecording({ recordingId: REC, profileId: USER, title: "a".repeat(121) }),
+      (e) => e instanceof CallRecordingError && e.status === 400,
+    );
+  });
+
+  it("rejects renaming a recording that does not exist", async () => {
+    const prisma = { callRecording: { findUnique: async () => null } };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await assert.rejects(
+      svc.renameRecording({ recordingId: REC, profileId: USER, title: "x" }),
+      (e) => e instanceof CallRecordingError && e.status === 404,
+    );
+  });
+
+  it("rejects renaming for a caller who is not a member of the conversation (IDOR guard)", async () => {
+    let updateCalled = false;
+    const prisma = {
+      $queryRaw: async () => [], // not a member
+      callRecording: {
+        findUnique: async () => ({ id: REC, conversationId: CONV, status: "READY" }),
+        update: async () => { updateCalled = true; return {}; },
+      },
+    };
+    const svc = createCallRecordingService({ prisma, env: env(), EgressClientImpl: FakeEgress });
+    await assert.rejects(
+      svc.renameRecording({ recordingId: REC, profileId: "someone-else", title: "x" }),
+      (e) => e instanceof CallRecordingError && e.status === 404,
+    );
+    assert.equal(updateCalled, false);
+  });
+});
