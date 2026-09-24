@@ -9,7 +9,7 @@ export function GuestRoomChat({ polled, liveIncoming, onSend, myName }) {
       messages={mergeRoomMessages(polled, liveIncoming)}
       onSend={onSend}
       currentName={myName}
-      notice="Chat de la llamada — solo visible aquí."
+      notice="Chat de la llamada."
     />
   );
 }
