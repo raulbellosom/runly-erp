@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolvePinnedEntry, resolveSpotlightMain, spotlightStrip, stripRowCount } from "../callLayout.js";
+import { resolvePinnedEntry, resolveSpotlightMain, spotlightStrip, stripRowCount, advanceSpeakingFocus, orderBySpeakingFocus } from "../callLayout.js";
 
 const p = (id, isLocal = false) => ({ participant: { identity: id, sid: id }, isLocal });
 const parts = [p("me", true), p("a"), p("b")];
@@ -71,6 +71,64 @@ describe("resolveSpotlightMain", () => {
   it("null when neither a valid pin nor a screen share exist", () => {
     assert.equal(resolveSpotlightMain(parts, null, null), null);
     assert.equal(resolveSpotlightMain(parts, "ghost", null), null);
+  });
+});
+
+describe("advanceSpeakingFocus", () => {
+  it("starts with no focused speaker", () => {
+    const state = advanceSpeakingFocus(null, { candidateId: null, now: 0, stableMs: 1500 });
+    assert.equal(state.focusedId, null);
+  });
+
+  it("does not focus a new candidate before it has been stable for stableMs", () => {
+    let state = advanceSpeakingFocus(null, { candidateId: "b", now: 0, stableMs: 1500 });
+    assert.equal(state.focusedId, null);
+    state = advanceSpeakingFocus(state, { candidateId: "b", now: 1000, stableMs: 1500 });
+    assert.equal(state.focusedId, null);
+  });
+
+  it("focuses the candidate once it has been stable for stableMs", () => {
+    let state = advanceSpeakingFocus(null, { candidateId: "b", now: 0, stableMs: 1500 });
+    state = advanceSpeakingFocus(state, { candidateId: "b", now: 1500, stableMs: 1500 });
+    assert.equal(state.focusedId, "b");
+  });
+
+  it("resets the stability timer if the candidate changes before stableMs", () => {
+    let state = advanceSpeakingFocus(null, { candidateId: "b", now: 0, stableMs: 1500 });
+    state = advanceSpeakingFocus(state, { candidateId: "c", now: 1000, stableMs: 1500 });
+    state = advanceSpeakingFocus(state, { candidateId: "c", now: 2000, stableMs: 1500 });
+    assert.equal(state.focusedId, null);
+    state = advanceSpeakingFocus(state, { candidateId: "c", now: 2500, stableMs: 1500 });
+    assert.equal(state.focusedId, "c");
+  });
+
+  it("keeps the current focus when nobody is speaking (candidateId null) instead of clearing it immediately", () => {
+    let state = advanceSpeakingFocus(null, { candidateId: "b", now: 0, stableMs: 1500 });
+    state = advanceSpeakingFocus(state, { candidateId: "b", now: 1500, stableMs: 1500 });
+    assert.equal(state.focusedId, "b");
+    state = advanceSpeakingFocus(state, { candidateId: null, now: 1600, stableMs: 1500 });
+    assert.equal(state.focusedId, "b");
+  });
+});
+
+describe("orderBySpeakingFocus", () => {
+  it("returns the base order when there is no focused speaker", () => {
+    const entries = [{ participant: { identity: "a" } }, { participant: { identity: "b" } }];
+    assert.deepEqual(orderBySpeakingFocus(entries, null).map((e) => e.participant.identity), ["a", "b"]);
+  });
+
+  it("moves the focused speaker to the front, keeping the rest in order", () => {
+    const entries = [
+      { participant: { identity: "a" } },
+      { participant: { identity: "b" } },
+      { participant: { identity: "c" } },
+    ];
+    assert.deepEqual(orderBySpeakingFocus(entries, "c").map((e) => e.participant.identity), ["c", "a", "b"]);
+  });
+
+  it("is a no-op when the focused id is not present in entries", () => {
+    const entries = [{ participant: { identity: "a" } }, { participant: { identity: "b" } }];
+    assert.deepEqual(orderBySpeakingFocus(entries, "ghost").map((e) => e.participant.identity), ["a", "b"]);
   });
 });
 

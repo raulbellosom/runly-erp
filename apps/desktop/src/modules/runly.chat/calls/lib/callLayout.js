@@ -46,3 +46,43 @@ export const STRIP_TWO_ROW_THRESHOLD = 5;
 export function stripRowCount(tileCount) {
   return tileCount >= STRIP_TWO_ROW_THRESHOLD ? 2 : 1;
 }
+
+// How long a single candidate must be the top "who's speaking" pick before
+// the strip actually reorders — avoids jitter on every audio-level blip
+// (someone clearing their throat shouldn't reshuffle the call). Named
+// constant per the same pattern as STRIP_TWO_ROW_THRESHOLD, easy to retune.
+export const SPEAKING_FOCUS_STABLE_MS = 1500;
+
+// Pure debounce state machine for "who should be boosted to the front of the
+// strip". `state` is `{ focusedId, pendingId, pendingSince } | null`.
+// `candidateId` is whoever is the top active speaker this tick (or null if
+// nobody is speaking). A `null` candidate never clears an existing focus —
+// silence (or everyone briefly pausing) shouldn't un-focus the last speaker.
+// See
+// docs/superpowers/specs/2026-09-23-call-spotlight-polish-round2-design.md §8.4.
+export function advanceSpeakingFocus(state, { candidateId, now, stableMs = SPEAKING_FOCUS_STABLE_MS }) {
+  const current = state ?? { focusedId: null, pendingId: null, pendingSince: null };
+  if (!candidateId || candidateId === current.focusedId) {
+    return { ...current, pendingId: null, pendingSince: null };
+  }
+  if (candidateId !== current.pendingId) {
+    return { ...current, pendingId: candidateId, pendingSince: now };
+  }
+  if (now - current.pendingSince >= stableMs) {
+    return { focusedId: candidateId, pendingId: null, pendingSince: null };
+  }
+  return current;
+}
+
+// Moves the focused speaker's entry to the front of `entries`, preserving
+// the relative order of everyone else. A no-op if `focusedId` is null or not
+// present.
+export function orderBySpeakingFocus(entries, focusedId) {
+  if (!focusedId) return entries;
+  const idx = entries.findIndex((e) => e.participant?.identity === focusedId);
+  if (idx <= 0) return entries;
+  const copy = entries.slice();
+  const [focused] = copy.splice(idx, 1);
+  copy.unshift(focused);
+  return copy;
+}
