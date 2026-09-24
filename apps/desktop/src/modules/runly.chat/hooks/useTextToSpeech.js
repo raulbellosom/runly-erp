@@ -58,13 +58,32 @@ export function useSpeakText() {
     // Clicking the button that's already playing just stops it.
     if (playingText === text) { cleanup(); return; }
     cleanup();
+
+    // iOS Safari (and other WebKit-based mobile browsers) only allows
+    // audio.play() when it's still tied to the user gesture that triggered
+    // it — once this function `await`s the network round-trip below, the
+    // gesture is no longer "fresh" by the time playback would start, and
+    // play() throws NotAllowedError ("...possibly because the user denied
+    // permission", a real report: a short reply synthesized fast enough
+    // stayed inside whatever grace window Safari allows, a longer one
+    // didn't). Fix: create the <audio> element and call play() on it
+    // SYNCHRONOUSLY, right now, before any await — with no source yet, that
+    // call is expected to reject (nothing to play), but it "unlocks" this
+    // specific element against the current gesture, so setting its `src`
+    // and calling play() again later, after the network call, still works.
+    const audio = new Audio();
+    audio.play().catch(() => {});
+    audioRef.current = audio;
+
     setLoadingText(text);
     try {
       const blob = await mutation.mutateAsync(text);
+      // Superseded while the request was in flight (stopped, or a different
+      // message started playing) — don't resurrect this element.
+      if (audioRef.current !== audio) return;
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
       urlRef.current = url;
+      audio.src = url;
       audio.addEventListener("ended", cleanup);
       setPlayingText(text);
       await audio.play();
