@@ -25,6 +25,7 @@ import {
 import { createChatService, ChatServiceError, resolveUserProfileId } from "./chat-service.js";
 import { createMiraiService } from "./mirai-service.js";
 import { createMiraiTtsService } from "./mirai-tts-service.js";
+import { createCallTranscriptService } from "../calls/call-transcript-service.js";
 import { createMiraiRoutes } from "./mirai-routes.js";
 import { createVisionService } from "../../services/vision-service.js";
 import { createChatExternalInboxService } from "./chat-external-inbox-service.js";
@@ -154,6 +155,14 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     }
     return msg;
   }
+  // Read-only from MirAI's tools (list_call_transcripts/get_call_transcript,
+  // mirai-tools.js) — a separate lightweight instance from the one
+  // apps/api/src/routes/calls/index.js owns, since that one also drives
+  // audit logging/system-message posting on write paths this one never
+  // touches. Its own access control (participated in the call, or requested
+  // it) is unchanged — MirAI never gets broader read access than the user
+  // asking it would get calling the REST endpoint directly.
+  const callTranscriptService = createCallTranscriptService({ prisma });
   const miraiService = createMiraiService({
     prisma,
     visionService,
@@ -168,6 +177,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     calendarEventService,
     projectsService,
     tasksService,
+    callTranscriptService,
   });
   const miraiTtsService = createMiraiTtsService();
 

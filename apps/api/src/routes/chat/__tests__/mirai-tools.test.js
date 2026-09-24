@@ -1,7 +1,7 @@
 // apps/api/src/routes/chat/__tests__/mirai-tools.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TOOL_DEFS, buildToolRunners } from "../mirai-tools.js";
+import { TOOL_DEFS, buildToolRunners, CHANNEL_TOOL_DEFS, buildChannelToolRunners } from "../mirai-tools.js";
 
 const ctx = { companyId: "co1", actorAuthUserId: "auth1", actorProfileId: "prof1", conversationId: "conv1" };
 
@@ -21,8 +21,8 @@ function membership({ companyId, roleKey = null, permissions = [] }) {
 test("TOOL_DEFS lists every read tool with JSON schemas", () => {
   const names = TOOL_DEFS.map((t) => t.function.name).sort();
   assert.deepEqual(names, [
-    "describe_image", "get_conversation_messages", "get_recent_messages",
-    "list_bank_accounts", "list_conversation_files", "list_my_calendar",
+    "describe_image", "get_call_transcript", "get_conversation_messages", "get_recent_messages",
+    "list_bank_accounts", "list_call_transcripts", "list_conversation_files", "list_my_calendar",
     "list_my_tasks", "search_inventory", "search_my_conversations", "search_runly",
   ]);
   for (const t of TOOL_DEFS) assert.equal(t.type, "function");
@@ -180,4 +180,80 @@ test("search_my_conversations passes the query through to chatSearchService", as
   const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService, visionService: {}, signAttachmentUrl: async () => "http://x" });
   const out = await runners.search_my_conversations({ query: "factura" }, ctx);
   assert.equal(out.results[0].conversationTitle, "Ventas");
+});
+
+const withMembership = async () => ({ profile: { id: "prof1" }, memberships: [membership({ companyId: "co1" })] });
+
+test("list_call_transcripts: resolves the caller's profile id and defaults to the current conversation", async () => {
+  let seen;
+  const callTranscriptService = {
+    listTranscripts: async (args) => { seen = args; return [{ id: "t1", callId: "call1", status: "READY", createdAt: new Date("2026-09-24T00:00:00Z"), durationMs: 90_000 }]; },
+  };
+  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: withMembership, callTranscriptService });
+  const out = await runners.list_call_transcripts({}, ctx);
+  assert.equal(seen.conversationId, "conv1");
+  assert.equal(seen.profileId, "prof1");
+  assert.equal(out.transcripts[0].transcriptId, "t1");
+  assert.equal(out.transcripts[0].durationMs, 90_000);
+});
+
+test("list_call_transcripts: missing service dep -> friendly error, no throw", async () => {
+  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x" });
+  const out = await runners.list_call_transcripts({}, ctx);
+  assert.ok(out.error);
+});
+
+test("get_call_transcript: formats segments with mm:ss timestamps and speaker labels", async () => {
+  const callTranscriptService = {
+    getTranscript: async ({ transcriptId, profileId }) => {
+      assert.equal(transcriptId, "t1"); assert.equal(profileId, "prof1");
+      return {
+        id: "t1", status: "READY", durationMs: 65_000,
+        segments: [
+          { startMs: 0, text: "Hola a todos", speakerLabel: null },
+          { startMs: 65_000, text: "Empecemos", speakerLabel: "Raul" },
+        ],
+      };
+    },
+  };
+  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: withMembership, callTranscriptService });
+  const out = await runners.get_call_transcript({ transcriptId: "t1" }, ctx);
+  assert.equal(out.text, "[00:00] Hola a todos\n[01:05] Raul: Empecemos");
+  assert.equal(out.truncated, false);
+});
+
+test("get_call_transcript: not READY yet -> a note, not the (nonexistent) text", async () => {
+  const callTranscriptService = { getTranscript: async () => ({ id: "t1", status: "PROCESSING" }) };
+  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: withMembership, callTranscriptService });
+  const out = await runners.get_call_transcript({ transcriptId: "t1" }, ctx);
+  assert.equal(out.status, "PROCESSING");
+  assert.ok(out.note);
+  assert.equal(out.text, undefined);
+});
+
+test("get_call_transcript: a 404 from the service (no access / not found) maps to a tool-data error, not a throw", async () => {
+  const callTranscriptService = { getTranscript: async () => { const e = new Error("Transcripción no encontrada."); e.status = 404; throw e; } };
+  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: withMembership, callTranscriptService });
+  const out = await runners.get_call_transcript({ transcriptId: "t1" }, ctx);
+  assert.ok(out.error);
+});
+
+test("CHANNEL_TOOL_DEFS includes the transcript tools alongside get_channel_messages", () => {
+  const names = CHANNEL_TOOL_DEFS.map((t) => t.function.name).sort();
+  assert.deepEqual(names, ["get_call_transcript", "get_channel_messages", "list_call_transcripts"]);
+});
+
+test("channel list_call_transcripts/get_call_transcript use ctx.actorProfileId directly — no resolveUserContext needed (unlike the 1:1/panel version)", async () => {
+  const channelCtx = { conversationId: "chan1", actorProfileId: "prof9" };
+  let seenList;
+  const callTranscriptService = {
+    listTranscripts: async (args) => { seenList = args; return []; },
+    getTranscript: async ({ profileId }) => { assert.equal(profileId, "prof9"); return { id: "t1", status: "READY", segments: [] }; },
+  };
+  const runners = buildChannelToolRunners({ prisma: {}, callTranscriptService });
+  await runners.list_call_transcripts({}, channelCtx);
+  assert.equal(seenList.conversationId, "chan1");
+  assert.equal(seenList.profileId, "prof9");
+  const out = await runners.get_call_transcript({ transcriptId: "t1" }, channelCtx);
+  assert.equal(out.text, "");
 });

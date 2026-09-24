@@ -154,6 +154,29 @@ export const TOOL_DEFS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_call_transcripts",
+      description: "Lista las transcripciones de llamadas/videollamadas grabadas en una conversacion (por defecto la actual) a las que el usuario tiene acceso: id, estado, cuando se genero, duracion. Usa esto antes de get_call_transcript para saber que transcriptId pedir. Solo devuelve transcripciones en las que el usuario participo en la llamada o que el mismo solicito.",
+      parameters: {
+        type: "object",
+        properties: { conversationId: { type: "string", description: "Id de la conversacion; por defecto la actual." } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_call_transcript",
+      description: "Devuelve el texto completo (con marcas de tiempo) de UNA transcripcion de llamada, dado su transcriptId (usa list_call_transcripts primero para obtenerlo). Usalo para resumir una reunion, buscar acuerdos o responder preguntas sobre lo que se hablo en una llamada grabada.",
+      parameters: {
+        type: "object",
+        properties: { transcriptId: { type: "string" } },
+        required: ["transcriptId"],
+      },
+    },
+  },
 ];
 
 function trimMessage(m) {
@@ -171,6 +194,7 @@ function trimMessage(m) {
 export function buildToolRunners({
   prisma, listMessages, chatSearchService, visionService, signAttachmentUrl, resolveUserContext,
   inventoryService, ledgerService, calendarEventService, projectsService, tasksService,
+  callTranscriptService,
 }) {
   const getAllActivePermissionKeys = createPermissionKeysCache({
     prisma,
@@ -462,33 +486,122 @@ export function buildToolRunners({
     }
   }
 
+  async function list_call_transcripts(args, ctx) {
+    if (!callTranscriptService) return { error: "Las transcripciones no estan disponibles aqui." };
+    const resolved = await resolveScopedErpContext(ctx);
+    if (resolved.error) return resolved;
+    const conversationId = String(args?.conversationId || ctx.conversationId);
+    try {
+      const rows = await callTranscriptService.listTranscripts({ conversationId, profileId: resolved.userId });
+      return {
+        transcripts: rows.map((t) => ({
+          transcriptId: t.id,
+          callId: t.callId,
+          status: t.status,
+          createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
+          durationMs: t.durationMs ?? null,
+        })),
+      };
+    } catch (err) {
+      return { error: `No se pudieron listar las transcripciones: ${String(err?.message ?? err).slice(0, 160)}` };
+    }
+  }
+
+  async function get_call_transcript(args, ctx) {
+    if (!callTranscriptService) return { error: "Las transcripciones no estan disponibles aqui." };
+    const transcriptId = String(args?.transcriptId ?? "").trim();
+    if (!transcriptId) return { error: "Falta transcriptId." };
+    const resolved = await resolveScopedErpContext(ctx);
+    if (resolved.error) return resolved;
+    try {
+      const row = await callTranscriptService.getTranscript({ transcriptId, profileId: resolved.userId });
+      if (row.status !== "READY") {
+        return { transcriptId: row.id, status: row.status, note: "Esta transcripcion todavia no esta lista." };
+      }
+      const fullText = (row.segments ?? [])
+        .map((s) => `[${formatSegmentTimestamp(s.startMs)}]${s.speakerLabel ? ` ${s.speakerLabel}:` : ""} ${s.text}`)
+        .join("\n");
+      // Capped well under the tool-result byte limit (mirai-service.js's
+      // clampToolResult) so a long meeting gets a useful partial answer
+      // instead of that limit replacing the WHOLE result with a generic
+      // "too big" note.
+      const MAX_CHARS = 6000;
+      const truncated = fullText.length > MAX_CHARS;
+      return {
+        transcriptId: row.id,
+        status: row.status,
+        durationMs: row.durationMs ?? null,
+        text: truncated ? fullText.slice(0, MAX_CHARS) : fullText,
+        truncated,
+      };
+    } catch (err) {
+      return { error: err?.status === 404 ? "Transcripcion no encontrada o sin acceso." : `No se pudo leer la transcripcion: ${String(err?.message ?? err).slice(0, 160)}` };
+    }
+  }
+
   return {
     get_recent_messages, get_conversation_messages, search_my_conversations,
     list_conversation_files, describe_image, search_runly,
     search_inventory, list_bank_accounts, list_my_calendar, list_my_tasks,
+    list_call_transcripts, get_call_transcript,
   };
 }
 
+function formatSegmentTimestamp(ms) {
+  const totalSeconds = Math.floor((ms ?? 0) / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 // ---------------------------------------------------------------------------
-// Spec 3 — the single tool for a `@MirAI` channel mention. No assertMember:
-// the mention came from a channel member and the reply is public in that same
-// channel, so reading its recent history exposes nothing the members don't see.
+// Spec 3 — tools for a `@MirAI` channel mention. get_channel_messages has no
+// assertMember: the mention came from a channel member and the reply is
+// public in that same channel, so reading its recent history exposes nothing
+// the members don't see. list/get_call_transcript are the exception — they
+// keep the stricter call-participant check regardless of channel membership.
 // ---------------------------------------------------------------------------
-export const CHANNEL_TOOL_DEFS = [{
-  type: "function",
-  function: {
-    name: "get_channel_messages",
-    description: "Devuelve los mensajes recientes de ESTE canal (donde te mencionaron). Es tu unica fuente de contexto ademas de tu conocimiento general.",
-    parameters: {
-      type: "object",
-      properties: {
-        limit: { type: "integer", minimum: 1, maximum: 40, description: "Cuantos traer (max 40, por defecto 25)." },
+export const CHANNEL_TOOL_DEFS = [
+  {
+    type: "function",
+    function: {
+      name: "get_channel_messages",
+      description: "Devuelve los mensajes recientes de ESTE canal (donde te mencionaron). Es tu unica fuente de contexto ademas de tu conocimiento general.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", minimum: 1, maximum: 40, description: "Cuantos traer (max 40, por defecto 25)." },
+        },
       },
     },
   },
-}];
+  // Unlike get_channel_messages, these two DO enforce the stricter transcript
+  // access rule (participated in that specific call, or requested it) via
+  // callTranscriptService — being a channel member is not enough on its own,
+  // same rule as the private 1:1/panel versions of these tools above.
+  {
+    type: "function",
+    function: {
+      name: "list_call_transcripts",
+      description: "Lista las transcripciones de llamadas/videollamadas grabadas en este canal a las que el usuario tiene acceso. Usa esto antes de get_call_transcript.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_call_transcript",
+      description: "Devuelve el texto completo (con marcas de tiempo) de UNA transcripcion de llamada de este canal, dado su transcriptId (usa list_call_transcripts primero).",
+      parameters: {
+        type: "object",
+        properties: { transcriptId: { type: "string" } },
+        required: ["transcriptId"],
+      },
+    },
+  },
+];
 
-export function buildChannelToolRunners({ prisma }) {
+export function buildChannelToolRunners({ prisma, callTranscriptService }) {
   async function get_channel_messages(args, ctx) {
     const limit = Math.min(Math.max(parseInt(args?.limit, 10) || 25, 1), 40);
     const rows = await prisma.$queryRaw`
@@ -515,7 +628,51 @@ export function buildChannelToolRunners({ prisma }) {
       })),
     };
   }
-  return { get_channel_messages };
+  async function list_call_transcripts(_args, ctx) {
+    if (!callTranscriptService) return { error: "Las transcripciones no estan disponibles aqui." };
+    try {
+      const rows = await callTranscriptService.listTranscripts({ conversationId: ctx.conversationId, profileId: ctx.actorProfileId });
+      return {
+        transcripts: rows.map((t) => ({
+          transcriptId: t.id,
+          callId: t.callId,
+          status: t.status,
+          createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
+          durationMs: t.durationMs ?? null,
+        })),
+      };
+    } catch (err) {
+      return { error: `No se pudieron listar las transcripciones: ${String(err?.message ?? err).slice(0, 160)}` };
+    }
+  }
+
+  async function get_call_transcript(args, ctx) {
+    if (!callTranscriptService) return { error: "Las transcripciones no estan disponibles aqui." };
+    const transcriptId = String(args?.transcriptId ?? "").trim();
+    if (!transcriptId) return { error: "Falta transcriptId." };
+    try {
+      const row = await callTranscriptService.getTranscript({ transcriptId, profileId: ctx.actorProfileId });
+      if (row.status !== "READY") {
+        return { transcriptId: row.id, status: row.status, note: "Esta transcripcion todavia no esta lista." };
+      }
+      const fullText = (row.segments ?? [])
+        .map((s) => `[${formatSegmentTimestamp(s.startMs)}]${s.speakerLabel ? ` ${s.speakerLabel}:` : ""} ${s.text}`)
+        .join("\n");
+      const MAX_CHARS = 6000;
+      const truncated = fullText.length > MAX_CHARS;
+      return {
+        transcriptId: row.id,
+        status: row.status,
+        durationMs: row.durationMs ?? null,
+        text: truncated ? fullText.slice(0, MAX_CHARS) : fullText,
+        truncated,
+      };
+    } catch (err) {
+      return { error: err?.status === 404 ? "Transcripcion no encontrada o sin acceso." : `No se pudo leer la transcripcion: ${String(err?.message ?? err).slice(0, 160)}` };
+    }
+  }
+
+  return { get_channel_messages, list_call_transcripts, get_call_transcript };
 }
 
 // Download an attachment's bytes via a service-role signed URL and return
