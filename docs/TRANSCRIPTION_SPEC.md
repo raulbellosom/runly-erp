@@ -1,9 +1,16 @@
 # Especificación técnica: transcripción de llamadas (runly.chat)
 
-**Fecha:** 2026-09-23 (revisión 2, tras retroalimentación de dirección de producto)
-**Estado:** Propuesto — pendiente de aprobación antes de plan de implementación
+**Fecha:** 2026-09-24 (revisión 3 — V1 ya implementado y verificado, ver `docs/TASKS.md`; esta revisión solo completa el diseño de V2 pendiente de la Etapa 3, sin código nuevo)
+**Estado:** V1 implementado. V2 (esta revisión): diseño de datos y arquitectura completo y listo para la Etapa 0/1 de validación contra LiveKit real — ver el registro de cambios de la revisión 3 para qué sigue genuinamente bloqueado por esa validación y qué ya se resolvió por análisis del contrato documentado de la API de LiveKit Egress
 **Depende de:** `docs/TRANSCRIPTION_CURRENT_STATE.md` (auditoría del estado real del repositorio)
 **Módulo:** `runly.chat` (extensión de `runly.calls`, no un módulo RME3 nuevo — ver §0.3)
+
+## Registro de cambios (revisión 3)
+
+Sesión de 2026-09-24, a petición explícita del usuario tras cerrar V1 y la función de texto a voz de MirAI: "empezar el spec [de V2] ahora" — documento solamente, sin implementación. Un repaso de la Etapa 3 del plan (`TRANSCRIPTION_IMPLEMENTATION_PLAN.md`) mostró que ya dejaba explícitamente pendiente una decisión de modelo de datos ("`call_transcript_track`... decisión de diseño a resolver en esta etapa, no en el spec, porque depende de cómo se comporte `startTrackEgress` en la prueba real"). Esa premisa era parcialmente incorrecta: **la necesidad de una tabla auxiliar no depende de ningún comportamiento no documentado de esta versión de LiveKit** — se deriva directamente del contrato ya público de `EgressClient.startTrackEgress`: cada llamada crea un trabajo de egress independiente con su propio `egress_id`, estado y ciclo de vida (igual que ya hace `startRoomCompositeEgress` para `CallRecording`, solo que aquí son N trabajos por transcripción en vez de uno). Esa parte se resuelve aquí, por análisis, no por prueba:
+
+- **Resuelto por análisis (nuevo en esta revisión)**: modelo `CallTranscriptTrack` (§3.1) — una fila por pista/`egressId`, con su propio `status` (mismo vocabulario que `CallRecording.status`: `STARTING`/`ACTIVE`/`PROCESSING`/`READY`/`FAILED`) para que una pista pueda fallar sin invalidar las demás.
+- **Sigue genuinamente bloqueado por una prueba en vivo** (sin cambios respecto a la revisión 2): la calidad/formato real del audio que produce `startTrackEgress` en la versión de LiveKit Egress que usa esta instancia (`v1.9.0`), el costo real de CPU de N pistas simultáneas, y si el alineamiento de marca de tiempo entre pistas es lo bastante preciso para intercalar segmentos sin desfase perceptible. Nada de esto se puede validar sin una llamada real con LiveKit self-hosted — no se inventan cifras aquí (mismo principio que ya se siguió en la Etapa 1 de V1 con faster-whisper).
 
 ## Registro de cambios (revisión 2)
 
@@ -158,7 +165,7 @@ sequenceDiagram
 
 ### 2.2. Flujo V2 (con identificación de hablantes)
 
-Igual al anterior, salvo que `startRecording`-equivalente (`call-transcript-service.js`) llama `EgressClient.startTrackEgress` una vez por cada pista de audio activa en la sala (una por `CallParticipant`/`CallGuest` con micrófono publicado), etiquetando cada salida con la identidad de LiveKit en el nombre del objeto. El transcriptor procesa cada pista por separado y en el paso de fusión intercala los segmentos de todas las pistas por marca de tiempo absoluta, asignando `speakerUserId`/`speakerGuestId` según a cuál pista pertenece cada segmento — sin ejecutar ningún modelo de diarización.
+Igual al anterior, salvo que `startRecording`-equivalente (`call-transcript-service.js`) llama `EgressClient.startTrackEgress` una vez por cada pista de audio activa en la sala (una por `CallParticipant`/`CallGuest` con micrófono publicado), etiquetando cada salida con la identidad de LiveKit en el nombre del objeto y registrando una fila `CallTranscriptTrack` (§3.1) por cada llamada a `startTrackEgress` — cada una con su propio `egressId` y `status`, para que una pista pueda fallar sin invalidar las demás. El transcriptor procesa cada pista por separado y en el paso de fusión intercala los segmentos de todas las pistas por marca de tiempo absoluta, asignando `speakerUserId`/`speakerGuestId` según a cuál pista pertenece cada segmento — sin ejecutar ningún modelo de diarización.
 
 ---
 
@@ -233,6 +240,45 @@ model CallTranscriptSegment {
   @@index([transcriptId, startMs])
   @@map("call_transcript_segment")
 }
+
+// V2 (Etapa 3) — nuevo en la revisión 3. Una fila por cada `startTrackEgress`
+// invocado para una transcripción PER_TRACK, no una por transcripción: N
+// participantes con micrófono publicado = N trabajos de egress
+// independientes, cada uno con su propio `egress_id`/estado/ciclo de vida
+// (mismo principio que ya usa CallRecording.egressId para una composición de
+// sala completa, aquí multiplicado por pista). Sin esta tabla, una sola fila
+// CallTranscript no podría representar "3 de 4 pistas ya listas, 1 todavía
+// activa, 1 falló" al mismo tiempo.
+model CallTranscriptTrack {
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  transcriptId    String   @db.Uuid @map("transcript_id")
+  egressId        String   @map("egress_id")             // EgressInfo.egress_id de LiveKit — clave para reconciliar contra ListEgress
+  livekitIdentity String   @map("livekit_identity")        // CallParticipant.livekitIdentity o CallGuest.livekitIdentity (`guest_<uuid>`)
+  speakerUserId   String?  @db.Uuid @map("speaker_user_id")
+  speakerGuestId  String?  @db.Uuid @map("speaker_guest_id")
+  objectKey       String?  @map("object_key")             // ej. recordings/transcripts/<conversationId>/<callId>/track_<livekitIdentity>.ogg — null hasta READY
+  // Mismo vocabulario de string libre que CallRecording.status (no un enum
+  // nuevo) — STARTING (egress solicitado) -> ACTIVE (grabando) -> PROCESSING
+  // (llamada terminó, Egress todavía finalizando/subiendo) -> READY|FAILED.
+  status          String   @default("STARTING") @map("status")
+  failureReason   String?  @map("failure_reason")
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+
+  transcript   CallTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  speakerUser  UserProfile?   @relation(fields: [speakerUserId], references: [id])
+  speakerGuest CallGuest?     @relation(fields: [speakerGuestId], references: [id])
+
+  // Una pista por identidad de LiveKit por transcripción — si alguien se
+  // reconecta a mitad de llamada, se decide en la Etapa 3 (tras la prueba en
+  // vivo) si eso reutiliza la fila existente o crea una segunda pista para la
+  // misma identidad; no se asume aquí sin haber visto el comportamiento real
+  // de reconexión de Egress.
+  @@unique([transcriptId, livekitIdentity])
+  @@index([status])
+  @@map("call_transcript_track")
+}
 ```
 
 Notas de diseño:
@@ -243,7 +289,7 @@ Notas de diseño:
 
 ### 3.2. Migración
 
-Tabla nueva, sin columnas añadidas a tablas existentes — migración aditiva de bajo riesgo, mismo perfil que `20260913120000_add_call_recording`.
+`CallTranscript`/`CallTranscriptSegment` ya están aplicados en producción (migraciones `20260924000000_add_call_transcript`/`20260924000001_call_transcript_finalized_at`, V1). `CallTranscriptTrack` (§3.1, nuevo en la revisión 3) **todavía no tiene migración** — es diseño únicamente hasta que la Etapa 3 confirme contra LiveKit real que este modelo de una fila por pista es correcto; sin columnas añadidas a tablas existentes, aditiva de bajo riesgo cuando se cree, mismo perfil que `20260913120000_add_call_recording`.
 
 ---
 
