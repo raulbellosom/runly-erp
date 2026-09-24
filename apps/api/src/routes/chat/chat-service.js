@@ -358,8 +358,8 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
         m.thread_last_reply_at,
         m.reply_to_message_id,
         json_build_object(
-          'id', up.id,
-          'displayName', up.display_name,
+          'id', COALESCE(up.id, cg.id),
+          'displayName', COALESCE(up.display_name, cg.display_name),
           'avatarFileId', up.avatar_file_id::text
         ) AS sender,
         (
@@ -399,6 +399,7 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
         ) AS reactions
       FROM chat_messages m
       LEFT JOIN user_profile up ON up.id = m.sender_user_id
+      LEFT JOIN call_guest cg ON cg.id = m.sender_call_guest_id
       WHERE m.id = ${messageId}
       LIMIT 1
     `;
@@ -493,8 +494,8 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
         m.reply_to_message_id,
         -- sender info
         json_build_object(
-          'id', up.id,
-          'displayName', up.display_name,
+          'id', COALESCE(up.id, cg.id),
+          'displayName', COALESCE(up.display_name, cg.display_name),
           'avatarFileId', up.avatar_file_id::text
         ) AS sender,
         -- attachments
@@ -535,6 +536,7 @@ export function createChatService({ prisma, supabaseAdmin, notificationService =
         ) AS reactions
       FROM chat_messages m
       LEFT JOIN user_profile up ON up.id = m.sender_user_id
+      LEFT JOIN call_guest cg ON cg.id = m.sender_call_guest_id
       WHERE m.conversation_id = ${conversationId}
         AND m.thread_root_id IS NULL
         ${before ? Prisma.sql`AND m.created_at < ${new Date(before)}` : Prisma.empty}
