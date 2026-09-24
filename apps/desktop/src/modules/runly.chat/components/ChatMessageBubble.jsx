@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   CheckCheck, MoreHorizontal, Copy, Trash2, Forward, EyeOff, CheckSquare,
-  Pin, PinOff, Smile, MessageSquare, CornerUpLeft, Sparkles,
+  Pin, PinOff, Smile, MessageSquare, CornerUpLeft, Sparkles, Volume2, Square,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -140,6 +140,22 @@ function MessageActions({
           className={`${revealCls} h-6 w-6 flex items-center justify-center rounded-full hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-opacity shrink-0 self-center touch-manipulation`}
         >
           <Smile className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {/* Quick-speak affordance — same idea as the quick-react button above:
+          a dedicated icon instead of only being buried inside the "..."
+          menu (user feedback: it was too hard to find in there). Still also
+          listed in the dropdown (buildMessageActions) for discoverability,
+          same redundancy the reaction action already has. */}
+      {onSpeak && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onSpeak(); }}
+          title={isSpeaking ? "Detener lectura" : "Leer en voz alta"}
+          aria-label={isSpeaking ? "Detener lectura" : "Leer en voz alta"}
+          className={`${revealCls} h-6 w-6 flex items-center justify-center rounded-full hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-opacity shrink-0 self-center touch-manipulation`}
+        >
+          {isSpeaking ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         </button>
       )}
       <DropdownMenu>
