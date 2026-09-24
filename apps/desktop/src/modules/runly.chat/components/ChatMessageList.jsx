@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Skeleton } from "@runly/ui";
 import { Loader2, ChevronDown, AtSign } from "lucide-react";
+import { toast } from "sonner";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { MessageReceiptDialog } from "./MessageReceiptDialog";
 import { PinnedMessagesBar } from "./PinnedMessagesBar";
@@ -8,6 +9,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { groupMessagesByDate, formatDateSeparator } from "../lib/chatUtils";
 import { findOwnMember, isMentioned } from "../lib/chatPermissions";
 import { useChatPreferences } from "../hooks/useChatPreferences";
+import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
 import { MIRAI_NAME } from "../lib/mirai";
 
 function senderKey(msg) {
@@ -88,6 +90,12 @@ export function ChatMessageList({
   unreadCountAtOpen = 0,
 }) {
   const { prefs } = useChatPreferences();
+  // "Leer en voz alta" — one shared instance for the whole visible list, so
+  // clicking a second message's speak action stops whatever was already
+  // playing instead of overlapping it (see hooks/useTextToSpeech.js).
+  const { data: ttsStatus } = useTtsStatus();
+  const ttsEnabled = Boolean(ttsStatus?.enabled);
+  const speech = useSpeakText();
   // Tileable line-art wallpaper — a masked, tinted layer painted BEHIND the
   // scrolling column (z-index:-1 inside an `isolate`d, `chat-wallpaper`
   // container). See chat-theme.css. Rendered only when the pref is on.
@@ -599,6 +607,10 @@ export function ChatMessageList({
                 </span>
               </div>
             ),
+            // "Leer en voz alta" — AI-authored messages only (MirAI, wherever it
+            // posts: the dedicated conversation, the panel, or an @MirAI mention
+            // in a channel), never a human's own message — same signal
+            // ChatMessageBubble already uses for AssistantMarkdown.
             <ChatMessageBubble
               key={item.id}
               message={item}
@@ -613,6 +625,10 @@ export function ChatMessageList({
               onCopy={!isDeleted && !isPending && item.body
                 ? () => navigator.clipboard.writeText(item.body).catch(() => {})
                 : undefined}
+              onSpeak={ttsEnabled && !isDeleted && !isPending && item.body && item.sender_type === "assistant"
+                ? () => speech.speak(item.body).catch((err) => toast.error(err?.message ?? "No se pudo generar el audio."))
+                : undefined}
+              isSpeaking={item.sender_type === "assistant" && Boolean(item.body) && speech.isPlaying(item.body)}
               onDelete={isOwn && !isDeleted && !isPending && onDeleteMessage
                 ? () => onDeleteMessage(item.id)
                 : undefined}

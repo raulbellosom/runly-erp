@@ -41,16 +41,6 @@ test("GET /chat/mirai/status reflects configuration", async () => {
   assert.equal((await off.json()).data.available, false);
 });
 
-test("GET /chat/mirai/status reports tts:false when the tts service is not configured", async () => {
-  const r = await app({ miraiTtsService: { isConfigured: () => false } }).request("/chat/mirai/status");
-  assert.equal((await r.json()).data.tts, false);
-});
-
-test("GET /chat/mirai/status reports tts:false when no tts service was wired at all", async () => {
-  const r = await app().request("/chat/mirai/status");
-  assert.equal((await r.json()).data.tts, false);
-});
-
 test("POST /chat/mirai/tts returns the synthesized audio bytes with its content type", async () => {
   const audio = Buffer.from([1, 2, 3, 4]);
   const a = app({ miraiTtsService: { synthesize: async (text) => {
@@ -78,6 +68,30 @@ test("POST /chat/mirai/tts surfaces a ChatServiceError's status and message", as
   });
   assert.equal(r.status, 503);
   assert.equal((await r.json()).error, "La lectura en voz alta no está configurada.");
+});
+
+test("POST /chat/mirai/tts works without chat.mirai.use — it's a generic, permission-free capability now", async () => {
+  // requirePermission() here is a stand-in that ALWAYS lets a request
+  // through (see the app() helper above) — this test instead proves the
+  // route itself never calls requirePermission at all, by using a version
+  // that always rejects, and confirming the route still succeeds.
+  const audio = Buffer.from([7]);
+  const a = new Hono();
+  a.use("*", async (c, next) => { c.set("authUserId", "auth1"); c.set("companyId", "co1"); await next(); });
+  const alwaysDenies = () => async (c) => c.json({ error: "forbidden" }, 403);
+  a.route("", createMiraiRoutes({
+    requirePermission: alwaysDenies,
+    miraiService: { isConfigured: () => true },
+    miraiTtsService: { synthesize: async () => ({ buffer: audio, contentType: "audio/wav" }) },
+    resolveProfileId: async () => "prof1",
+    assertConversationMember: async () => true,
+  }));
+  const r = await a.request("/chat/mirai/tts", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text: "hola" }),
+  });
+  assert.equal(r.status, 200);
 });
 
 test("GET /chat/mirai/panel/:id 404s for a non-member", async () => {

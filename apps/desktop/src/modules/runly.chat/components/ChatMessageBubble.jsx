@@ -108,11 +108,12 @@ function SwipeReplyHint({ translateX, isOwn }) {
 function MessageActions({
   isOwn, hasBody, onCopy, onDelete, onHideForMe, onForward, onEnterSelection,
   canPin, isPinned, onPin, onReact, canReply, onOpenThread, onReply, onAskMirai, onShowReceipt,
+  onSpeak, isSpeaking,
 }) {
   const actions = buildMessageActions({
     hasBody, isOwn, canPin, isPinned, canReply,
     onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-    onDelete, onHideForMe, onAskMirai, onShowReceipt,
+    onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking,
   });
   const primary = actions.filter((a) => a.group === "primary");
   const danger = actions.filter((a) => a.group === "danger");
@@ -307,6 +308,8 @@ export function ChatMessageBubble({
   onAskMirai,
   onJumpToMessage,
   onShowReceipt,
+  onSpeak,
+  isSpeaking = false,
 }) {
   const [avatarErr, setAvatarErr] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -665,6 +668,8 @@ export function ChatMessageBubble({
             onReply={onReply ? () => onReply(message) : undefined}
             onAskMirai={onAskMirai ? () => onAskMirai(message) : undefined}
             onShowReceipt={onShowReceipt ? () => onShowReceipt(message) : undefined}
+            onSpeak={onSpeak ? () => onSpeak(message) : undefined}
+            isSpeaking={isSpeaking}
           />
         )}
         <MessageActionSheet
@@ -681,6 +686,8 @@ export function ChatMessageBubble({
             onCopy, onForward, onEnterSelection, onPin, onOpenThread, onDelete, onHideForMe,
             onAskMirai: onAskMirai ? () => onAskMirai(message) : undefined,
             onShowReceipt: onShowReceipt ? () => onShowReceipt(message) : undefined,
+            onSpeak: onSpeak ? () => onSpeak(message) : undefined,
+            isSpeaking,
           }}
           onQuickReact={(emoji) => onToggleReaction?.(message.id, emoji)}
           onOpenFullPicker={() => setReactionPickerOpen(true)}
@@ -885,6 +892,8 @@ export function ChatMessageBubble({
           onReply: onReply ? () => onReply(message) : undefined,
           onCopy, onForward, onEnterSelection, onPin, onOpenThread, onDelete, onHideForMe,
           onAskMirai: onAskMirai ? () => onAskMirai(message) : undefined,
+          onSpeak: onSpeak ? () => onSpeak(message) : undefined,
+          isSpeaking,
         }}
         onQuickReact={(emoji) => onToggleReaction?.(message.id, emoji)}
         onOpenFullPicker={() => setReactionPickerOpen(true)}
@@ -1072,6 +1081,8 @@ export function ChatMessageBubble({
           onOpenThread={onOpenThread}
           onReply={onReply ? () => onReply(message) : undefined}
           onAskMirai={onAskMirai ? () => onAskMirai(message) : undefined}
+          onSpeak={onSpeak ? () => onSpeak(message) : undefined}
+          isSpeaking={isSpeaking}
         />
       )}
     </div>

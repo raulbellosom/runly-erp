@@ -55,3 +55,14 @@ test("an unrelated unmatched path is not turned into a 401 by the chat router", 
   const body = await res.text();
   assert.ok(!body.includes("No autorizado"), `unexpected auth 401 body: ${body}`);
 });
+
+test("GET /chat/tts/status requires authentication like the rest of /chat", async () => {
+  const res = await buildApp().request("/chat/tts/status");
+  assert.equal(res.status, 401);
+});
+
+test("GET /chat/tts/status reports enabled:false when MIRAI_TTS_URL is unset — no chat.mirai.use gate", async () => {
+  const res = await buildApp().request("/chat/tts/status", { headers: { Authorization: "Bearer t" } });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.enabled, false);
+});

@@ -1,4 +1,4 @@
-import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, EyeOff, CornerUpLeft, Sparkles, Info } from "lucide-react";
+import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, EyeOff, CornerUpLeft, Sparkles, Info, Volume2, Square } from "lucide-react";
 
 // Single source of truth for the per-message action list. Consumed by the
 // desktop hover menu (MessageActions in ChatMessageBubble) and the mobile /
@@ -8,11 +8,23 @@ import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, 
 export function buildMessageActions({
   hasBody, isOwn, canPin, isPinned, canReply,
   onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-  onDelete, onHideForMe, onAskMirai, onShowReceipt,
+  onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking,
 }) {
   const items = [];
   if (onReply) items.push({ key: "reply", label: "Responder", icon: CornerUpLeft, onSelect: onReply, group: "primary" });
   if (hasBody && onCopy) items.push({ key: "copy", label: "Copiar", icon: Copy, onSelect: onCopy, group: "primary" });
+  // "Leer en voz alta" — any message with text, from anyone, not just MirAI
+  // (see hooks/useTextToSpeech.js). Toggles to "Detener lectura" while this
+  // specific message's audio is the one currently playing.
+  if (hasBody && onSpeak) {
+    items.push({
+      key: "speak",
+      label: isSpeaking ? "Detener lectura" : "Leer en voz alta",
+      icon: isSpeaking ? Square : Volume2,
+      onSelect: onSpeak,
+      group: "primary",
+    });
+  }
   if (onForward) items.push({ key: "forward", label: "Reenviar", icon: Forward, onSelect: onForward, group: "primary" });
   if (onAskMirai) items.push({ key: "ask-mirai", label: "Preguntar a MirAI", icon: Sparkles, onSelect: onAskMirai, group: "primary" });
   if (onEnterSelection) items.push({ key: "select", label: "Seleccionar", icon: CheckSquare, onSelect: onEnterSelection, group: "primary" });

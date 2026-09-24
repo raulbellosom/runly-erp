@@ -23,15 +23,17 @@ export function createMiraiRoutes({ requirePermission, miraiService, resolveProf
     return c.json({ data: {
       available: Boolean(miraiService.isConfigured()),
       web: Boolean(miraiService.isWebEnabled?.()),
-      tts: Boolean(miraiTtsService?.isConfigured?.()),
     } });
   });
 
-  // "Leer en voz alta" — text is whatever MirAI text the client already has
-  // on screen (its own reply), not looked up by message id: there is no
-  // extra fact to authorize beyond chat.mirai.use, which already gated
-  // showing that text to this same user (see mirai-tts-service.js).
-  r.post("/chat/mirai/tts", requirePermission("chat.mirai.use"), async (c) => {
+  // "Leer en voz alta" — deliberately NOT gated by chat.mirai.use (nor any
+  // other permission): it's a generic capability now, usable on any message
+  // in any conversation, not just MirAI's own replies (see
+  // hooks/useTextToSpeech.js on the frontend and GET /chat/tts/status in
+  // index.js, which reports availability without that permission either).
+  // Still requires being logged in — this route lives under /chat/mirai/*,
+  // which the `mirai` sub-app already gates with authMiddleware.
+  r.post("/chat/mirai/tts", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     try {
       const { buffer, contentType } = await miraiTtsService.synthesize(body?.text);

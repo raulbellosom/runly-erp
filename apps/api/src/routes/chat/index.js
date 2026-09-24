@@ -192,6 +192,15 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
 
 
   // GET /chat/conversations
+  // "Leer en voz alta" availability — deliberately no permission beyond being
+  // logged in (`internal` already requires that): it's usable on any message
+  // in any conversation, not gated by chat.mirai.use or any conversation-
+  // specific check, same as GET /chat/mirai/status but without conflating an
+  // unrelated permission with this capability's real availability.
+  internal.get("/tts/status", (c) => {
+    return c.json({ data: { enabled: Boolean(miraiTtsService.isConfigured()) } });
+  });
+
   internal.get("/conversations", requirePermission("chat.conversations.read"), async (c) => {
     try {
       const authUserId = c.get("authUserId");

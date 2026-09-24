@@ -463,8 +463,17 @@ export function createChatDomain(request, withAuthHeaders, toQueryString, reques
         request(`/chat/mirai/panel/${encodeURIComponent(conversationId)}`, {
           method: "DELETE", headers: withAuthHeaders(token),
         }),
-      // "Leer en voz alta" — returns a Blob (audio/wav), not JSON, hence
-      // requestBlob instead of request.
+    },
+
+    // ----------------------------------------------------------------
+    // "Leer en voz alta" — permission-free, any message in any conversation
+    // (not MirAI-specific despite the route living under /chat/mirai/tts,
+    // which is a historical implementation detail, not part of this
+    // capability's own contract).
+    // ----------------------------------------------------------------
+    tts: {
+      status: (token) => request("/chat/tts/status", { headers: withAuthHeaders(token) }),
+      // Returns a Blob (audio/wav), not JSON, hence requestBlob instead of request.
       speak: (text, token) =>
         requestBlob("/chat/mirai/tts", {
           method: "POST",

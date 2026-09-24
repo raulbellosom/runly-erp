@@ -7,7 +7,8 @@ import {
 import { Sparkles, Send, Trash2, Volume2, Square, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
-import { useMiraiStatus, useSpeakMirai } from "../hooks/useMirAI";
+import { useMiraiStatus } from "../hooks/useMirAI";
+import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
 import { useMiraiPanelThread, useSendMiraiPanel, useClearMiraiPanel } from "../hooks/useMirAIPanel";
 import { MIRAI_NAME } from "../lib/mirai";
 import { AssistantMarkdown } from "./AssistantMarkdown";
@@ -74,8 +75,9 @@ export function MirAIPanel({ open, onOpenChange, conversationId, focusMessage })
   const { prefs } = useChatPreferences();
   const { data: status } = useMiraiStatus();
   const available = status?.available !== false;
-  const ttsEnabled = Boolean(status?.tts);
-  const speech = useSpeakMirai();
+  const { data: ttsStatus } = useTtsStatus();
+  const ttsEnabled = Boolean(ttsStatus?.enabled);
+  const speech = useSpeakText();
 
   const { data, isLoading } = useMiraiPanelThread(conversationId, { enabled: open });
   const send = useSendMiraiPanel(conversationId);
