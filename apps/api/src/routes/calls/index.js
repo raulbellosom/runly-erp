@@ -4,7 +4,6 @@ import {
   callCreateSchema,
   callLinkPatchSchema,
   callInviteSchema,
-  callRoomMessageSchema,
 } from "@runly/validators";
 import { createCallService, CallServiceError } from "./call-service.js";
 import { createCallLinksService, CallLinkError } from "./call-links-service.js";
@@ -168,22 +167,6 @@ export function createCallsRouter({
       const { muted } = z.object({ muted: z.boolean() }).parse(await c.req.json());
       return c.json({ data: await guestService.muteGuest({ profileId: await profileId(c), callId, guestId, muted }) });
     } catch (error) { return handleError(c, error, "Error al silenciar."); }
-  });
-
-  // ---- call-room chat (members) ----
-  internal.get("/:callId/messages", async (c) => {
-    try {
-      const callId = callIdSchema.parse(c.req.param("callId"));
-      const sinceId = c.req.query("sinceId") || null;
-      return c.json({ data: await messagesService.listMessagesGuarded({ profileId: await profileId(c), callId, sinceId }) });
-    } catch (error) { return handleError(c, error, "Error obteniendo mensajes."); }
-  });
-  internal.post("/:callId/messages", async (c) => {
-    try {
-      const callId = callIdSchema.parse(c.req.param("callId"));
-      const { body } = callRoomMessageSchema.parse(await c.req.json());
-      return c.json({ data: await messagesService.postMemberMessage({ profileId: await profileId(c), callId, body }) });
-    } catch (error) { return handleError(c, error, "Error enviando el mensaje."); }
   });
 
   internal.post(

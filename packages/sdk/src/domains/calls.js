@@ -62,14 +62,6 @@ export function createCallsDomain(request, withAuthHeaders) {
     deleteRecording: (recordingId, token) =>
       json(`/calls/recordings/${encodeURIComponent(recordingId)}`, "DELETE", undefined, token),
 
-    // --- call-room chat (members) ---
-    listMessages: (callId, sinceId, token) =>
-      request(
-        `/calls/${encodeURIComponent(callId)}/messages${sinceId ? `?sinceId=${encodeURIComponent(sinceId)}` : ""}`,
-        { headers: withAuthHeaders(token) },
-      ),
-    sendMessage: (callId, body, token) => json(`/calls/${callId}/messages`, "POST", { body }, token),
-
     // --- guest (unauthenticated) ---
     guest: {
       join: (payload) => guestJson("/calls/guest/join", "POST", payload),
