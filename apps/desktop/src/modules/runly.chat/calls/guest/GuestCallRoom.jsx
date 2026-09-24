@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { Button } from "@runly/ui";
+import { Button, useIsMobile } from "@runly/ui";
 import { Mic, MicOff, Camera, CameraOff, MonitorUp, PhoneOff, MessageSquare, Hand } from "lucide-react";
 import { GuestRoomChat } from "./GuestRoomChat";
 import { useCallEphemeral } from "../hooks/useCallEphemeral";
@@ -27,6 +27,10 @@ function RemoteAudio({ participant }) {
 }
 
 export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLeave, myName, recordingActive = false }) {
+  // Below this width there's no room for a video+chat side-by-side layout,
+  // so chat replaces the video view instead (matches CallRoom.jsx's own
+  // mobile breakpoint for the member side).
+  const isMobile = useIsMobile(1024);
   const room = useMemo(() => new Room({ adaptiveStream: true, dynacast: true }), []);
   const [, force] = useState(0);
   const [mic, setMic] = useState(true);
@@ -162,75 +166,82 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-slate-950 text-white">
-      <main className="relative min-h-0 flex-1 p-2 sm:p-4">
-        <RecordingBanner active={recordingActive} />
-        {showChat ? (
+    <div className="fixed inset-0 flex bg-slate-950 text-white">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="relative min-h-0 flex-1 p-2 sm:p-4">
+          <RecordingBanner active={recordingActive} />
+          {isMobile && showChat ? (
+            <GuestRoomChat polled={messages} liveIncoming={live} onSend={publishChat} myName={myName} />
+          ) : spotlightMain ? (
+            <SpotlightLayout
+              mainEntry={spotlightMain}
+              others={spotlightOthers}
+              screenShareEntry={screenShareEntry}
+              isMobile
+              raisedHands={ephemeral.raisedHands}
+              myHandRaised={ephemeral.myHandRaised}
+              myLocalIdentity={room.localParticipant?.identity}
+              mirrorLocalCamera
+              onPin={setPinned}
+              speakingIds={speakingIds}
+            />
+          ) : useFocusLayout ? (
+            <DirectFocusLayout
+              localEntry={localEntry}
+              remoteEntry={remoteEntries[0]}
+              raisedHands={ephemeral.raisedHands}
+              myHandRaised={ephemeral.myHandRaised}
+              mirrorLocalCamera
+              swapped={directSwapped}
+              onToggleSwap={toggleDirectSwap}
+              speakingIds={speakingIds}
+            />
+          ) : (
+            <div className={`mx-auto grid h-full max-w-5xl gap-2 ${participants.length <= 1 ? "grid-cols-1" : participants.length === 2 ? "sm:grid-cols-2" : "grid-cols-2"}`}>
+              {participants.map(({ participant, isLocal }) => (
+                <ParticipantTile
+                  key={participant?.sid || participant?.identity}
+                  participant={participant}
+                  isLocal={isLocal}
+                  handRaised={ephemeral.raisedHands.has(participant?.identity)}
+                  onPin={participants.length > 1 ? setPinned : null}
+                  mirrorLocalCamera
+                  fit="contain"
+                  speaking={speakingIds.has(participant?.identity)}
+                />
+              ))}
+            </div>
+          )}
+          {remote.map((p) => <RemoteAudio key={`a-${p.identity}`} participant={p} />)}
+          <CallReactionsOverlay reactions={ephemeral.reactions} />
+        </main>
+        <footer className="flex shrink-0 items-center justify-center gap-2 border-t border-white/10 bg-black/30 p-3">
+          <Button variant={mic ? "secondary" : "destructive"} size="icon" className="h-11 w-11 rounded-full" onClick={toggleMic}>
+            {mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+          </Button>
+          <Button variant={cam ? "secondary" : "destructive"} size="icon" className="h-11 w-11 rounded-full" onClick={toggleCam}>
+            {cam ? <Camera className="h-5 w-5" /> : <CameraOff className="h-5 w-5" />}
+          </Button>
+          <Button variant={screen ? "default" : "secondary"} size="icon" className="h-11 w-11 rounded-full" onClick={toggleScreen}>
+            <MonitorUp className="h-5 w-5" />
+          </Button>
+          <CallReactionButton onReact={ephemeral.sendReaction} />
+          <Button variant={ephemeral.myHandRaised ? "default" : "secondary"} size="icon" className="h-11 w-11 rounded-full" onClick={ephemeral.toggleHand} title={ephemeral.myHandRaised ? "Bajar la mano" : "Levantar la mano"}>
+            <Hand className="h-5 w-5" />
+          </Button>
+          <Button variant={showChat ? "default" : "secondary"} size="icon" className="h-11 w-11 rounded-full" onClick={() => setShowChat((v) => !v)}>
+            <MessageSquare className="h-5 w-5" />
+          </Button>
+          <Button variant="destructive" size="icon" className="h-11 w-11 rounded-full sm:w-auto sm:px-6" onClick={onLeave}>
+            <PhoneOff className="h-5 w-5 sm:mr-2" /><span className="hidden sm:inline">Salir</span>
+          </Button>
+        </footer>
+      </div>
+      {!isMobile && showChat && (
+        <aside className="flex w-[380px] shrink-0 flex-col border-l border-white/10 bg-slate-950">
           <GuestRoomChat polled={messages} liveIncoming={live} onSend={publishChat} myName={myName} />
-        ) : spotlightMain ? (
-          <SpotlightLayout
-            mainEntry={spotlightMain}
-            others={spotlightOthers}
-            screenShareEntry={screenShareEntry}
-            isMobile
-            raisedHands={ephemeral.raisedHands}
-            myHandRaised={ephemeral.myHandRaised}
-            myLocalIdentity={room.localParticipant?.identity}
-            mirrorLocalCamera
-            onPin={setPinned}
-            speakingIds={speakingIds}
-          />
-        ) : useFocusLayout ? (
-          <DirectFocusLayout
-            localEntry={localEntry}
-            remoteEntry={remoteEntries[0]}
-            raisedHands={ephemeral.raisedHands}
-            myHandRaised={ephemeral.myHandRaised}
-            mirrorLocalCamera
-            swapped={directSwapped}
-            onToggleSwap={toggleDirectSwap}
-            speakingIds={speakingIds}
-          />
-        ) : (
-          <div className={`mx-auto grid h-full max-w-5xl gap-2 ${participants.length <= 1 ? "grid-cols-1" : participants.length === 2 ? "sm:grid-cols-2" : "grid-cols-2"}`}>
-            {participants.map(({ participant, isLocal }) => (
-              <ParticipantTile
-                key={participant?.sid || participant?.identity}
-                participant={participant}
-                isLocal={isLocal}
-                handRaised={ephemeral.raisedHands.has(participant?.identity)}
-                onPin={participants.length > 1 ? setPinned : null}
-                mirrorLocalCamera
-                fit="contain"
-                speaking={speakingIds.has(participant?.identity)}
-              />
-            ))}
-          </div>
-        )}
-        {remote.map((p) => <RemoteAudio key={`a-${p.identity}`} participant={p} />)}
-        <CallReactionsOverlay reactions={ephemeral.reactions} />
-      </main>
-      <footer className="flex shrink-0 items-center justify-center gap-2 border-t border-white/10 bg-black/30 p-3">
-        <Button variant={mic ? "secondary" : "destructive"} size="icon" className="h-11 w-11 rounded-full" onClick={toggleMic}>
-          {mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-        </Button>
-        <Button variant={cam ? "secondary" : "destructive"} size="icon" className="h-11 w-11 rounded-full" onClick={toggleCam}>
-          {cam ? <Camera className="h-5 w-5" /> : <CameraOff className="h-5 w-5" />}
-        </Button>
-        <Button variant={screen ? "default" : "secondary"} size="icon" className="h-11 w-11 rounded-full" onClick={toggleScreen}>
-          <MonitorUp className="h-5 w-5" />
-        </Button>
-        <CallReactionButton onReact={ephemeral.sendReaction} />
-        <Button variant={ephemeral.myHandRaised ? "default" : "secondary"} size="icon" className="h-11 w-11 rounded-full" onClick={ephemeral.toggleHand} title={ephemeral.myHandRaised ? "Bajar la mano" : "Levantar la mano"}>
-          <Hand className="h-5 w-5" />
-        </Button>
-        <Button variant={showChat ? "default" : "secondary"} size="icon" className="h-11 w-11 rounded-full" onClick={() => setShowChat((v) => !v)}>
-          <MessageSquare className="h-5 w-5" />
-        </Button>
-        <Button variant="destructive" size="icon" className="h-11 w-11 rounded-full sm:w-auto sm:px-6" onClick={onLeave}>
-          <PhoneOff className="h-5 w-5 sm:mr-2" /><span className="hidden sm:inline">Salir</span>
-        </Button>
-      </footer>
+        </aside>
+      )}
     </div>
   );
 }
