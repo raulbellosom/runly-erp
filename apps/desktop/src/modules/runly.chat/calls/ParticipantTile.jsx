@@ -1,21 +1,46 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCoarsePointer } from "@runly/ui";
 import { Hand, MicOff, Pin, PinOff } from "lucide-react";
 import { Track } from "livekit-client";
+
+// A caller-requested "auto" fit means cover for camera, contain for screen
+// (see the `fit` prop doc on ParticipantTile below). But a portrait phone
+// camera forced to `cover` in a landscape tile crops so aggressively it reads
+// as distorted — so for camera tracks specifically, "auto" is resolved at
+// render time from the track's own decoded dimensions instead of a fixed
+// default. See
+// docs/superpowers/specs/2026-09-23-call-spotlight-polish-round2-design.md §8.1.
+function resolveAutoFit(isPortrait) {
+  return isPortrait ? "contain" : "cover";
+}
 
 function TrackRenderer({ participant, source, muted = false, mirror = false, fit = "cover" }) {
   const elementRef = useRef(null);
   const publication = participant?.getTrackPublication?.(source);
   const track = publication?.track;
+  const [isPortrait, setIsPortrait] = useState(false);
 
   useEffect(() => {
     const element = elementRef.current;
     if (!track || !element) return undefined;
     track.attach(element);
-    return () => track.detach(element);
+    const checkOrientation = () => {
+      if (element.videoWidth && element.videoHeight) {
+        setIsPortrait(element.videoHeight > element.videoWidth);
+      }
+    };
+    checkOrientation();
+    element.addEventListener("loadedmetadata", checkOrientation);
+    element.addEventListener("resize", checkOrientation);
+    return () => {
+      element.removeEventListener("loadedmetadata", checkOrientation);
+      element.removeEventListener("resize", checkOrientation);
+      track.detach(element);
+    };
   }, [track]);
 
   if (!track || publication?.isMuted) return null;
+  const effectiveFit = fit === "auto" ? resolveAutoFit(isPortrait) : fit;
   return (
     // react-doctor-disable-next-line media-has-caption -- LiveKit attaches a video-only WebRTC track; remote audio is rendered separately.
     <video
@@ -23,7 +48,7 @@ function TrackRenderer({ participant, source, muted = false, mirror = false, fit
       autoPlay
       playsInline
       muted={muted}
-      className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${mirror ? "-scale-x-100" : ""}`}
+      className={`h-full w-full ${effectiveFit === "contain" ? "object-contain" : "object-cover"} ${mirror ? "-scale-x-100" : ""}`}
     />
   );
 }
@@ -67,7 +92,7 @@ export function ParticipantTile({
           participant={participant}
           source={source}
           muted={isLocal}
-          fit={fit === "contain" || isScreen ? "contain" : "cover"}
+          fit={fit === "contain" || isScreen ? "contain" : "auto"}
           mirror={isLocal && source === Track.Source.Camera && mirrorLocalCamera}
         />
       ) : (
