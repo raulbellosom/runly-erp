@@ -101,7 +101,6 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
   // spotlight instead. See DirectFocusLayout.
   const [directSwapped, setDirectSwapped] = useState(false);
   const toggleDirectSwap = useCallback(() => setDirectSwapped((v) => !v), []);
-  const [liveMessages, setLiveMessages] = useState([]);
   const [aloneDeadline, setAloneDeadline] = useState(() => Date.now() + ALONE_LIMIT_MS);
   const [aloneSecondsLeft, setAloneSecondsLeft] = useState(0);
 
@@ -190,21 +189,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
       if (publication?.source === Track.Source.ScreenShare) setScreenEnabled(false);
       refresh();
     };
-    const handleData = (payload, participant) => {
-      try {
-        const msg = JSON.parse(new TextDecoder().decode(payload));
-        if (msg?.type !== "chat") return;
-        setLiveMessages((prev) => [...prev.slice(-199), {
-          body: msg.body,
-          senderName: msg.senderName,
-          senderKind: msg.senderKind
-            ?? (participant?.identity?.startsWith?.("guest_") ? "guest" : "user"),
-          createdAt: msg.createdAt ?? new Date().toISOString(),
-        }]);
-      } catch { /* not a chat data packet */ }
-    };
     events.forEach((event) => room.on(event, refresh));
-    room.on(RoomEvent.DataReceived, handleData);
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
     room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
     room.on(RoomEvent.Reconnecting, handleReconnecting);
@@ -255,7 +240,6 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
       room.off(RoomEvent.MediaDevicesChanged, handleMediaDevicesChanged);
       room.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
       room.off(RoomEvent.LocalTrackUnpublished, handleLocalTrackUnpublished);
-      room.off(RoomEvent.DataReceived, handleData);
       room.disconnect();
     };
   }, [room, session, refresh, refreshCameraCapabilities]);
@@ -539,16 +523,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
 
   const chatPanelNode =
     !isMobile || mobileView === "chat"
-      ? (
-        <CallChatPanel
-          conversationId={conversationId}
-          onClose={handleChatClose}
-          roomMode={hasGuests ? "call" : "conversation"}
-          callId={session.call.id}
-          liveIncoming={liveMessages}
-          publishData={publishData}
-        />
-      )
+      ? <CallChatPanel conversationId={conversationId} onClose={handleChatClose} />
       : null;
 
   if (minimized) {
