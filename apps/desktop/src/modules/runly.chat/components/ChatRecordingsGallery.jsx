@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AdvancedFileViewer, ConfirmDialog, EmptyState, ErrorState, Input, Skeleton,
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, useCoarsePointer,
 } from "@runly/ui";
 import { AlertCircle, Check, Loader2, Pencil, Play, Trash2, Video, X } from "lucide-react";
 import { toast } from "sonner";
@@ -98,6 +98,12 @@ function RecordingTitle({ recording, renameRecording }) {
     );
   }
 
+  // On touch devices there is no hover, so a hover-only reveal would leave
+  // the pencil permanently invisible there — same fix already applied to
+  // the speak button elsewhere in runly.chat (useCoarsePointer).
+  const coarse = useCoarsePointer();
+  const revealCls = coarse ? "opacity-100" : "opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100";
+
   return (
     <div className="group/title flex items-center gap-1.5 min-w-0">
       <p className="truncate text-sm font-medium">{recording.title || formatRecordingDateTime(recording.startedAt)}</p>
@@ -106,7 +112,7 @@ function RecordingTitle({ recording, renameRecording }) {
         onClick={startEditing}
         title="Renombrar"
         aria-label="Renombrar grabación"
-        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-opacity"
+        className={`${revealCls} flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-opacity`}
       >
         <Pencil className="h-3 w-3" />
       </button>
