@@ -14,7 +14,19 @@
 
 import { ChatServiceError } from "./chat-service-error.js";
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+// Piper synthesizes ~17.8 chars of text per second of audio (see
+// scripts/poc-piper/synth_test.py's SAMPLE_TEXT: 143 chars -> 8.03s audio).
+// A flat 10s timeout was tuned against the idle-VPS realtime factor
+// (0.069x, scripts/poc-piper/RESULTS.md "tercera ronda") but that doc's own
+// "Lo que falta" section flags CPU contention (a live LiveKit call and/or
+// the transcriber running at the same time) as untested. The dev-machine
+// run under an artificial CPU limit — the closest proxy we have for a busy
+// production box — saw a 0.282x factor instead, ~4x worse; MS_PER_CHAR
+// below bakes that factor in plus headroom, so a near-MAX_TEXT_CHARS
+// request under real contention still has time to finish instead of
+// aborting into a 502.
+const MIN_TIMEOUT_MS = 10_000;
+const MS_PER_CHAR = 30;
 const MAX_TEXT_CHARS = 2000;
 
 export function createMiraiTtsService({ env = process.env, fetchImpl } = {}) {
@@ -33,8 +45,9 @@ export function createMiraiTtsService({ env = process.env, fetchImpl } = {}) {
       throw new ChatServiceError(`El texto es demasiado largo (máximo ${MAX_TEXT_CHARS} caracteres).`, 400);
     }
 
+    const timeoutMs = Math.max(MIN_TIMEOUT_MS, trimmed.length * MS_PER_CHAR);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     let response;
     try {
       response = await fetchFn(`${baseUrl}/synthesize`, {

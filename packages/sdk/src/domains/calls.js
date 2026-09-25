@@ -88,7 +88,12 @@ export function createCallsDomain(request, withAuthHeaders) {
       token: (guestToken) => guestJson("/calls/guest/token", "POST", {}, guestToken),
       heartbeat: (guestToken) => guestJson("/calls/guest/heartbeat", "POST", {}, guestToken),
       leave: (guestToken) => guestJson("/calls/guest/leave", "POST", {}, guestToken),
-      sendMessage: (guestToken, body) => guestJson("/calls/guest/messages", "POST", { body }, guestToken),
+      sendMessage: (guestToken, body, metadata) =>
+        guestJson("/calls/guest/messages", "POST", metadata ? { body, metadata } : { body }, guestToken),
+      presignAttachment: (guestToken, payload) =>
+        guestJson("/calls/guest/attachments/presign", "POST", payload, guestToken),
+      getAttachmentUrl: (guestToken, attachmentId) =>
+        guestJson(`/calls/guest/attachments/${encodeURIComponent(attachmentId)}/url`, "GET", undefined, guestToken),
     },
   };
 }

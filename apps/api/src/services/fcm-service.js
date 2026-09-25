@@ -49,6 +49,11 @@ function getFirebaseApp() {
 export function createFcmService({ messaging = null } = {}) {
   function getClient() {
     if (messaging) return messaging;
+    // Explicit kill switch, independent of whether a credential file is
+    // mounted — same default-true pattern as CHAT_MIRAI_WEB in
+    // mirai-service.js, so ops can disable FCM in prod without touching the
+    // mounted secret.
+    if (String(process.env.RUNLY_FCM_ENABLED ?? "true").toLowerCase() === "false") return null;
     if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) return null;
     return getMessaging(getFirebaseApp());
   }

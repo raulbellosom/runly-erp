@@ -1350,3 +1350,4 @@ export const documentGeneratedEnabledSchema = z
 export * from './chat.js';
 export * from './calls.js';
 export * from './notes.js';
+export * from './support.js';

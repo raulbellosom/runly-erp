@@ -153,6 +153,12 @@ const COMPOSE_INTERPOLATION_KEYS = [
   "RUNLY_API_HOST_PORT", "RUNLY_WEB_HOST_PORT", "RUNLY_COLLABORA_HOST_PORT", "RUNLY_PUBLIC_BIND_ADDR",
   "LIVEKIT_HTTP_HOST_PORT", "LIVEKIT_RTC_TCP_PORT", "LIVEKIT_RTC_UDP_PORT", "LIVEKIT_REDIS_PORT",
   "LIVEKIT_TLS_HTTP_PORT", "LIVEKIT_TLS_HTTPS_PORT",
+  // docker-compose.yml's runly-tts deploy.resources.limits also interpolates
+  // these two — omitting them here silently reset a manually-raised
+  // TTS_MEMORY_LIMIT back to the compose file's 512m default on every
+  // update run (the Piper synthesis container was getting OOM-killed
+  // mid-request on long "leer en voz alta" replies).
+  "TTS_CPU_LIMIT", "TTS_MEMORY_LIMIT",
 ];
 
 function composeInterpolationEnvLines(existingEnvContent) {
@@ -320,6 +326,8 @@ const OPTIONAL_VAR_GROUPS = [
     vars: [
       { key: "MIRAI_TTS_MODE",   placeholder: "disabled", comment: null },
       { key: "TTS_CPU_THREADS",  placeholder: "2",        comment: null },
+      { key: "TTS_CPU_LIMIT",    placeholder: "1",        comment: null },
+      { key: "TTS_MEMORY_LIMIT", placeholder: "1024m",    comment: "# Sube esto si /chat/mirai/tts da 502 en textos largos (el contenedor se queda sin RAM)" },
       { key: "MIRAI_TTS_URL",    placeholder: "", comment: "# Derivada automaticamente — no editar a mano" },
     ],
   },

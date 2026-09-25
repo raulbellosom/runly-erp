@@ -295,3 +295,115 @@ describe("createCallGuestService moderation", () => {
     assert.equal(attempts, 2);
   });
 });
+
+describe("createCallGuestService.presignGuestAttachmentUpload", () => {
+  const admittedGuest = { id: GUEST, status: "ADMITTED", callId: CALL, livekitIdentity: "guest_x", displayName: "Ana", sessionTokenHash: "h" };
+
+  function svcFor({ guest = admittedGuest, callRow = liveCall, supabaseAdmin, insertedValues } = {}) {
+    const prisma = {
+      callGuest: { findFirst: async () => guest, update: async () => ({}) },
+      $queryRaw: async (strings, ...values) => {
+        const sql = Array.isArray(strings) ? strings.join("?") : String(strings);
+        if (sql.includes('FROM "call"')) return callRow ? [callRow] : [];
+        if (sql.includes("INSERT INTO chat_attachments")) {
+          if (insertedValues) insertedValues.push(values);
+          return [{ id: "att-1" }];
+        }
+        return [];
+      },
+    };
+    return createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService(), supabaseAdmin });
+  }
+
+  function fakeStorage({ signError = null } = {}) {
+    return {
+      storage: {
+        from: (bucket) => ({
+          createSignedUploadUrl: async (key) => {
+            assert.equal(bucket, "runly-chat");
+            assert.match(key, new RegExp(`^conversations/${CONV}/guest/.+\\.png$`));
+            return signError ? { data: null, error: signError } : { data: { signedUrl: "https://x/upload", token: "tok" }, error: null };
+          },
+        }),
+      },
+    };
+  }
+
+  it("rejects a disallowed mime type", async () => {
+    const svc = svcFor({ supabaseAdmin: fakeStorage() });
+    await assert.rejects(
+      svc.presignGuestAttachmentUpload({ guestToken: "gt", fileName: "malware.exe", mimeType: "application/x-msdownload", sizeBytes: 100 }),
+      (e) => e instanceof CallGuestError && e.status === 422,
+    );
+  });
+
+  it("rejects a file over 20MB", async () => {
+    const svc = svcFor({ supabaseAdmin: fakeStorage() });
+    await assert.rejects(
+      svc.presignGuestAttachmentUpload({ guestToken: "gt", fileName: "big.png", mimeType: "image/png", sizeBytes: 21 * 1024 * 1024 }),
+      (e) => e instanceof CallGuestError && e.status === 422,
+    );
+  });
+
+  it("refuses a guest that is not ADMITTED", async () => {
+    const svc = svcFor({ guest: { ...admittedGuest, status: "LOBBY" }, supabaseAdmin: fakeStorage() });
+    await assert.rejects(
+      svc.presignGuestAttachmentUpload({ guestToken: "gt", fileName: "photo.png", mimeType: "image/png", sizeBytes: 100 }),
+      (e) => e instanceof CallGuestError && e.status === 403,
+    );
+  });
+
+  it("inserts a chat_attachments row scoped to the guest's own conversation, with no uploaded_by_user_id", async () => {
+    const insertedValues = [];
+    const svc = svcFor({ supabaseAdmin: fakeStorage(), insertedValues });
+    const out = await svc.presignGuestAttachmentUpload({ guestToken: "gt", fileName: "photo.png", mimeType: "image/png", sizeBytes: 1234 });
+    assert.equal(out.attachmentId, "att-1");
+    assert.equal(out.uploadUrl, "https://x/upload");
+    // conversationId, bucket, objectKey, fileName, mimeType, sizeBytes — no uploader column.
+    assert.equal(insertedValues[0][0], CONV);
+    assert.equal(insertedValues[0].length, 5);
+  });
+});
+
+describe("createCallGuestService.getGuestAttachmentUrl", () => {
+  const admittedGuest = { id: GUEST, status: "ADMITTED", callId: CALL, livekitIdentity: "guest_x", displayName: "Ana", sessionTokenHash: "h" };
+
+  function svcFor({ attachmentRow, signedUrl = "https://x/signed" } = {}) {
+    const prisma = {
+      callGuest: { findFirst: async () => admittedGuest, update: async () => ({}) },
+      $queryRaw: async (strings) => {
+        const sql = Array.isArray(strings) ? strings.join("?") : String(strings);
+        if (sql.includes('FROM "call"')) return [liveCall];
+        if (sql.includes("FROM chat_attachments")) return attachmentRow ? [attachmentRow] : [];
+        return [];
+      },
+    };
+    const supabaseAdmin = {
+      storage: {
+        from: (bucket) => ({
+          createSignedUrl: async (key) => {
+            assert.equal(bucket, attachmentRow?.bucket);
+            assert.equal(key, attachmentRow?.object_key);
+            return { data: { signedUrl }, error: null };
+          },
+        }),
+      },
+    };
+    return createCallGuestService({ prisma, env: env(), AccessTokenImpl: FakeToken, linksService: baseLinksService(), supabaseAdmin });
+  }
+
+  it("returns a signed url for an attachment in the guest's own conversation", async () => {
+    const svc = svcFor({ attachmentRow: { bucket: "runly-chat", object_key: `conversations/${CONV}/guest/x.png` } });
+    const out = await svc.getGuestAttachmentUrl({ guestToken: "gt", attachmentId: "att-1" });
+    assert.equal(out.url, "https://x/signed");
+    assert.equal(out.expiresIn, 300);
+  });
+
+  it("throws 404 when the attachment is not in the guest's conversation (scoped query found nothing)", async () => {
+    const svc = svcFor({ attachmentRow: null });
+    await assert.rejects(
+      svc.getGuestAttachmentUrl({ guestToken: "gt", attachmentId: "att-x" }),
+      (e) => e instanceof CallGuestError && e.status === 404,
+    );
+  });
+});

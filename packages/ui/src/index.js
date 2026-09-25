@@ -228,6 +228,8 @@ export { DynamicTable } from "./components/DynamicTable.jsx";
 export { DynamicForm } from "./components/DynamicForm.jsx";
 export { ActionMenu } from "./components/ActionMenu.jsx";
 export { ConfirmDialog } from "./components/ConfirmDialog.jsx";
+export { BugReportDialog } from "./components/BugReportDialog.jsx";
+export { requestBugReport, onBugReportRequest } from "./lib/bugReportBus.js";
 export { ContactPicker } from "./components/ContactPicker.jsx";
 export { FileCard } from "./components/FileCard.jsx";
 export { DistDropZone } from "./components/DistDropZone.jsx";

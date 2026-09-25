@@ -8,6 +8,14 @@ const MAX_GUESTS_PER_CALL = 20;
 const GUEST_TOKEN_TTL = "15m";
 const ABANDON_MS = 2 * 60 * 1000;
 const LIVE = ["RINGING", "ACTIVE"];
+// Same allow-list and cap as the other unauthenticated-guest attachment path
+// (apps/api/src/routes/chat/index.js's /public/chat/session/:token/attachments/presign)
+// — see docs/superpowers/specs/2026-09-25-call-guest-chat-attachments-design.md §12.
+const GUEST_ATTACHMENT_ALLOWED_MIME = [
+  /^image\//, /^application\/pdf$/, /^text\/plain$/,
+  /^application\/msword$/, /^application\/vnd\.openxmlformats/,
+];
+const GUEST_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 
 export class CallGuestError extends Error {
   constructor(message, status = 400, reason = null) {
@@ -295,7 +303,13 @@ export function createCallGuestService({
           m.sender_type AS "senderKind",
           COALESCE(up.display_name, cg.display_name) AS "senderName",
           m.body,
-          m.created_at AS "createdAt"
+          m.created_at AS "createdAt",
+          (
+            SELECT json_agg(json_build_object(
+              'id', a.id, 'fileName', a.file_name, 'mimeType', a.mime_type, 'sizeBytes', a.size_bytes
+            ))
+            FROM chat_attachments a WHERE a.message_id = m.id
+          ) AS attachments
         FROM chat_messages m
         LEFT JOIN user_profile up ON up.id = m.sender_user_id
         LEFT JOIN call_guest cg ON cg.id = m.sender_call_guest_id
@@ -366,6 +380,61 @@ export function createCallGuestService({
     const call = await liveCallById(guest.callId);
     if (!call || !LIVE.includes(call.status)) throw new CallGuestError("La llamada no está activa.", 409);
     return { guestId: guest.id, callId: guest.callId, displayName: guest.displayName };
+  }
+
+  // Presigns an upload straight into the call's real conversation, the same
+  // way a call guest's chat messages already land there (postGuestMessage) —
+  // see docs/superpowers/specs/2026-09-25-call-guest-chat-attachments-design.md.
+  async function presignGuestAttachmentUpload({ guestToken, fileName, mimeType, sizeBytes }) {
+    if (!supabaseAdmin) throw new CallGuestError("No disponible.", 500);
+    const { callId } = await resolveAdmittedGuestForMessage({ guestToken });
+    const call = await liveCallById(callId);
+    if (!call) throw new CallGuestError("La llamada no está activa.", 409);
+
+    if (!GUEST_ATTACHMENT_ALLOWED_MIME.some((re) => re.test(mimeType))) {
+      throw new CallGuestError("Tipo de archivo no permitido.", 422);
+    }
+    if (sizeBytes > GUEST_ATTACHMENT_MAX_BYTES) {
+      throw new CallGuestError("Archivo demasiado grande (máx. 20 MB).", 422);
+    }
+
+    const conversationId = call.conversationId;
+    const ext = fileName.split(".").pop()?.toLowerCase() ?? "bin";
+    const objectKey = `conversations/${conversationId}/guest/${crypto.randomUUID()}.${ext}`;
+
+    const { data, error } = await supabaseAdmin.storage
+      .from("runly-chat")
+      .createSignedUploadUrl(objectKey, { expiresIn: 300 });
+    if (error) throw new CallGuestError("Error generando URL de subida.", 500);
+
+    const attRows = await prisma.$queryRaw`
+      INSERT INTO chat_attachments (conversation_id, bucket, object_key, file_name, mime_type, size_bytes)
+      VALUES (${conversationId}, 'runly-chat', ${objectKey}, ${fileName}, ${mimeType}, ${sizeBytes})
+      RETURNING id
+    `;
+
+    return { attachmentId: attRows[0].id, uploadUrl: data.signedUrl };
+  }
+
+  // Short-lived signed URL for an attachment the guest can see — scoped to
+  // the conversation of the call they were admitted to.
+  async function getGuestAttachmentUrl({ guestToken, attachmentId }) {
+    if (!supabaseAdmin) throw new CallGuestError("No disponible.", 500);
+    const { callId } = await resolveAdmittedGuestForMessage({ guestToken });
+    const call = await liveCallById(callId);
+    if (!call) throw new CallGuestError("La llamada no está activa.", 409);
+
+    const rows = await prisma.$queryRaw`
+      SELECT bucket, object_key FROM chat_attachments
+      WHERE id = ${attachmentId}::uuid AND conversation_id = ${call.conversationId}::uuid
+      LIMIT 1
+    `;
+    if (!rows.length) throw new CallGuestError("Adjunto no encontrado.", 404);
+
+    const { bucket, object_key: objectKey } = rows[0];
+    const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(objectKey, 300);
+    if (error || !data?.signedUrl) throw new CallGuestError("Error generando URL del adjunto.", 500);
+    return { url: data.signedUrl, expiresIn: 300 };
   }
 
   // ---- host moderation -------------------------------------------------------
@@ -491,6 +560,8 @@ export function createCallGuestService({
     heartbeatGuest,
     leaveGuest,
     resolveAdmittedGuestForMessage,
+    presignGuestAttachmentUpload,
+    getGuestAttachmentUrl,
     listCallGuests,
     admitGuest,
     denyGuest,

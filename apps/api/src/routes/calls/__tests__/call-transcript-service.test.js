@@ -320,7 +320,7 @@ describe("createCallTranscriptService.reconcileReadyTranscripts", () => {
     const svc = createCallTranscriptService({ prisma, onTranscriptReady: async () => {} });
     await svc.reconcileReadyTranscripts();
     const days = (updateData.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
-    assert.ok(days > 89 && days < 91, "should fall back to the 90-day provisional default");
+    assert.ok(days > 364 && days < 366, "should fall back to the 365-day default");
   });
 
   it("leaves a row unfinalized (retried next tick) when the notification callback throws", async () => {

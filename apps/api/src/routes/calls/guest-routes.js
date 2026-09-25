@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { callGuestJoinSchema, callRoomMessageSchema } from "@runly/validators";
+import { callGuestJoinSchema, callRoomMessageSchema, callGuestAttachmentPresignSchema } from "@runly/validators";
 
 function guestToken(c) {
   const auth = c.req.header("authorization") || c.req.header("Authorization");
@@ -59,11 +59,32 @@ export function createGuestCallRouter({ guestService, messagesService }) {
 
   app.post("/messages", async (c) => {
     try {
-      const { body } = callRoomMessageSchema.parse(await c.req.json());
-      return c.json({ data: await messagesService.postGuestMessage({ guestToken: guestToken(c), body }) });
+      const { body, metadata } = callRoomMessageSchema.parse(await c.req.json());
+      return c.json({ data: await messagesService.postGuestMessage({ guestToken: guestToken(c), body, metadata }) });
     } catch (error) {
       if (error?.name === "ZodError") return c.json({ error: "Mensaje inválido." }, 422);
       return fail(c, error, "No se pudo enviar el mensaje.");
+    }
+  });
+
+  app.post("/attachments/presign", async (c) => {
+    try {
+      const data = callGuestAttachmentPresignSchema.parse(await c.req.json());
+      const result = await guestService.presignGuestAttachmentUpload({ guestToken: guestToken(c), ...data });
+      return c.json({ data: result }, 201);
+    } catch (error) {
+      if (error?.name === "ZodError") return c.json({ error: "Datos inválidos." }, 422);
+      return fail(c, error, "No se pudo generar la URL de subida.");
+    }
+  });
+
+  app.get("/attachments/:attachmentId/url", async (c) => {
+    try {
+      const attachmentId = c.req.param("attachmentId");
+      const data = await guestService.getGuestAttachmentUrl({ guestToken: guestToken(c), attachmentId });
+      return c.json({ data });
+    } catch (error) {
+      return fail(c, error, "No se pudo obtener el adjunto.");
     }
   });
 

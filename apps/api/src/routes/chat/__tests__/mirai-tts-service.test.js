@@ -89,3 +89,31 @@ test("synthesize() maps a network failure (e.g. container down) to a 502 ChatSer
     (e) => e instanceof ChatServiceError && e.status === 502,
   );
 });
+
+test("synthesize()'s abort timeout scales with text length instead of staying flat at 10s", async (t) => {
+  // Regression test: a flat 10s AbortController timeout meant long replies
+  // synthesized under real CPU contention could abort before Piper finished
+  // (see the comment above MS_PER_CHAR in mirai-tts-service.js). Uses
+  // node:test's mock timers to assert the abort fires at the length-scaled
+  // deadline, not a fixed 10s, without actually waiting that long.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let aborted = false;
+  const svc = createMiraiTtsService({
+    env: { MIRAI_TTS_URL: "http://runly-tts:8090" },
+    // Mirrors real fetch: an aborted signal rejects the in-flight request.
+    fetchImpl: (url, opts) => new Promise((resolve, reject) => {
+      opts.signal.addEventListener("abort", () => { aborted = true; reject(new Error("aborted")); });
+    }),
+  });
+
+  const pending = svc.synthesize("a".repeat(1800)).catch(() => {});
+  await Promise.resolve();
+  t.mock.timers.tick(10_000); // flat-10s behavior would have aborted here
+  await Promise.resolve();
+  assert.equal(aborted, false, "1800 chars * 30ms/char = 54s; a 10s abort is a regression");
+
+  t.mock.timers.tick(1_800 * 30 - 10_000 + 1); // clears the full length-scaled deadline
+  await Promise.resolve();
+  assert.equal(aborted, true);
+  await pending;
+});

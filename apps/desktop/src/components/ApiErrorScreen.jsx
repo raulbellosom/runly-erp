@@ -17,6 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { classifyError } from "../lib/classifyError.js";
+import { requestBugReport } from "@runly/ui";
 
 // ─── Per-type config ──────────────────────────────────────────────────────────
 const ERROR_CONFIG = {
@@ -386,6 +387,18 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, com
             Recargar
           </button>
         </motion.div>
+
+        {/* Report bug — opens the BugReportHost dialog mounted at app root */}
+        <motion.button
+          onClick={() => requestBugReport({ context, message: summary, stack: fullDetails })}
+          className="text-xs font-medium transition-opacity duration-150 hover:opacity-80"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+          initial={reduced ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.38 }}
+        >
+          Reportar bug
+        </motion.button>
 
         {/* Technical details toggle */}
         <motion.div

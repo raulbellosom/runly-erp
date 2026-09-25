@@ -268,7 +268,15 @@ services:
       resources:
         limits:
           cpus: "${TTS_CPU_LIMIT:-1}"
-          memory: ${TTS_MEMORY_LIMIT:-512m}
+          # scripts/poc-piper/RESULTS.md measured 387.6MB peak RSS on a
+          # 143-char benchmark phrase alone; longer "leer en voz alta"
+          # replies (up to MAX_TEXT_CHARS=2000 in mirai-tts-service.js) push
+          # well past 512MB and get cgroup-OOM-killed mid-request, which
+          # surfaces to the browser as a 502 on POST /chat/mirai/tts with no
+          # trace in either the API or Piper's own logs (a kernel OOM kill
+          # isn't a catchable Python exception). 1024m leaves real headroom
+          # on a typical VPS; override via TTS_MEMORY_LIMIT if still tight.
+          memory: ${TTS_MEMORY_LIMIT:-1024m}
     restart: unless-stopped
 
   livekit-caddy:

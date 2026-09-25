@@ -19,7 +19,7 @@
 // crea la fila PENDING inicial y hace el trabajo de "finalizacion" una vez
 // que ve un READY (fijar expires_at + publicar el mensaje de sistema).
 
-const DEFAULT_RETENTION_DAYS = 90; // provisional — ver docs/TRANSCRIPTION_OPEN_QUESTIONS.md §6
+const DEFAULT_RETENTION_DAYS = 365; // decisión de producto confirmada 2026-09-24 — ver docs/TRANSCRIPTION_OPEN_QUESTIONS.md §6
 const RETENTION_CONFIG_KEY = "transcription.retentionDays";
 const LOG_PREFIX = "[runly.calls/transcript]";
 

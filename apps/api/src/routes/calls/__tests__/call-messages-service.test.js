@@ -96,4 +96,78 @@ describe("createCallMessagesService.postGuestMessage", () => {
     const out = await svc.postGuestMessage({ guestToken: "gt", body: "hola" });
     assert.equal(out.message.id, "m2");
   });
+
+  it("allows an empty body when metadata.attachmentId is present (attachment-only message)", async () => {
+    const prisma = {
+      $queryRaw: async (strings) => {
+        const text = sql(strings);
+        if (text.includes('FROM "call"')) return [{ id: CALL, conversationId: CONV, status: "ACTIVE" }];
+        if (text.includes("INSERT INTO chat_messages")) return [{ id: "m3", created_at: new Date() }];
+        if (text.includes("SELECT id, file_name")) return [{ id: "att-1", fileName: "foto.png", mimeType: "image/png", sizeBytes: 1234 }];
+        return [];
+      },
+      $executeRaw: async (strings) => (sql(strings).includes("SET message_id") ? 1 : 1),
+    };
+    const guestService = {
+      resolveAdmittedGuestForMessage: async () => ({ guestId: "g1", callId: CALL, displayName: "Vis" }),
+    };
+    const svc = createCallMessagesService({ prisma, guestService });
+    const out = await svc.postGuestMessage({ guestToken: "gt", body: "", metadata: { attachmentId: "att-1" } });
+    assert.equal(out.message.body, "");
+    assert.deepEqual(out.message.attachments, [{ id: "att-1", fileName: "foto.png", mimeType: "image/png", sizeBytes: 1234 }]);
+  });
+
+  it("links a pending attachment to the new message and bumps attachment_count", async () => {
+    let linkArgs = null;
+    let bumpCalled = false;
+    const prisma = {
+      $queryRaw: async (strings, ...values) => {
+        const text = sql(strings);
+        if (text.includes('FROM "call"')) return [{ id: CALL, conversationId: CONV, status: "ACTIVE" }];
+        if (text.includes("INSERT INTO chat_messages")) return [{ id: "m4", created_at: new Date() }];
+        if (text.includes("SELECT id, file_name")) return [{ id: "att-1", fileName: "doc.pdf", mimeType: "application/pdf", sizeBytes: 555 }];
+        return [];
+      },
+      $executeRaw: async (strings, ...values) => {
+        const text = sql(strings);
+        if (text.includes("UPDATE chat_attachments") && text.includes("SET message_id")) { linkArgs = values; return 1; }
+        if (text.includes("attachment_count = attachment_count")) { bumpCalled = true; return 1; }
+        return 1;
+      },
+    };
+    const guestService = {
+      resolveAdmittedGuestForMessage: async () => ({ guestId: "g1", callId: CALL, displayName: "Vis" }),
+    };
+    const svc = createCallMessagesService({ prisma, guestService });
+    const out = await svc.postGuestMessage({ guestToken: "gt", body: "un doc", metadata: { attachmentId: "att-1" } });
+    assert.ok(linkArgs.includes("att-1"), "update should be scoped to the attachmentId");
+    assert.ok(linkArgs.includes(CONV), "update should be scoped to the conversation");
+    assert.ok(bumpCalled, "expected attachment_count to be bumped");
+    assert.equal(out.message.attachments.length, 1);
+  });
+
+  it("does not bump attachment_count when the attachmentId is stale or foreign (scoped update no-ops)", async () => {
+    let bumpCalled = false;
+    const prisma = {
+      $queryRaw: async (strings) => {
+        const text = sql(strings);
+        if (text.includes('FROM "call"')) return [{ id: CALL, conversationId: CONV, status: "ACTIVE" }];
+        if (text.includes("INSERT INTO chat_messages")) return [{ id: "m5", created_at: new Date() }];
+        return [];
+      },
+      $executeRaw: async (strings) => {
+        const text = sql(strings);
+        if (text.includes("UPDATE chat_attachments") && text.includes("SET message_id")) return 0;
+        if (text.includes("attachment_count = attachment_count")) { bumpCalled = true; return 1; }
+        return 1;
+      },
+    };
+    const guestService = {
+      resolveAdmittedGuestForMessage: async () => ({ guestId: "g1", callId: CALL, displayName: "Vis" }),
+    };
+    const svc = createCallMessagesService({ prisma, guestService });
+    const out = await svc.postGuestMessage({ guestToken: "gt", body: "hola", metadata: { attachmentId: "stale-id" } });
+    assert.equal(bumpCalled, false);
+    assert.deepEqual(out.message.attachments, []);
+  });
 });

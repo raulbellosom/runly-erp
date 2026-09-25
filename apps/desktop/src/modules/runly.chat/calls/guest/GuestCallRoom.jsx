@@ -3,6 +3,7 @@ import { Room, RoomEvent, Track } from "livekit-client";
 import { Button, useIsMobile } from "@runly/ui";
 import { Mic, MicOff, Camera, CameraOff, MonitorUp, PhoneOff, MessageSquare, Hand } from "lucide-react";
 import { GuestRoomChat } from "./GuestRoomChat";
+import { useGuestChatUpload } from "./useGuestChatUpload";
 import { useCallEphemeral } from "../hooks/useCallEphemeral";
 import { CallReactionsOverlay } from "../CallReactionsOverlay";
 import { CallReactionButton } from "../CallReactionButton";
@@ -26,11 +27,15 @@ function RemoteAudio({ participant }) {
   return <audio ref={ref} autoPlay />;
 }
 
-export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLeave, myName, recordingActive = false }) {
+export function GuestCallRoom({
+  fetchLivekitToken, messages, onSendMessage, onLeave, myName, recordingActive = false,
+  presignAttachment, getAttachmentUrl,
+}) {
   // Below this width there's no room for a video+chat side-by-side layout,
   // so chat replaces the video view instead (matches CallRoom.jsx's own
   // mobile breakpoint for the member side).
   const isMobile = useIsMobile(1024);
+  const { uploadFile } = useGuestChatUpload(presignAttachment);
   const room = useMemo(() => new Room({ adaptiveStream: true, dynacast: true }), []);
   const [, force] = useState(0);
   const [mic, setMic] = useState(true);
@@ -133,12 +138,18 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
     screenShareEntry: screenShareEntry ? { ...screenShareEntry, hasCamera: screenShareHasCamera } : null,
   });
 
-  const publishChat = useCallback((body) => {
-    const echo = { type: "chat", body, senderName: myName, senderKind: "guest", createdAt: new Date().toISOString() };
-    try {
-      room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(echo)), { reliable: true });
-    } catch { /* not connected */ }
-    onSendMessage(body);
+  const publishChat = useCallback((body, attachmentId) => {
+    // An attachment-only message has nothing useful to echo instantly over
+    // the data channel — it reaches other guests via the next state poll,
+    // same as it already reaches members via the Realtime broadcast in
+    // postGuestMessage (see docs/superpowers/specs/2026-09-25-call-guest-chat-attachments-design.md).
+    if (body) {
+      const echo = { type: "chat", body, senderName: myName, senderKind: "guest", createdAt: new Date().toISOString() };
+      try {
+        room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(echo)), { reliable: true });
+      } catch { /* not connected */ }
+    }
+    onSendMessage(body, attachmentId ? { attachmentId } : undefined);
   }, [room, myName, onSendMessage]);
 
   const publishSignal = useCallback((obj) => {
@@ -171,7 +182,14 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
         <main className="relative min-h-0 flex-1 p-2 sm:p-4">
           <RecordingBanner active={recordingActive} />
           {isMobile && showChat ? (
-            <GuestRoomChat polled={messages} liveIncoming={live} onSend={publishChat} myName={myName} />
+            <GuestRoomChat
+              polled={messages}
+              liveIncoming={live}
+              onSend={publishChat}
+              myName={myName}
+              onUploadFile={uploadFile}
+              onResolveAttachmentUrl={getAttachmentUrl}
+            />
           ) : spotlightMain ? (
             <SpotlightLayout
               mainEntry={spotlightMain}
@@ -239,7 +257,14 @@ export function GuestCallRoom({ fetchLivekitToken, messages, onSendMessage, onLe
       </div>
       {!isMobile && showChat && (
         <aside className="flex w-[380px] shrink-0 flex-col border-l border-white/10 bg-slate-950">
-          <GuestRoomChat polled={messages} liveIncoming={live} onSend={publishChat} myName={myName} />
+          <GuestRoomChat
+            polled={messages}
+            liveIncoming={live}
+            onSend={publishChat}
+            myName={myName}
+            onUploadFile={uploadFile}
+            onResolveAttachmentUrl={getAttachmentUrl}
+          />
         </aside>
       )}
     </div>

@@ -210,6 +210,12 @@ const COMPOSE_INTERPOLATION_KEYS = [
   "RUNLY_API_HOST_PORT", "RUNLY_WEB_HOST_PORT", "RUNLY_COLLABORA_HOST_PORT", "RUNLY_PUBLIC_BIND_ADDR",
   "LIVEKIT_HTTP_HOST_PORT", "LIVEKIT_RTC_TCP_PORT", "LIVEKIT_RTC_UDP_PORT", "LIVEKIT_REDIS_PORT",
   "LIVEKIT_TLS_HTTP_PORT", "LIVEKIT_TLS_HTTPS_PORT",
+  // docker-compose.yml's runly-tts deploy.resources.limits also interpolates
+  // these two — omitting them here silently reset a manually-raised
+  // TTS_MEMORY_LIMIT back to the compose file's 512m default on every
+  // update-local.sh run (the Piper synthesis container was getting
+  // OOM-killed mid-request on long "leer en voz alta" replies).
+  "TTS_CPU_LIMIT", "TTS_MEMORY_LIMIT",
 ];
 
 function composeInterpolationEnvLines(existingEnvContent) {
@@ -820,6 +826,14 @@ async function writeLocalEnv(supabaseInput, identity) {
     throw new Error(`MIRAI_TTS_MODE must be "local" or "disabled" (got "${miraiTtsMode}").`);
   }
   const ttsCpuThreads = fromLocalEnv("TTS_CPU_THREADS") || "2";
+  // Read back (never silently dropped) so a manually-raised limit survives
+  // every re-run — docker-compose.yml's runly-tts deploy.resources.limits
+  // interpolates these from the auto-generated .env (see
+  // COMPOSE_INTERPOLATION_KEYS below), and a text-length-scaled synthesis
+  // request can peak well above the 512m default (OOM-kills the container
+  // mid-request, surfacing as a 502 on POST /chat/mirai/tts).
+  const ttsCpuLimit = fromLocalEnv("TTS_CPU_LIMIT") || "1";
+  const ttsMemoryLimit = fromLocalEnv("TTS_MEMORY_LIMIT") || "1024m";
   // Nombre de servicio de Compose, no container_name (que lleva el prefijo
   // configurable RUNLY_CONTAINER_PREFIX) — la unica forma estable de
   // resolver este contenedor por DNS interno de Docker sin importar como se
@@ -936,6 +950,8 @@ TRANSCRIBER_DATABASE_URL=${transcriberDatabaseUrl}
 # disabled: no se instala ni se activa ningun contenedor ni boton en la UI.
 MIRAI_TTS_MODE=${miraiTtsMode}
 TTS_CPU_THREADS=${ttsCpuThreads}
+TTS_CPU_LIMIT=${ttsCpuLimit}
+TTS_MEMORY_LIMIT=${ttsMemoryLimit}
 MIRAI_TTS_URL=${miraiTtsUrl}
 `;
 

@@ -416,3 +416,55 @@ export function buildSmtpTestEmail({ brand = null, env = process.env }) {
 
   return { subject: "Runly ERP — Prueba de SMTP", html, text };
 }
+
+// Sent from the "Reportar bug" button (ApiErrorScreen / ErrorState) to the
+// instance's support address — never branded with the reporting company's
+// logo/colors, since the recipient is Runly's own support inbox, not the
+// company's customers. `fields` is an ordered [label, value] list so the
+// caller controls which rows appear (a plain report vs. one with company info).
+export function buildBugReportEmail({ errorMessage, description, fields = [], stackText, env = process.env }) {
+  const heading = errorMessage ? errorMessage.slice(0, 200) : "Reporte de bug";
+
+  const rows = fields
+    .filter(([, value]) => value)
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:4px 12px 4px 0;font-size:13px;color:#64748b;white-space:nowrap;vertical-align:top">${escapeHtml(label)}</td>
+          <td style="padding:4px 0;font-size:13px;color:#334155;word-break:break-word">${escapeHtml(String(value))}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const bodyHtml = `
+        <table style="border-collapse:collapse;width:100%;margin-bottom:16px">${rows}</table>
+        ${
+          description
+            ? `<p style="margin:0 0 14px 0;font-size:13px;line-height:1.6;color:#334155;white-space:pre-wrap">${escapeHtml(description)}</p>`
+            : ""
+        }
+        ${
+          stackText
+            ? `<pre style="margin:0;padding:12px;background:#0f172a;color:#e2e8f0;border-radius:10px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow:auto">${escapeHtml(stackText)}</pre>`
+            : ""
+        }`;
+
+  const html = renderRunlyEmailLayout({
+    kicker: "Reporte de bug",
+    heading,
+    bodyHtml,
+    footnote: "Este correo fue generado desde el botón \"Reportar bug\" de una instancia de Runly ERP.",
+    env,
+  });
+
+  const text = [
+    heading,
+    "",
+    ...fields.filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`),
+    "",
+    ...(description ? [description, ""] : []),
+    ...(stackText ? [stackText] : []),
+  ].join("\n");
+
+  return { subject: `[Bug] ${heading}`, html, text };
+}

@@ -11,6 +11,24 @@ describe("fcm-service", () => {
     assert.match(result.error, /no configurado/);
   });
 
+  it("returns not-configured when RUNLY_FCM_ENABLED=false, even with credentials set", async () => {
+    const prevEnabled = process.env.RUNLY_FCM_ENABLED;
+    const prevCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    process.env.RUNLY_FCM_ENABLED = "false";
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = "/run/secrets/firebase/service-account.json";
+    try {
+      const service = createFcmService({ messaging: null });
+      const result = await service.sendToToken({ token: "tok-1", payload: { title: "Hola" } });
+      assert.equal(result.ok, false);
+      assert.match(result.error, /no configurado/);
+    } finally {
+      if (prevEnabled === undefined) delete process.env.RUNLY_FCM_ENABLED;
+      else process.env.RUNLY_FCM_ENABLED = prevEnabled;
+      if (prevCreds === undefined) delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      else process.env.GOOGLE_APPLICATION_CREDENTIALS = prevCreds;
+    }
+  });
+
   it("sends via the injected messaging client", async () => {
     const sent = [];
     const service = createFcmService({

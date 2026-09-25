@@ -75,12 +75,24 @@ export function useGuestCall({ token = null, code = null, inviteToken = null }) 
 
   const fetchLivekitToken = useCallback(async () => unwrap(await runly.calls.guest.token(gtRef.current)), []);
 
-  const sendMessage = useCallback(async (body) => {
-    const res = unwrap(await runly.calls.guest.sendMessage(gtRef.current, body));
+  const sendMessage = useCallback(async (body, metadata) => {
+    const res = unwrap(await runly.calls.guest.sendMessage(gtRef.current, body, metadata));
     if (res?.message) {
       setMessages((prev) => (prev.some((m) => m.id === res.message.id) ? prev : [...prev, res.message]));
     }
   }, []);
+
+  // Presign + read for attachments in the call chat — see
+  // docs/superpowers/specs/2026-09-25-call-guest-chat-attachments-design.md.
+  const presignAttachment = useCallback(
+    async ({ fileName, mimeType, sizeBytes }) =>
+      unwrap(await runly.calls.guest.presignAttachment(gtRef.current, { fileName, mimeType, sizeBytes })),
+    [],
+  );
+  const getAttachmentUrl = useCallback(
+    async (attachmentId) => unwrap(await runly.calls.guest.getAttachmentUrl(gtRef.current, attachmentId)),
+    [],
+  );
 
   const leave = useCallback(async () => {
     if (gtRef.current) await runly.calls.guest.leave(gtRef.current).catch(() => {});
@@ -90,6 +102,6 @@ export function useGuestCall({ token = null, code = null, inviteToken = null }) 
   return {
     phase: guestPhase(state),
     state, call, livekitUrl, guests, messages, branding, joining,
-    join, fetchLivekitToken, sendMessage, leave,
+    join, fetchLivekitToken, sendMessage, leave, presignAttachment, getAttachmentUrl,
   };
 }

@@ -28,8 +28,22 @@ export const callGuestJoinSchema = z
     message: "Se requiere un enlace, código o invitación.",
   });
 
-export const callRoomMessageSchema = z.object({
-  body: z.string().trim().min(1).max(4000),
+export const callRoomMessageSchema = z
+  .object({
+    body: z.string().trim().max(4000),
+    // Set when the message carries a presigned attachment (see
+    // docs/superpowers/specs/2026-09-25-call-guest-chat-attachments-design.md).
+    // An attachment-only message sends an empty body.
+    metadata: z.object({ attachmentId: z.string().uuid() }).optional(),
+  })
+  .refine((v) => v.body.length > 0 || Boolean(v.metadata?.attachmentId), {
+    message: "El mensaje no puede estar vacío.",
+  });
+
+export const callGuestAttachmentPresignSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(255),
+  sizeBytes: z.number().int().positive(),
 });
 
 export const callGuestModerationSchema = z.object({

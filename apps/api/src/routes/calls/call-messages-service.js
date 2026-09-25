@@ -8,9 +8,11 @@ export class CallMessageError extends Error {
 
 const MAX_BODY = 4000;
 
+// An empty body is valid here (an attachment-only message) — the "body or
+// attachment" invariant is enforced by callRoomMessageSchema before this
+// service ever runs (see docs/superpowers/specs/2026-09-25-call-guest-chat-attachments-design.md).
 function cleanBody(body) {
   const b = String(body ?? "").trim();
-  if (!b) throw new CallMessageError("El mensaje no puede estar vacío.", 422);
   if (b.length > MAX_BODY) throw new CallMessageError("El mensaje es demasiado largo.", 422);
   return b;
 }
@@ -32,6 +34,7 @@ export function createCallMessagesService({ prisma, guestService = null, broadca
       senderUserId: m.senderUserId ?? null,
       body: m.body,
       createdAt: m.createdAt,
+      attachments: m.attachments ?? [],
     };
   }
 
@@ -40,8 +43,12 @@ export function createCallMessagesService({ prisma, guestService = null, broadca
   // docs/superpowers/specs/2026-09-23-call-spotlight-polish-round2-design.md
   // §8.2. Mirrors the insert+bump+broadcast pattern already used for call
   // system messages in call-service.js's postSystemMessage.
-  async function postGuestMessage({ guestToken, body }) {
+  async function postGuestMessage({ guestToken, body, metadata = {} }) {
     const clean = cleanBody(body);
+    // Redundant with callRoomMessageSchema's own refine (defense in depth for
+    // any other caller of this service) — a message needs a body or an
+    // attachment, never neither.
+    if (!clean && !metadata?.attachmentId) throw new CallMessageError("El mensaje no puede estar vacío.", 422);
     if (!guestService?.resolveAdmittedGuestForMessage) throw new CallMessageError("No disponible.", 500);
     const { guestId, callId, displayName: name } = await guestService.resolveAdmittedGuestForMessage({ guestToken });
     const call = await loadCall(callId);
@@ -53,6 +60,31 @@ export function createCallMessagesService({ prisma, guestService = null, broadca
     `;
     const messageId = rows[0].id;
     const createdAt = rows[0].created_at;
+
+    // Link a guest-presigned attachment (created by
+    // POST /calls/guest/attachments/presign) to this message. Scoped to the
+    // conversation and to rows not yet linked so a stale or foreign
+    // attachmentId is a silent no-op — mirrors chat/guest-service.js's
+    // sendGuestMessage for the website-guest path.
+    let attachments = [];
+    if (metadata?.attachmentId) {
+      const linked = await prisma.$executeRaw`
+        UPDATE chat_attachments
+        SET message_id = ${messageId}
+        WHERE id = ${metadata.attachmentId}::uuid
+          AND conversation_id = ${call.conversationId}::uuid
+          AND message_id IS NULL
+      `;
+      if (linked > 0) {
+        await prisma.$executeRaw`
+          UPDATE chat_messages SET attachment_count = attachment_count + ${linked} WHERE id = ${messageId}
+        `;
+        attachments = await prisma.$queryRaw`
+          SELECT id, file_name AS "fileName", mime_type AS "mimeType", size_bytes AS "sizeBytes"
+          FROM chat_attachments WHERE id = ${metadata.attachmentId}::uuid
+        `;
+      }
+    }
 
     await prisma.$executeRaw`
       UPDATE chat_conversations
@@ -78,7 +110,7 @@ export function createCallMessagesService({ prisma, guestService = null, broadca
       }
     }
 
-    return { message: shape({ id: messageId, senderKind: "guest", senderName: name, senderUserId: null, body: clean, createdAt }) };
+    return { message: shape({ id: messageId, senderKind: "guest", senderName: name, senderUserId: null, body: clean, createdAt, attachments }) };
   }
 
   return { postGuestMessage };

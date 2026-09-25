@@ -104,6 +104,8 @@ export default function GuestCallScreen() {
         onLeave={gc.leave}
         myName={formRef.current.name || name}
         recordingActive={gc.state.recording?.active}
+        presignAttachment={gc.presignAttachment}
+        getAttachmentUrl={gc.getAttachmentUrl}
       />
     );
   }

@@ -103,6 +103,7 @@ import { createPwaRouter } from "./routes/pwa.js";
 import { createChatRouter } from "./routes/chat/index.js";
 import { createCallsRouter } from "./routes/calls/index.js";
 import { createNotesRouter } from "./routes/notes/index.js";
+import { createSupportRouter } from "./routes/support-routes.js";
 import { createSharesService as createNotesSharesService } from "./routes/notes/shares-service.js";
 import { createCanvasService as createNotesCanvasService } from "./routes/notes/canvas-service.js";
 import { createYDocService as createNotesYDocService } from "./routes/notes/ydoc-service.js";
@@ -4509,6 +4510,7 @@ app.route("/", createChatRouter({ prisma, supabaseAdmin, authMiddleware, require
 const callsSmtpService = createSmtpService({ prisma });
 app.route("/", createCallsRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission, notificationService, broadcaster, deliveryWorker: notificationDeliveryWorker, smtpService: callsSmtpService }));
 app.route("/", createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requirePermission, broadcaster, notificationService }));
+app.route("/", createSupportRouter({ prisma, authMiddleware }));
 
 app.get("/public", (c) => {
   return c.json({

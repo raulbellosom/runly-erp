@@ -11,21 +11,20 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, useCoarsePointer,
 } from "@runly/ui";
 import {
-  Send, Paperclip, Smile, X, Loader2, AlertCircle, Mic, Plus,
-  Play, FileText, FileType2, FileSpreadsheet, FileImage, FileVideo, FileAudio,
-  FileArchive, FileCode, File as FileIcon, Link2,
+  Send, Paperclip, Smile, X, Loader2, AlertCircle, Plus, Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
 import { useChatUpload } from "../hooks/useChatUpload";
 import { useMentionCandidates } from "../hooks/useMentionCandidates";
 import { MIRAI_MENTION_ID } from "../lib/mirai";
-import { formatFileSize } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
 import { EntityReferencePicker } from "./EntityReferencePicker";
 import { DropZoneOverlay } from "./DropZoneOverlay";
 import { MessageQuote } from "./MessageQuote";
 import { ChatAttachmentViewer } from "./ChatAttachmentViewer";
+import { AttachmentPreviewCard } from "./AttachmentPreviewCard";
+import { VoiceMicButton, VoiceRecordingBar } from "./VoiceRecordingControls";
 import { mapPendingToViewerFiles, attachmentIdsToDiscard } from "../lib/pendingAttachments";
 import { ENTITY_TYPE_BY_VALUE } from "../lib/entityReferenceTypes";
 
@@ -83,157 +82,6 @@ function mimeToExt(mimeType) {
   if (mimeType.includes("ogg")) return "ogg";
   if (mimeType.includes("mp4")) return "m4a";
   return "webm";
-}
-
-function formatDuration(seconds) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = (seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
-}
-
-function fileTypeIcon(mimeType) {
-  const m = String(mimeType ?? "").toLowerCase();
-  if (m.startsWith("image/"))   return <FileImage className="h-5 w-5 text-blue-400" />;
-  if (m.startsWith("video/"))   return <FileVideo className="h-5 w-5 text-orange-400" />;
-  if (m.startsWith("audio/"))   return <FileAudio className="h-5 w-5 text-emerald-400" />;
-  if (m === "application/pdf")  return <FileText className="h-5 w-5 text-red-400" />;
-  if (m.includes("spreadsheet") || m.includes("excel")) return <FileSpreadsheet className="h-5 w-5 text-green-400" />;
-  if (m.includes("word") || m.includes("document"))     return <FileType2 className="h-5 w-5 text-blue-400" />;
-  if (m.includes("zip") || m.includes("archive") || m.includes("compressed")) return <FileArchive className="h-5 w-5 text-yellow-400" />;
-  if (m.startsWith("text/"))    return <FileCode className="h-5 w-5 text-purple-400" />;
-  return <FileIcon className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />;
-}
-
-function RemoveBtn({ onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors touch-manipulation z-10"
-      aria-label="Quitar"
-    >
-      <X className="h-3 w-3 text-white" />
-    </button>
-  );
-}
-
-function StatusOverlay({ uploading, error }) {
-  if (uploading) return (
-    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl pointer-events-none">
-      <Loader2 className="h-4 w-4 animate-spin text-white" />
-    </div>
-  );
-  if (error) return (
-    <div className="absolute inset-0 bg-red-500/40 flex items-center justify-center rounded-xl pointer-events-none">
-      <AlertCircle className="h-4 w-4 text-white" />
-    </div>
-  );
-  return null;
-}
-
-function AttachmentPreviewCard({ entry, onRemove, onOpen, onRetry }) {
-  const mime = entry.file.type;
-  const isImage = mime.startsWith("image/");
-  const isVideo = mime.startsWith("video/");
-  const isAudio = mime.startsWith("audio/");
-
-  // Shared props that turn a card body into a "ver archivo" click target.
-  const openProps = {
-    role: "button",
-    tabIndex: 0,
-    "aria-label": "Ver archivo",
-    onClick: () => onOpen?.(entry),
-    onKeyDown: (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen?.(entry); }
-    },
-  };
-
-  // ── Image thumbnail ──────────────────────────────────────────────────────
-  if (isImage && entry.objectUrl) {
-    return (
-      <div {...openProps} className="relative h-20 w-20 rounded-xl overflow-hidden shrink-0 bg-[hsl(var(--muted))] cursor-pointer">
-        <img src={entry.objectUrl} alt="" className="h-full w-full object-cover" />
-        <StatusOverlay uploading={entry.uploading} error={entry.error} />
-        <RemoveBtn onClick={() => onRemove(entry.localId)} />
-      </div>
-    );
-  }
-
-  // ── Video thumbnail ──────────────────────────────────────────────────────
-  if (isVideo) {
-    return (
-      <div {...openProps} className="relative h-20 w-20 rounded-xl overflow-hidden shrink-0 bg-black/25 cursor-pointer">
-        {entry.objectUrl && (
-          <video
-            src={`${entry.objectUrl}#t=0.001`}
-            preload="auto"
-            muted
-            playsInline
-            className="h-full w-full object-cover"
-          />
-        )}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-7 w-7 rounded-full bg-black/55 flex items-center justify-center">
-            <Play className="h-3.5 w-3.5 text-white fill-white ml-0.5" />
-          </div>
-        </div>
-        <StatusOverlay uploading={entry.uploading} error={entry.error} />
-        <RemoveBtn onClick={() => onRemove(entry.localId)} />
-      </div>
-    );
-  }
-
-  // ── Audio / voice note ───────────────────────────────────────────────────
-  if (isAudio) {
-    return (
-      <div className="relative flex items-center gap-2.5 bg-[hsl(var(--muted))] rounded-xl px-3 py-2.5 shrink-0 pr-8" style={{ maxWidth: 200 }}>
-        <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-          <Mic className="h-4 w-4 text-emerald-500" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium leading-tight">Nota de voz</p>
-          <p className="text-[10px] text-[hsl(var(--muted-foreground))] leading-tight">
-            {formatFileSize(entry.file.size)}
-            {entry.uploading && " · Subiendo..."}
-            {entry.error && (
-              // Full message in `title` (long-press/hover) — the composer
-              // used to swallow it into a bare "Error", which made an
-              // iOS-only upload failure impossible to diagnose remotely.
-              <span className="text-red-500" title={entry.error}> · Error</span>
-            )}
-          </p>
-          {entry.error && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
-              className="mt-0.5 text-[10px] font-medium text-primary underline underline-offset-2"
-            >
-              Reintentar
-            </button>
-          )}
-        </div>
-        <RemoveBtn onClick={() => onRemove(entry.localId)} />
-      </div>
-    );
-  }
-
-  // ── Generic file ─────────────────────────────────────────────────────────
-  return (
-    <div {...openProps} className="relative flex items-center gap-2.5 bg-[hsl(var(--muted))] rounded-xl px-3 py-2.5 shrink-0 pr-8 cursor-pointer" style={{ maxWidth: 200 }}>
-      <div className="h-8 w-8 rounded-full bg-[hsl(var(--border))] flex items-center justify-center shrink-0">
-        {fileTypeIcon(mime)}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium truncate leading-tight">{entry.file.name}</p>
-        <p className="text-[10px] text-[hsl(var(--muted-foreground))] leading-tight">
-          {formatFileSize(entry.file.size)}
-          {entry.uploading && " · Subiendo..."}
-          {entry.error && <span className="text-red-500"> · Error</span>}
-        </p>
-      </div>
-      <RemoveBtn onClick={() => onRemove(entry.localId)} />
-    </div>
-  );
 }
 
 export const MessageComposer = forwardRef(function MessageComposer(
@@ -884,33 +732,11 @@ export const MessageComposer = forwardRef(function MessageComposer(
 
       {/* ── Recording mode ── */}
       {recording ? (
-        <div className="chat-glass flex items-center gap-2 rounded-2xl px-3 py-2">
-          {/* Cancel */}
-          <button
-            type="button"
-            onClick={() => stopRecording(true)}
-            className="shrink-0 flex items-center justify-center rounded-full border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-red-500 hover:border-red-400 transition-colors touch-manipulation h-8 w-8"
-            title="Cancelar nota de voz"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
-          {/* Red pulse dot + timer */}
-          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-          <span className="text-sm font-mono tabular-nums flex-1 text-center">
-            {formatDuration(recordSeconds)}
-          </span>
-
-          {/* Send */}
-          <button
-            type="button"
-            onClick={() => stopRecording(false)}
-            className="shrink-0 flex items-center justify-center rounded-full bg-(--brand-primary) text-(--brand-primary-foreground) hover:opacity-90 active:scale-95 transition-[opacity,transform] touch-manipulation h-8 w-8"
-            title="Enviar nota de voz"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </div>
+        <VoiceRecordingBar
+          seconds={recordSeconds}
+          onCancel={() => stopRecording(true)}
+          onSend={() => stopRecording(false)}
+        />
       ) : (
         <div className="chat-glass flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl">
           {/* Textarea (with @mention autocomplete) — its own full-width row,
@@ -1123,18 +949,12 @@ export const MessageComposer = forwardRef(function MessageComposer(
 
             {/* Mic — only shown when there's nothing else ready to send */}
             {!body.trim() && !pendingFiles.length && !pendingEntityRefs.length && (
-              <button
-                type="button"
-                onClick={startRecording}
+              <VoiceMicButton
+                btnSize={btnSize}
+                iconSize={iconSize}
                 disabled={disabled}
-                className={[
-                  "shrink-0 flex items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))] transition-colors touch-manipulation",
-                  btnSize,
-                ].join(" ")}
-                title="Nota de voz"
-              >
-                <Mic className={iconSize} />
-              </button>
+                onClick={startRecording}
+              />
             )}
 
             <div className="flex-1" />

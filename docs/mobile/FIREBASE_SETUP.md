@@ -49,7 +49,7 @@ GOOGLE_APPLICATION_CREDENTIALS=D:/path/to/runly/.secrets/firebase/service-accoun
 RUNLY_ANDROID_GOOGLE_SERVICES_JSON=D:/path/to/runly/.secrets/firebase/google-services.json
 ```
 
-Mantener `RUNLY_FCM_ENABLED=false` durante esta preparación. El interruptor todavía no tiene consumidor implementado. No hay que migrar la autenticación, los datos ni las llamadas de Runly a Firebase para usar FCM.
+Mantener `RUNLY_FCM_ENABLED=false` durante esta preparación. **Actualización 2026-09-24**: el interruptor ya tiene consumidor (`fcm-service.js`, mismo patrón kill-switch que `CHAT_MIRAI_WEB`) — con `false` explícito, el envío se desactiva aunque la credencial esté montada; sin la variable (o en `true`), el comportamiento sigue siendo el mismo de siempre: solo depende de que exista `GOOGLE_APPLICATION_CREDENTIALS`. En esta etapa de preparación, antes de tener la credencial real, el valor de la variable no cambia nada. No hay que migrar la autenticación, los datos ni las llamadas de Runly a Firebase para usar FCM.
 
 ## Archivos locales y producción
 
@@ -72,12 +72,12 @@ node lib/firebase-config.mjs .env.external
 Después copia mediante SFTP/SCP el JSON privado a `.secrets/firebase/service-account.json` dentro de esa carpeta y limita su lectura al usuario de despliegue (`chmod 600 .secrets/firebase/service-account.json` en Linux). Completa en `.env.external`:
 
 ```dotenv
-RUNLY_FCM_ENABLED=false
+RUNLY_FCM_ENABLED=true
 FIREBASE_PROJECT_ID=tu-id-real-del-proyecto
 GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase/service-account.json
 ```
 
-No copies el `.env` de Windows al VPS: las rutas y el resto de la configuración de producción son diferentes. El instalador utiliza la ruta de contenedor indicada arriba; cuando FCM está habilitado valida que exista una cuenta de servicio con clave RSA y proyecto coincidente antes de iniciar Runly. Todavía hay que implementar y desplegar el runtime FCM; subir la credencial y preparar las variables no activa las notificaciones.
+No copies el `.env` de Windows al VPS: las rutas y el resto de la configuración de producción son diferentes. El instalador utiliza la ruta de contenedor indicada arriba; cuando FCM está habilitado valida que exista una cuenta de servicio con clave RSA y proyecto coincidente antes de iniciar Runly. **Actualización 2026-09-24**: el runtime FCM (envío desde la cola, endpoints de suscripción, receptor Android) ya está implementado y su migración (`20260921010000_fcm_device_token`) ya se verificó aplicada contra la base de datos de desarrollo real — lo que falta es republicar/redesplegar esos servicios en este VPS con la credencial real montada, y compilar+instalar un APK que incluya el receptor, para ver una notificación de llamada real llegar en segundo plano en un dispositivo físico.
 
 La configuración Android se utiliza al compilar y sus identificadores quedan en la app; la cuenta de servicio permanece exclusivamente en el servidor. Cambiar las variables de entorno del servidor no configura un APK ya instalado.
 

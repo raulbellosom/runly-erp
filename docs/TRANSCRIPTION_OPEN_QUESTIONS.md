@@ -13,13 +13,12 @@ Solo se listan aquí decisiones que **no pueden resolverse inspeccionando el có
 
 ---
 
-## 1. 🟡 Nivel de acceso a una transcripción — ¿igual que grabaciones, o más estricto?
+## 1. 🟢 Nivel de acceso a una transcripción — ¿igual que grabaciones, o más estricto?
 
-**Actualización (revisión 2):** el usuario indicó una dirección clara — **más estricto que grabaciones**. `TRANSCRIPTION_SPEC.md` §5.1 ya adopta esta dirección: acceso restringido a quien solicitó la transcripción, a quien participó realmente en esa llamada (`CallParticipant`, no solo miembro actual de la conversación), o a quien tenga el nuevo permiso de administración `chat.calls.transcript.manage`. Los invitados externos (`CallGuest`) quedan propuestos sin acceso posterior alguno a transcripciones, a diferencia de las grabaciones.
+**Actualización (revisión 3, 2026-09-24) — confirmado por el usuario, cerrada:** más estricto que grabaciones, sin excepción. `TRANSCRIPTION_SPEC.md` §5.1 ya implementa esta dirección: acceso restringido a quien solicitó la transcripción, a quien participó realmente en esa llamada (`CallParticipant`, no solo miembro actual de la conversación), o a quien tenga el permiso de administración `chat.calls.transcript.manage`.
 
-**Lo que sigue pendiente de validación explícita antes de construir la API de producción** (por eso sigue listada aquí, no se cierra del todo):
-1. Confirmar que excluir por completo a los invitados externos del acceso a transcripciones (incluso mediante un enlace) es efectivamente lo que se quiere, y no solo una propuesta razonable de este análisis.
-2. Confirmar el criterio exacto para "usuario autorizado" más allá de "participó en la llamada" — el encargo original menciona explícitamente "usuarios expresamente autorizados" como una categoría adicional a "participantes", sin detallar qué la distingue de tener el permiso `chat.calls.transcript.manage`. Podría ser lo mismo, o podría implicar un mecanismo de autorización puntual por transcripción (ej. "compartir esta transcripción con X persona específica", análogo a compartir un archivo) que hoy no está diseñado.
+1. **Invitados externos (`CallGuest`): confirmado sin acceso alguno**, ni siquiera mediante enlace. Es el comportamiento ya implementado, ninguna acción de código pendiente.
+2. **"Usuario expresamente autorizado" confirmado como equivalente a tener `chat.calls.transcript.manage`** — no se requiere un mecanismo de compartir puntual por transcripción (tipo compartir-archivo). Ya implementado tal cual, sin cambio de código pendiente.
 
 ---
 
@@ -57,11 +56,9 @@ Solo se listan aquí decisiones que **no pueden resolverse inspeccionando el có
 
 ---
 
-## 6. 🟡 Retención de la transcripción — mecanismo decidido, valor numérico pendiente
+## 6. 🟢 Retención de la transcripción — mecanismo y valor confirmados
 
-**Actualización (revisión 2):** el usuario confirmó la dirección (b) de la revisión 1 — la transcripción **no** debe expirar automáticamente junto con su grabación de origen; necesita una retención propia. `TRANSCRIPTION_SPEC.md` §5.7 ya diseña el mecanismo: un valor configurable en `InstanceConfig` (tabla clave-valor ya usada en el repo, ver `growth-retention-worker.js`), en vez de heredar `CallRecording.expiresAt`.
-
-**Lo que sigue genuinamente pendiente de aprobación de producto** (el usuario fue explícito: "no establezcas automáticamente una retención indefinida" ni asumas un número):
-1. **El valor numérico por defecto** — ¿90 días como las grabaciones, algo más largo dado que el texto es barato de almacenar, o indefinido sujeto a borrado manual? Este análisis no fija ninguno de los tres sin que el usuario lo confirme.
-2. **Alcance por empresa vs. por instancia** — `InstanceConfig` es una tabla a nivel de instancia completa, no por empresa individual. Si el usuario quiere que distintas empresas de una misma instalación de Runly tengan políticas de retención distintas (mencionado como posibilidad — "no asumas que todas las empresas tendrán las mismas necesidades"), el mecanismo de `InstanceConfig` no alcanza y haría falta una columna nueva en `Company` u otra tabla de configuración por empresa que hoy no existe. Confirmar si esto es necesario desde V1 o puede quedar como una limitación conocida a resolver más adelante.
-3. **Requisitos legales/de cumplimiento específicos** — si existe algún requisito conocido de la jurisdicción del usuario o de sus clientes que obligue a un plazo concreto (o a poder configurarlo por empresa desde el día uno), es información que el usuario tiene y el código no puede tener.
+**Actualización (revisión 3, 2026-09-24) — confirmado por el usuario, cerrada:**
+1. **Valor numérico por defecto: 365 días** (más largo que los 90 de las grabaciones, dado que el texto es barato de almacenar). `DEFAULT_RETENTION_DAYS` en `call-transcript-service.js` actualizado de 90 a 365; test correspondiente actualizado.
+2. **Alcance: por instancia**, no por empresa. `InstanceConfig` (`transcription.retentionDays`) es suficiente para V1; no se necesita una columna/tabla de configuración por empresa. Queda como limitación conocida si en el futuro se pide diferenciar por empresa, no como algo a resolver ahora.
+3. Sin requisito legal/de cumplimiento específico reportado por el usuario que exija un plazo distinto.

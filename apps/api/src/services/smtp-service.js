@@ -140,7 +140,7 @@ export function createSmtpService({ prisma, companyId: defaultCompanyId = null, 
   // company-branded transactional email — the from-EMAIL always stays the
   // SMTP-authenticated address (config.fromEmail), never the override, so
   // SPF/DKIM/DMARC alignment for that domain is never broken by branding.
-  async function sendEmail({ to, subject, html, text, fromName, companyId = defaultCompanyId }) {
+  async function sendEmail({ to, subject, html, text, fromName, attachments, companyId = defaultCompanyId }) {
     const config = await getConfig(companyId)
     if (!config) throw new Error('SMTP no configurado')
 
@@ -164,6 +164,7 @@ export function createSmtpService({ prisma, companyId: defaultCompanyId = null, 
       subject,
       html,
       text,
+      ...(attachments?.length ? { attachments } : {}),
     })
   }
 

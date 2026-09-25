@@ -27,6 +27,7 @@ import { applyBrandTheme } from "../lib/brandTheme";
 import { registerServiceWorker } from "../lib/webPush";
 import { BootLoaderOverlay } from "../components/BootLoaderOverlay";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { BugReportHost } from "../components/BugReportHost";
 import { useBootLoader } from "../stores/bootLoader";
 import { useBrandingStore } from "../stores/branding";
 import { useThemeStore } from "../stores/theme";
@@ -142,6 +143,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
             <BrowserRouter>
               <AuthProvider>
                 <OfficeProvider>
+                <BugReportHost />
                 <Routes>
                   <Route path="/" element={<PublicWebsiteEntry />} />
                   <Route path="/app/setup" element={<AppRouteGuard mode="setup" />} />

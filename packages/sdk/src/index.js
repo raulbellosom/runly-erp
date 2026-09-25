@@ -98,6 +98,15 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
 
   return {
     settings: createSettingsDomain({ request, withAuthHeaders }),
+    support: {
+      reportBug: (data, token) =>
+        request("/support/report-bug", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(data),
+          onlineOnly: true,
+        }),
+    },
     health: () => request("/health"),
     instance: { status: () => request("/instance/status") },
     setup: {
