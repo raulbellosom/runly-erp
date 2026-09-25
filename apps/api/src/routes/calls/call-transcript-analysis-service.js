@@ -198,6 +198,32 @@ export function createCallTranscriptAnalysisService({
     return defaultStatus.id;
   }
 
+  // Mirrors requireProjectAccess's real authorization shape (see
+  // projects-routes.js) since commitProposals calls tasksService.createTask
+  // directly, bypassing that HTTP middleware entirely: tasksService's own
+  // validateTargets only confirms the project *exists*, with no companyId or
+  // membership check, so without this the transcript-analysis permission
+  // alone would let a caller create a Task in any project in any company by
+  // supplying an arbitrary projectId in acceptedActionItems.
+  async function assertProjectAccess(projectId, profileId, companyId) {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId },
+      select: { id: true, companyId: true, ownerId: true },
+    });
+    if (!project || project.companyId !== companyId) {
+      throw new CallTranscriptAnalysisError("Proyecto no encontrado.", 404);
+    }
+    if (project.ownerId === profileId) return;
+    const member = await prisma.projectMember.findFirst({ where: { projectId, userId: profileId }, select: { role: true } });
+    // Same minimum as the real task-creation route, requireProjectAccess('MEMBER')
+    // in projects-routes.js — a project VIEWER can read but not create tasks
+    // through the normal API, so this path must not let them do it either.
+    const PROJECT_ROLE_RANK = { VIEWER: 1, MEMBER: 2, OWNER: 3 };
+    if (!member || (PROJECT_ROLE_RANK[member.role] ?? 0) < PROJECT_ROLE_RANK.MEMBER) {
+      throw new CallTranscriptAnalysisError("No tienes acceso suficiente en ese proyecto.", 403);
+    }
+  }
+
   // Known V1 limitations (not implemented in this pass, no hecho a proposito):
   // - No idempotency/dedup guard against double-submitting the same accepted
   //   items — would need tracking committed indices, not just the resulting
@@ -205,8 +231,11 @@ export function createCallTranscriptAnalysisService({
   // - No shared Groq-JSON-client extraction with ai-import-extraction.js's
   //   near-identical callGroqText — pre-existing duplication pattern in this
   //   codebase, not a regression introduced here.
-  // SECURITY: see the note above analyzeTranscript — same caller-enforced
-  // access-check invariant applies here, not just token verification.
+  // - The persisted analysis is not currently read back anywhere (no GET
+  //   route/query includes the `analysis` relation) — reopening a transcript
+  //   re-runs Groq instead of showing the stored draft, which is the
+  //   opposite of what spec §7.1 says persistence is for. A real gap, not by
+  //   design — deferred here for scope, not forgotten.
   async function commitProposals({ transcriptId, profileId, proofToken, acceptedActionItems, acceptedEvents }) {
     const transcript = await prisma.callTranscript.findUnique({ where: { id: transcriptId } });
     if (!transcript) throw new CallTranscriptAnalysisError("Transcripción no encontrada.", 404);
@@ -233,6 +262,7 @@ export function createCallTranscriptAnalysisService({
         continue;
       }
       try {
+        await assertProjectAccess(item.projectId, profileId, transcript.companyId);
         const statusId = await getDefaultStatusId(item.projectId);
         const task = await tasksService.createTask(item.projectId, profileId, {
           title: source.text,

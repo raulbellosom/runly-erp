@@ -13,7 +13,17 @@ function fakeGroqResponse(obj) {
   };
 }
 
-function basePrisma({ transcript, segments, analysis = null }) {
+// Default fixtures below assume companyId "c1" and profileId "u1" (the
+// values every test but the cross-company one uses), so existing tests keep
+// passing without repeating this boilerplate: "proj-1" belongs to "c1" and
+// "u1" is a real (non-owner) ProjectMember on it.
+function basePrisma({
+  transcript,
+  segments,
+  analysis = null,
+  projects = [{ id: "proj-1", companyId: "c1", ownerId: "someone-else" }],
+  projectMembers = [{ projectId: "proj-1", userId: "u1", role: "MEMBER" }],
+}) {
   let savedAnalysis = analysis;
   return {
     callTranscript: {
@@ -32,6 +42,13 @@ function basePrisma({ transcript, segments, analysis = null }) {
     },
     taskStatus: {
       findFirst: async ({ where }) => (where.projectId ? { id: "status-default" } : null),
+    },
+    project: {
+      findFirst: async ({ where }) => projects.find((p) => p.id === where.id) ?? null,
+    },
+    projectMember: {
+      findFirst: async ({ where }) =>
+        projectMembers.find((m) => m.projectId === where.projectId && m.userId === where.userId) ?? null,
     },
   };
 }
@@ -177,5 +194,92 @@ describe("call-transcript-analysis-service.commitProposals", () => {
     assert.equal(result.skippedActionItems[0].index, 5);
     assert.match(result.skippedActionItems[0].reason, /indice/);
     assert.ok(result.analysis.committedAt, "still records the commit for the item that did succeed");
+  });
+
+  it("rejects an accepted action item whose project belongs to a different company, but still commits a same-company item", async () => {
+    const { signAiProof } = await import("../../../lib/ai-proof-token.js");
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = {
+      id: "an-1", transcriptId: "t1", companyId: "c1",
+      actionItems: [{ text: "Tarea del proyecto propio" }, { text: "Tarea de otra empresa" }],
+      proposedEvents: [],
+      committedAt: null, committedTaskIds: null, committedEventIds: null,
+    };
+    // "proj-1" is in the caller's own company ("c1") and "u1" is a real
+    // ProjectMember on it. "proj-2" belongs to a different company ("c2")
+    // entirely — this is the cross-tenant task-injection path the fix closes.
+    const prisma = basePrisma({
+      transcript, segments: [], analysis,
+      projects: [
+        { id: "proj-1", companyId: "c1", ownerId: "someone-else" },
+        { id: "proj-2", companyId: "c2", ownerId: "someone-else" },
+      ],
+      projectMembers: [{ projectId: "proj-1", userId: "u1", role: "MEMBER" }],
+    });
+    const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
+    const createdTasks = [];
+    const tasksService = {
+      createTask: async (projectId, createdBy, data) => {
+        const task = { id: `task-${createdTasks.length}`, projectId, createdBy, ...data };
+        createdTasks.push(task);
+        return task;
+      },
+    };
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService, calendarService: {} });
+
+    const result = await service.commitProposals({
+      transcriptId: "t1", profileId: "u1", proofToken,
+      acceptedActionItems: [
+        { index: 0, projectId: "proj-1" },
+        { index: 1, projectId: "proj-2" }, // different company — must be rejected
+      ],
+      acceptedEvents: [],
+    });
+
+    assert.equal(createdTasks.length, 1);
+    assert.equal(createdTasks[0].projectId, "proj-1");
+    assert.equal(result.createdTasks.length, 1);
+    assert.equal(result.skippedActionItems.length, 1);
+    assert.equal(result.skippedActionItems[0].index, 1);
+    assert.match(result.skippedActionItems[0].reason, /no encontrado|acceso/i);
+    assert.equal(createdTasks.some((t) => t.projectId === "proj-2"), false);
+  });
+
+  it("rejects a same-company action item when the caller is only a VIEWER on that project", async () => {
+    const { signAiProof } = await import("../../../lib/ai-proof-token.js");
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = {
+      id: "an-1", transcriptId: "t1", companyId: "c1",
+      actionItems: [{ text: "Tarea que un viewer no deberia poder crear" }],
+      proposedEvents: [],
+      committedAt: null, committedTaskIds: null, committedEventIds: null,
+    };
+    const prisma = basePrisma({
+      transcript, segments: [], analysis,
+      projects: [{ id: "proj-1", companyId: "c1", ownerId: "someone-else" }],
+      // "u1" is a real ProjectMember, but only VIEWER — same as a real
+      // requireProjectAccess('MEMBER') rejection on the normal task route.
+      projectMembers: [{ projectId: "proj-1", userId: "u1", role: "VIEWER" }],
+    });
+    const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
+    const createdTasks = [];
+    const tasksService = {
+      createTask: async (projectId, createdBy, data) => {
+        const task = { id: `task-${createdTasks.length}`, projectId, createdBy, ...data };
+        createdTasks.push(task);
+        return task;
+      },
+    };
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService, calendarService: {} });
+
+    const result = await service.commitProposals({
+      transcriptId: "t1", profileId: "u1", proofToken,
+      acceptedActionItems: [{ index: 0, projectId: "proj-1" }],
+      acceptedEvents: [],
+    });
+
+    assert.equal(createdTasks.length, 0);
+    assert.equal(result.skippedActionItems.length, 1);
+    assert.match(result.skippedActionItems[0].reason, /acceso suficiente/i);
   });
 });
