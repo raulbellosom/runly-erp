@@ -35,3 +35,29 @@ export const callRoomMessageSchema = z.object({
 export const callGuestModerationSchema = z.object({
   muted: z.boolean(),
 });
+
+export const callTranscriptCommitProposalsSchema = z.object({
+  proofToken: z.string().min(1),
+  acceptedActionItems: z
+    .array(
+      z.object({
+        index: z.number().int().nonnegative(),
+        projectId: z.string().uuid(),
+        assigneeUserId: z.string().uuid().nullish(),
+        dueDate: z.string().nullish(),
+      }),
+    )
+    .default([]),
+  // calendarId is a deliberate elaboration of TRANSCRIPTION_SPEC.md §7.3's
+  // `{ index }`-only shape — CalendarEvent.calendarId is NOT NULL
+  // (calendar-event-service.js createEvent), so an accepted event needs a
+  // target calendar the same way an accepted task needs a projectId.
+  acceptedEvents: z
+    .array(
+      z.object({
+        index: z.number().int().nonnegative(),
+        calendarId: z.string().uuid(),
+      }),
+    )
+    .default([]),
+});
