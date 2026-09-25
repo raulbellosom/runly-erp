@@ -10,6 +10,7 @@ import { playCallSound } from '../modules/runly.chat/calls/callSounds'
 import { useChatFloatStore } from '../modules/runly.chat/store/chatFloatStore'
 import { useNotificationSoundStore } from '../stores/notificationSound'
 import { notificationKey, claimNotification } from '../lib/notificationDedup'
+import { trackToastHoverRead } from '../lib/toastHoverRead'
 import { getStoredWebPushSubscriptionId } from '../lib/webPush'
 import { runly } from '../lib/runly'
 
@@ -124,10 +125,28 @@ export function RealtimeProvider({ children }) {
         // raw broadcast for the same message, so showing this toast too would
         // double it.
         if (payload.eventType !== 'chat.message.new') {
+          const toastDuration = 6000
+          // Facebook-style "hover to read": resting the pointer on the toast
+          // (not just brushing past it) marks the underlying notification
+          // read, same as opening it. Only safe when sourceType/sourceId are
+          // present — markReadBySource matches ALL of the user's unread
+          // notifications for that source, so a null/null pair would read
+          // far more than this one toast.
+          if (payload.sourceType && payload.sourceId) {
+            trackToastHoverRead(dupKey, () => {
+              const currentToken = sessionRef.current?.access_token
+              if (!currentToken) return
+              runly.notifications
+                .markReadBySource(currentToken, payload.sourceType, payload.sourceId)
+                .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+                .catch(() => {})
+            }, toastDuration)
+          }
           toast(payload.title, {
             description: payload.body ?? undefined,
-            duration: 6000,
+            duration: toastDuration,
             action: payload.link ? { label: 'Ver', onClick: handleClick } : undefined,
+            testId: payload.sourceType && payload.sourceId ? dupKey : undefined,
           })
         }
       })

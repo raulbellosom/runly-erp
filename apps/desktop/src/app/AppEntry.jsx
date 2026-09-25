@@ -144,6 +144,15 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
               <AuthProvider>
                 <OfficeProvider>
                 <BugReportHost />
+                {/* Inner boundary: a render crash anywhere in the routed tree
+                    (e.g. a screen crash below) must not unmount BugReportHost
+                    too — it sits above this boundary as a sibling. Without
+                    this, the outer ErrorBoundary in renderApp() below catches
+                    every crash by tearing down the ENTIRE app including
+                    BugReportHost, so "Reportar bug" on the resulting
+                    ApiErrorScreen calls requestBugReport() with no listener
+                    left registered and silently does nothing. */}
+                <ErrorBoundary>
                 <Routes>
                   <Route path="/" element={<PublicWebsiteEntry />} />
                   <Route path="/app/setup" element={<AppRouteGuard mode="setup" />} />
@@ -192,6 +201,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
                   </Route>
                   <Route path="*" element={<PublicWebsiteEntry />} />
                 </Routes>
+                </ErrorBoundary>
                 </OfficeProvider>
               </AuthProvider>
               <Toaster />

@@ -32,7 +32,11 @@ function useCalendarOptions(open) {
     enabled: Boolean(open && session?.access_token),
     queryFn: () => runly.calendar.listCalendars(session.access_token),
   });
-  return (unwrap(data) ?? []).map((c) => ({ value: c.id, label: c.name }));
+  // listCalendars resolves to { owned, shared }, not a flat array (same
+  // shape consumed via calData?.owned/shared in useCalendarData.js callers) —
+  // treating it as an array here threw "(... ?? []).map is not a function".
+  const calendars = unwrap(data);
+  return [...(calendars?.owned ?? []), ...(calendars?.shared ?? [])].map((c) => ({ value: c.id, label: c.name }));
 }
 
 // transcriptId only (no conversationId prop): useAnalyzeTranscript/
