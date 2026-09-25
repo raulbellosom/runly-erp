@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Send, Paperclip, X, Download, Loader2 } from "lucide-react";
+import { renderRichText } from "@runly/ui";
 import { groupConsecutiveBySender } from "./lib/roomChat";
+
+// Dark-locked variant of the shared code styling (this surface never uses the
+// app's --muted/--border CSS variables — see the component doc comment below).
+const RICH_TEXT_CODE_CLASS = "rounded bg-white/15 px-1 py-0.5 font-mono text-[0.85em]";
 
 function timeLabel(iso) {
   try {
@@ -145,16 +150,24 @@ function MessageRow({ m, mine, onResolveAttachmentUrl }) {
         {fused ? (
           <div className={`w-full overflow-hidden ${radius} ${mine ? "bg-violet-600" : "bg-white/10"}`}>
             <AttachmentImage attachment={fused} onResolveUrl={onResolveAttachmentUrl} rounded={false} />
-            <p className="whitespace-pre-wrap wrap-break-word px-3 py-2 text-sm text-white">{m.body}</p>
+            <div className="px-3 py-2 text-sm text-white">
+              {renderRichText(m.body, {
+                codeClassName: RICH_TEXT_CODE_CLASS,
+                paragraphClassName: "whitespace-pre-wrap wrap-break-word",
+              })}
+            </div>
           </div>
         ) : m.body ? (
-          <span
-            className={`whitespace-pre-wrap wrap-break-word px-3 py-1.5 text-sm ${radius} ${
+          <div
+            className={`px-3 py-1.5 text-sm ${radius} ${
               mine ? "bg-violet-600 text-white" : "bg-white/10 text-slate-100"
             }`}
           >
-            {m.body}
-          </span>
+            {renderRichText(m.body, {
+              codeClassName: RICH_TEXT_CODE_CLASS,
+              paragraphClassName: "whitespace-pre-wrap wrap-break-word",
+            })}
+          </div>
         ) : null}
         {standaloneImages.map((att) => (
           <div key={att.id} className={`w-full max-w-[16rem] overflow-hidden ${bubbleRadius(mine, true, true)}`}>
@@ -168,16 +181,21 @@ function MessageRow({ m, mine, onResolveAttachmentUrl }) {
   );
 }
 
-// Presentational plain-text room chat. No markdown, no mentions, no HTML —
-// file attachments are the one exception (see AttachmentImage/AttachmentFile
-// above). Always rendered inside a dark call surface (member CallRoom + guest
-// GuestCallRoom, both bg-slate-950), and guests force a light page theme — so
-// this component is deliberately dark-locked instead of using app theme tokens.
+// Presentational room chat. Supports the same *bold*/_italic_/~strike~/
+// `code`/list formatting as the main chat (renderRichText) — with the same
+// Ctrl/Cmd+B/I/Shift+X/Shift+M shortcuts — but deliberately still no mentions
+// (this is the guest's lightweight chat; guests have no member list to
+// mention) and no other HTML. File attachments are the one further exception
+// (see AttachmentImage/AttachmentFile above). Always rendered inside a dark
+// call surface (member CallRoom + guest GuestCallRoom, both bg-slate-950),
+// and guests force a light page theme — so this component is deliberately
+// dark-locked instead of using app theme tokens.
 export function RoomChatView({ messages, onSend, notice, currentName, onUploadFile, onResolveAttachmentUrl }) {
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(null); // { attachmentId, fileName } | null
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const textareaRef = useRef(null);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const endRef = useRef(null);
   const listRef = useRef(null);
@@ -240,6 +258,37 @@ export function RoomChatView({ messages, onSend, notice, currentName, onUploadFi
     setPending(null);
   }
 
+  // Same formatting shortcuts as the main chat composer — wraps the current
+  // selection (or just places the cursor between the marks) in the marker
+  // pair. This is a plain <textarea> (no MentionTextarea here), so it can
+  // read/set selection directly instead of going through an imperative handle.
+  function wrapDraftSelection(markStart, markEnd = markStart) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart ?? draft.length;
+    const end = ta.selectionEnd ?? draft.length;
+    const before = draft.slice(0, start);
+    const selected = draft.slice(start, end);
+    const after = draft.slice(end);
+    setDraft(`${before}${markStart}${selected}${markEnd}${after}`);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const newStart = start + markStart.length;
+      ta.setSelectionRange(newStart, newStart + selected.length);
+    });
+  }
+
+  function handleDraftKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) { submit(e); return; }
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (key === "b") { e.preventDefault(); wrapDraftSelection("*"); return; }
+    if (key === "i") { e.preventDefault(); wrapDraftSelection("_"); return; }
+    if (e.shiftKey && key === "x") { e.preventDefault(); wrapDraftSelection("~"); return; }
+    if (e.shiftKey && key === "m") { e.preventDefault(); wrapDraftSelection("`"); return; }
+  }
+
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-slate-950 text-slate-100">
       {notice && (
@@ -297,9 +346,10 @@ export function RoomChatView({ messages, onSend, notice, currentName, onUploadFi
           </>
         )}
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) submit(e); }}
+          onKeyDown={handleDraftKeyDown}
           rows={1}
           placeholder="Mensaje..."
           className="max-h-24 min-h-[38px] flex-1 resize-none rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-white/30"

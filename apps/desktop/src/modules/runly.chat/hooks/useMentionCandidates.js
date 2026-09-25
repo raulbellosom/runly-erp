@@ -36,7 +36,7 @@ export function useMentionCandidates(conversationId, currentUserId) {
       miraiStatus?.available === true &&
       convType !== "mirai" &&
       convType !== "external_support"
-        ? [{ id: MIRAI_MENTION_ID, displayName: MIRAI_NAME }]
+        ? [{ id: MIRAI_MENTION_ID, displayName: MIRAI_NAME, kind: "assistant" }]
         : [];
 
     // Excludes guest members (userId is NULL for a chat_conversation_members row
@@ -50,14 +50,14 @@ export function useMentionCandidates(conversationId, currentUserId) {
       .filter((m) => m.userId && m.userId !== currentUserId)
       .map((m) => ({ id: m.userId, displayName: m.displayName ?? "Usuario", avatarUrl: m.avatarUrl, email: m.email }));
 
-    const roleCandidates = roles.map((r) => ({ id: r.id, displayName: r.name }));
+    const roleCandidates = roles.map((r) => ({ id: r.id, displayName: r.name, kind: "role" }));
 
     const sentinelCandidates = [];
     if (roleHasPermission(ownMember, CHAT_PERMISSIONS.MENTIONS_EVERYONE)) {
-      sentinelCandidates.push({ id: EVERYONE_MENTION_ID, displayName: "everyone" });
+      sentinelCandidates.push({ id: EVERYONE_MENTION_ID, displayName: "everyone", kind: "sentinel" });
     }
     if (roleHasPermission(ownMember, CHAT_PERMISSIONS.MENTIONS_HERE)) {
-      sentinelCandidates.push({ id: HERE_MENTION_ID, displayName: "here" });
+      sentinelCandidates.push({ id: HERE_MENTION_ID, displayName: "here", kind: "sentinel" });
     }
 
     return [...miraiCandidate, ...memberCandidates, ...roleCandidates, ...sentinelCandidates];

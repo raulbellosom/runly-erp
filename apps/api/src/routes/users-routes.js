@@ -23,6 +23,7 @@ export function createUsersRouter({ prisma, requirePermission }) {
         INNER JOIN membership m ON m.user_id = p.id AND m.enabled = true
         WHERE m.company_id = ${companyId}::uuid
           AND p.id != ${actorId}::uuid
+          AND p.is_bot = false
           AND (
             p.display_name ILIKE ${pattern}
             OR p.email ILIKE ${pattern}

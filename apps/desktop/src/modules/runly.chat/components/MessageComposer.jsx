@@ -578,7 +578,19 @@ export const MessageComposer = forwardRef(function MessageComposer(
       // (matches WhatsApp / Telegram / every mobile chat). Only Enter-to-send
       // on a real keyboard.
       if (coarse) return;
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); return; }
+      // WhatsApp Desktop's own formatting shortcuts — Ctrl/Cmd+B bold,
+      // +I italic, +Shift+X strikethrough, +Shift+M monospace. Wraps the
+      // current selection (or just places the cursor between the marks) via
+      // MentionTextarea's wrapSelection.
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === "b") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("*"); return; }
+        if (key === "i") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("_"); return; }
+        if (e.shiftKey && key === "x") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("~"); return; }
+        if (e.shiftKey && key === "m") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("`"); return; }
+      }
     },
     [handleSend, coarse],
   );

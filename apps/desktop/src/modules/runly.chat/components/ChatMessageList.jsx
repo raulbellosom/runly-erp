@@ -609,7 +609,7 @@ export function ChatMessageList({
             // "Leer en voz alta" — AI-authored messages only (MirAI, wherever it
             // posts: the dedicated conversation, the panel, or an @MirAI mention
             // in a channel), never a human's own message — same signal
-            // ChatMessageBubble already uses for AssistantMarkdown.
+            // ChatMessageBubble uses to skip search-highlighting its own answers.
             <ChatMessageBubble
               key={item.id}
               message={item}

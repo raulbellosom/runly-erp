@@ -295,6 +295,7 @@ export {
   renderMentionText,
   parseMentionIds,
 } from "./components/MentionTextarea.jsx";
+export { renderRichText } from "./lib/chatRichText.jsx";
 export { CommentThread } from "./components/CommentThread.jsx";
 
 export { OfflineIndicator } from "./components/OfflineIndicator.jsx";

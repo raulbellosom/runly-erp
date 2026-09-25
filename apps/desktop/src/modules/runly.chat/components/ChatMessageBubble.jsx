@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  AssistantWordmark, renderMentionText, useLongPress, useSwipeToReply, useCoarsePointer, useIsMobile,
+  AssistantWordmark, renderMentionText, renderRichText, useLongPress, useSwipeToReply, useCoarsePointer, useIsMobile,
 } from "@runly/ui";
 import { formatMessageTime } from "../lib/chatUtils";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -21,7 +21,6 @@ import { CallLogCard } from "./CallLogCard";
 import { getCallMeta, getRecordingMeta } from "./callLogMeta";
 import { RecordingReadyCard } from "./RecordingReadyCard";
 import { MessageActionSheet } from "./MessageActionSheet";
-import { AssistantMarkdown } from "./AssistantMarkdown";
 import { buildMessageActions } from "../lib/messageActions";
 
 // Block native text selection app-wide the instant a touch lands on a message
@@ -208,61 +207,6 @@ function MessageActions({
   );
 }
 
-// ── Search text highlight ──────────────────────────────────────────────────────
-// NOTE: despite the name/original design, this is the render path for EVERY
-// real (non-system) message body, not just search results — it's called
-// unconditionally at both call sites below with `query={searchQuery}`, which
-// is "" whenever the user isn't actively searching. So mention-chip rendering
-// has to live HERE (composed with the existing substring highlight), not in a
-// separate "plain" render path — there isn't one for real messages.
-// Highlights the query only at WORD STARTS (mirrors the server's `\m<tok>`
-// predicate) so a common short query like "la" marks the word, not the "la"
-// inside "Michael" / "canción" — which is what made the count and the visible
-// marks disagree.
-function highlightRegex(query) {
-  const escaped = String(query).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!escaped) return null;
-  try {
-    return new RegExp("\\b" + escaped, "gi");
-  } catch {
-    return null;
-  }
-}
-
-function HighlightedText({ text, query }) {
-  if (!text) return null;
-  const mentionParts = renderMentionText(text);
-  const parts = Array.isArray(mentionParts) ? mentionParts : [mentionParts ?? text];
-  const re = query ? highlightRegex(query) : null;
-  if (!re) return <>{parts}</>;
-
-  const highlighted = [];
-  let key = 0;
-  for (const part of parts) {
-    if (typeof part !== "string") {
-      // Already a mention chip <span> from renderMentionText — pass through
-      // unchanged rather than searching for query matches inside its markup.
-      highlighted.push(part);
-      continue;
-    }
-    re.lastIndex = 0;
-    let lastIndex = 0;
-    let m;
-    while ((m = re.exec(part)) !== null) {
-      if (m.index > lastIndex) highlighted.push(part.slice(lastIndex, m.index));
-      highlighted.push(
-        <mark key={`hl-${key++}`} className="bg-yellow-300 text-black rounded-xs px-0.5">
-          {m[0]}
-        </mark>,
-      );
-      lastIndex = m.index + m[0].length;
-      if (re.lastIndex === m.index) re.lastIndex += 1; // zero-width guard
-    }
-    if (lastIndex < part.length) highlighted.push(part.slice(lastIndex));
-  }
-  return <>{highlighted}</>;
-}
-
 // One bubble shared by image/video attachments and their caption, WhatsApp
 // style: media flush to the top (no inner rounding — the bubble's
 // overflow-hidden clips it), caption directly below in the same coloured
@@ -285,9 +229,10 @@ function MediaCaptionBubble({ radiusClass, isOwn, body, searchQuery, replyTo, on
         {replyTo && (
           <MessageQuote reply={replyTo} variant="inline" context={isOwn ? "onBrand" : "onMuted"} onJump={onJumpToMessage} />
         )}
-        <p className={["text-left whitespace-pre-wrap wrap-break-word", isOwn ? "text-(--brand-primary-foreground)" : "text-[hsl(var(--foreground))]"].join(" ")}>
-          <HighlightedText text={body} query={searchQuery} />
-        </p>
+        {renderRichText(body, {
+          highlightQuery: searchQuery,
+          paragraphClassName: ["text-left whitespace-pre-wrap wrap-break-word", isOwn ? "text-(--brand-primary-foreground)" : "text-[hsl(var(--foreground))]"].join(" "),
+        })}
       </div>
     </div>
   );
@@ -757,12 +702,8 @@ export function ChatMessageBubble({
                     )}
                     {isDeleted ? (
                       <span>Mensaje eliminado</span>
-                    ) : isAssistant ? (
-                      <AssistantMarkdown text={message.body} />
                     ) : (
-                      <p className="text-left whitespace-pre-wrap wrap-break-word">
-                        <HighlightedText text={message.body} query={searchQuery} />
-                      </p>
+                      renderRichText(message.body, { highlightQuery: isAssistant ? "" : searchQuery })
                     )}
                   </div>
                 )}
@@ -979,12 +920,8 @@ export function ChatMessageBubble({
                   )}
                   {isDeleted ? (
                     <span>Mensaje eliminado</span>
-                  ) : isAssistant ? (
-                    <AssistantMarkdown text={message.body} />
                   ) : (
-                    <p className="text-left whitespace-pre-wrap wrap-break-word">
-                      <HighlightedText text={message.body} query={searchQuery} />
-                    </p>
+                    renderRichText(message.body, { highlightQuery: isAssistant ? "" : searchQuery })
                   )}
                 </div>
               )}

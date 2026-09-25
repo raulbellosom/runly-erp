@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { createPortal } from 'react-dom'
+import { Bot, Megaphone, Shield } from 'lucide-react'
 import { useIsolatedScroll } from '../hooks/useIsolatedScroll.js'
 
 // Stored format:  @[uuid:DisplayName]
 // Display format: @[DisplayName]   (no UUID visible in textarea)
-const STORED_TOKEN_RE = /@\[([a-f0-9-]{36}):([^\]]+)\]/g
+// Exported so other chat-rendering code (e.g. the rich-text formatter) can
+// split a body into mention/text segments without duplicating this pattern.
+export const MENTION_TOKEN_RE = /@\[([a-f0-9-]{36}):([^\]]+)\]/g
+const STORED_TOKEN_RE = MENTION_TOKEN_RE
 const DISPLAY_TOKEN_RE = /@\[([^\]]+)\]/g
 
 export function renderMentionText(text) {
@@ -27,6 +31,25 @@ export function renderMentionText(text) {
   }
   if (last < text.length) parts.push(text.slice(last))
   return parts.length === 0 ? text : parts
+}
+
+// Splits raw text into { type: 'text', value } / { type: 'mention', uuid, name }
+// segments — the same token this component inserts, but as data instead of
+// pre-rendered chips, for callers (the rich-text formatter) that need to
+// interleave mentions with their own inline formatting.
+export function splitMentionSegments(text) {
+  if (!text) return []
+  const parts = []
+  let last = 0
+  let match
+  MENTION_TOKEN_RE.lastIndex = 0
+  while ((match = MENTION_TOKEN_RE.exec(text)) !== null) {
+    if (match.index > last) parts.push({ type: 'text', value: text.slice(last, match.index) })
+    parts.push({ type: 'mention', uuid: match[1], name: match[2] })
+    last = match.index + match[0].length
+  }
+  if (last < text.length) parts.push({ type: 'text', value: text.slice(last) })
+  return parts
 }
 
 export function parseMentionIds(text) {
@@ -58,8 +81,30 @@ function toSerialized(display, mentionMap) {
   })
 }
 
+// Non-person entries (assistant, roles, @everyone/@here) get a distinct icon
+// badge instead of a letter avatar, so they read as a different kind of
+// mention target rather than looking like a real person the query matched.
+const KIND_ICON = {
+  assistant: Bot,
+  role: Shield,
+  sentinel: Megaphone,
+}
+
+// How many matches the dropdown renders at once — arrow-key navigation is
+// clamped to this too (see handleKeyDown). A "+N más" footer below the list
+// tells the user there are more instead of silently truncating.
+const MENTION_VISIBLE_LIMIT = 8
+
 function MemberAvatar({ member }) {
   const [imgErr, setImgErr] = useState(false)
+  const Icon = KIND_ICON[member.kind]
+  if (Icon) {
+    return (
+      <span className="w-6 h-6 rounded-full bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] flex items-center justify-center shrink-0 select-none">
+        <Icon className="w-3.5 h-3.5" />
+      </span>
+    )
+  }
   if (member.avatarUrl && !imgErr) {
     return (
       <img
@@ -135,6 +180,31 @@ const MentionTextarea = forwardRef(function MentionTextarea({
   useImperativeHandle(ref, () => ({
     focus: (opts) => textareaRef.current?.focus(opts),
     blur: () => textareaRef.current?.blur(),
+    // Wraps the current selection (or, with nothing selected, just places the
+    // cursor between the marks) in the given marker pair — the primitive
+    // behind the composer's bold/italic/strikethrough/code keyboard shortcuts.
+    // Operates on displayValue directly: a mention chip's `@[Name]` display
+    // token has no `*_~` in it, so wrapping around/through one is safe.
+    wrapSelection: (markStart, markEnd = markStart) => {
+      const ta = textareaRef.current
+      if (!ta) return
+      const start = ta.selectionStart ?? displayValue.length
+      const end = ta.selectionEnd ?? displayValue.length
+      const before = displayValue.slice(0, start)
+      const selected = displayValue.slice(start, end)
+      const after = displayValue.slice(end)
+      const newDisplay = `${before}${markStart}${selected}${markEnd}${after}`
+      setDisplayValue(newDisplay)
+      const serialized = toSerialized(newDisplay, mentionMap.current)
+      lastSerializedRef.current = serialized
+      onChange(serialized)
+      requestAnimationFrame(() => {
+        ta.focus()
+        const newStart = start + markStart.length
+        const newEnd = newStart + selected.length
+        ta.setSelectionRange(newStart, newEnd)
+      })
+    },
   }))
 
   // Auto-grow: rest at `rows` tall, expand with content up to `maxRows`,
@@ -240,9 +310,13 @@ const MentionTextarea = forwardRef(function MentionTextarea({
 
   function handleKeyDown(e) {
     if (open) {
+      // Clamp navigation to the visible slice — filtered can hold more
+      // results than are rendered (see MENTION_VISIBLE_LIMIT below), and
+      // arrowing onto a hidden one would leave nothing highlighted.
+      const visibleCount = Math.min(MENTION_VISIBLE_LIMIT, filtered.length)
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setActiveIdx((i) => Math.min(i + 1, filtered.length - 1))
+        setActiveIdx((i) => Math.min(i + 1, visibleCount - 1))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setActiveIdx((i) => Math.max(i - 1, 0))
@@ -330,7 +404,7 @@ const MentionTextarea = forwardRef(function MentionTextarea({
             boxShadow: 'var(--glass-shadow)',
           }}
         >
-          {filtered.slice(0, 8).map((m, i) => (
+          {filtered.slice(0, MENTION_VISIBLE_LIMIT).map((m, i) => (
             <button
               key={m.id}
               type="button"
@@ -347,6 +421,11 @@ const MentionTextarea = forwardRef(function MentionTextarea({
               <span className="truncate">{m.displayName}</span>
             </button>
           ))}
+          {filtered.length > MENTION_VISIBLE_LIMIT && (
+            <span className="px-3 py-1 text-xs text-muted-foreground border-t border-(--glass-border) mt-1 pt-1.5">
+              +{filtered.length - MENTION_VISIBLE_LIMIT} más — sigue escribiendo para filtrar
+            </span>
+          )}
         </div>,
         portalContainer ?? document.body
       )}

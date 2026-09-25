@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
-  Button, EmptyState, Skeleton, ConfirmDialog, Textarea, AssistantWordmark,
+  Button, EmptyState, Skeleton, ConfirmDialog, Textarea, AssistantWordmark, renderRichText,
 } from "@runly/ui";
 import { Sparkles, Send, Trash2, Volume2, Square, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +11,6 @@ import { useMiraiStatus } from "../hooks/useMirAI";
 import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
 import { useMiraiPanelThread, useSendMiraiPanel, useClearMiraiPanel } from "../hooks/useMirAIPanel";
 import { MIRAI_NAME } from "../lib/mirai";
-import { AssistantMarkdown } from "./AssistantMarkdown";
 import "../chat-theme.css";
 
 const FOCUS_PROMPT = "¿Qué me puedes decir de este mensaje?";
@@ -51,7 +50,7 @@ function Bubble({ role, content, ttsEnabled, speech }) {
             : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
         ].join(" ")}
       >
-        {isUser ? content : <AssistantMarkdown text={content} />}
+        {renderRichText(content, { paragraphClassName: isUser ? "whitespace-pre-wrap wrap-break-word" : "text-left whitespace-pre-wrap wrap-break-word" })}
       </div>
       {!isUser && ttsEnabled && (
         <button
