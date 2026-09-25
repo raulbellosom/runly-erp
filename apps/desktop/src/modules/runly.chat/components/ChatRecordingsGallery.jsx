@@ -44,6 +44,14 @@ function RecordingTitle({ recording, renameRecording }) {
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
+  // On touch devices there is no hover, so a hover-only reveal would leave
+  // the pencil permanently invisible there — same fix already applied to
+  // the speak button elsewhere in runly.chat (useCoarsePointer). Must run
+  // before the `editing` early return below: calling it after that return
+  // means it's skipped whenever `editing` becomes true, which changes the
+  // number of hooks called between renders (React error #300).
+  const coarse = useCoarsePointer();
+
   function startEditing() {
     setDraft(recording.title ?? "");
     setEditing(true);
@@ -98,10 +106,6 @@ function RecordingTitle({ recording, renameRecording }) {
     );
   }
 
-  // On touch devices there is no hover, so a hover-only reveal would leave
-  // the pencil permanently invisible there — same fix already applied to
-  // the speak button elsewhere in runly.chat (useCoarsePointer).
-  const coarse = useCoarsePointer();
   const revealCls = coarse ? "opacity-100" : "opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100";
 
   return (
