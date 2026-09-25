@@ -8,7 +8,7 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   Eye, EyeOff, Lock, LockOpen, GripVertical, Plus, MoreVertical,
   ChevronRight, ChevronDown, Trash2, Square, Circle, Diamond, ArrowRight,
-  Minus, Pencil, Type, Image as ImageIcon, Frame,
+  Minus, Pencil, Type, Image as ImageIcon, Frame, X,
 } from 'lucide-react'
 import {
   Sheet,
@@ -614,6 +614,15 @@ export function CanvasLayersPanel({
   if (!open) return null
   return (
     <div className="absolute top-3 right-3 bottom-3 w-72 z-20 rounded-2xl glass-strong overflow-hidden flex flex-col">
+      <button
+        type="button"
+        onClick={() => onOpenChange(false)}
+        className="absolute right-2 top-2 z-10 flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/70 hover:bg-black/6 dark:hover:bg-white/8"
+        aria-label="Cerrar panel de capas"
+        title="Cerrar"
+      >
+        <X size={15} />
+      </button>
       {header}
       {bodyEl}
     </div>
