@@ -2202,6 +2202,7 @@ model CallTranscript {
   recording   CallRecording?  @relation(fields: [recordingId], references: [id], onDelete: SetNull)
   requestedBy UserProfile     @relation("CallTranscriptRequestedBy", fields: [requestedByUserId], references: [id])
   segments    CallTranscriptSegment[]
+  analysis  CallTranscriptAnalysis?
 
   @@index([callId])
   @@index([conversationId])
@@ -2229,6 +2230,33 @@ model CallTranscriptSegment {
 
   @@index([transcriptId, startMs])
   @@map("call_transcript_segment")
+}
+
+// MirAI Etapa 5 (docs/TRANSCRIPTION_SPEC.md §7.1) — persisted analysis draft.
+// One row per transcript (unique on transcriptId), not a version history:
+// re-analyzing REPLACES the draft (same "reuse the row" principle as
+// CallTranscript.regenerateTranscript). committedTaskIds/committedEventIds
+// survive a re-analyze even though committedAt is reset to null, so the
+// history of what was already created is never lost.
+model CallTranscriptAnalysis {
+  id                String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  transcriptId      String    @unique @db.Uuid @map("transcript_id")
+  companyId         String    @db.Uuid @map("company_id")
+  summary           String    @map("summary")
+  decisions         Json      @map("decisions")        // string[]
+  actionItems       Json      @map("action_items")      // [{ text: string }]
+  proposedEvents    Json      @map("proposed_events")   // [{ title, startsAt, endsAt?, description? }]
+  model             String    @map("model")
+  generatedByUserId String    @db.Uuid @map("generated_by_user_id")
+  generatedAt       DateTime  @default(now()) @map("generated_at")
+  committedTaskIds  Json?     @map("committed_task_ids")  // uuid[]
+  committedEventIds Json?     @map("committed_event_ids") // uuid[]
+  committedAt       DateTime? @map("committed_at")
+
+  transcript CallTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("call_transcript_analysis")
 }
 
 model CalendarEventFile {
