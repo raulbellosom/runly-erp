@@ -44,7 +44,10 @@ export const callTranscriptCommitProposalsSchema = z.object({
         index: z.number().int().nonnegative(),
         projectId: z.string().uuid(),
         assigneeUserId: z.string().uuid().nullish(),
-        dueDate: z.string().nullish(),
+        // Strict YYYY-MM-DD so a malformed date is rejected at the API
+        // boundary (code review of Task 4) instead of becoming an Invalid
+        // Date once it reaches tasks-service.js's toNoonUTC().
+        dueDate: z.string().date().nullish(),
       }),
     )
     .default([]),
