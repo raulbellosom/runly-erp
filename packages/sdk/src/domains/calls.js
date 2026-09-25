@@ -76,6 +76,10 @@ export function createCallsDomain(request, withAuthHeaders) {
       json(`/calls/transcripts/${encodeURIComponent(transcriptId)}`, "GET", undefined, token),
     deleteTranscript: (transcriptId, token) =>
       json(`/calls/transcripts/${encodeURIComponent(transcriptId)}`, "DELETE", undefined, token),
+    analyzeTranscript: (transcriptId, token) =>
+      json(`/calls/transcripts/${encodeURIComponent(transcriptId)}/analyze`, "POST", {}, token),
+    commitTranscriptProposals: (transcriptId, body, token) =>
+      json(`/calls/transcripts/${encodeURIComponent(transcriptId)}/commit-proposals`, "POST", body, token),
 
     // --- guest (unauthenticated) ---
     guest: {

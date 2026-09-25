@@ -119,6 +119,16 @@ export function createCallTranscriptAnalysisService({
     };
   }
 
+  // SECURITY: neither this function nor commitProposals below checks
+  // participant/requester access on its own (no assertMember/
+  // wasParticipantOrRequester call) — that check is enforced exclusively by
+  // the caller. Today the only sanctioned caller is
+  // apps/api/src/routes/calls/index.js's /analyze and /commit-proposals
+  // routes, which both call transcriptService.getTranscript(...) first and
+  // discard the result purely for its access-check side effect. Any new
+  // caller (a script, another route, a queue worker) MUST perform that same
+  // check before invoking this service, or it will silently bypass
+  // docs/TRANSCRIPTION_SPEC.md §5.1/§7.3's access rule.
   async function analyzeTranscript({ transcriptId, profileId }) {
     const transcript = await prisma.callTranscript.findUnique({
       where: { id: transcriptId },
@@ -195,6 +205,8 @@ export function createCallTranscriptAnalysisService({
   // - No shared Groq-JSON-client extraction with ai-import-extraction.js's
   //   near-identical callGroqText — pre-existing duplication pattern in this
   //   codebase, not a regression introduced here.
+  // SECURITY: see the note above analyzeTranscript — same caller-enforced
+  // access-check invariant applies here, not just token verification.
   async function commitProposals({ transcriptId, profileId, proofToken, acceptedActionItems, acceptedEvents }) {
     const transcript = await prisma.callTranscript.findUnique({ where: { id: transcriptId } });
     if (!transcript) throw new CallTranscriptAnalysisError("Transcripción no encontrada.", 404);

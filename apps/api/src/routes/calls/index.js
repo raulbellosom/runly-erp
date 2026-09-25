@@ -11,6 +11,10 @@ import { createCallGuestService, CallGuestError } from "./call-guest-service.js"
 import { createCallMessagesService, CallMessageError } from "./call-messages-service.js";
 import { createCallRecordingService, CallRecordingError } from "./call-recording-service.js";
 import { createCallTranscriptService, CallTranscriptError } from "./call-transcript-service.js";
+import { createCallTranscriptAnalysisService, CallTranscriptAnalysisError } from "./call-transcript-analysis-service.js";
+import { createTasksService } from "../projects/tasks-service.js";
+import { createCalendarEventService } from "../calendar/calendar-event-service.js";
+import { callTranscriptCommitProposalsSchema } from "@runly/validators";
 import { buildRecordingReadyMessage, buildTranscriptReadyMessage } from "./call-system-messages.js";
 import { createGuestCallRouter } from "./guest-routes.js";
 
@@ -27,6 +31,7 @@ function handleError(c, error, fallback) {
     || error instanceof CallMessageError
     || error instanceof CallRecordingError
     || error instanceof CallTranscriptError
+    || error instanceof CallTranscriptAnalysisError
   ) {
     return c.json(
       {
@@ -85,6 +90,12 @@ export function createCallsRouter({
       const msg = buildTranscriptReadyMessage({ transcriptId: t.id, durationMs: t.durationMs });
       await calls.postSystemMessage(t.conversationId, msg);
     },
+  });
+  const analysisService = createCallTranscriptAnalysisService({
+    prisma,
+    tasksService: createTasksService({ prisma }),
+    calendarService: createCalendarEventService({ prisma }),
+    logAudit,
   });
 
   if (!service) {
@@ -305,6 +316,38 @@ export function createCallsRouter({
         await transcriptService.deleteTranscript({ transcriptId, profileId: c.get("userId") });
         return c.json({ data: { id: transcriptId } });
       } catch (error) { return handleError(c, error, "Error eliminando la transcripción."); }
+    },
+  );
+  internal.post(
+    "/transcripts/:transcriptId/analyze",
+    requirePermission("chat.calls.transcript.analyze"),
+    async (c) => {
+      try {
+        const transcriptId = transcriptIdSchema.parse(c.req.param("transcriptId"));
+        const profileId = c.get("userId");
+        // Same access bar as reading the transcript itself (spec §7.3): must
+        // have participated in the call, requested it, or hold
+        // chat.calls.transcript.manage — reuse getTranscript's own check by
+        // calling it first and discarding the result, rather than
+        // duplicating wasParticipantOrRequester here.
+        await transcriptService.getTranscript({ transcriptId, profileId });
+        const data = await analysisService.analyzeTranscript({ transcriptId, profileId });
+        return c.json({ data });
+      } catch (error) { return handleError(c, error, "Error analizando la transcripción."); }
+    },
+  );
+  internal.post(
+    "/transcripts/:transcriptId/commit-proposals",
+    requirePermission("chat.calls.transcript.analyze"),
+    async (c) => {
+      try {
+        const transcriptId = transcriptIdSchema.parse(c.req.param("transcriptId"));
+        const profileId = c.get("userId");
+        await transcriptService.getTranscript({ transcriptId, profileId });
+        const body = callTranscriptCommitProposalsSchema.parse(await c.req.json());
+        const data = await analysisService.commitProposals({ transcriptId, profileId, ...body });
+        return c.json({ data });
+      } catch (error) { return handleError(c, error, "Error confirmando las propuestas."); }
     },
   );
 
