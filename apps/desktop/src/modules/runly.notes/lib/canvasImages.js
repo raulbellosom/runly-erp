@@ -1,7 +1,7 @@
 import { runly } from '../../../lib/runly'
 import { supabase } from '../../../lib/supabase'
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+export const MAX_IMAGE_BYTES = 30 * 1024 * 1024
 
 // Given Excalidraw's files map after an onChange, upload any entry that still
 // has only a dataURL (freshly pasted/dropped) to the runly-notes bucket and
@@ -17,7 +17,7 @@ export async function syncNewImages({ files, manifest, noteId, token }) {
     if (!dataURL || !dataURL.startsWith('data:')) continue
     const blob = dataURLtoBlob(dataURL)
     if (blob.size > MAX_IMAGE_BYTES) {
-      throw new Error('La imagen supera el limite de 10 MB')
+      throw new Error(`La imagen supera el limite de ${Math.round(MAX_IMAGE_BYTES / 1024 / 1024)} MB`)
     }
     const mimeType = file.mimeType ?? blob.type ?? 'image/png'
     const ext = (mimeType.split('/')[1] ?? 'png').replace('+xml', '')
@@ -71,7 +71,7 @@ export async function hydrateImages(manifest) {
   return entries.filter(Boolean)
 }
 
-function dataURLtoBlob(dataURL) {
+export function dataURLtoBlob(dataURL) {
   const [head, b64] = dataURL.split(',')
   const mime = head.match(/data:(.*?);base64/)?.[1] ?? 'image/png'
   const bin = atob(b64)
