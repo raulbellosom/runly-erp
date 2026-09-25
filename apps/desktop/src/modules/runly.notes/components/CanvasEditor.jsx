@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Layers, FileDown } from 'lucide-react'
+import { Layers, FileDown, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -29,9 +29,11 @@ import {
   deleteLayerElements,
 } from '../lib/canvasLayers.js'
 import { SupabaseCanvasSync } from '../lib/SupabaseCanvasSync.js'
-import { syncNewImages, hydrateImages, pickManifest } from '../lib/canvasImages.js'
+import { syncNewImages, hydrateImages, pickManifest, dataURLtoBlob, MAX_IMAGE_BYTES } from '../lib/canvasImages.js'
 import { exportCanvasPng, exportCanvasSvg, exportCanvasPdf } from '../lib/canvasExport.js'
+import { readImageFullRes, getPdfPageCount, renderPdfPageFullRes, computeFitDimensions } from '../lib/canvasBaseImage.js'
 import { CanvasLayersPanel } from './CanvasLayersPanel.jsx'
+import { CanvasPdfPageDialog } from './CanvasPdfPageDialog.jsx'
 
 const CanvasStage = lazy(() => import('./CanvasStage.jsx'))
 const AUTOSAVE_DELAY = 1500
@@ -84,6 +86,8 @@ export function CanvasEditor({ note }) {
   const showLayersRef = useRef(false)
   showLayersRef.current = showLayers
   const [isMobile, setIsMobile] = useState(false)
+  const [pdfPicker, setPdfPicker] = useState(null) // { file, pageCount } while a multi-page PDF awaits a page choice
+  const fileInputRef = useRef(null)
   const [selectionCount, setSelectionCount] = useState(0)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const selectionRef = useRef(0)
@@ -259,6 +263,32 @@ export function CanvasEditor({ note }) {
     })
   }, [])
 
+  // Upload any freshly added images, then persist + share the manifest so
+  // they survive a reload and reach other participants (deltas carry
+  // elements, not file bytes). Shared by handleChange (drag/drop/paste,
+  // Excalidraw's own image tool) and the high-res insert path below.
+  const uploadPendingImages = useCallback(async () => {
+    const files = apiRef.current?.getFiles?.() ?? {}
+    const hasNew = Object.keys(files).some((id) => !filesManifestRef.current[id]?.url)
+    if (!hasNew) return
+    try {
+      const { manifest, uploadedIds } = await syncNewImages({
+        files,
+        manifest: filesManifestRef.current,
+        noteId,
+        token,
+      })
+      filesManifestRef.current = manifest
+      if (uploadedIds.length) {
+        syncRef.current?.broadcastFiles(pickManifest(manifest, uploadedIds))
+        persist()
+      }
+    } catch (err) {
+      console.warn('[canvas] image upload failed:', err?.message ?? err)
+      toast.error(err?.message ?? 'No se pudo subir la imagen al lienzo')
+    }
+  }, [noteId, token, persist])
+
   const handleChange = useCallback(
     async (elements, appState) => {
       const active = activeLayerIdRef.current ?? layersRef.current[0]?.id
@@ -287,31 +317,9 @@ export function CanvasEditor({ note }) {
       syncRef.current?.notifyLocalChange()
       persist()
 
-      // Upload any freshly added images, then persist + share the manifest so
-      // they survive a reload and reach other participants (deltas carry
-      // elements, not file bytes).
-      const files = apiRef.current?.getFiles?.() ?? {}
-      const hasNew = Object.keys(files).some((id) => !filesManifestRef.current[id]?.url)
-      if (hasNew) {
-        try {
-          const { manifest, uploadedIds } = await syncNewImages({
-            files,
-            manifest: filesManifestRef.current,
-            noteId,
-            token,
-          })
-          filesManifestRef.current = manifest
-          if (uploadedIds.length) {
-            syncRef.current?.broadcastFiles(pickManifest(manifest, uploadedIds))
-            persist()
-          }
-        } catch (err) {
-          console.warn('[canvas] image upload failed:', err?.message ?? err)
-          toast.error(err?.message ?? 'No se pudo subir la imagen al lienzo')
-        }
-      }
+      await uploadPendingImages()
     },
-    [noteId, token, persist],
+    [persist, uploadPendingImages],
   )
 
   const handlePointer = useCallback((payload) => {
