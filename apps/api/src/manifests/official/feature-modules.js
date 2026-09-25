@@ -863,6 +863,7 @@ export const chatMap = createModuleManifest({
     { key: 'chat.calls.record',         name: 'Grabar llamadas' },
     { key: 'chat.calls.transcript.request', name: 'Solicitar transcripción de llamadas' },
     { key: 'chat.calls.transcript.manage',  name: 'Administrar transcripciones de llamadas' },
+    { key: 'chat.calls.transcript.analyze', name: 'Analizar transcripciones con MirAI' },
   ],
   acl: {
     module: 'chat.access',
@@ -874,6 +875,7 @@ export const chatMap = createModuleManifest({
       'chat.calls.record':         'chat.calls.record',
       'chat.calls.transcript.request': 'chat.calls.transcript.request',
       'chat.calls.transcript.manage':  'chat.calls.transcript.manage',
+      'chat.calls.transcript.analyze': 'chat.calls.transcript.analyze',
     },
   },
   blueprints: [],

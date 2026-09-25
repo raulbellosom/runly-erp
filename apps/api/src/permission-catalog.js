@@ -1467,6 +1467,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "chat",
     order: 62,
   },
+  "chat.calls.transcript.analyze": {
+    displayNameEs: "Analizar transcripciones con MirAI",
+    descriptionEs: "Permite pedirle a MirAI un resumen/minuta de una transcripción y confirmar tareas o eventos propuestos a partir de ella.",
+    groupKey: "chat",
+    order: 63,
+  },
   // -----------------------------------------------------------------------
   // runly.inventory
   // -----------------------------------------------------------------------
