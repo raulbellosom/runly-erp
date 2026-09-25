@@ -1,0 +1,181 @@
+import { describe, it, mock } from "node:test";
+import assert from "node:assert/strict";
+import { createCallTranscriptAnalysisService, CallTranscriptAnalysisError } from "../call-transcript-analysis-service.js";
+import { verifyAiProof } from "../../../lib/ai-proof-token.js";
+
+const ENV = { GROQ_API_KEY: "test-key", AI_PROOF_SIGNING_SECRET: "test-secret" };
+
+function fakeGroqResponse(obj) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ model: "openai/gpt-oss-120b", choices: [{ message: { content: JSON.stringify(obj) } }] }),
+  };
+}
+
+function basePrisma({ transcript, segments, analysis = null }) {
+  let savedAnalysis = analysis;
+  return {
+    callTranscript: {
+      findUnique: async ({ where }) => (where.id === transcript.id ? { ...transcript, segments } : null),
+    },
+    callTranscriptAnalysis: {
+      findUnique: async ({ where }) => (where.transcriptId === transcript.id ? savedAnalysis : null),
+      upsert: async ({ create, update }) => {
+        savedAnalysis = savedAnalysis ? { ...savedAnalysis, ...update } : { id: "an-1", ...create };
+        return savedAnalysis;
+      },
+      update: async ({ data }) => {
+        savedAnalysis = { ...savedAnalysis, ...data };
+        return savedAnalysis;
+      },
+    },
+    taskStatus: {
+      findFirst: async ({ where }) => (where.projectId ? { id: "status-default" } : null),
+    },
+  };
+}
+
+describe("call-transcript-analysis-service.analyzeTranscript", () => {
+  it("requires the transcript to be READY", async () => {
+    const prisma = basePrisma({ transcript: { id: "t1", status: "PENDING", companyId: "c1" }, segments: [] });
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService: {}, calendarService: {} });
+    await assert.rejects(
+      () => service.analyzeTranscript({ transcriptId: "t1", profileId: "u1" }),
+      (err) => err instanceof CallTranscriptAnalysisError && err.status === 409,
+    );
+  });
+
+  it("calls Groq with the joined segment text and persists the draft", async () => {
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const segments = [
+      { startMs: 0, text: "Hola equipo, empecemos." },
+      { startMs: 5000, text: "Quedamos en enviar la propuesta el viernes." },
+    ];
+    const prisma = basePrisma({ transcript, segments });
+    const draft = {
+      summary: "Reunion de seguimiento.",
+      decisions: ["Enviar la propuesta el viernes."],
+      actionItems: [{ text: "Enviar la propuesta al cliente" }],
+      proposedEvents: [],
+    };
+    const fetchImpl = mock.fn(async () => fakeGroqResponse(draft));
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, fetchImpl, tasksService: {}, calendarService: {} });
+
+    const result = await service.analyzeTranscript({ transcriptId: "t1", profileId: "u1" });
+
+    assert.equal(fetchImpl.mock.calls.length, 1);
+    assert.equal(result.analysis.summary, draft.summary);
+    assert.deepEqual(result.analysis.actionItems, draft.actionItems);
+    const proof = verifyAiProof(result.proofToken, ENV);
+    assert.equal(proof.transcriptId, "t1");
+    assert.equal(proof.companyId, "c1");
+  });
+
+  it("wraps an unreadable Groq response", async () => {
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const prisma = basePrisma({ transcript, segments: [{ startMs: 0, text: "hola" }] });
+    const fetchImpl = mock.fn(async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: "no es json" } }] }) }));
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, fetchImpl, tasksService: {}, calendarService: {} });
+    await assert.rejects(() => service.analyzeTranscript({ transcriptId: "t1", profileId: "u1" }), CallTranscriptAnalysisError);
+  });
+});
+
+describe("call-transcript-analysis-service.commitProposals", () => {
+  it("rejects an invalid proof token", async () => {
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = { id: "an-1", transcriptId: "t1", companyId: "c1", actionItems: [], proposedEvents: [], committedAt: null };
+    const prisma = basePrisma({ transcript, segments: [], analysis });
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService: {}, calendarService: {} });
+    await assert.rejects(
+      () => service.commitProposals({ transcriptId: "t1", profileId: "u1", proofToken: "garbage", acceptedActionItems: [], acceptedEvents: [] }),
+      (err) => err instanceof CallTranscriptAnalysisError && err.status === 409,
+    );
+  });
+
+  it("creates a Task per accepted action item and a CalendarEvent per accepted event, then marks committed", async () => {
+    const { signAiProof } = await import("../../../lib/ai-proof-token.js");
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = {
+      id: "an-1", transcriptId: "t1", companyId: "c1",
+      actionItems: [{ text: "Enviar propuesta" }],
+      proposedEvents: [{ title: "Seguimiento", startsAt: "2026-10-01T15:00:00.000Z" }],
+      committedAt: null, committedTaskIds: null, committedEventIds: null,
+    };
+    const prisma = basePrisma({ transcript, segments: [], analysis });
+    const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
+    const createdTasks = [];
+    const createdEvents = [];
+    const tasksService = {
+      createTask: async (projectId, createdBy, data) => {
+        const task = { id: `task-${createdTasks.length}`, projectId, createdBy, ...data };
+        createdTasks.push(task);
+        return task;
+      },
+    };
+    const calendarService = {
+      createEvent: async (userId, data) => {
+        const event = { id: `event-${createdEvents.length}`, userId, ...data };
+        createdEvents.push(event);
+        return event;
+      },
+    };
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService, calendarService });
+
+    const result = await service.commitProposals({
+      transcriptId: "t1", profileId: "u1", proofToken,
+      acceptedActionItems: [{ index: 0, projectId: "proj-1" }],
+      acceptedEvents: [{ index: 0, calendarId: "cal-1" }],
+    });
+
+    assert.equal(createdTasks.length, 1);
+    assert.equal(createdTasks[0].title, "Enviar propuesta");
+    assert.equal(createdTasks[0].statusId, "status-default");
+    assert.equal(createdEvents.length, 1);
+    assert.equal(createdEvents[0].title, "Seguimiento");
+    assert.equal(createdEvents[0].sourceModule, "runly.chat");
+    assert.equal(createdEvents[0].sourceEntityId, "t1");
+    assert.equal(result.createdTasks.length, 1);
+    assert.equal(result.createdEvents.length, 1);
+    assert.deepEqual(result.skippedActionItems, []);
+    assert.deepEqual(result.skippedEvents, []);
+  });
+
+  it("skips an out-of-range accepted index instead of throwing, and still commits what succeeded", async () => {
+    const { signAiProof } = await import("../../../lib/ai-proof-token.js");
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = {
+      id: "an-1", transcriptId: "t1", companyId: "c1",
+      actionItems: [{ text: "Enviar propuesta" }],
+      proposedEvents: [],
+      committedAt: null, committedTaskIds: null, committedEventIds: null,
+    };
+    const prisma = basePrisma({ transcript, segments: [], analysis });
+    const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
+    const createdTasks = [];
+    const tasksService = {
+      createTask: async (projectId, createdBy, data) => {
+        const task = { id: `task-${createdTasks.length}`, projectId, createdBy, ...data };
+        createdTasks.push(task);
+        return task;
+      },
+    };
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService, calendarService: {} });
+
+    const result = await service.commitProposals({
+      transcriptId: "t1", profileId: "u1", proofToken,
+      acceptedActionItems: [
+        { index: 0, projectId: "proj-1" },
+        { index: 5, projectId: "proj-1" }, // out of range: analysis only has index 0
+      ],
+      acceptedEvents: [],
+    });
+
+    assert.equal(createdTasks.length, 1);
+    assert.equal(result.createdTasks.length, 1);
+    assert.equal(result.skippedActionItems.length, 1);
+    assert.equal(result.skippedActionItems[0].index, 5);
+    assert.match(result.skippedActionItems[0].reason, /indice/);
+    assert.ok(result.analysis.committedAt, "still records the commit for the item that did succeed");
+  });
+});
