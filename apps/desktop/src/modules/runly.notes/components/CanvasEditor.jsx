@@ -396,6 +396,82 @@ export function CanvasEditor({ note }) {
     [persist],
   )
 
+  // Inserts one image element at full source resolution, bypassing
+  // Excalidraw's own insert path (which downscales to 1440px — see the
+  // canvas-highres-base-image design doc). `data` is whatever
+  // readImageFullRes / renderPdfPageFullRes resolved: full-res dataURL +
+  // natural pixel size.
+  const insertBaseImageElement = useCallback(
+    async ({ dataURL, mimeType, naturalWidth, naturalHeight }) => {
+      const blob = dataURLtoBlob(dataURL)
+      if (blob.size > MAX_IMAGE_BYTES) {
+        toast.error(`El archivo supera el limite de ${Math.round(MAX_IMAGE_BYTES / 1024 / 1024)} MB`)
+        return
+      }
+      const fileId = crypto.randomUUID()
+      apiRef.current?.addFiles([{ id: fileId, dataURL, mimeType, created: Date.now() }])
+      const { width, height } = computeFitDimensions(naturalWidth, naturalHeight)
+      // Dynamic import: keeps @excalidraw/excalidraw out of this file's own
+      // chunk (CanvasStage.jsx is the only static importer). Already
+      // resolved by the time this runs — the canvas has to be open (and
+      // CanvasStage loaded) for the user to click "Subir plano" at all.
+      const { convertToExcalidrawElements } = await import('@excalidraw/excalidraw')
+      const [element] = convertToExcalidrawElements([
+        { type: 'image', fileId, x: 0, y: 0, width, height },
+      ])
+      const active = activeLayerIdRef.current ?? layersRef.current[0]?.id
+      const withLayer = assignLayer(element, active)
+      applyElements([...elementsRef.current, withLayer])
+      try {
+        apiRef.current?.scrollToContent?.([withLayer], { fitToContent: true, animate: true })
+      } catch {
+        /* older signature */
+      }
+      await uploadPendingImages()
+    },
+    [applyElements, uploadPendingImages],
+  )
+
+  const handleUploadBaseImage = useCallback(
+    async (file) => {
+      const isPdf = file.type === 'application/pdf'
+      const isImage = file.type.startsWith('image/')
+      if (!isPdf && !isImage) {
+        toast.error('Solo se pueden subir imagenes o archivos PDF')
+        return
+      }
+      try {
+        if (isImage) {
+          const data = await readImageFullRes(file)
+          await insertBaseImageElement(data)
+          return
+        }
+        const pageCount = await getPdfPageCount(file)
+        if (pageCount <= 1) {
+          const data = await renderPdfPageFullRes(file, 1)
+          await insertBaseImageElement(data)
+          return
+        }
+        setPdfPicker({ file, pageCount })
+      } catch (err) {
+        toast.error(err?.message ?? 'No se pudo procesar el archivo')
+      }
+    },
+    [insertBaseImageElement],
+  )
+
+  const insertPdfPage = useCallback(
+    async (file, page) => {
+      try {
+        const data = await renderPdfPageFullRes(file, page)
+        await insertBaseImageElement(data)
+      } catch (err) {
+        toast.error(err?.message ?? 'No se pudo procesar la pagina del PDF')
+      }
+    },
+    [insertBaseImageElement],
+  )
+
   const childHandlers = {
     onSelectElement: (id) => {
       const api = apiRef.current
@@ -564,6 +640,24 @@ export function CanvasEditor({ note }) {
               <DropdownMenuItem onSelect={() => exportScoped('selection', 'pdf')}>PDF</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted rounded-lg"
+          >
+            <Upload size={13} /> Subir plano
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) handleUploadBaseImage(file)
+            }}
+          />
           <div className="flex-1" />
           <button
             type="button"
@@ -621,6 +715,22 @@ export function CanvasEditor({ note }) {
         selectedIds={selectedIds}
         {...layerCbs}
       />
+
+      {pdfPicker && (
+        <CanvasPdfPageDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setPdfPicker(null)
+          }}
+          file={pdfPicker.file}
+          pageCount={pdfPicker.pageCount}
+          onSelect={async (page) => {
+            const { file } = pdfPicker
+            setPdfPicker(null)
+            await insertPdfPage(file, page)
+          }}
+        />
+      )}
     </div>
   )
 }
