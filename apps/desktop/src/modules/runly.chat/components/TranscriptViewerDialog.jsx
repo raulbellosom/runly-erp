@@ -7,6 +7,7 @@ import { Copy, Download, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useTranscript, useRetryTranscript, useRegenerateTranscript } from "../hooks/useConversationTranscripts";
 import { copyTranscriptToClipboard, downloadTranscriptPdf } from "../lib/transcriptExport";
+import { TranscriptAnalysisDialog } from "./TranscriptAnalysisDialog";
 
 function formatTimestamp(ms) {
   const totalSeconds = Math.floor((ms ?? 0) / 1000);
@@ -40,6 +41,7 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
   const retryTranscript = useRetryTranscript(conversationId);
   const regenerateTranscript = useRegenerateTranscript(conversationId);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const transcript = data?.data ?? data;
 
   async function handleCopy() {
@@ -132,6 +134,9 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
                 <RefreshCw className="h-3.5 w-3.5" />
                 Generar de nuevo
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setAnalysisOpen(true)}>
+                Analizar con MirAI
+              </Button>
             </div>
             <div className="max-h-[55vh] overflow-y-auto divide-y divide-[hsl(var(--border))]">
               {transcript.segments?.length
@@ -152,6 +157,8 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
         loading={regenerateTranscript.isPending}
         onConfirm={handleRegenerate}
       />
+
+      <TranscriptAnalysisDialog transcriptId={transcriptId} open={analysisOpen} onOpenChange={setAnalysisOpen} />
     </Dialog>
   );
 }
