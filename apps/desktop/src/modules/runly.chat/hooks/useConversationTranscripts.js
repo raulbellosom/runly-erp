@@ -81,3 +81,25 @@ export function useDeleteTranscript(conversationId) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-transcripts", conversationId] }),
   });
 }
+
+export function useAnalyzeTranscript(conversationId) {
+  const { session } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (transcriptId) => runly.calls.analyzeTranscript(transcriptId, session.access_token),
+    onSuccess: (_data, transcriptId) => {
+      qc.invalidateQueries({ queryKey: ["chat-transcript-analysis", transcriptId] });
+    },
+  });
+}
+
+export function useCommitTranscriptProposals(conversationId) {
+  const { session } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transcriptId, ...body }) => runly.calls.commitTranscriptProposals(transcriptId, body, session.access_token),
+    onSuccess: (_data, { transcriptId }) => {
+      qc.invalidateQueries({ queryKey: ["chat-transcript-analysis", transcriptId] });
+    },
+  });
+}
