@@ -7,7 +7,8 @@
 import { toLocalIso, toLocalMonth } from "@runly/core";
 import { PfmServiceError, isTableNotFoundError } from "./service-helpers.js";
 import { TOOL_DEFS, buildToolRunners } from "./assistant-tools.js";
-import { isReasoningModel } from "../../services/groq-model-helpers.js";
+import { createAiRouter } from "../../services/ai/ai-router.js";
+import { isLocalEnabled } from "../../services/ai/ai-providers.js";
 
 const NOT_INSTALLED = "El modulo de finanzas personales no esta instalado.";
 const MAX_TOOL_ITERATIONS = 6;
@@ -17,9 +18,6 @@ const RATE_WINDOW_MS = 60_000;
 const GROQ_TIMEOUT_MS = 25_000;
 const TOOL_RESULT_MAX_BYTES = 8_000;
 const USER_CONTENT_MAX = 2_000;
-// Groq retired the llama-3.x lineup; openai/gpt-oss-120b is the current
-// (2026-09) general-purpose tool-calling model on their API.
-const DEFAULT_ASSISTANT_MODEL = "openai/gpt-oss-120b";
 
 function systemPrompt() {
   const date = toLocalIso(); // "2026-09-02" in ATLAS_TIME_ZONE
@@ -48,15 +46,13 @@ export function createAssistantService({
   env = process.env,
   fetchImpl,
 }) {
-  const fetchFn = fetchImpl ?? globalThis.fetch;
-  const model = env.PFM_ASSISTANT_MODEL || DEFAULT_ASSISTANT_MODEL;
-  const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
+  const aiRouter = createAiRouter({ env, fetchImpl });
   const runners = buildToolRunners({ summary, wallets, movements, budgets, categories });
 
   const buckets = new Map(); // actorId -> number[]
 
   function isConfigured() {
-    return Boolean(env.GROQ_API_KEY);
+    return Boolean(env.GROQ_API_KEY) || isLocalEnabled(env);
   }
 
   function assertConfigured() {
@@ -143,54 +139,14 @@ export function createAssistantService({
     return { id: threadId, deleted: true };
   }
 
-  // ── Groq call ─────────────────────────────────────────────────────────
+  // ── Groq/local call ──────────────────────────────────────────────────
   async function callGroq(messages) {
-    const body = {
-      model,
-      temperature: 0.2,
-      max_tokens: 800,
-      tools: TOOL_DEFS,
-      tool_choice: "auto",
-      ...(isReasoningModel(model) ? { reasoning_format: "hidden" } : {}),
-      messages,
-    };
-    let lastErr;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${env.GROQ_API_KEY}`,
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch (err) {
-        lastErr = err;
-        clearTimeout(timer);
-        continue;
-      }
-      clearTimeout(timer);
-      if (res.status === 429 || res.status >= 500) {
-        lastErr = new Error(`Groq respondio ${res.status}`);
-        continue;
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new PfmServiceError(
-          `El asistente rechazo la peticion (${res.status}): ${detail.slice(0, 160)}`,
-          502,
-        );
-      }
-      const payload = await res.json();
-      return payload?.choices?.[0]?.message ?? null;
+    try {
+      const { message } = await aiRouter.runTask({ task: "pfm_assistant", messages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 800, timeoutMs: GROQ_TIMEOUT_MS });
+      return message;
+    } catch (err) {
+      throw new PfmServiceError(err.message ?? "El asistente no respondio, intenta de nuevo.", 502);
     }
-    throw new PfmServiceError("El asistente no respondio, intenta de nuevo.", 502);
   }
 
   function clampToolResult(value) {
