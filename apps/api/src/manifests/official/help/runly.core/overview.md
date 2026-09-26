@@ -1,6 +1,6 @@
 ---
 title: Runly Core
-summary: El nucleo del sistema: administra los modulos instalados, la configuracion general de la instancia y la bitacora de auditoria.
+summary: "El nucleo del sistema: administra los modulos instalados, la configuracion general de la instancia y la bitacora de auditoria."
 ---
 Runly Core es el modulo base de todo el ERP. Siempre esta instalado y no se puede desinstalar.
 

@@ -1,6 +1,6 @@
 ---
 title: Sitio web
-summary: Crea y publica el sitio web de tu compania: paginas, blog, tema visual, formularios y pagos.
+summary: "Crea y publica el sitio web de tu compania: paginas, blog, tema visual, formularios y pagos."
 ---
 Runly Sitio web es un creador de sitios (tipo CMS): arma paginas arrastrando bloques, publica un blog, elige un tema visual y recibe formularios o pagos desde tu propio sitio.
 

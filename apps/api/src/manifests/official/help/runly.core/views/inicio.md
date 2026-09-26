@@ -1,7 +1,7 @@
 ---
 viewKey: /app/home
 title: Bienvenida
-summary: Tu punto de partida en Runly: como moverte por el sistema.
+summary: "Tu punto de partida en Runly: como moverte por el sistema."
 ---
 Este es tu inicio en Runly ERP.
 

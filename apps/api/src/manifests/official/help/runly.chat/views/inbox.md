@@ -1,7 +1,7 @@
 ---
 viewKey: /chat/inbox
 title: Chat
-summary: Tus conversaciones: mensajes directos, grupos, canales y MirAI.
+summary: "Tus conversaciones: mensajes directos, grupos, canales y MirAI."
 ---
 Aqui ves todas tus conversaciones activas, ordenadas por la mas reciente.
 
