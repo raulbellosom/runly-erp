@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight, LineChart, PieChart as PieChartIcon, BarChart3 } from 'lucide-react'
+import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight, LineChart, PieChart as PieChartIcon, BarChart3, Layers, CalendarRange } from 'lucide-react'
 import { ErrorState, Card } from '@runly/ui'
 import { useAccountSummary } from '../hooks/use-ledger-queries.js'
 import { LedgerStatCard } from '../components/LedgerStatCard.jsx'
@@ -38,6 +38,15 @@ function fmtDay(dateStr) {
   if (!dateStr) return ''
   const parts = String(dateStr).split('-')
   return `${parts[2]}/${parts[1]}`
+}
+
+const MONTH_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+function fmtMonth(monthStr) {
+  if (!monthStr) return ''
+  const [year, month] = String(monthStr).split('-')
+  const label = MONTH_ABBR[Number(month) - 1] ?? month
+  return `${label} ${String(year).slice(2)}`
 }
 
 function TooltipShell({ children }) {
@@ -74,6 +83,20 @@ function CategoryTip({ active, payload, label, currency }) {
   return (
     <TooltipShell>
       <div style={{ color: C_MUTED, marginBottom: 4 }}>{label}</div>
+      {payload.map((entry) => (
+        <div key={entry.dataKey} style={{ color: entry.color, fontWeight: 600 }}>
+          {entry.name}: {fmt(entry.value, currency)}
+        </div>
+      ))}
+    </TooltipShell>
+  )
+}
+
+function MonthTip({ active, payload, label, currency }) {
+  if (!active || !payload?.length) return null
+  return (
+    <TooltipShell>
+      <div style={{ color: C_MUTED, marginBottom: 4 }}>{fmtMonth(label)}</div>
       {payload.map((entry) => (
         <div key={entry.dataKey} style={{ color: entry.color, fontWeight: 600 }}>
           {entry.name}: {fmt(entry.value, currency)}
@@ -158,7 +181,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
     )
   }
 
-  const { kpis = {}, balance_series = [], by_category = [] } = data ?? {}
+  const { kpis = {}, balance_series = [], by_category = [], by_month = [] } = data ?? {}
   const totalIng = Number(kpis.total_deposito ?? 0)
   const totalEgr = Number(kpis.total_retiro ?? 0)
   const areaData = balance_series.map((row) => ({ fecha: row.fecha, balance: Number(row.balance) }))
@@ -172,6 +195,36 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
     Egreso: Number(row.retiro),
   }))
   const hasData = areaData.length > 1 || barData.length > 0
+
+  // Top 5 categories by combined volume, remainder folded into "Otras" — a
+  // client-side reshape of the same by_category data the "Por categoria"
+  // section already uses, no extra query.
+  const TOP_CATEGORY_COUNT = 5
+  const sortedByCategory = [...by_category].sort(
+    (a, b) => (Number(b.deposito) + Number(b.retiro)) - (Number(a.deposito) + Number(a.retiro)),
+  )
+  const topCategoryRows = sortedByCategory.slice(0, TOP_CATEGORY_COUNT)
+  const restCategoryRows = sortedByCategory.slice(TOP_CATEGORY_COUNT)
+  const otherCategoryRow = restCategoryRows.length > 0
+    ? {
+      category_name: 'Otras',
+      deposito: restCategoryRows.reduce((sum, row) => sum + Number(row.deposito), 0),
+      retiro: restCategoryRows.reduce((sum, row) => sum + Number(row.retiro), 0),
+    }
+    : null
+  const topCategoryData = [...topCategoryRows, ...(otherCategoryRow ? [otherCategoryRow] : [])].map((row) => ({
+    categoria: row.category_name,
+    Ingreso: Number(row.deposito),
+    Egreso: Number(row.retiro),
+  }))
+  const topCategoryH = Math.max(180, topCategoryData.length * 52 + 32)
+
+  const monthData = by_month.map((row) => ({
+    month: row.month,
+    Ingreso: Number(row.deposito),
+    Egreso: Number(row.retiro),
+  }))
+
   const barH = Math.max(180, barData.length * 52 + 32)
 
   return (
@@ -228,7 +281,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
                       axisLine={false}
                       width={52}
                     />
-                    <Tooltip content={<BalanceTip currency={currency} />} />
+                    <Tooltip content={<BalanceTip currency={currency} />} cursor={{ stroke: C_BORDER, strokeWidth: 1 }} />
                     <Area
                       type="monotone"
                       dataKey="balance"
@@ -251,9 +304,9 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
                   <Pie
                     data={pieData}
                     cx="50%"
-                    cy="46%"
-                    innerRadius={62}
-                    outerRadius={88}
+                    cy="42%"
+                    innerRadius={52}
+                    outerRadius={74}
                     paddingAngle={3}
                     cornerRadius={5}
                     dataKey="value"
@@ -263,7 +316,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
                       <Cell key={`${entry.name}-${entry.fill}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle">
+                  <text x="50%" y="42%" textAnchor="middle" dominantBaseline="middle">
                     <tspan x="50%" dy="-0.55em" style={{ fontSize: 10, fill: C_MUTED }}>
                       Flujo neto
                     </tspan>
@@ -324,9 +377,93 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
                 tickLine={false}
                 axisLine={false}
               />
-              <Tooltip content={<CategoryTip currency={currency} />} />
+              <Tooltip content={<CategoryTip currency={currency} />} cursor={{ fill: 'hsl(var(--muted) / 0.15)' }} />
               <Bar dataKey="Ingreso" fill={C_INCOME} radius={[0, 4, 4, 0]} />
               <Bar dataKey="Egreso" fill={C_EXPENSE} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Section>
+      )}
+
+      {topCategoryData.length > 0 && (
+        <Section
+          title="Top categorias"
+          icon={Layers}
+          aside={(
+            <div className="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+              <span className="flex items-center gap-1.5"><Dot color={C_INCOME} />Ingreso</span>
+              <span className="flex items-center gap-1.5"><Dot color={C_EXPENSE} />Egreso</span>
+            </div>
+          )}
+        >
+          <ResponsiveContainer width="100%" height={topCategoryH}>
+            <BarChart
+              data={topCategoryData}
+              layout="vertical"
+              margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
+              barCategoryGap="28%"
+              barGap={3}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={C_GRID} horizontal={false} />
+              <XAxis
+                type="number"
+                tickFormatter={fmtCompact}
+                tick={{ fontSize: 10, fill: C_MUTED }}
+                tickLine={false}
+                axisLine={{ stroke: C_BORDER }}
+              />
+              <YAxis
+                type="category"
+                dataKey="categoria"
+                width={110}
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip content={<CategoryTip currency={currency} />} cursor={{ fill: 'hsl(var(--muted) / 0.15)' }} />
+              <Bar dataKey="Ingreso" fill={C_INCOME} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="Egreso" fill={C_EXPENSE} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Section>
+      )}
+
+      {monthData.length > 0 && (
+        <Section
+          title="Ingresos vs egresos por mes"
+          icon={CalendarRange}
+          aside={(
+            <div className="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+              <span className="flex items-center gap-1.5"><Dot color={C_INCOME} />Ingreso</span>
+              <span className="flex items-center gap-1.5"><Dot color={C_EXPENSE} />Egreso</span>
+            </div>
+          )}
+        >
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={monthData}
+              margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+              barCategoryGap="24%"
+              barGap={3}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={C_GRID} vertical={false} />
+              <XAxis
+                dataKey="month"
+                tickFormatter={fmtMonth}
+                tick={{ fontSize: 10, fill: C_MUTED }}
+                tickLine={false}
+                axisLine={{ stroke: C_BORDER }}
+              />
+              <YAxis
+                tickFormatter={fmtCompact}
+                tick={{ fontSize: 10, fill: C_MUTED }}
+                tickLine={false}
+                axisLine={false}
+                width={52}
+              />
+              <Tooltip content={<MonthTip currency={currency} />} cursor={{ fill: 'hsl(var(--muted) / 0.15)' }} />
+              <Bar dataKey="Ingreso" fill={C_INCOME} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Egreso" fill={C_EXPENSE} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Section>

@@ -1,7 +1,7 @@
 # runly.ledger — Densidad de pantallas, gráficas del Resumen, listado en "Compartir" y reporte PDF
 
 Date: 2026-09-25
-Status: Draft
+Status: In Progress — implemented 2026-09-25 (commissioned directly by the user: "ejecuta todo y toma las mejores decisiones hasta terminar"); lint/build/tests all pass (see plan's Verification Gate), but the manual browser walkthrough of all 11 acceptance criteria (§25) was not performed in this session (no browser-automation tool available). Move to Complete once that walkthrough is done.
 Author: Claude Sonnet 5 (spec agent)
 Spec file: docs/superpowers/specs/2026-09-25-ledger-density-charts-pdf-polish-design.md
 Plan file: docs/superpowers/plans/2026-09-25-ledger-density-charts-pdf-polish.md (se crea tras aprobar esta spec)
@@ -190,7 +190,9 @@ Sin cambios al modelo de aislamiento. `GET /users/search` (con o sin `q`) sigue 
 
 ## 20. Files/storage impact
 
-Sí, para el watermark del PDF: el header ya carga el logo **de la empresa** (`branding.logoBuffer`, vía Supabase Storage — `loadCompanyLogoBuffer` en `pdf-branding-service.js`). El watermark que pide el usuario es el isotipo **de Runly como producto**, no el logo de cada tenant — son dos imágenes distintas y no deben confundirse. Por eso el isotipo de Runly se agrega como **asset estático empaquetado** (ej. `apps/api/src/assets/runly-mark.png`, cargado una vez con `fs.readFileSync`/`import.meta.url` al boot del proceso, cacheado en memoria) en vez de subirlo a Supabase Storage — no hay `FileAsset` nuevo, no hay bucket nuevo, no depende de que cada empresa tenga algo configurado.
+Sí, para el watermark del PDF: el header ya carga el logo **de la empresa** (`branding.logoBuffer`, vía Supabase Storage — `loadCompanyLogoBuffer` en `pdf-branding-service.js`). El watermark que pide el usuario es el isotipo **de Runly como producto**, no el logo de cada tenant — son dos imágenes distintas y no deben confundirse. Por eso el isotipo de Runly se lee como **asset estático ya existente** en el repo (`apps/desktop/public/brand/runly-logo-isotype.png`) en vez de subirlo a Supabase Storage — no hay `FileAsset` nuevo, no hay bucket nuevo, no depende de que cada empresa tenga algo configurado.
+
+**Nota de implementación (2026-09-25):** en vez de copiar ese PNG a un nuevo `apps/api/src/assets/runly-mark.png` (como se planteó inicialmente en esta sección), se reutilizó el archivo ya existente en `apps/desktop/public/brand/runly-logo-isotype.png`, resuelto vía `import.meta.url` con el mismo patrón de ruta relativa que `apps/api/src/index.js` ya usa en producción para servir ese mismo archivo en `GET /brand/:filename` (`apps/api` no tiene paso de build — `"build": "echo no-build-needed"` — así que esta resolución relativa es tan confiable como la que ya está en producción). Evita duplicar el binario y el riesgo de que las dos copias del isotipo diverjan con el tiempo.
 
 ## 21. Export/import requirements
 

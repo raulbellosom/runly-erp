@@ -366,11 +366,41 @@ export function drawPdfHeader(doc, { branding, title, subtitle, folio }) {
   return HEADER_H + 16;
 }
 
+// ─── Runly watermark asset loader ──────────────────────────────────────────────
+// Runly's own product mark for the PDF watermark — distinct from the tenant's
+// uploaded company logo (loadCompanyLogoBuffer above, which comes from Supabase
+// Storage per-company). This is a static asset shipped with the app, read once
+// from disk and cached in memory — same "resolve a repo-relative path from
+// import.meta.url" approach apps/api/src/index.js already uses in production
+// to serve these same brand PNGs at GET /brand/:filename.
+
+let runlyWatermarkBufferPromise = null;
+
+export async function resolveRunlyWatermarkBuffer() {
+  if (!runlyWatermarkBufferPromise) {
+    runlyWatermarkBufferPromise = (async () => {
+      try {
+        const { readFile } = await import("node:fs/promises");
+        const assetUrl = new URL(
+          "../../../../apps/desktop/public/brand/runly-logo-isotype.png",
+          import.meta.url,
+        );
+        return await readFile(assetUrl);
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return runlyWatermarkBufferPromise;
+}
+
 // ─── PDF footer renderer ───────────────────────────────────────────────────────
 // Draws a standard footer: "Generado por <empresa> · fecha" on the left,
-// a discreet "Runly ERP" watermark centered, and page numbers on the right.
+// a discreet "Runly ERP" text watermark centered, page numbers on the right,
+// plus (when `watermarkBuffer` is supplied) a faint Runly isotipo stamped
+// across the page body — independent of any per-company branding.
 
-export function drawPdfFooter(doc, { branding, pageNumber, totalPages }) {
+export function drawPdfFooter(doc, { branding, pageNumber, totalPages, watermarkBuffer }) {
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const MARGIN = 44;
@@ -415,5 +445,19 @@ export function drawPdfFooter(doc, { branding, pageNumber, totalPages }) {
         width: colW,
         align: "right",
       });
+  }
+
+  if (Buffer.isBuffer(watermarkBuffer)) {
+    const markSize = Math.min(170, pageWidth * 0.28);
+    const markX = (pageWidth - markSize) / 2;
+    const markY = (pageHeight - markSize) / 2;
+    doc.save();
+    doc.opacity(0.06);
+    try {
+      doc.image(watermarkBuffer, markX, markY, { fit: [markSize, markSize], align: "center", valign: "center" });
+    } catch {
+      // Missing/unreadable watermark asset must never fail the export.
+    }
+    doc.restore();
   }
 }

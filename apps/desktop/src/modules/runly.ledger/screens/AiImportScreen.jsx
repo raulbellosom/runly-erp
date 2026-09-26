@@ -149,10 +149,12 @@ export default function AiImportScreen() {
               : 'Sube un estado de cuenta (PDF, foto, CSV o Excel) y revisa los movimientos antes de importarlos.'
           }
         />
-        <StepIndicator current={currentStep} />
       </div>
 
-      <div className="flex-1 overflow-auto px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex-1 min-h-0 flex flex-col gap-4 px-4 py-4 sm:flex-row sm:px-6 sm:py-6 overflow-hidden">
+        <ImportStepIndicator steps={STEPS} current={currentStep} />
+
+        <div className="flex-1 min-h-0 overflow-auto">
 
         {/* Step 1: Upload */}
         {!result && (
@@ -182,8 +184,8 @@ export default function AiImportScreen() {
 
         {/* Step 2: Review */}
         {result && (
-          <div className="max-w-5xl mx-auto space-y-4">
-            <Card variant="solid" className="rounded-xl flex items-end gap-3 flex-wrap p-4">
+          <div className="max-w-5xl mx-auto h-full flex flex-col gap-4">
+            <Card variant="solid" className="shrink-0 rounded-xl flex items-end gap-3 flex-wrap p-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-(--brand-soft) text-(--brand-primary)">
                 <Landmark size={18} />
               </div>
@@ -213,14 +215,16 @@ export default function AiImportScreen() {
             </Card>
 
             {rows.length > 0 && (
-              <LedgerStatStrip
-                items={[
-                  { key: 'detected', label: 'Detectados', value: rows.length, icon: FileText, tone: 'brand' },
-                  { key: 'duplicates', label: 'Posibles duplicados', value: duplicateCount, icon: CopyX, tone: 'amber' },
-                  { key: 'deposits', label: 'Total depósitos', value: `+${fmtAmount(totals.deposits)}`, icon: ArrowDownLeft, tone: 'success' },
-                  { key: 'withdrawals', label: 'Total retiros', value: `-${fmtAmount(totals.withdrawals)}`, icon: ArrowUpRight, tone: 'destructive' },
-                ]}
-              />
+              <div className="shrink-0">
+                <LedgerStatStrip
+                  items={[
+                    { key: 'detected', label: 'Detectados', value: rows.length, icon: FileText, tone: 'brand' },
+                    { key: 'duplicates', label: 'Posibles duplicados', value: duplicateCount, icon: CopyX, tone: 'amber' },
+                    { key: 'deposits', label: 'Total depósitos', value: `+${fmtAmount(totals.deposits)}`, icon: ArrowDownLeft, tone: 'success' },
+                    { key: 'withdrawals', label: 'Total retiros', value: `-${fmtAmount(totals.withdrawals)}`, icon: ArrowUpRight, tone: 'destructive' },
+                  ]}
+                />
+              </div>
             )}
 
             {rows.length === 0 ? (
@@ -233,7 +237,7 @@ export default function AiImportScreen() {
             ) : (
               <>
                 {/* Desktop: full editable grid */}
-                <div className="hidden sm:block border border-[hsl(var(--border))] rounded-xl overflow-auto max-h-112">
+                <div className="hidden sm:block flex-1 min-h-0 border border-[hsl(var(--border))] rounded-xl overflow-auto">
                   <table className="w-full text-xs border-collapse">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
@@ -320,7 +324,7 @@ export default function AiImportScreen() {
                 </div>
 
                 {/* Mobile: stacked editable cards */}
-                <div className="sm:hidden border border-[hsl(var(--border))] rounded-xl overflow-auto max-h-140 divide-y divide-[hsl(var(--border)/0.5)]">
+                <div className="sm:hidden flex-1 min-h-0 border border-[hsl(var(--border))] rounded-xl overflow-auto divide-y divide-[hsl(var(--border)/0.5)]">
                   {rows.map((row) => {
                     const isDeposit = Number(row.deposito) > 0
                     return (
@@ -393,6 +397,7 @@ export default function AiImportScreen() {
           </div>
         )}
 
+        </div>
       </div>
 
       {result && rows.length > 0 && (

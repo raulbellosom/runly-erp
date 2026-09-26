@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
 import PDFDocument from 'pdfkit'
-import { drawPdfHeader, drawPdfFooter, toSafeText } from '../../services/pdf-branding-service.js'
+import { drawPdfHeader, drawPdfFooter, resolveRunlyWatermarkBuffer, toSafeText } from '../../services/pdf-branding-service.js'
 
 function fmt(num) {
   return Number(num ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -102,6 +102,7 @@ export async function buildExcelBuffer({ account, rows, branding = EMPTY_BRANDIN
   summary.addRow(['Empresa',          companyName])
   if (toSafeText(branding?.rfc, '-') !== '-') summary.addRow(['RFC', branding.rfc])
   summary.addRow(['Cuenta',           account?.name ?? ''])
+  summary.addRow(['Numero de cuenta', account?.account_number ?? ''])
   summary.addRow(['Banco',            account?.bank ?? ''])
   summary.addRow(['Moneda',           currency])
   summary.addRow(['Periodo',          periodLabel(dateFrom, dateTo)])
@@ -166,12 +167,16 @@ export async function buildPdfBuffer({ account, rows, branding = EMPTY_BRANDING,
     const currency = account?.currency ?? 'MXN'
     const totalDep = rows.reduce((s, r) => s + Number(r.deposito ?? 0), 0)
     const totalRet = rows.reduce((s, r) => s + Number(r.retiro   ?? 0), 0)
+    const accountNumber = toSafeText(account?.account_number, '')
+    const accountSubtitle = accountNumber
+      ? `${account?.name ?? ''} — ${currency} — ${accountNumber}`
+      : `${account?.name ?? ''} — ${currency}`
 
     // Branded header (company name / logo / RFC / address come from the DB)
     let y = drawPdfHeader(doc, {
       branding,
       title: 'Libro de cuentas',
-      subtitle: `${account?.name ?? ''} — ${currency}`,
+      subtitle: accountSubtitle,
       folio: periodLabel(dateFrom, dateTo),
     })
     doc.y = y
@@ -180,25 +185,43 @@ export async function buildPdfBuffer({ account, rows, branding = EMPTY_BRANDING,
     const cols   = [30, 60, 45, 60, 130, 80, 150, 70, 70, 70]
     const headers = ['#', 'Fecha', 'Tipo', 'Numero', 'Nombre', 'Referencia', 'Concepto', 'Deposito', 'Retiro', 'Saldo']
     const startX = doc.page.margins.left
+    const ROW_MIN_HEIGHT = 12
+    const ROW_V_PAD = 3
+
+    // Long "Concepto"/"Nombre" text must wrap within its own row instead of
+    // silently overflowing into the row below — measure the tallest wrapped
+    // cell first, and use that measured height both to decide the page break
+    // (before drawing, so a tall row is never split across a page boundary)
+    // and to advance the cursor afterward.
+    function measureRowHeight(cells, bold) {
+      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7)
+      let maxHeight = ROW_MIN_HEIGHT
+      cells.forEach((text, i) => {
+        const h = doc.heightOfString(String(text ?? ''), { width: cols[i] - 4 })
+        if (h > maxHeight) maxHeight = h
+      })
+      return maxHeight + ROW_V_PAD
+    }
 
     function drawRow(cells, bold = false) {
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7)
-      let x = startX
-      cells.forEach((text, i) => {
-        const align = i >= 7 ? 'right' : 'left'
-        doc.text(String(text ?? ''), x + 2, y, { width: cols[i] - 4, align, lineBreak: false })
-        x += cols[i]
-      })
-      y += 12
-      if (y > doc.page.height - doc.page.margins.bottom - 30) {
+      const rowHeight = measureRowHeight(cells, bold)
+      if (y + rowHeight > doc.page.height - doc.page.margins.bottom - 30) {
         doc.addPage()
         y = drawPdfHeader(doc, {
           branding,
           title: 'Libro de cuentas',
-          subtitle: `${account?.name ?? ''} — ${currency}`,
+          subtitle: accountSubtitle,
           folio: periodLabel(dateFrom, dateTo),
         })
       }
+      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7)
+      let x = startX
+      cells.forEach((text, i) => {
+        const align = i >= 7 ? 'right' : 'left'
+        doc.text(String(text ?? ''), x + 2, y, { width: cols[i] - 4, align })
+        x += cols[i]
+      })
+      y += rowHeight
     }
 
     drawRow(headers, true)
@@ -232,13 +255,15 @@ export async function buildPdfBuffer({ account, rows, branding = EMPTY_BRANDING,
     y += 4
     drawRow(['', '', '', '', '', '', 'TOTAL', fmt(totalDep), fmt(totalRet), ''], true)
 
-    // Branded footer on every page
-    const range = doc.bufferedPageRange()
-    for (let i = 0; i < range.count; i += 1) {
-      doc.switchToPage(range.start + i)
-      drawPdfFooter(doc, { branding, pageNumber: i + 1, totalPages: range.count })
-    }
-
-    doc.end()
+    // Branded footer on every page, including the Runly watermark (fetched
+    // once here, before drawing starts — drawPdfFooter itself stays sync).
+    resolveRunlyWatermarkBuffer().then((watermarkBuffer) => {
+      const range = doc.bufferedPageRange()
+      for (let i = 0; i < range.count; i += 1) {
+        doc.switchToPage(range.start + i)
+        drawPdfFooter(doc, { branding, pageNumber: i + 1, totalPages: range.count, watermarkBuffer })
+      }
+      doc.end()
+    }, reject)
   })
 }

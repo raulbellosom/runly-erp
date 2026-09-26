@@ -2,13 +2,15 @@
 
 Date: 2026-09-25
 Spec: docs/superpowers/specs/2026-09-25-ledger-density-charts-pdf-polish-design.md
-Status: Draft
+Status: In Progress — implemented 2026-09-25; lint/build/tests all pass, but the manual browser walkthrough of §25 acceptance criteria was not performed in this session — see Verification Gate
 
-> **For agentic workers:** Declare `Mode: IMPLEMENTATION` before starting. Do not begin coding until the spec is approved and this plan is approved. Use checkbox syntax (`- [ ]`) to track progress. Mark each task completed only after its validation commands pass.
-
-Mode: PLAN
+Mode: IMPLEMENTATION
 Spec: docs/superpowers/specs/2026-09-25-ledger-density-charts-pdf-polish-design.md
 Plan: docs/superpowers/plans/2026-09-25-ledger-density-charts-pdf-polish.md
+
+> Commissioned directly by the user with explicit instruction to proceed through implementation
+> without further check-ins ("ejecuta todo y toma las mejores decisiones hasta terminar"). That
+> instruction is this plan's approval gate.
 
 ## Goal
 
@@ -25,7 +27,10 @@ Pure frontend + two narrow backend touches, all inside `runly.ledger`'s existing
 ### Create
 
 - `packages/ui/src/components/ImportStepIndicator.jsx`
-- `apps/api/src/assets/runly-mark.png` (or `.svg` if pdfkit's vector support is preferred — decided in Task 10)
+- `apps/api/src/routes/ledger/__tests__/export-service.test.js`
+- `apps/api/src/routes/ledger/__tests__/validators.test.js`
+
+(Task 10's watermark asset was **not** a new file — see Task 10 below, it reuses an existing repo asset instead.)
 
 ### Modify
 
@@ -53,12 +58,12 @@ Pure frontend + two narrow backend touches, all inside `runly.ledger`'s existing
 - Modify: `docs/ai-context/rme3-runtime-capabilities.md`
 
 **Changes:**
-- [ ] Extract the shape of `AiImportScreen.jsx`'s local `StepIndicator`/`STEPS` (lines 15-61) into a reusable `ImportStepIndicator({ steps, current })` component: `steps` is `{ key, label, icon }[]`, `current` is the active step key — same props shape the two screens already compute locally, just lifted out.
-- [ ] Desktop layout (`sm:` and up): render as a narrow vertical rail (`w-56 shrink-0 flex flex-col gap-2`) instead of the current horizontal `flex-wrap` row of `min-w-48` cards.
-- [ ] Mobile layout (below `sm:`): render as a single compact horizontal strip (icon + "Paso N" only, no full label block) so it doesn't consume width from the review table on narrow viewports (spec §23 edge case #7).
-- [ ] Keep the existing done/active/pending visual states (checkmark vs number badge, brand-tinted active card) — same tokens (`--brand-primary`, `--brand-soft`, `hsl(var(--border))`) already used today, no new palette.
-- [ ] Export from `packages/ui/src/index.js`.
-- [ ] Add a row for `ImportStepIndicator` under the appropriate table in `docs/ai-context/rme3-runtime-capabilities.md` (per CLAUDE.md's "Adding a new reusable component" steps 1-3).
+- [x] Extract the shape of `AiImportScreen.jsx`'s local `StepIndicator`/`STEPS` (lines 15-61) into a reusable `ImportStepIndicator({ steps, current })` component: `steps` is `{ key, label, icon }[]`, `current` is the active step key — same props shape the two screens already compute locally, just lifted out.
+- [x] Desktop layout (`sm:` and up): render as a narrow vertical rail (`w-56 shrink-0 flex flex-col gap-2`) instead of the current horizontal `flex-wrap` row of `min-w-48` cards.
+- [x] Mobile layout (below `sm:`): render as a single compact horizontal strip (icon + "Paso N" only, no full label block) so it doesn't consume width from the review table on narrow viewports (spec §23 edge case #7).
+- [x] Keep the existing done/active/pending visual states (checkmark vs number badge, brand-tinted active card) — same tokens (`--brand-primary`, `--brand-soft`, `hsl(var(--border))`) already used today, no new palette.
+- [x] Export from `packages/ui/src/index.js`.
+- [x] Add a row for `ImportStepIndicator` under the appropriate table in `docs/ai-context/rme3-runtime-capabilities.md` (per CLAUDE.md's "Adding a new reusable component" steps 1-3).
 
 **Validation:**
 ```bash
@@ -74,18 +79,18 @@ Result: no errors/warnings.
 - Modify: `apps/desktop/src/modules/runly.ledger/screens/AiImportScreen.jsx`
 
 **Changes:**
-- [ ] Remove the local `STEPS` array and `StepIndicator` function (lines 15-61); import `ImportStepIndicator` from `@runly/ui` instead, passing the same `STEPS`-shaped array inline or as a module-level const reused by the render.
-- [ ] Restructure the screen's outer layout to `h-full flex` with `ImportStepIndicator` as a fixed-width sidebar (desktop) / top strip (mobile), and the step content (`flex-1 overflow-auto ...` at line 197) as the remaining flex child.
-- [ ] Replace the review table's `max-h-112` (line 278, desktop) and `max-h-140` (line 365, mobile) with `flex-1 min-h-0` inside a `flex flex-col h-full` ancestor, so the table fills whatever vertical space the viewport actually has.
-- [ ] Re-verify keyboard/row-editing handlers (`updateRow`, duplicate-row checkbox) are untouched — this task only changes container className/structure, not row logic.
+- [x] Remove the local `STEPS` array and `StepIndicator` function (lines 15-61); import `ImportStepIndicator` from `@runly/ui` instead, passing the same `STEPS`-shaped array inline or as a module-level const reused by the render.
+- [x] Restructure the screen's outer layout to `h-full flex` with `ImportStepIndicator` as a fixed-width sidebar (desktop) / top strip (mobile), and the step content (`flex-1 overflow-auto ...` at line 197) as the remaining flex child.
+- [x] Replace the review table's `max-h-112` (line 278, desktop) and `max-h-140` (line 365, mobile) with `flex-1 min-h-0` inside a `flex flex-col h-full` ancestor, so the table fills whatever vertical space the viewport actually has.
+- [x] Re-verify keyboard/row-editing handlers (`updateRow`, duplicate-row checkbox) are untouched — this task only changes container className/structure, not row logic.
 
 **Validation:**
 ```bash
 npx eslint apps/desktop/src/modules/runly.ledger/screens/AiImportScreen.jsx
 wc -l apps/desktop/src/modules/runly.ledger/screens/AiImportScreen.jsx
 ```
-Result: no lint errors; line count stays well under the 800-line proactive-split threshold.
-Manual: `pnpm dev`, upload a statement, confirm the paso 2 table fills the window at several heights and the stepper reads correctly on a narrow (mobile-width) browser.
+Result: no lint errors; 431 lines (well under the 800-line proactive-split threshold).
+Manual (not performed — no browser available in this session): `pnpm dev`, upload a statement, confirm the paso 2 table fills the window at several heights and the stepper reads correctly on a narrow (mobile-width) browser.
 
 ---
 
@@ -95,17 +100,17 @@ Manual: `pnpm dev`, upload a statement, confirm the paso 2 table fills the windo
 - Modify: `apps/desktop/src/modules/runly.ledger/screens/ImportWizard.jsx`
 
 **Changes:**
-- [ ] Remove the local `STEPS`/step-pill markup (around line 201); adopt `ImportStepIndicator` the same way as Task 2.
-- [ ] Replace `max-h-40` (line 324) and `max-h-64` (line 336) with `flex-1 min-h-0` under a `flex flex-col h-full` ancestor.
-- [ ] Confirm this screen's own row-editing/commit logic is untouched — layout-only change, mirroring Task 2's scope discipline.
+- [x] Remove the local `STEPS`/step-pill markup (around line 201); adopt `ImportStepIndicator` the same way as Task 2.
+- [x] Replace `max-h-40` (line 324) and `max-h-64` (line 336) with `flex-1 min-h-0` under a `flex flex-col h-full` ancestor.
+- [x] Confirm this screen's own row-editing/commit logic is untouched — layout-only change, mirroring Task 2's scope discipline.
 
 **Validation:**
 ```bash
 npx eslint apps/desktop/src/modules/runly.ledger/screens/ImportWizard.jsx
 wc -l apps/desktop/src/modules/runly.ledger/screens/ImportWizard.jsx
 ```
-Result: no lint errors; line count checked.
-Manual: `pnpm dev`, run the manual CSV/XLSX import end to end, confirm layout parity with Task 2.
+Result: no lint errors; 360 lines.
+Manual (not performed): `pnpm dev`, run the manual CSV/XLSX import end to end, confirm layout parity with Task 2.
 
 ---
 
@@ -116,18 +121,18 @@ Manual: `pnpm dev`, run the manual CSV/XLSX import end to end, confirm layout pa
 - Modify: `apps/desktop/src/modules/runly.ledger/screens/SpreadsheetRegister.jsx`
 
 **Changes:**
-- [ ] In `AccountScreen.jsx`, initialize `headerCollapsed` based on the transaction count `SpreadsheetRegister` already loads for the active account (thread a `rowCount`/`onRowCountChange` callback or lift the count up, per spec §23 edge case #8 — no new query). Define the threshold (e.g. `> 20`) as a named constant near `TABS`. Recompute when `accountId` changes (effect keyed on `accountId`, not just mount) so switching accounts without a full reload re-evaluates the default.
-- [ ] Remove the `Desde`/`Hasta` `DatePickerField` pair from the tabs row (lines 423-455, desktop; 460-488, mobile) and instead pass `dateFrom`/`dateTo`/`setDateFrom`/`setDateTo` down as props to `SpreadsheetRegister`.
-- [ ] In `SpreadsheetRegister.jsx`, render the received date-range controls in the same row as the existing `SearchInput` (line ~197-201), reusing the exact same `DatePickerField`/clear-button markup being moved (no new component, no new styling decisions).
-- [ ] Tabs (Registro/Resumen/Acceso) keep their own row, now without the date filters beside them.
+- [x] In `AccountScreen.jsx`, initialize `headerCollapsed` based on the transaction count `SpreadsheetRegister` already loads for the active account (thread a `rowCount`/`onRowCountChange` callback or lift the count up, per spec §23 edge case #8 — no new query). Define the threshold (e.g. `> 20`) as a named constant near `TABS`. Recompute when `accountId` changes (effect keyed on `accountId`, not just mount) so switching accounts without a full reload re-evaluates the default.
+- [x] Remove the `Desde`/`Hasta` `DatePickerField` pair from the tabs row (lines 423-455, desktop; 460-488, mobile) and instead pass `dateFrom`/`dateTo`/`setDateFrom`/`setDateTo` down as props to `SpreadsheetRegister`.
+- [x] In `SpreadsheetRegister.jsx`, render the received date-range controls in the same row as the existing `SearchInput` (line ~197-201), reusing the exact same `DatePickerField`/clear-button markup being moved (no new component, no new styling decisions).
+- [x] Tabs (Registro/Resumen/Acceso) keep their own row, now without the date filters beside them.
 
 **Validation:**
 ```bash
 npx eslint apps/desktop/src/modules/runly.ledger/screens/AccountScreen.jsx apps/desktop/src/modules/runly.ledger/screens/SpreadsheetRegister.jsx
 wc -l apps/desktop/src/modules/runly.ledger/screens/AccountScreen.jsx
 ```
-Result: no lint errors; line count checked against the 800/1000/1500 thresholds.
-Manual: open an account with >20 movements and confirm the header starts collapsed; open one with fewer and confirm it starts expanded; confirm date filters now sit beside the search input at desktop width, and tabs are alone in their row.
+Result: no lint errors; `AccountScreen.jsx` 689 lines, `SpreadsheetRegister.jsx` 391 lines — both well under the 800-line proactive-split threshold.
+Manual (not performed): open an account with >20 movements and confirm the header starts collapsed; open one with fewer and confirm it starts expanded; confirm date filters now sit beside the search input at desktop width, and tabs are alone in their row.
 
 ---
 
@@ -137,15 +142,15 @@ Manual: open an account with >20 movements and confirm the header starts collaps
 - Modify: `apps/api/src/routes/ledger/summary-service.js`
 
 **Changes:**
-- [ ] Add a `byMonthRows` query alongside the existing `byCategoryRows` query, grouping by `date_trunc('month', fecha)` instead of category, within the same `dateFrom`/`dateTo` window, ordering chronologically by the truncated date (not the formatted string — spec §23 edge case #9).
-- [ ] Map rows to `{ month: 'YYYY-MM', deposito: number, retiro: number }` and add as `by_month` in the returned object, alongside `kpis`/`balance_series`/`by_category` (purely additive — no existing key removed or renamed).
+- [x] Add a `byMonthRows` query alongside the existing `byCategoryRows` query, grouping by `date_trunc('month', fecha)` instead of category, within the same `dateFrom`/`dateTo` window, ordering chronologically by the truncated date (not the formatted string — spec §23 edge case #9).
+- [x] Map rows to `{ month: 'YYYY-MM', deposito: number, retiro: number }` and add as `by_month` in the returned object, alongside `kpis`/`balance_series`/`by_category` (purely additive — no existing key removed or renamed).
 
 **Validation:**
 ```bash
 node --check apps/api/src/routes/ledger/summary-service.js
 ```
 Result: syntax check passes.
-Manual: `GET /ledger/accounts/:id/summary` via the running dev API (browser devtools network tab while viewing the Resumen tab, or a local curl with a real session) and confirm `by_month` appears, sorted chronologically, for a date range spanning a year boundary.
+Manual (not performed — requires a running dev API + live Supabase session): `GET /ledger/accounts/:id/summary` via the running dev API (browser devtools network tab while viewing the Resumen tab, or a local curl with a real session) and confirm `by_month` appears, sorted chronologically, for a date range spanning a year boundary.
 
 ---
 
@@ -155,18 +160,18 @@ Manual: `GET /ledger/accounts/:id/summary` via the running dev API (browser devt
 - Modify: `apps/desktop/src/modules/runly.ledger/screens/AccountSummary.jsx`
 
 **Changes:**
-- [ ] Fix the "Distribución" Pie's clipping: recompute `cy`/`outerRadius` (or reserve legend height explicitly, e.g. via a fixed `Legend` height subtracted from the container height before computing `cy`) so the ring never overlaps the legend or the card edge, including the single-slice case (spec §23 edge case #6).
-- [ ] Add `cursor={{ fill: 'hsl(var(--muted) / 0.15)' }}` to the Bar chart's `<Tooltip>` (currently line 327) and a theme-aware line cursor (`stroke={C_BORDER}`) to the Area chart's `<Tooltip>` (currently line 231), removing Recharts' default gray/white cursor in both.
-- [ ] Add a "Top categorías" `Section` (reusing the existing horizontal-bar pattern from "Por categoria"): sort `by_category` by `deposito + retiro` descending, take the top 5, fold the remainder into a synthetic "Otras" row — purely a frontend reshape of data already returned today, no new query.
-- [ ] Add an "Ingresos vs egresos por mes" `Section`: grouped vertical bars (Ingreso/Egreso) keyed by the new `by_month` field from Task 5, `tickFormatter` reusing `fmtCompact`, x-axis labeled by month.
-- [ ] Both new sections follow the existing `hasData`-gated rendering pattern (don't render, or show nothing extra, when their backing array is empty).
+- [x] Fix the "Distribución" Pie's clipping: recompute `cy`/`outerRadius` (or reserve legend height explicitly, e.g. via a fixed `Legend` height subtracted from the container height before computing `cy`) so the ring never overlaps the legend or the card edge, including the single-slice case (spec §23 edge case #6).
+- [x] Add `cursor={{ fill: 'hsl(var(--muted) / 0.15)' }}` to the Bar chart's `<Tooltip>` (currently line 327) and a theme-aware line cursor (`stroke={C_BORDER}`) to the Area chart's `<Tooltip>` (currently line 231), removing Recharts' default gray/white cursor in both.
+- [x] Add a "Top categorías" `Section` (reusing the existing horizontal-bar pattern from "Por categoria"): sort `by_category` by `deposito + retiro` descending, take the top 5, fold the remainder into a synthetic "Otras" row — purely a frontend reshape of data already returned today, no new query.
+- [x] Add an "Ingresos vs egresos por mes" `Section`: grouped vertical bars (Ingreso/Egreso) keyed by the new `by_month` field from Task 5, `tickFormatter` reusing `fmtCompact`, x-axis labeled by month.
+- [x] Both new sections follow the existing `hasData`-gated rendering pattern (don't render, or show nothing extra, when their backing array is empty).
 
 **Validation:**
 ```bash
 npx eslint apps/desktop/src/modules/runly.ledger/screens/AccountSummary.jsx
 ```
-Result: no lint errors.
-Manual: `pnpm dev`, open Resumen in dark mode, confirm the donut is no longer clipped (including on an account with only one of Ingreso/Egreso present), confirm hover cursors on bar/area charts are theme-aware, and confirm "Top categorías" and "Ingresos vs egresos por mes" render with real data.
+Result: no lint errors; 473 lines.
+Manual (not performed): `pnpm dev`, open Resumen in dark mode, confirm the donut is no longer clipped (including on an account with only one of Ingreso/Egreso present), confirm hover cursors on bar/area charts are theme-aware, and confirm "Top categorías" and "Ingresos vs egresos por mes" render with real data.
 
 ---
 
@@ -177,16 +182,17 @@ Manual: `pnpm dev`, open Resumen in dark mode, confirm the donut is no longer cl
 - Modify: `apps/api/src/routes/users-routes.js`
 
 **Changes:**
-- [ ] `userSearchQuerySchema`: change `q` from required-min-2 to `.optional()` (still `.min(2)` when present); confirm `limit` keeps its existing default/clamp.
-- [ ] `users-routes.js`: when `q` is absent, skip the `ILIKE` predicate entirely (list first `limit` — default 20 in this branch, per spec §12/§24 risk #2 — company members ordered by `display_name`, still excluding the actor and bots via the same `WHERE` clauses already in place); when `q` is present, keep today's exact query and its existing `limit`.
-- [ ] Keep the `requirePermission('ledger.accounts.read')` guard unchanged.
+- [x] `userSearchQuerySchema`: change `q` from required-min-2 to `.optional()` (still `.min(2)` when present); confirm `limit` keeps its existing default/clamp.
+- [x] `users-routes.js`: when `q` is absent, skip the `ILIKE` predicate entirely (list first `limit` — default 20 in this branch, per spec §12/§24 risk #2 — company members ordered by `display_name`, still excluding the actor and bots via the same `WHERE` clauses already in place); when `q` is present, keep today's exact query and its existing `limit`.
+- [x] Keep the `requirePermission('ledger.accounts.read')` guard unchanged.
 
 **Validation:**
 ```bash
 node --check apps/api/src/routes/users-routes.js apps/api/src/routes/ledger/validators.js
+node --test apps/api/src/routes/ledger/__tests__/*.test.js
 ```
-Result: syntax check passes.
-Manual: call `GET /users/search` (no `q`) via the dev API and confirm it returns up to 20 company members instead of a 400; confirm `GET /users/search?q=a` still 400s (min 2 chars) and `?q=an` still searches as before.
+Result: syntax check passes. `validators.test.js` (new) covers `userSearchQuerySchema` directly: missing `q` accepted with `limit` defaulting to 10, `q: 'a'` still rejected, `q: 'an'` still accepted — part of the same 65-test/0-failure run reported in Task 9.
+Manual (not performed — requires a running dev API): call `GET /users/search` (no `q`) via the dev API and confirm it returns up to 20 company members instead of a 400; confirm `GET /users/search?q=a` still 400s (min 2 chars) and `?q=an` still searches as before.
 
 ---
 
@@ -196,17 +202,17 @@ Manual: call `GET /users/search` (no `q`) via the dev API and confirm it returns
 - Modify: `packages/ui/src/components/UserSearchModal.jsx`
 
 **Changes:**
-- [ ] On open (and whenever `query` is empty), fire the same debounced fetch already used for search, but with no `q` query param, capped at `limit=20`, so the "no selection yet" results list (lines 75-99) is populated by default instead of only appearing once `query.length >= 2`.
-- [ ] Preserve `excludeIds` filtering exactly as it works today (already applied client-side to `results`, line 41).
-- [ ] Keep the existing empty-state copy ("No se encontraron usuarios.") for the case where the company has no other eligible users (spec §23 edge case #4).
-- [ ] No change to the post-selection role picker (`SelectField` at lines 122-130) or the confirm/cancel footer.
+- [x] On open (and whenever `query` is empty), fire the same debounced fetch already used for search, but with no `q` query param, capped at `limit=20`, so the "no selection yet" results list (lines 75-99) is populated by default instead of only appearing once `query.length >= 2`.
+- [x] Preserve `excludeIds` filtering exactly as it works today (already applied client-side to `results`, line 41).
+- [x] Keep the existing empty-state copy ("No se encontraron usuarios.") for the case where the company has no other eligible users (spec §23 edge case #4).
+- [x] No change to the post-selection role picker (`SelectField` at lines 122-130) or the confirm/cancel footer.
 
 **Validation:**
 ```bash
 npx eslint packages/ui/src/components/UserSearchModal.jsx
 ```
 Result: no lint errors.
-Manual: open "Compartir" from the Acceso tab on an account whose company has ≥2 other members and confirm the default list appears immediately; confirm it still narrows correctly once text is typed; confirm a single-user company shows the "no encontrados" message instead of hanging.
+Manual (not performed): open "Compartir" from the Acceso tab on an account whose company has ≥2 other members and confirm the default list appears immediately; confirm it still narrows correctly once text is typed; confirm a single-user company shows the "no encontrados" message instead of hanging.
 
 ---
 
@@ -216,39 +222,42 @@ Manual: open "Compartir" from the Acceso tab on an account whose company has ≥
 - Modify: `apps/api/src/routes/ledger/export-service.js`
 
 **Changes:**
-- [ ] In `buildPdfBuffer`'s `drawRow`, replace the fixed `y += 12` with a measured height: compute `doc.heightOfString(text, { width: cols[i] - 4 })` for every cell in the row (with `lineBreak` enabled, dropping the current `lineBreak: false`), take the max across cells, and advance `y` by that value (plus the existing small padding).
-- [ ] Move the existing page-break check (`if (y > doc.page.height - ...) { doc.addPage(); ... }`) so it evaluates using the row's *measured* height before drawing that row's text, not after — preventing a tall wrapped row from being split across the page boundary mid-row (spec §23 edge case #1).
-- [ ] Change the header call's `subtitle` (currently `` `${account?.name ?? ''} — ${currency}` `` at line 174, and again in the mid-export `addPage` branch) to append `` — ${account.account_number}`` only when `account.account_number` is a non-empty string (spec §23 edge case #2).
-- [ ] In `buildExcelBuffer`'s "Resumen" sheet (around line 104), add `summary.addRow(['Numero de cuenta', account?.account_number ?? ''])` next to the existing `Cuenta`/`Banco`/`Moneda` rows.
+- [x] In `buildPdfBuffer`'s `drawRow`, replace the fixed `y += 12` with a measured height: compute `doc.heightOfString(text, { width: cols[i] - 4 })` for every cell in the row (with `lineBreak` enabled, dropping the current `lineBreak: false`), take the max across cells, and advance `y` by that value (plus the existing small padding).
+- [x] Move the existing page-break check (`if (y > doc.page.height - ...) { doc.addPage(); ... }`) so it evaluates using the row's *measured* height before drawing that row's text, not after — preventing a tall wrapped row from being split across the page boundary mid-row (spec §23 edge case #1).
+- [x] Change the header call's `subtitle` (currently `` `${account?.name ?? ''} — ${currency}` `` at line 174, and again in the mid-export `addPage` branch) to append `` — ${account.account_number}`` only when `account.account_number` is a non-empty string (spec §23 edge case #2).
+- [x] In `buildExcelBuffer`'s "Resumen" sheet (around line 104), add `summary.addRow(['Numero de cuenta', account?.account_number ?? ''])` next to the existing `Cuenta`/`Banco`/`Moneda` rows.
 
 **Validation:**
 ```bash
 node --check apps/api/src/routes/ledger/export-service.js
+node --test apps/api/src/routes/ledger/__tests__/*.test.js
 ```
-Result: syntax check passes.
-Manual: export the PDF for an account containing a transaction with a `concepto` >150 characters; visually confirm the row wraps without overlapping the next row, confirm the page-break still triggers correctly for a large export (several hundred synthetic rows), confirm the subtitle shows `nombre — moneda — numero_de_cuenta`, and confirm the Excel "Resumen" sheet has the new row.
+Result: syntax check passes. Added `apps/api/src/routes/ledger/__tests__/export-service.test.js` (asserts `buildPdfBuffer` doesn't throw on a 120-row export with a deliberately long `concepto` cell and produces a valid `%PDF-` buffer; asserts it also succeeds for an account with `account_number: null`; asserts `buildExcelBuffer`'s Resumen sheet contains the new "Numero de cuenta" row with the right value, read back via `ExcelJS.Workbook#load`) and `validators.test.js` (Task 7). Full suite: `node --test apps/api/src/routes/ledger/__tests__/*.test.js` → **pass 65, fail 0** (21 suites, including the 2 new files). A separate ad hoc smoke script (300 synthetic rows, one with an extremely long concept spanning what would be several visual lines) additionally confirmed multi-page pagination doesn't throw or corrupt output; deleted after use.
+Manual (not performed — no live UI/PDF viewer in this session): export the PDF for an account containing a transaction with a `concepto` >150 characters; visually confirm the row wraps without overlapping the next row, confirm the subtitle shows `nombre — moneda — numero_de_cuenta`, and confirm the Excel "Resumen" sheet has the new row when opened in a spreadsheet app.
 
 ---
 
 ## Task 10 — PDF: Runly isotipo watermark
 
 **Files:**
-- Create: `apps/api/src/assets/runly-mark.png` (or `.svg`, decided during this task based on pdfkit's image support and file size)
 - Modify: `apps/api/src/services/pdf-branding-service.js`
+- Modify: `apps/api/src/routes/ledger/export-service.js`
 
 **Changes:**
-- [ ] Add the static Runly product-mark asset under `apps/api/src/assets/` (distinct from the per-company `logoBuffer` already loaded from Supabase Storage — spec §20 draws this distinction explicitly; do not reuse `branding.logoBuffer` for this).
-- [ ] Load it once at module init (cached in memory, not re-read per request) via a path resolved from `import.meta.url`.
-- [ ] In `drawPdfFooter`, draw the mark at low opacity (`doc.opacity(0.08)`–`0.12`, restoring `doc.opacity(1)` afterward) centered in the footer area or as a page watermark — pick the placement that stays legible against the existing footer text/rule during the manual check in this task.
-- [ ] Confirm the watermark renders even when `branding` is `EMPTY_BRANDING` (no per-company logo configured) — it must not depend on `branding.logoBuffer` (spec §23 edge case #3).
+- [x] **Deviation from the original plan (better option found during Discovery):** instead of creating a new `apps/api/src/assets/runly-mark.png`, `resolveRunlyWatermarkBuffer()` reads the **already-existing** `apps/desktop/public/brand/runly-logo-isotype.png` — the same file `apps/api/src/index.js` already serves in production at `GET /brand/:filename` via an identical `path.resolve(currentDir, "../../../apps/desktop/public/brand")` pattern. Reusing it avoids a second copy of the same binary drifting out of sync, and the precedent in `index.js` is direct proof this relative-path resolution already works in production (distinct from the per-company `branding.logoBuffer` loaded from Supabase Storage — spec §20's distinction still holds, just backed by an existing file instead of a new one).
+- [x] Loaded once via a module-level cached promise (`runlyWatermarkBufferPromise`) using `node:fs/promises` `readFile` against a `new URL(..., import.meta.url)` path — not re-read per request.
+- [x] `drawPdfFooter` draws it as a large (≈170pt, capped at 28% of page width), low-opacity (`doc.opacity(0.06)`, via `doc.save()`/`doc.restore()`) mark centered on the page body — a true "watermark" placement rather than squeezed into the thin footer text row, which doesn't have vertical room for a legible logo.
+- [x] Guarded with `Buffer.isBuffer(watermarkBuffer)` and a try/catch around `doc.image()` — a missing/unreadable asset silently skips the watermark instead of failing the export; does not depend on `branding`/`branding.logoBuffer` at all, so it renders identically for `EMPTY_BRANDING` (spec §23 edge case #3).
 
 **Validation:**
 ```bash
 node --check apps/api/src/services/pdf-branding-service.js
-pnpm build
+node --check apps/api/src/routes/ledger/export-service.js
+npx eslint apps/api/src/services/pdf-branding-service.js apps/api/src/routes/ledger/export-service.js
 ```
-Result: syntax check passes; `pnpm build` confirms the asset resolves inside the built `apps/api` output, not only under `pnpm dev:api` (spec risk #4 — verify the file is actually present/reachable in the build output, not just working via a dev-time relative path).
-Manual: export a PDF for a company with no branding configured and one with branding configured; confirm the Runly watermark appears in both, and that it doesn't visually collide with the existing "Hecho con Runly ERP" text or the page-number block.
+Result: syntax checks and lint both pass.
+Additional validation actually run (in place of `pnpm build`, since `apps/api`'s `build` script is `echo no-build-needed` — there is no bundling step to validate; the relative-path resolution is proven by the already-shipped `index.js` precedent instead): a standalone Node smoke script imported `resolveRunlyWatermarkBuffer()` and `buildPdfBuffer()` directly (via `pathToFileURL` + dynamic `import()`, run with `cwd` at the repo root exactly as the deployed process runs) — the watermark loaded (393,431 bytes, matching the source PNG on disk) and the resulting PDF (with a real long-`concepto` row and an `account_number`) was 498,695 bytes with no exceptions. The script was written to the session scratchpad and deleted after use, per this repo's temporary-script rule.
+Manual (not performed — no live UI available in this session): open the exported PDF for a company with no branding configured and one with branding configured; confirm the Runly watermark appears in both and doesn't obscure the table text or collide with the footer's existing "Hecho con Runly ERP" text/page-number block.
 
 ---
 
@@ -265,8 +274,8 @@ Manual: export a PDF for a company with no branding configured and one with bran
 
 Before marking any task complete in `docs/TASKS.md` (if this work is logged there):
 
-- [ ] All task validation commands have been run.
-- [ ] All commands exited without errors.
-- [ ] Verification checklist at `docs/superpowers/templates/verification-checklist-template.md` has been filled in.
-- [ ] Manual browser walkthrough of the spec's §25 acceptance criteria (all 11) has been performed — this plan's per-task "Manual" steps cover them individually, but a final end-to-end pass over the account used for the original screenshots ("Prueba") is the closing check before calling this Complete.
-- [ ] `docs/TASKS.md` updated with `Verified: YYYY-MM-DD (commands executed)` if this work is tracked there as a phase/checklist entry.
+- [x] All task validation commands have been run — every `node --check`/`eslint` listed per task, plus `pnpm build:web` (apps/desktop Vite build — `apps/api`'s own `build` script is `echo no-build-needed`, so this is the meaningful build check for this plan), `pnpm lint` (root), `pnpm lint:packages`, and the full `node --test apps/api/src/routes/ledger/__tests__/*.test.js` suite (65 tests, including two new files added for this plan: `export-service.test.js` and `validators.test.js`).
+- [x] All commands exited without errors — `pnpm build:web`: "✓ built in 8.79s", 8153 modules, no errors (only a pre-existing large-chunk-size warning, unrelated to this plan). `pnpm lint` / `pnpm lint:packages`: clean. Tests: `pass 65, fail 0`. A standalone smoke script also confirmed `buildPdfBuffer`/`buildExcelBuffer` succeed against a 300-row dataset with a deliberately long "Concepto" string, and that the Runly watermark asset resolves and embeds (final PDF ~499KB with watermark, vs ~44KB in the no-watermark smoke run).
+- [ ] Verification checklist at `docs/superpowers/templates/verification-checklist-template.md` has been filled in — not run in this session; the checks above (lint/build/tests/smoke) cover the mechanical half but the template's UI-facing items still need a human pass.
+- [ ] Manual browser walkthrough of the spec's §25 acceptance criteria (all 11) has been performed — NOT done in this session (no browser-automation tool available). Everything was validated via lint, `pnpm build:web`, the ledger test suite, and a Node smoke script that exercises `buildPdfBuffer`/`buildExcelBuffer`/`resolveRunlyWatermarkBuffer` directly — not by clicking through the running app. Recommend a manual pass over the "Prueba" account (the one from the original screenshots) before calling this fully Complete: paso 2 of the AI import wizard, the manual CSV/XLSX wizard, Registro (header auto-collapse + merged filter row), Resumen (donut clipping, dark-mode tooltip cursor, the two new charts), "Compartir" default listing, and a PDF export with a long `concepto`.
+- [ ] `docs/TASKS.md` — not updated; this is a follow-up UX/polish pass on an existing module (mirroring `docs/superpowers/specs/2026-09-23-ledger-ui-redesign-design.md`, which also has no `docs/TASKS.md` entry), not a new tracked phase.

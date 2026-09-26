@@ -1,12 +1,11 @@
 import { companyFetch } from '../../../lib/companyFetch.js'
 // apps/desktop/src/modules/runly.ledger/screens/AccountScreen.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   Badge,
-  DatePickerField,
   UserSearchModal,
   ConfirmDialog,
   EmptyState,
@@ -68,6 +67,11 @@ const TABS = [
 
 const MEMBER_ROLE_BADGE_VARIANT = { editor: "secondary", viewer: "outline" };
 
+// Accounts with more movements than this start with the header collapsed, so
+// the register table gets the vertical space by default — the user can still
+// toggle it manually at any time.
+const HEADER_AUTO_COLLAPSE_THRESHOLD = 20;
+
 function fmtCurrency(amount, currency = "MXN") {
   return Number(amount ?? 0).toLocaleString("es-MX", {
     style: "currency",
@@ -87,6 +91,8 @@ export default function AccountScreen() {
 
   const [activeTab, setActiveTab] = useState("registro");
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const [registerRowCount, setRegisterRowCount] = useState(null);
+  const autoCollapseAppliedFor = useRef(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -100,6 +106,22 @@ export default function AccountScreen() {
     currency: "MXN",
   });
   const [editSaving, setEditSaving] = useState(false);
+
+  // Reset the pending row count whenever the account changes, so a stale
+  // count from the previous account can't drive the auto-collapse decision.
+  useEffect(() => {
+    setRegisterRowCount(null);
+  }, [accountId]);
+
+  // Auto-collapse the header once per account load, as soon as the register
+  // reports its real transaction count — never overrides a manual toggle
+  // the user makes afterward.
+  useEffect(() => {
+    if (registerRowCount == null) return;
+    if (autoCollapseAppliedFor.current === accountId) return;
+    autoCollapseAppliedFor.current = accountId;
+    setHeaderCollapsed(registerRowCount > HEADER_AUTO_COLLAPSE_THRESHOLD);
+  }, [accountId, registerRowCount]);
 
   const queryClient = useQueryClient();
 
@@ -405,87 +427,19 @@ export default function AccountScreen() {
       </div>
 
       <div className="border-b border-[hsl(var(--border))] px-4 sm:px-6 py-2.5 shrink-0">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              {TABS.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <TabsTrigger key={tab.key} value={tab.key} className="gap-1.5">
-                    <Icon size={14} />
-                    {tab.label}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </Tabs>
-
-          {activeTab === "registro" && (
-            <div className="hidden sm:flex items-center gap-2 py-2">
-              <DatePickerField
-                compact
-                placeholder="Desde"
-                aria-label="Filtrar desde"
-                value={dateFrom || undefined}
-                onChange={(val) => setDateFrom(val ?? "")}
-              />
-              <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                —
-              </span>
-              <DatePickerField
-                compact
-                placeholder="Hasta"
-                aria-label="Filtrar hasta"
-                value={dateTo || undefined}
-                onChange={(val) => setDateTo(val ?? "")}
-              />
-              {(dateFrom || dateTo) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDateFrom("");
-                    setDateTo("");
-                  }}
-                  className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-                  title="Limpiar filtro"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Date filters — mobile only, below tabs */}
-        {activeTab === "registro" && (
-          <div className="sm:hidden flex items-center gap-2 pb-2">
-            <DatePickerField
-              compact
-              placeholder="Desde"
-              aria-label="Filtrar desde"
-              value={dateFrom || undefined}
-              onChange={(val) => setDateFrom(val ?? "")}
-            />
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>
-            <DatePickerField
-              compact
-              placeholder="Hasta"
-              aria-label="Filtrar hasta"
-              value={dateTo || undefined}
-              onChange={(val) => setDateTo(val ?? "")}
-            />
-            {(dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={() => { setDateFrom(""); setDateTo(""); }}
-                className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-                title="Limpiar filtro"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        )}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger key={tab.key} value={tab.key} className="gap-1.5">
+                  <Icon size={14} />
+                  {tab.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -494,6 +448,9 @@ export default function AccountScreen() {
             accountId={accountId}
             dateFrom={dateFrom || undefined}
             dateTo={dateTo || undefined}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
+            onRowCountChange={setRegisterRowCount}
             types={types}
             categories={categories}
             canWrite={canWriteRegister}

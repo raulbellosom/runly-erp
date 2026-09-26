@@ -27,13 +27,17 @@ export function UserSearchModal({ open, onClose, onConfirm, roles = [], excludeI
   }, [open, roles])
 
   useEffect(() => {
-    if (query.length < 2) { setResults([]); return }
+    // Once a user is selected, the picker list is hidden — no need to fetch.
+    if (!open || selected) return
+    const isSearching = query.length >= 2
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
+        const params = new URLSearchParams({ limit: isSearching ? '10' : '20' })
+        if (isSearching) params.set('q', query)
         const res = await fetch(
-          `${apiBase}/users/search?q=${encodeURIComponent(query)}&limit=10`,
+          `${apiBase}/users/search?${params.toString()}`,
           { headers: buildApiHeaders(token, companyId) }
         )
         if (!res.ok) { setResults([]); return }
@@ -44,9 +48,10 @@ export function UserSearchModal({ open, onClose, onConfirm, roles = [], excludeI
       } finally {
         setLoading(false)
       }
-    }, 300)
+      // No debounce needed for the default (no-query) listing fetched on open.
+    }, isSearching ? 300 : 0)
     return () => clearTimeout(debounceRef.current)
-  }, [query, apiBase, token, companyId, excludeIds])
+  }, [open, selected, query, apiBase, token, companyId, excludeIds])
 
   function handleConfirm() {
     if (!selected || !role) return
@@ -72,7 +77,7 @@ export function UserSearchModal({ open, onClose, onConfirm, roles = [], excludeI
             />
           )}
 
-          {!selected && query.length >= 2 && (
+          {!selected && (
             <div className="max-h-52 overflow-y-auto rounded-md border border-[hsl(var(--border))]">
               {loading && (
                 <div className="p-3 text-sm text-[hsl(var(--muted-foreground))]">Buscando...</div>

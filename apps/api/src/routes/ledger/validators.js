@@ -117,7 +117,7 @@ export const moveAccountGroupSchema = z.object({
 // ── User search ───────────────────────────────────────────────────────────────
 
 export const userSearchQuerySchema = z.object({
-  q:     z.string().trim().min(2).max(100),
+  q:     z.string().trim().min(2).max(100).optional(),
   limit: z.coerce.number().int().min(1).max(20).default(10),
 })
 

@@ -1,9 +1,9 @@
 // apps/desktop/src/modules/runly.ledger/screens/SpreadsheetRegister.jsx
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOfflineStatus } from '@runly/offline'
 import { toast } from 'sonner'
 import { Plus, Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
-import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar } from '@runly/ui'
+import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar, DatePickerField } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useAccountTransactions, useAccountSummary, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
 import { useTransactionMutations } from '../hooks/useTransactionMutations.js'
@@ -21,7 +21,18 @@ function fmtCurrency(amount, currency = 'MXN') {
   })
 }
 
-export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types = [], categories = [], canWrite = true, currency = 'MXN' }) {
+export default function SpreadsheetRegister({
+  accountId,
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
+  onRowCountChange,
+  types = [],
+  categories = [],
+  canWrite = true,
+  currency = 'MXN',
+}) {
   const { session } = useAuth()
   const { isOnline } = useOfflineStatus()
   const { isUsingLocalLedger } = useLedgerSQLite()
@@ -45,6 +56,11 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
   const rows = data?.data ?? []
   const total = data?.pagination?.total ?? rows.length
   const hasMore = total > rows.length
+
+  useEffect(() => {
+    onRowCountChange?.(total)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total])
 
   const normalizedSearch = search.trim().toLowerCase()
   const filtersActive = Boolean(normalizedSearch || filterValue.tipo || filterValue.categoria)
@@ -200,6 +216,38 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
             placeholder="Buscar por nombre, concepto, referencia..."
             className="flex-1 max-w-md"
           />
+          {(onDateFromChange || onDateToChange) && (
+            <div className="hidden sm:flex items-center gap-2 shrink-0">
+              <DatePickerField
+                compact
+                placeholder="Desde"
+                aria-label="Filtrar desde"
+                value={dateFrom || undefined}
+                onChange={(val) => onDateFromChange?.(val ?? "")}
+              />
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>
+              <DatePickerField
+                compact
+                placeholder="Hasta"
+                aria-label="Filtrar hasta"
+                value={dateTo || undefined}
+                onChange={(val) => onDateToChange?.(val ?? "")}
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDateFromChange?.("")
+                    onDateToChange?.("")
+                  }}
+                  className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
+                  title="Limpiar filtro"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <>
           {/* Desktop: inline new row. Mobile: sheet form. */}
@@ -225,6 +273,40 @@ export default function SpreadsheetRegister({ accountId, dateFrom, dateTo, types
           </Button>
         </>
       </div>
+
+      {/* Date filters — mobile only, own row below search/toolbar */}
+      {(onDateFromChange || onDateToChange) && (
+        <div className="sm:hidden flex items-center gap-2 px-3 py-2 border-b border-[hsl(var(--border))]">
+          <DatePickerField
+            compact
+            placeholder="Desde"
+            aria-label="Filtrar desde"
+            value={dateFrom || undefined}
+            onChange={(val) => onDateFromChange?.(val ?? "")}
+          />
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>
+          <DatePickerField
+            compact
+            placeholder="Hasta"
+            aria-label="Filtrar hasta"
+            value={dateTo || undefined}
+            onChange={(val) => onDateToChange?.(val ?? "")}
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => {
+                onDateFromChange?.("")
+                onDateToChange?.("")
+              }}
+              className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
+              title="Limpiar filtro"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
 
       {filterBarFilters.length > 0 && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[hsl(var(--border))] flex-wrap">

@@ -67,6 +67,22 @@ export function createSummaryService({ prisma }) {
         ORDER BY fecha
       `
 
+      // By month (chronological, within the requested period)
+      const byMonthRows = await prisma.$queryRaw`
+        SELECT
+          date_trunc('month', fecha) AS month_start,
+          COALESCE(SUM(COALESCE(deposito, 0)), 0) AS deposito,
+          COALESCE(SUM(COALESCE(retiro,   0)), 0) AS retiro
+        FROM ledger_transaction
+        WHERE account_id = ${accountId}::uuid
+          AND company_id = ${companyId}::uuid
+          AND enabled = true
+          AND (${from}::date IS NULL OR fecha >= ${from}::date)
+          AND (${to}::date   IS NULL OR fecha <= ${to}::date)
+        GROUP BY date_trunc('month', fecha)
+        ORDER BY date_trunc('month', fecha)
+      `
+
       // By category
       const byCategoryRows = await prisma.$queryRaw`
         SELECT
@@ -98,6 +114,12 @@ export function createSummaryService({ prisma }) {
           // eslint-disable-next-line no-restricted-syntax -- deliberate UTC: @db.Date row value
           fecha:   r.fecha instanceof Date ? r.fecha.toISOString().slice(0, 10) : String(r.fecha).slice(0, 10),
           balance: Number(r.balance),
+        })),
+        by_month: byMonthRows.map((r) => ({
+          // eslint-disable-next-line no-restricted-syntax -- deliberate UTC: @db.Date row value
+          month:   r.month_start instanceof Date ? r.month_start.toISOString().slice(0, 7) : String(r.month_start).slice(0, 7),
+          deposito: Number(r.deposito),
+          retiro:   Number(r.retiro),
         })),
         by_category: byCategoryRows.map((r) => ({
           category_name: r.category_name,

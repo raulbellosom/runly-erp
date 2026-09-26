@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Button, Card, DistDropZone, PageHeader, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@runly/ui'
+import { Button, Card, DistDropZone, PageHeader, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, ImportStepIndicator } from '@runly/ui'
 import { ArrowLeft, ArrowRight, Check, Upload, ListChecks, Eye, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -28,9 +28,9 @@ const STEP_MAPPING = 1
 const STEP_PREVIEW = 2
 
 const STEPS = [
-  { label: 'Subir archivo', icon: Upload },
-  { label: 'Mapear columnas', icon: ListChecks },
-  { label: 'Previsualizar', icon: Eye },
+  { key: 'upload',  label: 'Subir archivo',    icon: Upload },
+  { key: 'mapping', label: 'Mapear columnas',  icon: ListChecks },
+  { key: 'preview', label: 'Previsualizar',    icon: Eye },
 ]
 
 function fmtCurrency(amount, currency = 'MXN') {
@@ -195,44 +195,13 @@ export default function ImportWizard() {
             )
           }
         />
-
-        {/* ── Step indicators ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon
-            const state = step > i ? 'done' : step === i ? 'active' : 'pending'
-            return (
-              <div
-                key={s.label}
-                className={[
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 min-w-44',
-                  state === 'active' && 'border-(--brand-primary) bg-(--brand-soft)',
-                  state === 'done' && 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)]',
-                  state === 'pending' && 'border-[hsl(var(--border))] bg-transparent opacity-60',
-                ].filter(Boolean).join(' ')}
-              >
-                <span
-                  className={[
-                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-                    state === 'active' && 'bg-(--brand-primary) text-(--brand-primary-foreground)',
-                    state === 'done' && 'bg-[hsl(var(--muted-foreground)/0.25)] text-[hsl(var(--foreground))]',
-                    state === 'pending' && 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]',
-                  ].filter(Boolean).join(' ')}
-                >
-                  {state === 'done' ? <Check size={13} /> : i + 1}
-                </span>
-                <span className="text-xs font-medium flex items-center gap-1 truncate">
-                  <Icon size={12} className="shrink-0" />
-                  {s.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
       </div>
 
-      {/* ── Content ────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto px-6 py-8">
+      {/* ── Steps + content ───────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4 px-4 py-4 sm:flex-row sm:px-6 sm:py-6 overflow-hidden">
+        <ImportStepIndicator steps={STEPS} current={STEPS[step]?.key} />
+
+        <div className="flex-1 min-h-0 overflow-auto">
 
         {/* Step 0: Upload */}
         {step === STEP_UPLOAD && (
@@ -306,18 +275,20 @@ export default function ImportWizard() {
 
         {/* Step 2: Preview */}
         {step === STEP_PREVIEW && preview && (
-          <div className="max-w-2xl mx-auto space-y-4">
-            <LedgerStatStrip
-              items={[
-                { key: 'valid', label: 'Filas válidas', value: preview.valid_count, icon: CheckCircle2, tone: 'success' },
-                ...(preview.error_count > 0
-                  ? [{ key: 'errors', label: 'Filas con error', value: preview.error_count, icon: AlertTriangle, tone: 'destructive' }]
-                  : []),
-              ]}
-            />
+          <div className="max-w-2xl mx-auto h-full flex flex-col gap-4">
+            <div className="shrink-0">
+              <LedgerStatStrip
+                items={[
+                  { key: 'valid', label: 'Filas válidas', value: preview.valid_count, icon: CheckCircle2, tone: 'success' },
+                  ...(preview.error_count > 0
+                    ? [{ key: 'errors', label: 'Filas con error', value: preview.error_count, icon: AlertTriangle, tone: 'destructive' }]
+                    : []),
+                ]}
+              />
+            </div>
 
             {preview.errors?.length > 0 && (
-              <Card variant="solid" className="rounded-xl overflow-hidden border-rose-500/30">
+              <Card variant="solid" className="shrink-0 rounded-xl overflow-hidden border-rose-500/30">
                 <div className="px-3 py-2 bg-rose-500 text-xs font-semibold text-white flex items-center gap-1.5">
                   <AlertTriangle size={13} /> Errores detectados
                 </div>
@@ -333,7 +304,7 @@ export default function ImportWizard() {
             )}
 
             {preview.valid?.length > 0 && (
-              <div className="border border-[hsl(var(--border))] rounded-xl overflow-auto max-h-64">
+              <div className="flex-1 min-h-0 border border-[hsl(var(--border))] rounded-xl overflow-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
@@ -364,7 +335,7 @@ export default function ImportWizard() {
               </div>
             )}
 
-            <div className="flex justify-between pt-2">
+            <div className="shrink-0 flex justify-between pt-2">
               <Button variant="ghost" size="sm" onClick={() => setStep(STEP_MAPPING)}>
                 <ArrowLeft size={13} className="mr-1" />
                 Atras
@@ -382,6 +353,7 @@ export default function ImportWizard() {
           </div>
         )}
 
+        </div>
       </div>
     </div>
   )
