@@ -5,13 +5,13 @@ import { LedgerServiceError } from './ledger-service.js'
 
 export function createCategoriesService({ prisma }) {
 
-  async function listCategories({ companyId, actorId }) {
+  async function listCategories({ companyId, actorId, includeDisabled = false }) {
     try {
       const rows = await prisma.$queryRaw`
         SELECT *, (owner_id IS NULL) AS is_system
         FROM ledger_category
         WHERE company_id = ${companyId}::uuid
-          AND enabled = true
+          AND (enabled = true OR ${includeDisabled})
           AND (owner_id IS NULL OR owner_id = ${actorId}::uuid)
         ORDER BY owner_id NULLS FIRST, name
       `
