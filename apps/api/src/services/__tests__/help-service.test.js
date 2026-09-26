@@ -1,0 +1,121 @@
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+import { createHelpService } from '../help-service.js'
+
+const FLEET_MODULE = {
+  id: 'mod-fleet',
+  key: 'custom.fleet',
+  name: 'Flotas',
+  status: 'INSTALLED',
+  enabled: true,
+  manifest: { icon: 'Truck', navigation: [{ path: '/fleet/vehicles', label: 'Vehiculos' }] },
+}
+
+const CORE_MODULE = {
+  id: 'mod-core',
+  key: 'runly.core',
+  name: 'Runly Core',
+  status: 'INSTALLED',
+  enabled: true,
+  manifest: { icon: 'Layers', navigation: [{ path: '/modules', label: 'Modulos' }] },
+}
+
+const HELP_ROWS = [
+  {
+    moduleId: 'mod-fleet',
+    kind: 'HELP',
+    enabled: true,
+    module: FLEET_MODULE,
+    schema: { scope: 'module', viewKey: null, title: 'Flotas', summary: 'Gestiona vehiculos.', content: 'Modulo de flotas completo.' },
+  },
+  {
+    moduleId: 'mod-fleet',
+    kind: 'HELP',
+    enabled: true,
+    module: FLEET_MODULE,
+    schema: { scope: 'view', viewKey: '/fleet/vehicles', title: 'Vehiculos', summary: 'Lista de vehiculos.', content: 'Aqui puedes dar de alta un vehiculo nuevo.' },
+  },
+];
+
+function makePrisma({ modules = [CORE_MODULE, FLEET_MODULE], helpRows = HELP_ROWS } = {}) {
+  return {
+    runlyModule: {
+      findMany: async ({ where }) => modules.filter((m) => {
+        if (where?.status && m.status !== where.status) return false
+        if (where?.enabled !== undefined && m.enabled !== where.enabled) return false
+        if (where?.key && m.key !== where.key) return false
+        return true
+      }),
+      findFirst: async ({ where }) => modules.find((m) =>
+        m.key === where.key && m.status === where.status && m.enabled === where.enabled
+      ) ?? null,
+    },
+    blueprint: {
+      findMany: async ({ where }) => helpRows.filter((row) => {
+        if (where?.kind && row.kind !== where.kind) return false
+        if (where?.enabled !== undefined && row.enabled !== where.enabled) return false
+        if (where?.moduleId && row.moduleId !== where.moduleId) return false
+        if (where?.module?.key && row.module.key !== where.module.key) return false
+        return true
+      }),
+    },
+  }
+}
+
+describe('help-service', () => {
+  it('listModulesWithHelp returns one entry per module with a module-scope article', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.listModulesWithHelp()
+    assert.equal(result.length, 1)
+    assert.equal(result[0].moduleKey, 'custom.fleet')
+    assert.equal(result[0].summary, 'Gestiona vehiculos.')
+  })
+
+  it('getModuleHelp returns overview + views for an installed module', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.getModuleHelp('custom.fleet')
+    assert.equal(result.overview.title, 'Flotas')
+    assert.equal(result.views.length, 1)
+    assert.equal(result.views[0].viewKey, '/fleet/vehicles')
+  })
+
+  it('getModuleHelp returns null for a module that is not installed', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.getModuleHelp('custom.unknown')
+    assert.equal(result, null)
+  })
+
+  it('resolveHelp matches the view by exact path and returns both view + overview', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.resolveHelp('/fleet/vehicles')
+    assert.equal(result.moduleKey, 'custom.fleet')
+    assert.equal(result.view.title, 'Vehiculos')
+    assert.equal(result.overview.title, 'Flotas')
+  })
+
+  it('resolveHelp falls back to overview-only when no view matches', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.resolveHelp('/modules')
+    assert.equal(result.moduleKey, 'runly.core')
+    assert.equal(result.view, null)
+  })
+
+  it('resolveHelp returns nulls when the path belongs to no known module', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.resolveHelp('/unknown/path')
+    assert.equal(result.moduleKey, null)
+  })
+
+  it('searchHelp finds matches across module and view content, accent-insensitive', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.searchHelp('vehiculo')
+    assert.ok(result.length >= 1)
+    assert.ok(result.some((r) => r.viewKey === '/fleet/vehicles'))
+  })
+
+  it('searchHelp returns [] when nothing matches', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.searchHelp('xyzxyz')
+    assert.deepEqual(result, [])
+  })
+})
