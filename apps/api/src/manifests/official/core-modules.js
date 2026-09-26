@@ -1,4 +1,7 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createModuleManifest, MODULE_KINDS } from "@runly/core";
+import { loadHelpBlueprints } from "@runly/module-engine";
 import { inventoryAssistantThread, inventoryReusableCatalog } from './inventory-assistant.model.js';
 import {
   contactsMap,
@@ -12,12 +15,14 @@ import {
   chatMap,
 } from "./feature-modules.js";
 
+const HELP_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "help");
+
 export const runlyCoreMap = createModuleManifest({
   key: "runly.core",
   name: "Runly Core",
   description:
     "Nucleo del sistema: modulos, permisos, bitacora y configuracion de instancia.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -41,6 +46,13 @@ export const runlyCoreMap = createModuleManifest({
       layout: "main",
       permissionKey: "core.instance.read",
     },
+    {
+      label: "Ayuda",
+      path: "/help",
+      icon: "BookOpen",
+      layout: "main",
+      permissionKey: "runly.help.read",
+    },
   ],
   permissions: [
     { key: "platform.erp.access", name: "Access Runly ERP" },
@@ -59,6 +71,7 @@ export const runlyCoreMap = createModuleManifest({
     { key: "core.read", name: "Read Core" },
     { key: "core.manage", name: "Manage Core" },
     { key: "audit.read", name: "Read Audit Logs" },
+    { key: "runly.help.read", name: "Read Module Help" },
   ],
   acl: {
     module: "core.access",
@@ -98,6 +111,7 @@ export const runlyCoreMap = createModuleManifest({
         ],
       },
     },
+    ...loadHelpBlueprints("runly.core", path.join(HELP_DIR, "runly.core")),
   ],
 });
 
