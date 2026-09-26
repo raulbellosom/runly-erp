@@ -73,9 +73,16 @@ export function createHelpService({ prisma }) {
     const candidates = modules.flatMap((module_) =>
       (module_.manifest?.navigation ?? []).map((nav) => ({ module: module_, navPath: nav.path })),
     )
-    const owner = candidates
+    const matchedOwner = candidates
       .filter((c) => currentPath === c.navPath || currentPath.startsWith(`${c.navPath}/`))
       .sort((a, b) => b.navPath.length - a.navPath.length)[0]
+
+    // Screens that aren't declared in any module's own navigation (the
+    // app-shell home screen, an unknown/typo'd route) still get general
+    // orientation instead of no help at all — runly.core is always
+    // installed, so this fallback never itself returns null.
+    const fallbackModule = matchedOwner ? null : modules.find((m) => m.key === 'runly.core')
+    const owner = matchedOwner ?? (fallbackModule ? { module: fallbackModule, navPath: null } : null)
 
     if (!owner) {
       return { moduleKey: null, moduleName: null, overview: null, view: null }
@@ -85,10 +92,12 @@ export function createHelpService({ prisma }) {
       where: { kind: 'HELP', enabled: true, moduleId: owner.module.id },
     })
     const overviewRow = rows.find((r) => r.schema?.scope === 'module')
-    const viewRow = rows
-      .filter((r) => r.schema?.scope === 'view')
-      .filter((r) => currentPath === r.schema.viewKey || currentPath.startsWith(`${r.schema.viewKey}/`))
-      .sort((a, b) => b.schema.viewKey.length - a.schema.viewKey.length)[0]
+    const viewRow = matchedOwner
+      ? rows
+          .filter((r) => r.schema?.scope === 'view')
+          .filter((r) => currentPath === r.schema.viewKey || currentPath.startsWith(`${r.schema.viewKey}/`))
+          .sort((a, b) => b.schema.viewKey.length - a.schema.viewKey.length)[0]
+      : undefined
 
     return {
       moduleKey: owner.module.key,

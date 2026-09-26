@@ -35,6 +35,13 @@ const HELP_ROWS = [
     module: FLEET_MODULE,
     schema: { scope: 'view', viewKey: '/fleet/vehicles', title: 'Vehiculos', summary: 'Lista de vehiculos.', content: 'Aqui puedes dar de alta un vehiculo nuevo.' },
   },
+  {
+    moduleId: 'mod-core',
+    kind: 'HELP',
+    enabled: true,
+    module: CORE_MODULE,
+    schema: { scope: 'module', viewKey: null, title: 'Runly Core', summary: 'Nucleo del sistema.', content: 'Administra modulos y configuracion.' },
+  },
 ];
 
 function makePrisma({ modules = [CORE_MODULE, FLEET_MODULE], helpRows = HELP_ROWS } = {}) {
@@ -68,9 +75,9 @@ describe('help-service', () => {
   it('listModulesWithHelp returns one entry per module with a module-scope article', async () => {
     const service = createHelpService({ prisma: makePrisma() })
     const result = await service.listModulesWithHelp()
-    assert.equal(result.length, 1)
-    assert.equal(result[0].moduleKey, 'custom.fleet')
-    assert.equal(result[0].summary, 'Gestiona vehiculos.')
+    assert.equal(result.length, 2)
+    const fleet = result.find((r) => r.moduleKey === 'custom.fleet')
+    assert.equal(fleet.summary, 'Gestiona vehiculos.')
   })
 
   it('listModulesWithHelp excludes a DISABLED module even if it has help rows', async () => {
@@ -114,8 +121,16 @@ describe('help-service', () => {
     assert.equal(result.view, null)
   })
 
-  it('resolveHelp returns nulls when the path belongs to no known module', async () => {
+  it('resolveHelp falls back to runly.core general orientation when the path belongs to no known module', async () => {
     const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.resolveHelp('/unknown/path')
+    assert.equal(result.moduleKey, 'runly.core')
+    assert.equal(result.overview.title, 'Runly Core')
+    assert.equal(result.view, null)
+  })
+
+  it('resolveHelp returns nulls only when runly.core itself is not installed', async () => {
+    const service = createHelpService({ prisma: makePrisma({ modules: [FLEET_MODULE] }) })
     const result = await service.resolveHelp('/unknown/path')
     assert.equal(result.moduleKey, null)
   })

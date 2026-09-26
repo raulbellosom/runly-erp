@@ -229,8 +229,18 @@ Resuelve por *mejor coincidencia de prefijo* entre `path` y los `viewKey`
 declarados de todos los módulos instalados+habilitados. Si no hay match de
 vista, devuelve solo `overview` del módulo dueño de esa ruta (resuelto contra
 `navigation[].path` del propio manifest, ya materializado en
-`ModuleRegistry.resolveBlueprints()`/navegación). Si `path` no pertenece a
-ningún módulo conocido: `{ data: { moduleKey: null, overview: null, view: null } }` (200).
+`ModuleRegistry.resolveBlueprints()`/navegación).
+
+**Actualizado 2026-09-26** (feedback del usuario tras probar la Fase 1 en
+vivo: la pantalla de inicio del shell — `/home` — no pertenece a la
+navegación de ningún módulo, así que mostraba "sin ayuda" incluso
+teniéndola disponible en general): si `path` no matchea ningún
+`navigation[].path` de ningún módulo, el owner cae por defecto a
+`runly.core` (siempre instalado) y se devuelve su `overview` como
+orientación general — nunca `view`. Sólo se devuelve
+`{ moduleKey: null, overview: null, view: null }` en el caso extremo de que
+ni siquiera `runly.core` esté instalado (no debería ocurrir en una
+instancia real).
 
 ### GET /help/search?q=<query>
 
