@@ -55,4 +55,28 @@ describe('runly SDK — help namespace', () => {
     assert.equal(url, 'http://api/help/search?q=vehiculos')
     fetchMock.mock.restore()
   })
+
+  it('getAssistantStatus GETs /help/assistant/status', async () => {
+    const fetchMock = makeFetch()
+    const { createRunlyClient } = await import('../index.js')
+    const client = createRunlyClient({ baseUrl: 'http://api' })
+    globalThis.fetch = fetchMock
+    await client.help.getAssistantStatus('tok')
+    const [url] = fetchMock.mock.calls[0].arguments
+    assert.equal(url, 'http://api/help/assistant/status')
+    fetchMock.mock.restore()
+  })
+
+  it('askAssistant POSTs /help/ask with the body', async () => {
+    const fetchMock = makeFetch()
+    const { createRunlyClient } = await import('../index.js')
+    const client = createRunlyClient({ baseUrl: 'http://api' })
+    globalThis.fetch = fetchMock
+    await client.help.askAssistant({ path: '/fleet/vehicles', question: 'como registro un vehiculo' }, 'tok')
+    const [url, opts] = fetchMock.mock.calls[0].arguments
+    assert.equal(url, 'http://api/help/ask')
+    assert.equal(opts.method, 'POST')
+    assert.equal(JSON.parse(opts.body).question, 'como registro un vehiculo')
+    fetchMock.mock.restore()
+  })
 })

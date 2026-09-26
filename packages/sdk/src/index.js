@@ -679,6 +679,14 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/help/resolve?path=${encodeURIComponent(path)}`, { headers: withAuthHeaders(token) }),
       searchHelp: (query, token) =>
         request(`/help/search?q=${encodeURIComponent(query)}`, { headers: withAuthHeaders(token) }),
+      getAssistantStatus: (token) =>
+        request("/help/assistant/status", { headers: withAuthHeaders(token) }),
+      askAssistant: ({ path, question, history }, token) =>
+        request("/help/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...withAuthHeaders(token) },
+          body: JSON.stringify({ path, question, history }),
+        }),
     },
     contacts: {
       list: (token, options = {}) => {
