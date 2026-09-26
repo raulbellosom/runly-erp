@@ -51,7 +51,10 @@ export function createHelpRouter({ prisma, requirePermission, env, fetchImpl }) 
 
   app.post('/help/ask', guard, async (c) => {
     const parsed = helpAskBodySchema.safeParse(await c.req.json().catch(() => ({})))
-    if (!parsed.success) return c.json({ error: 'Cuerpo invalido.' }, 400)
+    if (!parsed.success) {
+      const detail = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
+      return c.json({ error: `Cuerpo invalido: ${detail}` }, 400)
+    }
     try {
       const data = await assistant.ask({
         actorId: c.get('authUserId') ?? 'anonymous',

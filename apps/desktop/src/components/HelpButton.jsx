@@ -35,13 +35,16 @@ export function HelpButton() {
     enabled: Boolean(token) && open,
   });
 
+  // mutationFn takes { question, history } as explicit mutate() variables
+  // rather than reading draft/conversation from the closure — useMutation
+  // re-binds mutationFn to each render's options, so a closure read can
+  // observe post-clear state (draft === "") if a re-render (triggered by
+  // setDraft("") right before mutate()) lands before the mutation's async
+  // dispatch actually runs, sending an empty question and failing the
+  // server's min-length validation ("Cuerpo invalido").
   const askMutation = useMutation({
-    mutationFn: () => {
-      const history = conversation
-        .slice(-MAX_HISTORY_TURNS)
-        .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
-      return runly.help.askAssistant({ path: apiPath, question: draft.trim(), history }, token).then((r) => r.data);
-    },
+    mutationFn: ({ question, history }) =>
+      runly.help.askAssistant({ path: apiPath, question, history }, token).then((r) => r.data),
     onSuccess: (result) => {
       if (result.mode === "ai") {
         setConversation((prev) => [...prev, { role: "assistant", content: result.answer, sources: result.sources }]);
@@ -57,9 +60,12 @@ export function HelpButton() {
   function handleAsk() {
     const question = draft.trim();
     if (!question || askMutation.isPending) return;
+    const history = conversation
+      .slice(-MAX_HISTORY_TURNS)
+      .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
     setConversation((prev) => [...prev, { role: "user", content: question }]);
     setDraft("");
-    askMutation.mutate();
+    askMutation.mutate({ question, history });
   }
 
   return (
