@@ -385,9 +385,9 @@ documentación en ningún otro punto del sistema.
    y el segundo gana en el `update` — se documenta como responsabilidad de
    revisión en PR, no hay validación automática de unicidad cross-módulo en
    esta fase.
-7. Contenido de ayuda con un link a `javascript:` o `data:` → el renderer
-   `SafeMarkdown` sólo permite esquemas `http:`/`https:`; cualquier otro
-   esquema se renderiza como texto plano, no como link.
+7. Contenido de ayuda con un link a `javascript:` o `data:` → `MarkdownViewer`
+   (react-markdown, sin `rehype-raw`) no interpreta HTML/URIs crudos; el link
+   se renderiza como texto, no como un `<a href="javascript:...">` ejecutable.
 
 ## 24. Risks
 
@@ -434,6 +434,45 @@ documentación en ningún otro punto del sistema.
    when llama cualquier endpoint `/help/*`, then la API responde 403.
 8. Given un módulo `DISABLED`, when se consulta `/help/modules`, then ese
    módulo no aparece en la lista.
+
+**Verificado: 2026-09-26** (implementación Fase 1 completa)
+
+1. Verificado — `pnpm db:seed` (re-sincroniza los manifests core, mismo
+   camino que `POST /modules/:key/sync`) produjo 3 filas `Blueprint`
+   `kind: "HELP"` reales para `runly.core` en la base de Supabase
+   (`runly.core.help.overview` con `scope: "module"` + 2 `scope: "view"`),
+   confirmado con una consulta Prisma directa contra la BD.
+2. Verificado a nivel API — `apps/api/src/routes/help/__tests__/help-routes.test.js`
+   (`GET /help/modules` con permiso → 200 con datos) +
+   `help-service.test.js` (`listModulesWithHelp`). El renderizado visual de
+   `/help` en el navegador no se probó en vivo — este entorno no tiene
+   herramienta de navegador disponible; sí se verificó que
+   `apps/desktop` compila limpio con la pantalla nueva
+   (`pnpm build`, incluye el build nativo Tauri completo).
+3. Verificado a nivel de datos — `help-service.test.js`
+   ("resolveHelp matches the view by exact path and returns both view +
+   overview"). El panel contextual (`HelpButton.jsx`) consume exactamente
+   esa forma de respuesta; no se verificó visualmente en un navegador real
+   por la misma limitación de entorno.
+4. Verificado a nivel de datos — `help-service.test.js`
+   ("resolveHelp falls back to overview-only when no view matches"); mismo
+   caveat de verificación visual que el punto 3.
+5. Verificado a nivel de datos — `help-service.test.js` ("resolveHelp
+   returns nulls when the path belongs to no known module"), que es el
+   caso que dispara el `EmptyState` en `HelpButton.jsx`; mismo caveat visual.
+6. Verificado — `help-service.test.js` ("searchHelp finds matches across
+   module and view content, accent-insensitive") + `help-routes.test.js`
+   ("GET /help/search with a valid q -> 200").
+7. Verificado — `help-routes.test.js` ("GET /help/modules without
+   permission -> 403"), más lectura de código: `runly.help.read` está en
+   `BASE_PERMISSION_KEYS` (`apps/api/src/index.js`), así que en la práctica
+   todo usuario autenticado lo tiene — el 403 solo ocurriría si esa
+   constante se quitara.
+8. Verificado — `help-service.test.js` ("listModulesWithHelp excludes a
+   DISABLED module even if it has help rows"), agregado explícitamente
+   para cubrir este criterio.
+
+Suites completas verificadas en verde el 2026-09-26: `apps/api/src/services/__tests__/*.test.js` (530 pass, 2 skip pre-existentes, 0 fail), `apps/api/src/routes/**/__tests__/*.test.js` (1141 pass, 0 fail), `packages/module-engine/src/__tests__/*.test.js` (101 pass), `packages/validators/src/__tests__/*.test.js` (18 pass), `packages/sdk/src/__tests__/*.test.js` (37 pass), `pnpm lint` (sin errores), `pnpm build` (build completo del monorepo, incluyendo el instalador nativo Tauri, verde).
 
 ## 26. Verification plan
 
