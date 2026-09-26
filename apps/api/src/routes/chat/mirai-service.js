@@ -710,7 +710,7 @@ export function createMiraiService({
     for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter += 1) {
       if (iter === MAX_TOOL_ITERATIONS - 1) return { text: "No pude terminar de revisarlo; se mas concreto.", toolLog };
       const msg = await callGroqRaw({
-        task: "mirai_chat", model, messages: llmMessages, tools: CHANNEL_TOOL_DEFS, toolChoice: "auto",
+        task: "mirai_chat", messages: llmMessages, tools: CHANNEL_TOOL_DEFS, toolChoice: "auto",
         maxTokens: 800, timeoutMs: GROQ_TIMEOUT_MS,
       });
       const toolCalls = msg?.tool_calls ?? [];
@@ -890,7 +890,7 @@ export function createMiraiService({
       try {
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter += 1) {
           if (iter === MAX_TOOL_ITERATIONS - 1) { finalText = "No pude terminar de revisarlo; se mas concreto."; break; }
-          const msg = await callGroqRaw({ task: "mirai_chat", model, messages: llmMessages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 900, timeoutMs: GROQ_TIMEOUT_MS });
+          const msg = await callGroqRaw({ task: "mirai_chat", messages: llmMessages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 900, timeoutMs: GROQ_TIMEOUT_MS });
           const toolCalls = msg?.tool_calls ?? [];
           if (!toolCalls.length) {
             const answer = String(msg?.content ?? "").trim();
@@ -947,7 +947,7 @@ export function createMiraiService({
     const started = Date.now();
     let calls = 0;
     for (let step = 0; step < 5 && Date.now() - started < 60_000; step++) {
-      const reply = await callGroqRaw({ task: "mirai_chat", model, messages: transcript, tools, toolChoice: 'auto', maxTokens: 1200, respectRateLimit: true });
+      const reply = await callGroqRaw({ task: "mirai_chat", messages: transcript, tools, toolChoice: 'auto', maxTokens: 1200, respectRateLimit: true });
       if (!reply?.tool_calls?.length) {
         if (!reply?.content?.trim()) throw new ChatServiceError('La IA no pudo responder. Intenta de nuevo.', 502);
         return { text: reply.content.trim().slice(0, 6000), model, calls };
