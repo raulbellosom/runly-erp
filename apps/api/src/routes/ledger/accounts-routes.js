@@ -18,6 +18,8 @@ import {
 // can import this router without triggering package resolution at module load time.
 import { getCompanyId, getActorId, getValidationErrorMessage } from "./service-helpers.js";
 
+const MAX_IMPORT_FILE_BYTES = 20 * 1024 * 1024;
+
 function handleError(c, err, fallback) {
   if (err instanceof LedgerServiceError)
     return c.json({ error: err.message }, err.status);
@@ -510,6 +512,43 @@ export function createAccountsRouter({ prisma, requirePermission }) {
   );
 
   // ── Import ────────────────────────────────────────────────────────────────
+
+  app.post(
+    "/ledger/accounts/:id/import/parse",
+    requirePermission("ledger.import"),
+    async (c) => {
+      try {
+        const { parseImportBuffer } = await import("./import-service.js");
+        const companyId = getCompanyId(c);
+        const actorId = getActorId(c);
+        const accountId = c.req.param("id");
+        if (!(await service.canWriteAccount({ companyId, accountId, actorId }))) {
+          return c.json({ error: 'No tienes permisos para importar movimientos en esta cuenta.' }, 403)
+        }
+        const form = await c.req.formData();
+        const file = form.get("file");
+        if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+          return c.json({ error: "Adjunta un archivo." }, 400);
+        }
+        const buffer = Buffer.from(await file.arrayBuffer());
+        if (buffer.length > MAX_IMPORT_FILE_BYTES) {
+          return c.json({ error: "El archivo excede el tamano maximo de 20MB." }, 400);
+        }
+        const filename = String(file.name || "").toLowerCase();
+        let format = null;
+        if (filename.endsWith(".csv")) format = "csv";
+        else if (filename.endsWith(".xlsx")) format = "xlsx";
+        if (!format) {
+          return c.json({ error: "Formato no soportado. Usa CSV o XLSX." }, 400);
+        }
+        const rows = await parseImportBuffer(buffer, format);
+        const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+        return c.json({ rows, headers });
+      } catch (err) {
+        return handleError(c, err, "No se pudo leer el archivo.");
+      }
+    },
+  );
 
   app.post(
     "/ledger/accounts/:id/import/preview",
