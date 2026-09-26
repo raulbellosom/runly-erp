@@ -146,6 +146,24 @@ describe('help-service', () => {
     assert.equal(result.moduleKey, 'runly.core')
   })
 
+  it('resolveHelp shows only the fallback view (suppresses the generic overview) when one exists, e.g. a home welcome screen', async () => {
+    const helpRowsWithHome = [
+      ...HELP_ROWS,
+      {
+        moduleId: 'mod-core',
+        kind: 'HELP',
+        enabled: true,
+        module: CORE_MODULE,
+        schema: { scope: 'view', viewKey: '/app/home', title: 'Bienvenida', summary: 'Tips de inicio.', content: 'Usa el menu lateral...' },
+      },
+    ]
+    const service = createHelpService({ prisma: makePrisma({ helpRows: helpRowsWithHome }) })
+    const result = await service.resolveHelp('/home')
+    assert.equal(result.moduleKey, 'runly.core')
+    assert.equal(result.view.title, 'Bienvenida')
+    assert.equal(result.overview, null)
+  })
+
   it('resolveHelp falls back to runly.core general orientation when the path belongs to no known module', async () => {
     const service = createHelpService({ prisma: makePrisma() })
     const result = await service.resolveHelp('/unknown/path')

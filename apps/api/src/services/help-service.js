@@ -110,18 +110,29 @@ export function createHelpService({ prisma }) {
       where: { kind: 'HELP', enabled: true, moduleId: owner.module.id },
     })
     const overviewRow = rows.find((r) => r.schema?.scope === 'module')
-    const viewRow = matchedOwner
-      ? rows
-          .filter((r) => r.schema?.scope === 'view')
-          .map((r) => ({ row: r, apiPath: toModuleApiPath(owner.module.key, r.schema.viewKey) }))
-          .filter(({ apiPath }) => apiPath && (currentPath === apiPath || currentPath.startsWith(`${apiPath}/`)))
-          .sort((a, b) => b.apiPath.length - a.apiPath.length)[0]?.row
-      : undefined
+    // Matches views the same way whether the owner came from a real
+    // navigation match or the runly.core fallback — a fallback view (e.g.
+    // runly.core's "/app/home" welcome tips, keyed like the "Ayuda" nav
+    // entry) is how a screen outside any module's own navigation gets its
+    // OWN content instead of always falling through to the generic
+    // module overview below.
+    const viewRow = rows
+      .filter((r) => r.schema?.scope === 'view')
+      .map((r) => ({ row: r, apiPath: toModuleApiPath(owner.module.key, r.schema.viewKey) }))
+      .filter(({ apiPath }) => apiPath && (currentPath === apiPath || currentPath.startsWith(`${apiPath}/`)))
+      .sort((a, b) => b.apiPath.length - a.apiPath.length)[0]?.row
+
+    // On a real module screen, show the view's own tip plus the module's
+    // general overview (drill-down: specific, then general). On a fallback
+    // screen (home, an unknown route) with its own dedicated view content,
+    // that view IS the general orientation — showing the module's
+    // unrelated administrative overview underneath it would be redundant.
+    const showOverview = matchedOwner || !viewRow
 
     return {
       moduleKey: owner.module.key,
       moduleName: owner.module.name,
-      overview: overviewRow ? pickArticle(overviewRow.schema) : null,
+      overview: showOverview && overviewRow ? pickArticle(overviewRow.schema) : null,
       view: viewRow ? pickArticle(viewRow.schema) : null,
     }
   }

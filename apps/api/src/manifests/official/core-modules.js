@@ -22,7 +22,7 @@ export const runlyCoreMap = createModuleManifest({
   name: "Runly Core",
   description:
     "Nucleo del sistema: modulos, permisos, bitacora y configuracion de instancia.",
-  version: "0.2.1",
+  version: "0.2.2",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
