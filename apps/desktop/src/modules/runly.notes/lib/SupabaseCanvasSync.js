@@ -15,6 +15,7 @@ export class SupabaseCanvasSync {
     readOnly = false,
     getLocalElements, // () => Element[]  (the CanvasEditor ref contents)
     getSnapshot, // () => ({ elements, layers, appState, files })
+    isReady = () => true, // () => bool — has the local scene finished loading from the DB?
     onRemoteElements, // (reconciled: Element[]) => void
     onRemoteSnapshot, // ({ elements, layers, appState, files }) => void
     onRemoteFiles, // (manifestSubset) => void
@@ -29,6 +30,7 @@ export class SupabaseCanvasSync {
     this._readOnly = readOnly
     this._getLocalElements = getLocalElements
     this._getSnapshot = getSnapshot
+    this._isReady = isReady
     this._onRemoteElements = onRemoteElements
     this._onRemoteSnapshot = onRemoteSnapshot
     this._onRemoteFiles = onRemoteFiles
@@ -148,6 +150,13 @@ export class SupabaseCanvasSync {
   }
 
   _broadcastFull() {
+    // Guard against broadcasting before the local scene has finished loading
+    // from the DB (elements/layers/files refs still at their empty initial
+    // state) — a peer subscribing while its own note is still hydrating
+    // (e.g. many images) would otherwise blast an empty snapshot the instant
+    // it joins, and every already-open session's onRemoteSnapshot applies it
+    // verbatim, wiping their canvas (which then autosaves the empty state).
+    if (!this._isReady()) return
     const snap = this._getSnapshot?.()
     if (!snap) return
     this._rawSend('scene.full', { ...snap, senderId: this._identity.id })

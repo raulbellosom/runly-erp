@@ -82,6 +82,8 @@ export function CanvasEditor({ note }) {
   activeLayerIdRef.current = activeLayerId
 
   const [ready, setReady] = useState(false)
+  const readyRef = useRef(false)
+  readyRef.current = ready
   const [showLayers, setShowLayers] = useState(false)
   const showLayersRef = useRef(false)
   showLayersRef.current = showLayers
@@ -155,6 +157,7 @@ export function CanvasEditor({ note }) {
         avatarUrl: userProfile?.avatarUrl ?? null,
       },
       getLocalElements: () => elementsRef.current,
+      isReady: () => readyRef.current,
       getSnapshot: () => ({
         elements: elementsRef.current,
         layers: layersRef.current,
