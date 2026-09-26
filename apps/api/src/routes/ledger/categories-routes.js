@@ -18,7 +18,8 @@ export function createCategoriesRouter({ prisma, requirePermission, requireAnyPe
 
   app.get('/ledger/categories', canRead, async (c) => {
     try {
-      return c.json(await service.listCategories({ companyId: getCompanyId(c), actorId: getActorId(c) }))
+      const includeDisabled = c.req.query('includeDisabled') === 'true'
+      return c.json(await service.listCategories({ companyId: getCompanyId(c), actorId: getActorId(c), includeDisabled }))
     }
     catch (err) { return handleError(c, err, 'No se pudieron listar las categorias.') }
   })
