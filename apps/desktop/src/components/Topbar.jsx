@@ -7,7 +7,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { SyncStatusPopover } from "@runly/ui";
 import { NotificationBell } from "./NotificationBell";
-import { ChatBell } from "./ChatBell";
 import { HelpButton } from "./HelpButton";
 import { UserMenu } from "./UserMenu";
 import { useOfflineStore } from "@runly/offline";
@@ -171,9 +170,6 @@ export function Topbar({
           <span className="hidden sm:contents">
             <ThemeToggle />
           </span>
-          {token && canReadChat && (
-            <ChatBell onOpen={() => navigate("/app/m/runly.chat/chat/inbox")} />
-          )}
           {token && canReadNotifications && (
             <NotificationBell
               token={token}
@@ -182,11 +178,11 @@ export function Topbar({
             />
           )}
           {token && <HelpButton />}
-          {/* Activity + "instalar modulo" live only in UserMenu now, at every
-              breakpoint — was two more always-on icons crowding this cluster
-              on top of sync/company/notifications/theme, which is what was
-              colliding with the centered search bar around the lg
-              breakpoint. See UserMenu.jsx. */}
+          {/* Chat + Activity + "instalar modulo" live only in UserMenu now, at
+              every breakpoint — three more always-on icons crowding this
+              cluster on top of sync/company/notifications/theme/help, which
+              is what was colliding with the centered search bar around the
+              lg breakpoint. See UserMenu.jsx. */}
           <UserMenu
             activeModuleKey={activeModuleKey}
             canInstall={canInstall}
@@ -194,6 +190,8 @@ export function Topbar({
             onInstall={onInstall}
             canReadActivity={canReadActivity}
             onActivityOpen={() => navigate("/app/m/runly.activity")}
+            canReadChat={canReadChat}
+            onChatOpen={() => navigate("/app/m/runly.chat/chat/inbox")}
           />
         </div>
       </div>

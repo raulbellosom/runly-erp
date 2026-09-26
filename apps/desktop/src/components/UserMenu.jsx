@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown, User, Settings, LogOut, Monitor, Download, X, Smartphone, Share, Sun, Moon, Activity, MessageSquare, Building2 } from "lucide-react";
 import { useThemeStore } from "../stores/theme";
 import { useChatFloatStore } from "../modules/runly.chat/store/chatFloatStore";
+import { useChatUnreadCount } from "../modules/runly.chat/hooks/useChatConversations";
 import { useActiveCompany } from "../company/ActiveCompanyProvider";
 import { CompanySwitcherModal } from "./CompanySwitcherModal";
 import {
@@ -71,10 +72,13 @@ export function UserMenu({
   onInstall,
   canReadActivity = false,
   onActivityOpen,
+  canReadChat = false,
+  onChatOpen,
 }) {
   const { userProfile, logout } = useAuth();
   const { isDark, toggle: toggleTheme } = useThemeStore();
   const { hidden: chatHubHidden, show: showChatHub } = useChatFloatStore();
+  const chatUnreadCount = useChatUnreadCount();
   const { activeCompany } = useActiveCompany();
   const navigate = useNavigate();
   const [showReminder, setShowReminder] = useState(() => shouldShowDesktopReminder());
@@ -285,13 +289,27 @@ export function UserMenu({
           </div>
         )}
 
-        {/* Activity + "instalar modulo": live here at every breakpoint (used
-            to be always-on topbar icons; moved in to free up space in a
+        {/* Chat + Activity + "instalar modulo": live here at every breakpoint
+            (used to be always-on topbar icons; moved in to free up space in a
             crowded right-hand cluster that was colliding with the centered
             search bar around the lg breakpoint — see Topbar.jsx). */}
-        {(canReadActivity || (canInstall && activeModuleKey)) && (
+        {(canReadChat || canReadActivity || (canInstall && activeModuleKey)) && (
           <>
             <DropdownMenuSeparator />
+            {canReadChat && (
+              <DropdownMenuItem
+                onClick={onChatOpen}
+                className="gap-2 cursor-pointer"
+              >
+                <MessageSquare size={14} />
+                <span className="flex-1">Chat</span>
+                {chatUnreadCount > 0 && (
+                  <span className="rounded-full bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                    {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            )}
             {canReadActivity && (
               <DropdownMenuItem
                 onClick={onActivityOpen}
