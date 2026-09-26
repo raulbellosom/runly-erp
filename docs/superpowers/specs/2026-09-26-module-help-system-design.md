@@ -122,12 +122,13 @@ ayuda. Buscar filtra por palabra clave contra título/resumen/contenido de
 todo el banco y muestra fragmentos con el módulo/vista de origen y un link
 directo. Estados de carga (`skeleton`) y error (`ErrorState`) estándar.
 
-**Renderizado de contenido:** el markdown se renderiza con un componente
-nuevo y compartido (`@runly/ui`), sin `dangerouslySetInnerHTML` — mismo
-principio de seguridad que ya sigue `renderRichText` del asistente de PFM
-(`apps/desktop/src/modules/runly.pfm/lib/assistant-format.js`), pero con más
-cobertura (encabezados, listas, negritas/itálicas, código inline, enlaces
-http(s) únicamente con `rel="noopener noreferrer"` y `target="_blank"`).
+**Renderizado de contenido:** se reutiliza el componente ya existente
+`MarkdownViewer` de `@runly/ui` (`packages/ui/src/components/MarkdownViewer.jsx`,
+`react-markdown` + `remark-gfm`, ya usado por `MarkdownField`/`RunlyForm`) —
+no se construye un renderer nuevo. Ya cubre encabezados, listas,
+negritas/itálicas, tablas y enlaces con `target="_blank"` +
+`rel="noopener noreferrer"`; no usa `rehype-raw`, así que no interpreta HTML
+crudo incrustado en el markdown.
 
 **Nunca:** `window.confirm/alert/prompt`, `<select>`/`<input>` nativos, modal
 hecho a mano — todo con `@runly/ui` según la política UI-first del proyecto.
