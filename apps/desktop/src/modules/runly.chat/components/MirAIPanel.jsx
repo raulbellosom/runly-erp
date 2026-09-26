@@ -44,7 +44,11 @@ function Bubble({ role, content, ttsEnabled, speech }) {
       {!isUser && <BotAvatar />}
       <div
         className={[
-          "max-w-[80%] wrap-break-word rounded-2xl px-3 py-2 text-sm",
+          // min-w-0: this bubble is a flex-row item — without it, a long
+          // unbroken run of characters floors its width at min-content and
+          // overflows past max-w-[80%] regardless of wrap-break-word (see
+          // the matching note in ChatMessageBubble.jsx).
+          "min-w-0 max-w-[80%] wrap-break-word rounded-2xl px-3 py-2 text-sm",
           isUser
             ? "whitespace-pre-wrap bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
             : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",

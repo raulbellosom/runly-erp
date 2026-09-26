@@ -704,7 +704,15 @@ export function ChatMessageBubble({
                 {hasText && (
                   <div
                     className={[
-                      "px-3 py-2 text-sm leading-relaxed",
+                      // min-w-0: this div is a flex/grid item (its "contents"
+                      // or "grid" parent above is transparent to layout) —
+                      // without it, a flex/grid item's default min-width:auto
+                      // floors it at its content's min-content width, which
+                      // for one long unbroken run of characters (a token,
+                      // URL, hash) ignores wrap-break-word entirely and
+                      // overflows straight past max-w-[72%]/65%, same root
+                      // cause as the min-w-0 note on data-msg-bubble above.
+                      "min-w-0 px-3 py-2 text-sm leading-relaxed",
                       radius,
                       firstEntityRefAttached ? "rounded-b-none!" : "",
                       "bg-(--brand-primary) text-(--brand-primary-foreground)",
@@ -925,7 +933,8 @@ export function ChatMessageBubble({
               {hasText && (
                 <div
                   className={[
-                    "px-3 py-2 text-sm leading-relaxed",
+                    // min-w-0 — see the matching note on the "own" bubble above.
+                    "min-w-0 px-3 py-2 text-sm leading-relaxed",
                     radius,
                     firstEntityRefAttached ? "rounded-b-none!" : "",
                     "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",

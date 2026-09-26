@@ -159,7 +159,10 @@ function MessageRow({ m, mine, onResolveAttachmentUrl }) {
           </div>
         ) : m.body ? (
           <div
-            className={`px-3 py-1.5 text-sm ${radius} ${
+            // min-w-0: flex-item of the min-w-0/items-end column above — without
+            // its own min-w-0 a long unbroken run of characters still floors
+            // this bubble's width at min-content and overflows past max-w-[85%].
+            className={`min-w-0 px-3 py-1.5 text-sm ${radius} ${
               mine ? "bg-violet-600 text-white" : "bg-white/10 text-slate-100"
             }`}
           >

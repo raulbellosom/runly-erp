@@ -626,6 +626,14 @@ export const MessageComposer = forwardRef(function MessageComposer(
     mentionTaRef.current?.wrapSelection?.(marker);
   }, []);
 
+  // Bullet/ordered list and blockquote — line-prefix formatting, handled by
+  // MentionTextarea's prefixLines (distinct from the wrap-around marks above).
+  // Ordered lists need an incrementing "1. ", "2. ", ... per line.
+  const applyLineFormat = useCallback((kind) => {
+    const prefix = kind === "ordered" ? (i) => `${i + 1}. ` : kind === "quote" ? "> " : "- ";
+    mentionTaRef.current?.prefixLines?.(prefix);
+  }, []);
+
   const handleSelectionChange = useCallback(({ start, end, hasSelection }) => {
     setSelection({ start, end, hasSelection });
   }, []);
@@ -824,7 +832,7 @@ export const MessageComposer = forwardRef(function MessageComposer(
       ) : (
         <div className="chat-glass flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl">
           {!coarse && selection.hasSelection && (
-            <ComposerFormatToolbar onApplyFormat={applyFormat} />
+            <ComposerFormatToolbar onApplyFormat={applyFormat} onApplyLineFormat={applyLineFormat} />
           )}
 
           {/* Textarea (with @mention autocomplete) — its own full-width row,

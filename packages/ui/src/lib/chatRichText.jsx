@@ -2,17 +2,19 @@
 //
 // WhatsApp-style rich text for chat bodies: *bold*, _italic_, ~strikethrough~,
 // `inline code`, ```fenced code```, plus real "- " bullet / "1. " ordered
-// lists (WhatsApp itself doesn't render lists, but chat messages here
-// routinely need them). Composes with the existing @[uuid:name] mention
-// tokens (MentionTextarea's format) and an optional search-query highlight,
-// so this is the single render path for every chat surface — member
-// messages, MirAI's answers, the MirAI side panel, and the call chat.
+// lists and "> " blockquotes (WhatsApp itself doesn't render any of those
+// three, but chat messages here routinely need them). Composes with the
+// existing @[uuid:name] mention tokens (MentionTextarea's format) and an
+// optional search-query highlight, so this is the single render path for
+// every chat surface — member messages, MirAI's answers, the MirAI side
+// panel, and the call chat.
 import { useState } from "react";
 import { splitMentionSegments } from "../components/MentionTextarea.jsx";
 
 const INLINE_TOKEN_RE = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`)/g;
 const LIST_ITEM_RE = /^\s*[-•]\s+(.*)$/;
 const ORDERED_ITEM_RE = /^\s*\d+[.)]\s+(.*)$/;
+const QUOTE_ITEM_RE = /^\s*>\s?(.*)$/;
 const FENCE_RE = /```([\w+-]*)\n?([\s\S]*?)```/g;
 
 function buildHighlightRegex(query) {
@@ -97,6 +99,7 @@ function groupLines(text) {
   while (i < lines.length) {
     const ordered = ORDERED_ITEM_RE.exec(lines[i]);
     const bullet = !ordered && LIST_ITEM_RE.exec(lines[i]);
+    const quote = !ordered && !bullet && QUOTE_ITEM_RE.exec(lines[i]);
     if (ordered || bullet) {
       const kind = ordered ? "ol" : "ul";
       const items = [];
@@ -110,9 +113,25 @@ function groupLines(text) {
       blocks.push({ type: kind, items });
       continue;
     }
+    if (quote) {
+      const quoteLines = [];
+      while (i < lines.length) {
+        const q = QUOTE_ITEM_RE.exec(lines[i]);
+        if (!q) break;
+        quoteLines.push(q[1]);
+        i += 1;
+      }
+      blocks.push({ type: "quote", text: quoteLines.join("\n") });
+      continue;
+    }
     const paraLines = [lines[i]];
     i += 1;
-    while (i < lines.length && !ORDERED_ITEM_RE.test(lines[i]) && !LIST_ITEM_RE.test(lines[i])) {
+    while (
+      i < lines.length &&
+      !ORDERED_ITEM_RE.test(lines[i]) &&
+      !LIST_ITEM_RE.test(lines[i]) &&
+      !QUOTE_ITEM_RE.test(lines[i])
+    ) {
       paraLines.push(lines[i]);
       i += 1;
     }
@@ -201,6 +220,18 @@ export function renderRichText(text, opts = {}) {
                   <li key={`${bKey}-li${ii}`}>{renderInlineText(item, highlightRe, codeClassName, `${bKey}i${ii}`)}</li>
                 ))}
               </ol>
+            );
+          }
+          if (block.type === "quote") {
+            // border-current so the rule always matches whatever color
+            // paragraphClassName gives the text (brand-on-own-bubble vs.
+            // foreground-on-received-bubble) without a separate isOwn prop.
+            return (
+              <blockquote key={bKey} className="my-1 border-l-2 border-current/40 pl-2 opacity-80">
+                <p className={paragraphClassName}>
+                  {renderInlineText(block.text, highlightRe, codeClassName, bKey)}
+                </p>
+              </blockquote>
             );
           }
           return (

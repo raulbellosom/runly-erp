@@ -213,6 +213,39 @@ const MentionTextarea = forwardRef(function MentionTextarea({
         ta.setSelectionRange(newStart, newEnd)
       })
     },
+    // Line-prefix formatting (bullet/ordered list, blockquote) — a different
+    // shape from wrapSelection above: it applies to every line the selection
+    // touches (or just the current line, with no selection) rather than
+    // wrapping a single inline span. `prefix` is either a constant string
+    // ("- ", "> ") or a function(lineIndex) for ordered lists, which need an
+    // incrementing "1. ", "2. ", ... per line.
+    prefixLines: (prefix) => {
+      const ta = textareaRef.current
+      if (!ta) return
+      const start = ta.selectionStart ?? displayValue.length
+      const end = ta.selectionEnd ?? displayValue.length
+      const lineStart = displayValue.lastIndexOf('\n', start - 1) + 1
+      const nextBreak = displayValue.indexOf('\n', end)
+      const lineEnd = nextBreak === -1 ? displayValue.length : nextBreak
+      const before = displayValue.slice(0, lineStart)
+      const block = displayValue.slice(lineStart, lineEnd)
+      const after = displayValue.slice(lineEnd)
+      const lines = block.split('\n')
+      const prefixOf = (i) => (typeof prefix === 'function' ? prefix(i) : prefix)
+      const prefixedLines = lines.map((line, i) => `${prefixOf(i)}${line}`)
+      const newBlock = prefixedLines.join('\n')
+      const newDisplay = `${before}${newBlock}${after}`
+      setDisplayValue(newDisplay)
+      const serialized = toSerialized(newDisplay, mentionMap.current)
+      lastSerializedRef.current = serialized
+      onChange(serialized)
+      requestAnimationFrame(() => {
+        ta.focus()
+        const firstPrefixLen = prefixOf(0).length
+        const delta = newBlock.length - block.length
+        ta.setSelectionRange(start + firstPrefixLen, end + delta)
+      })
+    },
   }))
 
   // Auto-grow: rest at `rows` tall, expand with content up to `maxRows`,
