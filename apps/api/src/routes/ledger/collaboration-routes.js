@@ -151,5 +151,31 @@ export function createCollaborationRouter({ prisma, requirePermission }) {
     }
   })
 
+  // ── Accept invitations ────────────────────────────────────────────────────
+
+  app.post('/ledger/invitations/groups/:id/accept', requirePermission('ledger.groups.read'), async (c) => {
+    try {
+      return c.json(await service.acceptGroupInvitation({
+        companyId: getCompanyId(c),
+        actorId: getActorId(c),
+        groupId: c.req.param('id'),
+      }))
+    } catch (err) {
+      return handleError(c, err, 'No se pudo aceptar la invitacion.')
+    }
+  })
+
+  app.post('/ledger/invitations/accounts/:id/accept', requirePermission('ledger.accounts.read'), async (c) => {
+    try {
+      return c.json(await service.acceptAccountInvitation({
+        companyId: getCompanyId(c),
+        actorId: getActorId(c),
+        accountId: c.req.param('id'),
+      }))
+    } catch (err) {
+      return handleError(c, err, 'No se pudo aceptar la invitacion.')
+    }
+  })
+
   return app
 }
