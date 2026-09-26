@@ -16,6 +16,9 @@
 // envBaseUrlOverrideVar: only ledger_import_text has a pre-existing custom
 //   Groq base URL override (LEDGER_IMPORT_BASE_URL); every other task uses
 //   the shared GROQ_BASE_URL from ai-providers.js.
+// groqDefaultModel: the model sent to Groq both when routing normally
+//   resolves to Groq for this task, and as the fallback model when a local
+//   (Ollama) attempt fails — see ai-router.js's circuit breaker.
 export const TASK_PROFILES = {
   mirai_classify: {
     weight: "light",
