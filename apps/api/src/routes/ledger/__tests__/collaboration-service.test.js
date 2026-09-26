@@ -275,4 +275,42 @@ describe('collaboration-service', () => {
       },
     )
   })
+
+  it('listMemberships includes pending memberships alongside active ones, with inviter name', async () => {
+    const groupRow = {
+      id: GROUP_ID, name: 'Grupo Test', role: 'viewer',
+      invited_at: new Date(), status: 'pending', invited_by_name: 'Admin User', member_count: 3,
+    }
+    const accountRow = {
+      id: ACCOUNT_ID, name: 'Cuenta Test', role: 'viewer',
+      invited_at: new Date(), status: 'pending', invited_by_name: 'Admin User', owner_name: 'Owner',
+    }
+    let groupsSql = null
+    let accountsSql = null
+    const prisma = buildPrismaMock(async (strings) => {
+      if (sqlContains(strings, 'from ledger_group_member gm')) {
+        groupsSql = strings
+        return [groupRow]
+      }
+      if (sqlContains(strings, 'from ledger_account_member am')) {
+        accountsSql = strings
+        return [accountRow]
+      }
+      return []
+    })
+    const service = createCollaborationService({ prisma })
+    const result = await service.listMemberships({ companyId: COMPANY_ID, actorId: ACTOR_ID })
+
+    assert.ok(groupsSql, 'expected the groups query to run')
+    assert.ok(sqlContains(groupsSql, "in ('active', 'pending')"), 'groups query must include pending memberships')
+    assert.ok(sqlContains(groupsSql, 'invited_by_name'), 'groups query must select the inviter name')
+    assert.ok(accountsSql, 'expected the accounts query to run')
+    assert.ok(sqlContains(accountsSql, "in ('active', 'pending')"), 'accounts query must include pending memberships')
+    assert.ok(sqlContains(accountsSql, 'invited_by_name'), 'accounts query must select the inviter name')
+
+    assert.equal(result.data.groups.length, 1)
+    assert.equal(result.data.groups[0].status, 'pending')
+    assert.equal(result.data.groups[0].invited_by_name, 'Admin User')
+    assert.equal(result.data.accounts[0].status, 'pending')
+  })
 })

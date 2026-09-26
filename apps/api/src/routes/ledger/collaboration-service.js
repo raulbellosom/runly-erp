@@ -163,24 +163,28 @@ export function createCollaborationService({ prisma }) {
   async function listMemberships({ companyId, actorId }) {
     const [groups, accounts] = await Promise.all([
       prisma.$queryRaw`
-        SELECT g.id, g.name, gm.role, gm.invited_at,
+        SELECT g.id, g.name, gm.role, gm.invited_at, gm.status,
+          inviter.display_name AS invited_by_name,
           COUNT(DISTINCT gm2.user_id) FILTER (WHERE gm2.status = 'active')::int4 AS member_count
         FROM ledger_group_member gm
         JOIN ledger_group g ON g.id = gm.group_id AND g.enabled = true
         LEFT JOIN ledger_group_member gm2 ON gm2.group_id = g.id
-        WHERE gm.user_id = ${actorId}::uuid AND gm.status = 'active'
+        LEFT JOIN user_profile inviter ON inviter.id = gm.invited_by
+        WHERE gm.user_id = ${actorId}::uuid AND gm.status IN ('active', 'pending')
           AND g.company_id = ${companyId}::uuid
           AND g.created_by != ${actorId}::uuid
-        GROUP BY g.id, gm.role, gm.invited_at
+        GROUP BY g.id, gm.role, gm.invited_at, gm.status, inviter.display_name
         ORDER BY g.name
       `,
       prisma.$queryRaw`
-        SELECT a.id, a.name, a.bank, a.currency, am.role, am.invited_at,
-          p.display_name AS owner_name
+        SELECT a.id, a.name, a.bank, a.currency, am.role, am.invited_at, am.status,
+          p.display_name AS owner_name,
+          inviter.display_name AS invited_by_name
         FROM ledger_account_member am
         JOIN ledger_account a ON a.id = am.account_id AND a.enabled = true
         JOIN user_profile p ON p.id = a.owner_id
-        WHERE am.user_id = ${actorId}::uuid AND am.status = 'active'
+        LEFT JOIN user_profile inviter ON inviter.id = am.invited_by
+        WHERE am.user_id = ${actorId}::uuid AND am.status IN ('active', 'pending')
           AND a.company_id = ${companyId}::uuid
         ORDER BY a.name
       `,
