@@ -15,13 +15,7 @@ import {
 } from "@runly/ui";
 import { runly } from "../lib/runly";
 import { useAuth } from "../auth/AuthProvider";
-
-// Strips the "/app" prefix the desktop router always adds so the path
-// matches the navigation.path values stored in each module's manifest
-// (e.g. "/app/help" -> "/help").
-function toApiPath(pathname) {
-  return pathname.startsWith("/app") ? pathname.slice(4) || "/" : pathname;
-}
+import { toApiPath } from "../lib/apiPath.js";
 
 const MAX_HISTORY_TURNS = 6;
 

@@ -24,6 +24,7 @@ import { FloatingChatHub } from '../modules/runly.chat/components/FloatingChatHu
 import { MODULE_SIDEBAR_SLOTS } from './sidebar-slots.js'
 import { useModuleNavBadges } from './useModuleNavBadges.js'
 import { useServiceWorkerNotifications } from './useServiceWorkerNotifications.js'
+import { useHelpTip } from './useHelpTip.js'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "atlas:v1:sidebar-collapsed";
 
@@ -209,6 +210,7 @@ export function RunlyApp() {
   }, [activeModule?.key])
 
   const navBadges = useModuleNavBadges(activeModule?.key)
+  const helpTip = useHelpTip()
 
   return (
     <OfflineProvider apiBaseUrl={apiBaseUrl} onTransportReady={handleTransportReady}
@@ -284,7 +286,7 @@ export function RunlyApp() {
               <Outlet />
             </main>
             {!(getLegacyModuleKey(activeModule?.key ?? moduleKeyFromPath) === "runly.chat" && isFullscreen) && (
-              <BrandFooter className="hidden lg:flex" editionName={RUNLY_EDITION_NAME} />
+              <BrandFooter className="hidden lg:flex" editionName={RUNLY_EDITION_NAME} tip={helpTip} />
             )}
           </div>
         </div>
