@@ -79,7 +79,8 @@ export function createAiRouter({ env = process.env, fetchImpl } = {}) {
       }
       localFailStreak = 0;
       return result;
-    } catch {
+    } catch (err) {
+      console.warn(`[ai-router] intento local fallido para "${task}": ${err?.message ?? err}`);
       localFailStreak += 1;
       if (localFailStreak === LOCAL_FAIL_THRESHOLD) {
         localOpenUntil = Date.now() + LOCAL_COOLDOWN_MS;
