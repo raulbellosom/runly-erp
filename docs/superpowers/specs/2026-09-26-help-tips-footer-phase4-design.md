@@ -188,3 +188,22 @@ lógica de recorte del prefijo `/app`.
 - `node --test apps/desktop/src/lib/__tests__/help-tip.test.js`
 - `pnpm --filter @runly/desktop build:web`
 - `pnpm lint`, `pnpm build`
+
+**Verificado: 2026-09-26** (implementación completa)
+
+1. Verificado — `help-tip.test.js` ("prefers the view summary when a view
+   is resolved").
+2. Verificado — `help-tip.test.js` ("falls back to the overview summary
+   when there is no view").
+3. Verificado — `help-tip.test.js` ("returns null when neither view nor
+   overview exist"); revisión de código de `BrandFooter.jsx` confirma que
+   `tip` falsy no renderiza el `<span>` central (footer idéntico al de
+   antes de esta fase).
+4. Verificado — `help-tip.test.js` ("returns null for undefined input",
+   "returns null for null input").
+
+`help-tip.test.js`: 5/5 pass. `pnpm --filter @runly/desktop build:web` y
+`pnpm build` (monorepo completo, incluyendo el instalador nativo Tauri)
+verdes. `pnpm lint` sin errores. No se verificó visualmente en navegador
+(mismo caveat de entorno que las fases 1-2): el diseño se validó por tipos
+de datos + build, no por captura de pantalla en vivo.
