@@ -231,6 +231,19 @@ vista, devuelve solo `overview` del módulo dueño de esa ruta (resuelto contra
 `navigation[].path` del propio manifest, ya materializado en
 `ModuleRegistry.resolveBlueprints()`/navegación).
 
+**Corregido 2026-09-26** (bug crítico descubierto en producción: `path`
+llega ya con el prefijo real del frontend — `/m/<moduleKey>/...`
+(`ModuleSidebar.buildFullPath`) — pero `navigation[].path` y `viewKey` se
+declaran *relativos al propio módulo* (`/modules`, `/chat/inbox`). Comparar
+directamente nunca coincidía; toda pantalla real caía silenciosamente al
+resumen genérico. `resolveHelp` ahora traduce cada `navPath`/`viewKey` con
+`toModuleApiPath(moduleKey, path)` — las mismas dos reglas que
+`buildFullPath` — antes de comparar contra `path`. La única excepción es un
+`navigation[].path` que empieza con `/app/` (como el propio ítem "Ayuda" de
+`runly.core`, que apunta a la pantalla de nivel superior `/app/help` en vez
+de pasar por `ModuleOutlet`): ese prefijo se respeta tal cual, sin anteponer
+`/m/<moduleKey>`.
+
 **Actualizado 2026-09-26** (feedback del usuario tras probar la Fase 1 en
 vivo: la pantalla de inicio del shell — `/home` — no pertenece a la
 navegación de ningún módulo, así que mostraba "sin ayuda" incluso
