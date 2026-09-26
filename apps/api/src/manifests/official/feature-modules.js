@@ -275,7 +275,7 @@ export const runlyWebsiteManifest = createModuleManifest({
   name: "Sitio web",
   description:
     "Sitio web publico, editor visual de paginas y publicacion de contenido.",
-  version: "0.2.0",
+  version: "0.3.0",
   kind: MODULE_KINDS.WEBSITE,
   core: true,
   uninstallable: false,
@@ -370,13 +370,16 @@ export const runlyWebsiteManifest = createModuleManifest({
       permissionKey: 'website.site.update',
     },
   ],
+  blueprints: [
+    ...loadHelpBlueprints('runly.website', path.join(HELP_DIR, 'runly.website')),
+  ],
 });
 
 export const runlyGrowthManifest = createModuleManifest({
   key: "runly.growth",
   name: "Growth",
   description: "Telemetria web, formularios y seguimiento de leads.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -496,14 +499,16 @@ export const runlyGrowthManifest = createModuleManifest({
       },
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.growth", path.join(HELP_DIR, "runly.growth")),
+  ],
 });
 
 export const runlyDocumentsManifest = createModuleManifest({
   key: "runly.documents",
   name: "Documentos",
   description: "Plantillas versionadas y documentos PDF generados.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -595,7 +600,9 @@ export const runlyDocumentsManifest = createModuleManifest({
       },
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.documents", path.join(HELP_DIR, "runly.documents")),
+  ],
 });
 
 export const featureModules = [];
@@ -604,7 +611,7 @@ export const activityMap = createModuleManifest({
   key: "runly.activity",
   name: "Actividad",
   description: "Bitácora legible de eventos y feed transversal de Runly ERP.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -661,14 +668,16 @@ export const activityMap = createModuleManifest({
       },
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.activity", path.join(HELP_DIR, "runly.activity")),
+  ],
 });
 
 export const notificationsMap = createModuleManifest({
   key: "runly.notifications",
   name: "Notificaciones",
   description: "Alertas accionables para eventos importantes del sistema.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -750,14 +759,16 @@ export const notificationsMap = createModuleManifest({
       },
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.notifications", path.join(HELP_DIR, "runly.notifications")),
+  ],
 });
 
 export const projectsMap = createModuleManifest({
   key: 'runly.projects',
   name: 'Proyectos',
   description: 'Gestion de proyectos y tareas con vistas Kanban, Lista y Timeline.',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -814,7 +825,9 @@ export const projectsMap = createModuleManifest({
   exposes: {
     createTask: 'function',
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints('runly.projects', path.join(HELP_DIR, 'runly.projects')),
+  ],
 });
 
 export const chatMap = createModuleManifest({
