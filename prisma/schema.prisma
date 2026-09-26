@@ -30,6 +30,7 @@ enum BlueprintKind {
   ACTION
   RELATION
   PERMISSION
+  HELP
   @@map("blueprint_kind")
 }
 
