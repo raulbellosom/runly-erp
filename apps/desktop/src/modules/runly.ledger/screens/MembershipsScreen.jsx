@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { PageHeader, EmptyState, ErrorState, ConfirmDialog, Button, Card } from '@runly/ui'
-import { LogOut, FolderOpen, Landmark } from 'lucide-react'
+import { LogOut, FolderOpen, Landmark, Check, X, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -21,6 +21,7 @@ export default function MembershipsScreen() {
 
   const [leaveGroup, setLeaveGroup]     = useState(null)
   const [leaveAccount, setLeaveAccount] = useState(null)
+  const [busyId, setBusyId]             = useState(null)
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ledger-memberships', token],
@@ -32,8 +33,13 @@ export default function MembershipsScreen() {
     enabled: !!token,
   })
 
-  const groups   = data?.data?.groups   ?? []
-  const accounts = data?.data?.accounts ?? []
+  const allGroups   = data?.data?.groups   ?? []
+  const allAccounts = data?.data?.accounts ?? []
+
+  const pendingGroups   = allGroups.filter((g) => g.status === 'pending')
+  const pendingAccounts = allAccounts.filter((a) => a.status === 'pending')
+  const groups          = allGroups.filter((g) => g.status !== 'pending')
+  const accounts        = allAccounts.filter((a) => a.status !== 'pending')
 
   async function confirmLeaveGroup() {
     const res = await companyFetch(`${API_BASE}/ledger/memberships/groups/${leaveGroup.id}`, {
@@ -57,6 +63,25 @@ export default function MembershipsScreen() {
     queryClient.invalidateQueries({ queryKey: ['ledger-accounts'] })
   }
 
+  async function respondInvitation(kind, id, action) {
+    setBusyId(`${kind}-${id}-${action}`)
+    try {
+      const res = await companyFetch(
+        `${API_BASE}/ledger/invitations/${kind}/${id}/${action}`,
+        { method: 'POST', headers },
+      )
+      if (!res.ok) throw new Error()
+      toast.success(action === 'accept' ? 'Invitación aceptada.' : 'Invitación rechazada.')
+      queryClient.invalidateQueries({ queryKey: ['ledger-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['ledger-groups'] })
+      queryClient.invalidateQueries({ queryKey: ['ledger-accounts'] })
+    } catch {
+      toast.error(action === 'accept' ? 'No se pudo aceptar la invitación.' : 'No se pudo rechazar la invitación.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-3">
@@ -67,7 +92,8 @@ export default function MembershipsScreen() {
 
   if (isError) return <ErrorState description="No se pudieron cargar las membresias." onRetry={refetch} />
 
-  const isEmpty = groups.length === 0 && accounts.length === 0
+  const hasPending = pendingGroups.length > 0 || pendingAccounts.length > 0
+  const isEmpty = !hasPending && groups.length === 0 && accounts.length === 0
 
   return (
     <div className="flex flex-col h-full">
@@ -82,6 +108,7 @@ export default function MembershipsScreen() {
           <LedgerStatStrip
             className="mb-2 max-w-2xl"
             items={[
+              { key: 'pending', label: 'Pendientes', value: pendingGroups.length + pendingAccounts.length, icon: Clock, tone: 'destructive' },
               { key: 'groups', label: 'Grupos', value: groups.length, icon: FolderOpen, tone: 'amber' },
               { key: 'accounts', label: 'Cuentas compartidas', value: accounts.length, icon: Landmark, tone: 'violet' },
             ]}
@@ -96,6 +123,80 @@ export default function MembershipsScreen() {
             title="Sin membresías"
             description="No tienes membresías activas en grupos ni cuentas compartidas."
           />
+        )}
+
+        {hasPending && (
+          <section>
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Clock size={14} /> Pendientes
+            </h3>
+            <div className="space-y-2">
+              {pendingGroups.map((g) => (
+                <Card key={`pending-group-${g.id}`} variant="solid" className="rounded-xl flex items-center justify-between px-3 py-2 border-amber-500/30">
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--brand-soft) text-(--brand-primary)">
+                      <FolderOpen size={14} />
+                    </span>
+                    <span className="min-w-0">
+                      <div className="text-sm font-medium truncate">{g.name}</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                        Invitación de {g.invited_by_name ?? 'un administrador'} · rol <span className="capitalize">{g.role}</span>
+                      </div>
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => respondInvitation('groups', g.id, 'accept')}
+                      disabled={busyId === `groups-${g.id}-accept`}
+                    >
+                      <Check size={13} className="mr-1" /> Aceptar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => respondInvitation('groups', g.id, 'reject')}
+                      disabled={busyId === `groups-${g.id}-reject`}
+                    >
+                      <X size={13} className="mr-1" /> Rechazar
+                    </Button>
+                  </span>
+                </Card>
+              ))}
+              {pendingAccounts.map((a) => (
+                <Card key={`pending-account-${a.id}`} variant="solid" className="rounded-xl flex items-center justify-between px-3 py-2 border-amber-500/30">
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                      <Landmark size={14} />
+                    </span>
+                    <span className="min-w-0">
+                      <div className="text-sm font-medium truncate">{a.name}</div>
+                      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                        Invitación de {a.invited_by_name ?? a.owner_name ?? 'el propietario'} · rol <span className="capitalize">{a.role}</span>
+                      </div>
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => respondInvitation('accounts', a.id, 'accept')}
+                      disabled={busyId === `accounts-${a.id}-accept`}
+                    >
+                      <Check size={13} className="mr-1" /> Aceptar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => respondInvitation('accounts', a.id, 'reject')}
+                      disabled={busyId === `accounts-${a.id}-reject`}
+                    >
+                      <X size={13} className="mr-1" /> Rechazar
+                    </Button>
+                  </span>
+                </Card>
+              ))}
+            </div>
+          </section>
         )}
 
         {groups.length > 0 && (
