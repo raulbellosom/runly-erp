@@ -19,6 +19,7 @@ import { OfficeProvider } from "../providers/OfficeProvider";
 import { CallsProvider } from "../modules/runly.chat/calls/CallsProvider";
 import { RunlyApp } from "./RunlyApp";
 import { HomeScreen } from "./HomeScreen";
+import { HelpCenterScreen } from "./HelpCenterScreen";
 import { ModuleOutlet } from "./ModuleOutlet";
 import { ProfileScreen } from "./ProfileScreen";
 import { GoogleCalendarCallbackScreen } from "./GoogleCalendarCallbackScreen";
@@ -190,6 +191,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
                       <Route path="home" element={<HomeScreen />} />
                       <Route path="m/:moduleKey/*" element={<ModuleOutlet />} />
                       <Route path="profile" element={<ProfileScreen />} />
+                      <Route path="help" element={<HelpCenterScreen />} />
                       <Route path="native-host" element={<NativeHostDiagnostics />} />
                     </Route>
                   </Route>
