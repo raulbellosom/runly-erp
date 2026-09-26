@@ -22,6 +22,7 @@ import { usePushAutoSubscribe } from "../hooks/usePushAutoSubscribe.js";
 import { runly } from '../lib/runly.js'
 import { FloatingChatHub } from '../modules/runly.chat/components/FloatingChatHub.jsx'
 import { MODULE_SIDEBAR_SLOTS } from './sidebar-slots.js'
+import { useModuleNavBadges } from './useModuleNavBadges.js'
 import { useServiceWorkerNotifications } from './useServiceWorkerNotifications.js'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "atlas:v1:sidebar-collapsed";
@@ -207,6 +208,8 @@ export function RunlyApp() {
     return Slot ? <Slot /> : null
   }, [activeModule?.key])
 
+  const navBadges = useModuleNavBadges(activeModule?.key)
+
   return (
     <OfflineProvider apiBaseUrl={apiBaseUrl} onTransportReady={handleTransportReady}
       session={{ accessToken: session?.access_token, companyId: activeCompanyId, userProfile }}>
@@ -262,6 +265,7 @@ export function RunlyApp() {
                 onCollapse={toggleCollapsed}
                 mobileOpen={mobileOpen}
                 sidebarSlot={sidebarSlot}
+                navBadges={navBadges}
                 onMobileClose={() => setMobileOpen(false)}
                 canInstall={canInstall}
                 onInstall={install}
