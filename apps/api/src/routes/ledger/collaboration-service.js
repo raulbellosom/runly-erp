@@ -78,9 +78,10 @@ export function createCollaborationService({ prisma }) {
     try {
       await prisma.$queryRaw`
         INSERT INTO ledger_account_member (account_id, user_id, role, invited_by, status)
-        VALUES (${accountId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'active')
+        VALUES (${accountId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'pending')
         ON CONFLICT (account_id, user_id) DO UPDATE
-          SET role = EXCLUDED.role, status = 'active', invited_by = EXCLUDED.invited_by, invited_at = NOW()
+          SET role = EXCLUDED.role, invited_by = EXCLUDED.invited_by, invited_at = NOW(),
+              status = CASE WHEN ledger_account_member.status = 'active' THEN 'active' ELSE 'pending' END
       `
     } catch (err) {
       if (err.message?.includes('violates foreign key')) {

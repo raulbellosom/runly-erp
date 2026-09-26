@@ -103,6 +103,40 @@ describe('collaboration-service', () => {
     )
   })
 
+  it('inviteAccountMember creates a pending membership, not an immediately active one', async () => {
+    const accountRow = {
+      id: ACCOUNT_ID,
+      name: 'Cuenta Test',
+      company_id: COMPANY_ID,
+      owner_id: ACTOR_ID,
+      group_id: null,
+      enabled: true,
+    }
+    let insertStrings = null
+
+    const prisma = buildPrismaMock(async (strings, ...values) => {
+      if (sqlContains(strings, 'from ledger_account')) return [accountRow]
+      if (sqlContains(strings, 'insert into ledger_account_member')) {
+        insertStrings = strings
+        return []
+      }
+      return []
+    })
+
+    const service = createCollaborationService({ prisma })
+    await service.inviteAccountMember({
+      companyId: COMPANY_ID,
+      accountId: ACCOUNT_ID,
+      actorId: ACTOR_ID,
+      actorName: 'Test Actor',
+      data: { user_id: TARGET_ID, role: 'viewer' },
+    })
+
+    assert.ok(insertStrings, 'expected an INSERT INTO ledger_account_member call')
+    assert.ok(sqlContains(insertStrings, "'pending'"), 'a fresh invite must insert status pending')
+    assert.ok(sqlContains(insertStrings, 'case when'), 'conflict update must preserve an already-active membership')
+  })
+
   it('inviteAccountMember throws 400 when actor invites themselves', async () => {
     // Account is owned by actor and has no group_id
     const accountRow = {
