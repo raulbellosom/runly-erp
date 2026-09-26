@@ -56,6 +56,8 @@ function makePrisma({ modules = [CORE_MODULE, FLEET_MODULE], helpRows = HELP_ROW
         if (where?.enabled !== undefined && row.enabled !== where.enabled) return false
         if (where?.moduleId && row.moduleId !== where.moduleId) return false
         if (where?.module?.key && row.module.key !== where.module.key) return false
+        if (where?.module?.status && row.module.status !== where.module.status) return false
+        if (where?.module?.enabled !== undefined && row.module.enabled !== where.module.enabled) return false
         return true
       }),
     },
@@ -69,6 +71,18 @@ describe('help-service', () => {
     assert.equal(result.length, 1)
     assert.equal(result[0].moduleKey, 'custom.fleet')
     assert.equal(result[0].summary, 'Gestiona vehiculos.')
+  })
+
+  it('listModulesWithHelp excludes a DISABLED module even if it has help rows', async () => {
+    const disabledFleet = { ...FLEET_MODULE, status: 'DISABLED' }
+    const service = createHelpService({
+      prisma: makePrisma({
+        modules: [CORE_MODULE, disabledFleet],
+        helpRows: HELP_ROWS.map((row) => ({ ...row, module: disabledFleet })),
+      }),
+    })
+    const result = await service.listModulesWithHelp()
+    assert.equal(result.length, 0)
   })
 
   it('getModuleHelp returns overview + views for an installed module', async () => {
