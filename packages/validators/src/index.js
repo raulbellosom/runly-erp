@@ -1360,3 +1360,17 @@ export const helpSearchQuerySchema = z.object({
 export const helpResolvePathQuerySchema = z.object({
   path: z.string().min(1).max(500),
 });
+
+export const helpAskBodySchema = z.object({
+  path: z.string().min(1).max(500),
+  question: z.string().trim().min(2).max(500),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(1000),
+      }),
+    )
+    .max(6)
+    .optional(),
+});
