@@ -242,6 +242,34 @@ export function createCollaborationService({ prisma }) {
     return { ok: true }
   }
 
+  async function acceptGroupInvitation({ companyId, actorId, groupId }) {
+    const rows = await prisma.$queryRaw`
+      UPDATE ledger_group_member
+      SET status = 'active'
+      WHERE group_id = ${groupId}::uuid AND user_id = ${actorId}::uuid AND status = 'pending'
+        AND EXISTS (
+          SELECT 1 FROM ledger_group WHERE id = ${groupId}::uuid AND company_id = ${companyId}::uuid
+        )
+      RETURNING *
+    `
+    if (!firstRow(rows)) throw new CollaborationServiceError('Invitación no encontrada.', 404)
+    return { ok: true }
+  }
+
+  async function acceptAccountInvitation({ companyId, actorId, accountId }) {
+    const rows = await prisma.$queryRaw`
+      UPDATE ledger_account_member
+      SET status = 'active'
+      WHERE account_id = ${accountId}::uuid AND user_id = ${actorId}::uuid AND status = 'pending'
+        AND EXISTS (
+          SELECT 1 FROM ledger_account WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid
+        )
+      RETURNING *
+    `
+    if (!firstRow(rows)) throw new CollaborationServiceError('Invitación no encontrada.', 404)
+    return { ok: true }
+  }
+
   return {
     listAccountMembers,
     inviteAccountMember,
@@ -252,5 +280,7 @@ export function createCollaborationService({ prisma }) {
     leaveAccount,
     rejectGroupInvitation,
     rejectAccountInvitation,
+    acceptGroupInvitation,
+    acceptAccountInvitation,
   }
 }

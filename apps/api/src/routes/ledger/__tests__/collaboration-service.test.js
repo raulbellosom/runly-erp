@@ -221,4 +221,58 @@ describe('collaboration-service', () => {
       },
     )
   })
+
+  it('acceptGroupInvitation activates a pending group membership', async () => {
+    const memberRow = { group_id: GROUP_ID, user_id: ACTOR_ID, role: 'viewer', status: 'active' }
+    const prisma = buildPrismaMock(async (strings) => {
+      if (sqlContains(strings, 'update ledger_group_member')) return [memberRow]
+      return []
+    })
+    const service = createCollaborationService({ prisma })
+    const result = await service.acceptGroupInvitation({ companyId: COMPANY_ID, actorId: ACTOR_ID, groupId: GROUP_ID })
+    assert.deepEqual(result, { ok: true })
+  })
+
+  it('acceptGroupInvitation throws 404 when there is no pending invitation', async () => {
+    const prisma = buildPrismaMock(async (strings) => {
+      if (sqlContains(strings, 'update ledger_group_member')) return []
+      return []
+    })
+    const service = createCollaborationService({ prisma })
+    await assert.rejects(
+      () => service.acceptGroupInvitation({ companyId: COMPANY_ID, actorId: ACTOR_ID, groupId: GROUP_ID }),
+      (err) => {
+        assert.ok(err instanceof CollaborationServiceError)
+        assert.equal(err.status, 404)
+        return true
+      },
+    )
+  })
+
+  it('acceptAccountInvitation activates a pending account membership', async () => {
+    const memberRow = { account_id: ACCOUNT_ID, user_id: ACTOR_ID, role: 'viewer', status: 'active' }
+    const prisma = buildPrismaMock(async (strings) => {
+      if (sqlContains(strings, 'update ledger_account_member')) return [memberRow]
+      return []
+    })
+    const service = createCollaborationService({ prisma })
+    const result = await service.acceptAccountInvitation({ companyId: COMPANY_ID, actorId: ACTOR_ID, accountId: ACCOUNT_ID })
+    assert.deepEqual(result, { ok: true })
+  })
+
+  it('acceptAccountInvitation throws 404 when there is no pending invitation', async () => {
+    const prisma = buildPrismaMock(async (strings) => {
+      if (sqlContains(strings, 'update ledger_account_member')) return []
+      return []
+    })
+    const service = createCollaborationService({ prisma })
+    await assert.rejects(
+      () => service.acceptAccountInvitation({ companyId: COMPANY_ID, actorId: ACTOR_ID, accountId: ACCOUNT_ID }),
+      (err) => {
+        assert.ok(err instanceof CollaborationServiceError)
+        assert.equal(err.status, 404)
+        return true
+      },
+    )
+  })
 })
