@@ -17,6 +17,7 @@ export { defineView,
          validateView }                  from './define-view.js'
 export { definePage,
          validatePage }                  from './define-page.js'
+export { loadHelpBlueprints }             from './load-help-blueprints.js'
 export { ModuleRegistry }               from './module-registry.js'
 export { ModelRegistry }                from './model-registry.js'
 export { ComponentRegistry }            from './component-registry.js'
