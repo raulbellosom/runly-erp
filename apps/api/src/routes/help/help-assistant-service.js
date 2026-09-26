@@ -7,9 +7,9 @@
 // supplied by the caller each time, never read from or written to a table.
 // See docs/superpowers/specs/2026-09-26-module-help-assistant-phase2-design.md.
 import { createHelpService } from "../../services/help-service.js";
-import { isReasoningModel } from "../../services/groq-model-helpers.js";
+import { createAiRouter } from "../../services/ai/ai-router.js";
+import { isLocalEnabled } from "../../services/ai/ai-providers.js";
 
-const DEFAULT_MODEL = "openai/gpt-oss-120b";
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
 const GROQ_TIMEOUT_MS = 25_000;
@@ -37,13 +37,11 @@ function systemPrompt() {
 
 export function createHelpAssistantService({ prisma, helpService, env = process.env, fetchImpl } = {}) {
   const service = helpService ?? createHelpService({ prisma });
-  const fetchFn = fetchImpl ?? globalThis.fetch;
-  const model = env.HELP_ASSISTANT_MODEL || DEFAULT_MODEL;
-  const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
+  const aiRouter = createAiRouter({ env, fetchImpl });
   const buckets = new Map();
 
   function isConfigured() {
-    return Boolean(env.GROQ_API_KEY);
+    return Boolean(env.GROQ_API_KEY) || isLocalEnabled(env);
   }
 
   function checkRate(actorId) {
@@ -57,42 +55,12 @@ export function createHelpAssistantService({ prisma, helpService, env = process.
   }
 
   async function callGroq(messages) {
-    const body = {
-      model,
-      temperature: 0.2,
-      max_tokens: 500,
-      ...(isReasoningModel(model) ? { reasoning_format: "hidden" } : {}),
-      messages,
-    };
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.GROQ_API_KEY}` },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch {
-        clearTimeout(timer);
-        continue;
-      }
-      clearTimeout(timer);
-      if (res.status === 429 || res.status >= 500) continue;
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new HelpAssistantServiceError(
-          `El asistente rechazo la peticion (${res.status}): ${detail.slice(0, 160)}`,
-          502,
-        );
-      }
-      const payload = await res.json();
-      return payload?.choices?.[0]?.message?.content ?? "";
+    try {
+      const { message } = await aiRouter.runTask({ task: "help_assistant", messages, maxTokens: 500, timeoutMs: GROQ_TIMEOUT_MS });
+      return message?.content ?? "";
+    } catch (err) {
+      throw new HelpAssistantServiceError(err.message ?? "El asistente no respondio, intenta de nuevo.", 502);
     }
-    throw new HelpAssistantServiceError("El asistente no respondio, intenta de nuevo.", 502);
   }
 
   function buildContext(searchResults, resolved, path) {
