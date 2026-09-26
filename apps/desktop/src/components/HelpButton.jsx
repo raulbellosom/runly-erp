@@ -16,6 +16,7 @@ import {
 import { runly } from "../lib/runly";
 import { useAuth } from "../auth/AuthProvider";
 import { toApiPath } from "../lib/apiPath.js";
+import { toChatHistory } from "../lib/chat-history.js";
 
 const MAX_HISTORY_TURNS = 6;
 
@@ -73,9 +74,7 @@ export function HelpButton() {
   function sendQuestion(text) {
     const question = text.trim();
     if (!question || askMutation.isPending) return;
-    const history = conversation
-      .slice(-MAX_HISTORY_TURNS)
-      .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+    const history = toChatHistory(conversation, MAX_HISTORY_TURNS);
     setConversation((prev) => [...prev, { role: "user", content: question }]);
     setDraft("");
     askMutation.mutate({ question, history });
