@@ -43,6 +43,7 @@ export function createHelpService({ prisma }) {
   async function listModulesWithHelp() {
     const rows = await prisma.blueprint.findMany({
       where: { kind: 'HELP', enabled: true, module: { status: 'INSTALLED', enabled: true } },
+      include: { module: true },
     })
     const byModule = new Map()
     for (const row of rows) {
@@ -128,6 +129,7 @@ export function createHelpService({ prisma }) {
   async function searchHelp(query) {
     const rows = await prisma.blueprint.findMany({
       where: { kind: 'HELP', enabled: true, module: { status: 'INSTALLED', enabled: true } },
+      include: { module: true },
     })
     const terms = normalize(query).split(/\s+/).filter(Boolean)
     const results = []
