@@ -574,3 +574,17 @@ banco de contenido y el mismo `help-service.js`** de esta fase, sin tocarlo:
    suficiente para que el ranking en memoria dejara de ser instantáneo.
 5. Métricas de qué artículos de ayuda se consultan más (para priorizar qué
    documentar primero) — no planeado, solo anotado como posible.
+6. **Banco de ayuda centralizado (idea del usuario, 2026-09-27):** en vez de
+   que el contenido viva completo dentro de cada instancia self-hosted,
+   alojarlo en un solo lugar (GitHub o `runly.mx/modules`) con una ruta tipo
+   `/modules/:module/resumen` que tanto usuarios como modelos de IA puedan
+   consultar directamente — así la documentación se actualiza en un solo
+   sitio en vez de re-desplegarse en cada VPS. Sin resolver todavía: (a) el
+   modo offline de Runly Desktop (algunos módulos dependen de operar sin
+   internet — CLAUDE.md, "runly.ledger desktop offline mode"), así que no
+   está claro si el contenido se podría borrar por completo de la instancia
+   o si seguiría viviendo ahí como cache/respaldo local sincronizado desde
+   el banco central; (b) qué tan público es ese banco central (documentación
+   de producto vs. posible filtración de detalles de instancias privadas si
+   no se separa bien). No planeado — anotado para retomar cuando se defina
+   el modo offline y el alcance de lo público.
