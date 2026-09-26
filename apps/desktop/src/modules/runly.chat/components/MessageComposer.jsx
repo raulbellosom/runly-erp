@@ -3,7 +3,6 @@ import {
   useRef,
   useCallback,
   useEffect,
-  useMemo,
   useImperativeHandle,
   forwardRef,
 } from "react";
@@ -12,9 +11,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, useCoarsePointer,
 } from "@runly/ui";
 import {
-  Send, Paperclip, Smile, X, Loader2, AlertCircle, Plus, Link2,
+  Send, Paperclip, Smile, X, Loader2, AlertCircle, Plus, Link2, Pencil, Check,
 } from "lucide-react";
-import { ComposerFormatToolbar, ComposerFormatPreview, hasFormattingSyntax } from "./ComposerFormatting";
+import { ComposerFormatToolbar } from "./ComposerFormatting";
 import { toast } from "sonner";
 import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
 import { useChatUpload } from "../hooks/useChatUpload";
@@ -97,6 +96,12 @@ export const MessageComposer = forwardRef(function MessageComposer(
     conversationType,
     replyingTo = null,
     onCancelReply,
+    // Editing an own, already-sent message — mutually exclusive with
+    // replyingTo (the caller is expected to clear whichever isn't active
+    // when starting the other). editingMessage needs only { id, body }.
+    editingMessage = null,
+    onCancelEdit,
+    onSubmitEdit,
     // Set by callers (ChatWindow, MiniChatWindow) that already wrap this
     // composer in their own outer drag-and-drop zone covering the whole
     // message area. Without this, dropping a file directly on the composer
@@ -474,9 +479,43 @@ export const MessageComposer = forwardRef(function MessageComposer(
     [onTyping],
   );
 
+  // ── Edit ─────────────────────────────────────────────────────────────────
+  // Entering edit mode loads the target message's text into the box (unlike
+  // replyingTo, which never touches body); leaving it is handled explicitly
+  // by the cancel button and by a successful submit below, not by this
+  // effect, so it never clobbers whatever the user is mid-typing.
+  const editingIdRef = useRef(null);
+  useEffect(() => {
+    const id = editingMessage?.id ?? null;
+    if (id === editingIdRef.current) return;
+    editingIdRef.current = id;
+    if (id != null) {
+      setBody(editingMessage.body ?? "");
+      requestAnimationFrame(() => mentionTaRef.current?.focus?.());
+    }
+  }, [editingMessage]);
+
+  const exitEdit = useCallback(() => {
+    setBody("");
+    onCancelEdit?.();
+  }, [onCancelEdit]);
+
   // ── Send ─────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const trimmed = body.trim();
+
+    if (editingMessage) {
+      if (!trimmed || isSending) return;
+      setIsSending(true);
+      try {
+        await onSubmitEdit?.(editingMessage.id, trimmed);
+        exitEdit();
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
+
     const hasFiles = pendingFiles.length > 0;
     const hasEntityRefs = pendingEntityRefs.length > 0;
     if ((!trimmed && !hasFiles && !hasEntityRefs) || isSending) return;
@@ -546,7 +585,10 @@ export const MessageComposer = forwardRef(function MessageComposer(
     } finally {
       setIsSending(false);
     }
-  }, [body, isSending, onSend, onTyping, pendingFiles, pendingEntityRefs, replyingTo, onCancelReply]);
+  }, [
+    body, isSending, onSend, onTyping, pendingFiles, pendingEntityRefs, replyingTo, onCancelReply,
+    editingMessage, onSubmitEdit, exitEdit,
+  ]);
 
   // Keep ref in sync so the auto-send effect never holds a stale closure.
   useEffect(() => {
@@ -587,8 +629,6 @@ export const MessageComposer = forwardRef(function MessageComposer(
   const handleSelectionChange = useCallback(({ start, end, hasSelection }) => {
     setSelection({ start, end, hasSelection });
   }, []);
-
-  const showFormatPreview = useMemo(() => hasFormattingSyntax(body), [body]);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -696,8 +736,22 @@ export const MessageComposer = forwardRef(function MessageComposer(
           see the dropZoneDisabled prop comment above. */}
       {!dropZoneDisabled && isDragOver && <DropZoneOverlay compact={compact} />}
 
-      {/* Reply-to preview — the message the next send will quote */}
-      {replyingTo && (
+      {/* Editing banner — mutually exclusive with the reply preview below;
+          the caller clears replyingTo when it starts an edit and vice versa. */}
+      {editingMessage ? (
+        <div className="flex items-center gap-2 rounded-lg border-l-2 border-[hsl(var(--primary))] bg-[hsl(var(--muted))]/60 px-2.5 py-1.5 mb-1.5">
+          <Pencil className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--primary))]" />
+          <span className="flex-1 min-w-0 text-xs font-medium text-[hsl(var(--primary))]">Editar mensaje</span>
+          <button
+            type="button"
+            onClick={exitEdit}
+            className="shrink-0 h-5 w-5 rounded-full flex items-center justify-center hover:bg-black/10 touch-manipulation"
+            aria-label="Cancelar edicion"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : replyingTo && (
         <MessageQuote
           variant="compose"
           reply={toReplyPreview(replyingTo)}
@@ -820,8 +874,6 @@ export const MessageComposer = forwardRef(function MessageComposer(
             />
           </div>
 
-          {showFormatPreview && <ComposerFormatPreview body={body} />}
-
           {/* Mobile quick-emoji strip — a normal in-flow row (full composer
               width) so it can never render off-screen the way the Popover
               could inside a bottom-anchored Sheet. The trailing "+" opens the
@@ -857,34 +909,40 @@ export const MessageComposer = forwardRef(function MessageComposer(
               both looked cluttered and ate into the width available for
               typing. */}
           <div className={["flex w-full min-w-0 max-w-full items-center gap-0.5 overflow-hidden", compact ? "px-1 pb-1" : "px-1.5 pb-1.5"].join(" ")}>
-            {/* Paperclip */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,audio/*,video/*,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.*,application/zip"
-              className="hidden"
-              onChange={handleFileInputChange}
-              disabled={disabled}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={[
-                "shrink-0 flex items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))] transition-colors touch-manipulation",
-                btnSize,
-              ].join(" ")}
-              title="Adjuntar archivo"
-              disabled={disabled}
-            >
-              <Paperclip className={iconSize} />
-            </button>
+            {/* Paperclip / entity reference — hidden while editing an
+                existing message: editing only ever changes its text (the API
+                PATCH is body-only), matching WhatsApp's edit composer. */}
+            {!editingMessage && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,audio/*,video/*,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.*,application/zip"
+                  className="hidden"
+                  onChange={handleFileInputChange}
+                  disabled={disabled}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={[
+                    "shrink-0 flex items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--border))] transition-colors touch-manipulation",
+                    btnSize,
+                  ].join(" ")}
+                  title="Adjuntar archivo"
+                  disabled={disabled}
+                >
+                  <Paperclip className={iconSize} />
+                </button>
+              </>
+            )}
 
             {/* Entity reference — hidden entirely in external_support
                 conversations (spec Non-goal 3); this is composer-level
                 enforcement only, Plan A's backend Zod validation is the real
                 safety net. */}
-            {canAttachEntityRefs && (
+            {!editingMessage && canAttachEntityRefs && (
               <EntityReferencePicker
                 open={showEntityPicker}
                 onOpenChange={setShowEntityPicker}
@@ -985,7 +1043,7 @@ export const MessageComposer = forwardRef(function MessageComposer(
             </Dialog>
 
             {/* Mic — only shown when there's nothing else ready to send */}
-            {!body.trim() && !pendingFiles.length && !pendingEntityRefs.length && (
+            {!editingMessage && !body.trim() && !pendingFiles.length && !pendingEntityRefs.length && (
               <VoiceMicButton
                 btnSize={btnSize}
                 iconSize={iconSize}
@@ -996,16 +1054,23 @@ export const MessageComposer = forwardRef(function MessageComposer(
 
             <div className="flex-1" />
 
-            {/* Send */}
+            {/* Send — a checkmark while editing (confirms the edit), the
+                usual paper plane otherwise. */}
             <Button
               size="sm"
               className={["shrink-0 rounded-full p-0 touch-manipulation", btnSize].join(" ")}
               onClick={handleSend}
               onMouseDown={(e) => e.preventDefault()}
-              disabled={(!body.trim() && !pendingFiles.length && !pendingEntityRefs.length) || isSending || disabled}
+              disabled={
+                editingMessage
+                  ? !body.trim() || isSending || disabled
+                  : (!body.trim() && !pendingFiles.length && !pendingEntityRefs.length) || isSending || disabled
+              }
             >
               {isSending ? (
                 <Loader2 className={compact ? "h-3 w-3 animate-spin" : "h-3.5 w-3.5 animate-spin"} />
+              ) : editingMessage ? (
+                <Check className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
               ) : (
                 <Send className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
               )}

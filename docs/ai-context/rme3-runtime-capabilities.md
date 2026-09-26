@@ -391,6 +391,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `ProgressMeter` | Threshold-aware bar with an optional label/value row. `value`/`max`; `tone="auto"` colours green→amber (`warnAt`, default 0.8)→red (≥1). Use for budgets, quota, reorder points. |
 | `RingProgress` | Circular SVG progress ring. `value`/`max`, `size`, `stroke`, `color`; renders `children` centred. Use for goals/completion. |
 | `SectionCard` | Glass `Card` with a `title` (+ optional `description`, `action` slot) header and a body. Standardises the "titled card" pattern; `variant` passes through to `Card`. |
+| `ImportStepIndicator` | Multi-step wizard rail. `steps` (`{ key, label, icon }[]`), `current` (active step key). Vertical rail on desktop (`sm:` and up), compact icon-only horizontal strip on mobile — keeps wizard chrome from eating width from step content like a review table. |
 | `Avatar`, `AvatarImage`, `AvatarFallback` | User avatar with fallback initials |
 
 ### Forms

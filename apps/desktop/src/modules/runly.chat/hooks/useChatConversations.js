@@ -40,6 +40,22 @@ export function useChatConversations() {
   return query;
 }
 
+// Total unread chat messages across every conversation, for a topbar badge —
+// muted conversations are excluded (same "don't bug me" contract mute already
+// has everywhere else in the chat UI). Reuses useChatConversations' own
+// query/cache, so mounting this in the topbar (which is always mounted,
+// unlike ChatScreen) doesn't add a second independent fetch — TanStack Query
+// dedupes by queryKey, and this becomes the thing that keeps the list warm
+// even when the user never opens the chat module.
+export function useChatUnreadCount() {
+  const { data } = useChatConversations();
+  const conversations = data?.data ?? [];
+  return conversations.reduce(
+    (sum, c) => (c.is_muted ? sum : sum + (c.unread_count ?? 0)),
+    0,
+  );
+}
+
 export function useArchivedConversations({ enabled = true } = {}) {
   const { session } = useAuth();
   const token = session?.access_token;

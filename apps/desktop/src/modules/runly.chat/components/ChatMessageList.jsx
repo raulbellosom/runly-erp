@@ -52,6 +52,7 @@ export function ChatMessageList({
   isLoadingMore,
   onLoadMore,
   onDeleteMessage,
+  onEditMessage,
   onDeleteAttachment,
   deletingAttachmentId,
   onHideForMe,
@@ -631,6 +632,9 @@ export function ChatMessageList({
               isSpeaking={item.sender_type === "assistant" && Boolean(item.body) && Boolean(speech?.isPlaying(item.body))}
               onDelete={isOwn && !isDeleted && !isPending && onDeleteMessage
                 ? () => onDeleteMessage(item.id)
+                : undefined}
+              onEdit={isOwn && !isDeleted && !isPending && item.body && onEditMessage
+                ? () => onEditMessage(item)
                 : undefined}
               onHideForMe={!isDeleted && !isPending && onHideForMe
                 ? () => onHideForMe(item.id)

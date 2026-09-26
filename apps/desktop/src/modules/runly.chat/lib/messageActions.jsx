@@ -1,4 +1,4 @@
-import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, EyeOff, CornerUpLeft, Sparkles, Info, Volume2, Square, Loader2 } from "lucide-react";
+import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, EyeOff, CornerUpLeft, Sparkles, Info, Volume2, Square, Loader2, Pencil } from "lucide-react";
 
 // Single source of truth for the per-message action list. Consumed by the
 // desktop hover menu (MessageActions in ChatMessageBubble) and the mobile /
@@ -10,10 +10,13 @@ import { Copy, Forward, CheckSquare, Pin, PinOff, Smile, MessageSquare, Trash2, 
 export function buildMessageActions({
   hasBody, isOwn, canPin, isPinned, canReply,
   onReply, onCopy, onForward, onEnterSelection, onPin, onReact, onOpenThread,
-  onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking, isLoadingSpeak,
+  onDelete, onHideForMe, onAskMirai, onShowReceipt, onSpeak, isSpeaking, isLoadingSpeak, onEdit,
 }) {
   const items = [];
   if (onReply) items.push({ key: "reply", label: "Responder", icon: CornerUpLeft, onSelect: onReply, group: "primary" });
+  // Own text messages only — editing an attachment's caption/body still goes
+  // through this same PATCH (the API only ever touches `body`).
+  if (isOwn && hasBody && onEdit) items.push({ key: "edit", label: "Editar", icon: Pencil, onSelect: onEdit, group: "primary" });
   if (hasBody && onCopy) items.push({ key: "copy", label: "Copiar", icon: Copy, onSelect: onCopy, group: "primary" });
   // "Leer en voz alta" — any message with text, from anyone, not just MirAI
   // (see hooks/useTextToSpeech.js). Toggles to "Detener lectura" while this

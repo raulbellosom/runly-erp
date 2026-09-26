@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   PageHeader, Button, Badge, EmptyState, ErrorState, Card,
-  DistDropZone, SelectField, Checkbox, Input,
+  DistDropZone, SelectField, Checkbox, Input, ImportStepIndicator,
 } from '@runly/ui'
 import { ArrowLeft, Check, FileWarning, Upload, ListChecks, CheckCircle2, Landmark, CheckCircle, AlertTriangle, FileText, CopyX, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { useAiImportMutations } from '../hooks/use-ai-import.js'
@@ -17,48 +17,6 @@ const STEPS = [
   { key: 'review', label: 'Revisión y mapeo', icon: ListChecks },
   { key: 'confirm', label: 'Confirmar e importar', icon: CheckCircle2 },
 ]
-
-function StepIndicator({ current }) {
-  const currentIdx = STEPS.findIndex((s) => s.key === current)
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {STEPS.map((step, idx) => {
-        const Icon = step.icon
-        const state = idx < currentIdx ? 'done' : idx === currentIdx ? 'active' : 'pending'
-        return (
-          <div
-            key={step.key}
-            className={[
-              'flex items-center gap-2 rounded-lg border px-3 py-2 min-w-48',
-              state === 'active' && 'border-(--brand-primary) bg-(--brand-soft)',
-              state === 'done' && 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)]',
-              state === 'pending' && 'border-[hsl(var(--border))] bg-transparent opacity-60',
-            ].filter(Boolean).join(' ')}
-          >
-            <span className={[
-              'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-              state === 'active' && 'bg-(--brand-primary) text-(--brand-primary-foreground)',
-              state === 'done' && 'bg-[hsl(var(--muted-foreground)/0.25)] text-[hsl(var(--foreground))]',
-              state === 'pending' && 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]',
-            ].filter(Boolean).join(' ')}
-            >
-              {state === 'done' ? <Check size={13} /> : idx + 1}
-            </span>
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                Paso {idx + 1}
-              </div>
-              <div className="text-xs font-medium truncate flex items-center gap-1">
-                <Icon size={12} className="shrink-0" />
-                {step.label}
-              </div>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 function fmtAmount(value) {
   return Number(value ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })

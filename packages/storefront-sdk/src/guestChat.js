@@ -170,7 +170,12 @@ export function createGuestChatDomain(request, supabaseUrl, supabaseAnonKey) {
       messageType: 'file',
       metadata: { attachmentId, fileName, mimeType, sizeBytes },
     })
-    return res.data
+    // The send endpoint only returns { messageId, conversationId, createdAt,
+    // realtimeToken } — the caller (useGuestChat's sendFile) needs the
+    // attachment's own fields to render it immediately, so fold in what this
+    // function already knows from the presign step above instead of forcing
+    // a refetch just to see your own upload.
+    return { ...res.data, attachmentId, fileName, mimeType, sizeBytes }
   }
 
   async function resumeByCode(trackingCode, email) {

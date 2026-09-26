@@ -6,7 +6,7 @@ import {
   ExternalLink, FolderOpen, MoreVertical, User, Users, Phone, Video, Pin,
 } from "lucide-react";
 import { Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@runly/ui";
-import { useChatMessages, useSendMessage, useMarkRead, useDeleteMessage, useDeleteAttachment, usePinMessage, useToggleReaction } from "../hooks/useChatMessages";
+import { useChatMessages, useSendMessage, useMarkRead, useDeleteMessage, useEditMessage, useDeleteAttachment, usePinMessage, useToggleReaction } from "../hooks/useChatMessages";
 import { useChatConversationDetail } from "../hooks/useChatConversationDetail";
 import { usePinnedMessages } from "../hooks/usePinnedMessages";
 import { MessageComposer } from "./MessageComposer";
@@ -73,6 +73,7 @@ function MiniChatWindowInner({ entry, index, edge, zIndex = 45, onClose, onMinim
   const { mutateAsync: send } = useSendMessage(id);
   const { mutate: markRead } = useMarkRead(id);
   const { mutate: deleteMessageMutate } = useDeleteMessage(id);
+  const { mutateAsync: editMessageMutate } = useEditMessage(id);
   const { mutate: deleteAttachmentMutate, isPending: isDeletingAttachment, variables: deletingAttachmentId } = useDeleteAttachment(id);
   const { mutate: pinMutate } = usePinMessage(id);
   // Own instance, independent of any main ChatWindow.jsx open elsewhere —
@@ -118,11 +119,17 @@ function MiniChatWindowInner({ entry, index, edge, zIndex = 45, onClose, onMinim
   const [hiddenMsgIds, setHiddenMsgIds] = useState(() => new Set());
   const [profileView, setProfileView] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
   const [jumpTarget, setJumpTarget] = useState(null);
   const [threadRootId, setThreadRootId] = useState(null);
   const [showPinned, setShowPinned] = useState(false);
 
-  useEffect(() => { setReplyingTo(null); setThreadRootId(null); setShowPinned(false); }, [id]);
+  useEffect(() => { setReplyingTo(null); setEditingMessage(null); setThreadRootId(null); setShowPinned(false); }, [id]);
+
+  const handleSubmitEdit = useCallback(
+    async (messageId, body) => { await editMessageMutate({ messageId, body }); },
+    [editMessageMutate],
+  );
 
   const handleJumpToMessage = useCallback((messageId, rootId) => {
     setShowPinned(false);
@@ -392,7 +399,8 @@ function MiniChatWindowInner({ entry, index, edge, zIndex = 45, onClose, onMinim
               onToggleReaction={(messageId, emoji, attachmentId) => toggleReactionMutate({ messageId, emoji, attachmentId })}
               onOpenThread={(messageId) => setThreadRootId(messageId)}
               onJumpToThread={(threadRootId) => setThreadRootId(threadRootId)}
-              onReplyToMessage={(msg) => setReplyingTo(msg)}
+              onReplyToMessage={(msg) => { setEditingMessage(null); setReplyingTo(msg); }}
+              onEditMessage={(msg) => { setReplyingTo(null); setEditingMessage(msg); }}
               onJumpToMessage={(msgId) => setJumpTarget({ id: msgId, nonce: Date.now() })}
               scrollToMessage={jumpTarget}
               pinnedMessages={pinnedMessages}
@@ -410,6 +418,9 @@ function MiniChatWindowInner({ entry, index, edge, zIndex = 45, onClose, onMinim
               conversationType={conversation?.type}
               replyingTo={replyingTo}
               onCancelReply={() => setReplyingTo(null)}
+              editingMessage={editingMessage}
+              onCancelEdit={() => setEditingMessage(null)}
+              onSubmitEdit={handleSubmitEdit}
               dropZoneDisabled
               disabled={!canSendMessages}
             />

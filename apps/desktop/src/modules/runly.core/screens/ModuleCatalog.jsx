@@ -2,51 +2,28 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Badge,
   Button,
-  Checkbox,
   PageHeader,
   SearchInput,
   FilterBar,
   EmptyState,
   ErrorState,
-  ConfirmDialog,
   Skeleton,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
   Tabs,
   TabsList,
   TabsTrigger,
-  TextField,
   cn,
-  LoadingState,
 } from "@runly/ui";
 import {
-  Home,
-  Power,
-  PowerOff,
-  Trash2,
   Lock,
-  ExternalLink,
   Info,
   LayoutGrid,
   List,
-  ArrowUpRight,
   Building2,
   Tag,
   GitBranch,
   AlertCircle,
-  CheckCircle2,
   RefreshCw,
-  Database,
-  Sprout,
   Upload,
   Package,
 } from "lucide-react";
@@ -60,44 +37,23 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
 import { UploadModuleSheet } from "./UploadModuleSheet";
 import {
-  CATEGORY_LABELS,
   getModuleLaunchPath,
   isModuleAvailable,
   mergeRuntimeModules,
 } from "../../../lib/runtimeModules";
-
-// ModuleIcon, resolveModuleVisuals, toAlphaHexColor imported from @/components/ModuleCard
-
-const STATUS_DOT = {
-  INSTALLED: "#22c55e",
-  DISABLED: "#f59e0b",
-  UNINSTALLED: "#94a3b8",
-  ERROR: "#ef4444",
-};
-
-const STATUS_VARIANT = {
-  INSTALLED: "success",
-  DISABLED: "warning",
-  UNINSTALLED: "secondary",
-  ERROR: "destructive",
-};
-
-const KIND_LABEL = {
-  CORE: "Sistema",
-  FEATURE: "Módulo",
-  INTEGRATION: "Integración",
-  WEBSITE: "Sitio web",
-};
-
-const ERROR_STAGE_LABEL = {
-  validation: "Validación",
-  dependency_sync: "Dependencias",
-  orm_migration: "Migración ORM",
-  manifest_migration: "Migración manifiesto",
-  install: "Instalación",
-  route_loader: "Carga de rutas",
-  unknown: "Desconocido",
-};
+import {
+  getCategoryLabel,
+  getPublisher,
+  buildModuleErrorDetail,
+} from "../lib/moduleCatalogHelpers";
+import {
+  CardAction,
+  StatusPill,
+  TYPE_FILTERS,
+  STATUS_TABS,
+} from "../components/ModuleCatalogCard";
+import { ModuleDetailSheet } from "../components/ModuleDetailSheet";
+import { ModuleCatalogDialogs } from "../components/ModuleCatalogDialogs";
 
 function getFirstFiniteNumber(...values) {
   for (const value of values) {
@@ -106,277 +62,6 @@ function getFirstFiniteNumber(...values) {
   }
   return null;
 }
-
-function statusLabel(module) {
-  if (module.core) return "Core";
-  if (module.updateAvailable) return "Actualización disponible";
-  if (module.status === "INSTALLED" && module.enabled) return "Instalado";
-  if (module.status === "DISABLED") return "Deshabilitado";
-  if (module.status === "UNINSTALLED") return "Sin instalar";
-  if (module.status === "ERROR") return "Error";
-  return module.status;
-}
-
-function getPublisher(module) {
-  if (module.core || module.kind === "CORE") return "Runly ERP";
-  return module.publisher ?? "Comunidad";
-}
-
-function getCategoryLabel(module) {
-  return CATEGORY_LABELS[module.category] ?? module.category ?? "General";
-}
-
-function isLocked(module) {
-  return module.core || module.uninstallable === false;
-}
-
-function getModuleErrorSummary(module) {
-  if (module?.status !== "ERROR") return null;
-  const lastError =
-    module.lastError ?? module.lifecycleConfig?.lastError ?? null;
-  if (!lastError) {
-    return {
-      message: "No hay detalle de error disponible para este módulo.",
-      stageLabel: null,
-      code: null,
-    };
-  }
-  const message = String(lastError.message ?? "").trim();
-  return {
-    message:
-      message.length > 220
-        ? `${message.slice(0, 220)}...`
-        : message || "No hay detalle de error disponible para este módulo.",
-    stageLabel: lastError.stage
-      ? (ERROR_STAGE_LABEL[lastError.stage] ?? String(lastError.stage))
-      : null,
-    code: lastError.code ? String(lastError.code) : null,
-  };
-}
-
-function buildModuleErrorDetail(module, lastError) {
-  if (!lastError || typeof lastError !== "object") {
-    return {
-      title: module?.name ?? module?.key ?? "Módulo",
-      summary: "No hay diagnóstico detallado de error disponible.",
-      copyText: `Módulo: ${module?.name ?? "-"}\nClave: ${module?.key ?? "-"}\n\nNo hay diagnóstico detallado de error disponible.`,
-      raw: null,
-    };
-  }
-
-  const stage = lastError?.stage ? String(lastError.stage) : null;
-  const stageLabel = stage ? (ERROR_STAGE_LABEL[stage] ?? stage) : null;
-  const code = lastError?.code ? String(lastError.code) : null;
-  const requestId = lastError?.requestId ? String(lastError.requestId) : null;
-  const failedAt = lastError?.failedAt ? String(lastError.failedAt) : null;
-  const retryable =
-    typeof lastError?.retryable === "boolean"
-      ? lastError.retryable
-        ? "Sí"
-        : "No"
-      : null;
-  const affectedTables = Array.isArray(lastError?.affectedTables)
-    ? lastError.affectedTables.filter(Boolean).map(String)
-    : [];
-  const affectedMigrations = Array.isArray(lastError?.affectedMigrations)
-    ? lastError.affectedMigrations.filter(Boolean).map(String)
-    : [];
-  const message =
-    String(lastError?.message ?? "").trim() || "Sin mensaje de error.";
-  const cause = String(lastError?.cause ?? "").trim() || null;
-
-  const lines = [
-    `Módulo: ${module?.name ?? "-"}`,
-    `Clave: ${module?.key ?? "-"}`,
-    stageLabel ? `Etapa: ${stageLabel}` : null,
-    code ? `Código: ${code}` : null,
-    requestId ? `RequestId: ${requestId}` : null,
-    failedAt ? `Fecha: ${failedAt}` : null,
-    retryable ? `Reintentable: ${retryable}` : null,
-    "",
-    `Mensaje: ${message}`,
-    cause ? `Causa: ${cause}` : null,
-    affectedTables.length > 0
-      ? `Tablas afectadas: ${affectedTables.join(", ")}`
-      : null,
-    affectedMigrations.length > 0
-      ? `Migraciones afectadas: ${affectedMigrations.join(", ")}`
-      : null,
-    "",
-    "Payload JSON:",
-    JSON.stringify(lastError, null, 2),
-  ].filter(Boolean);
-
-  return {
-    title: module?.name ?? module?.key ?? "Módulo",
-    summary: message,
-    copyText: lines.join("\n"),
-    raw: lastError,
-  };
-}
-
-// ---- ModuleIcon is imported from ../../../components/ModuleCard ----
-
-// ---- Status pill ----
-function StatusPill({ module, className }) {
-  const isInstalled =
-    module.status === "INSTALLED" && module.enabled && !module.updateAvailable;
-  const dotColor = module.updateAvailable
-    ? "#0ea5e9"
-    : (STATUS_DOT[module.status] ?? "#94a3b8");
-  return (
-    <div className={cn("flex items-center gap-1.5", className)}>
-      <span
-        className={cn(
-          "h-2 w-2 rounded-full shrink-0",
-          isInstalled && "shadow-[0_0_6px_rgba(34,197,94,0.7)]",
-          module.updateAvailable && "shadow-[0_0_6px_rgba(14,165,233,0.7)]",
-        )}
-        style={{ backgroundColor: dotColor }}
-      />
-      <span className="text-[11px] font-medium text-[hsl(var(--muted-foreground))]">
-        {statusLabel(module)}
-      </span>
-    </div>
-  );
-}
-
-// ---- Card primary action (inline on card) ----
-function CardAction({
-  module,
-  canInstallModules,
-  canDisableModules,
-  onAction,
-  onOpen,
-  onViewError,
-}) {
-  const canOpen = isModuleAvailable(module);
-  const canSyncModule = canOpen && module.updateAvailable && canInstallModules;
-  const canInstall =
-    module.status === "UNINSTALLED" &&
-    canInstallModules &&
-    module.compatibilityStatus !== "BLOCKED";
-  const canEnable =
-    module.status === "DISABLED" && !isLocked(module) && canDisableModules;
-  const canRetryInstall =
-    module.status === "ERROR" && !isLocked(module) && canInstallModules;
-
-  if (canSyncModule) {
-    return (
-      <Button
-        size="sm"
-        className="shrink-0 h-7 px-2.5 text-xs gap-1 bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
-        onClick={(e) => {
-          e.stopPropagation();
-          onAction("sync-module", module);
-        }}
-      >
-        Sincronizar
-        <RefreshCw className="h-3 w-3" />
-      </Button>
-    );
-  }
-  if (canOpen) {
-    return (
-      <Button
-        size="sm"
-        className="shrink-0 h-7 px-2.5 text-xs gap-1 bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen(module);
-        }}
-      >
-        Abrir
-        <ArrowUpRight className="h-3 w-3" />
-      </Button>
-    );
-  }
-  if (canEnable) {
-    return (
-      <Button
-        size="sm"
-        className="shrink-0 h-7 px-2.5 text-xs gap-1"
-        onClick={(e) => {
-          e.stopPropagation();
-          onAction("enable", module);
-        }}
-      >
-        Activar
-        <Power className="h-3 w-3" />
-      </Button>
-    );
-  }
-  if (canInstall) {
-    return (
-      <Button
-        size="sm"
-        className="shrink-0 h-7 px-2.5 text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-        onClick={(e) => {
-          e.stopPropagation();
-          onAction("install", module);
-        }}
-      >
-        Instalar
-      </Button>
-    );
-  }
-  if (canRetryInstall) {
-    return (
-      <div className="flex items-center gap-1.5 shrink-0">
-        <Button
-          size="sm"
-          className="shrink-0 h-7 px-2.5 text-xs gap-1 bg-amber-400 text-amber-950 hover:bg-amber-500 dark:bg-amber-300 dark:hover:bg-amber-200"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAction("retry-install", module);
-          }}
-        >
-          Reintentar
-        </Button>
-        {onViewError && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="shrink-0 h-7 px-2.5 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewError(module);
-            }}
-          >
-            Ver detalles
-          </Button>
-        )}
-      </div>
-    );
-  }
-  return null;
-}
-
-const TYPE_FILTERS = [
-  {
-    key: "type",
-    label: "Tipo",
-    options: [
-      { value: "core", label: "Core" },
-      { value: "feature", label: "Módulo" },
-    ],
-  },
-  {
-    key: "compat",
-    label: "Compatibilidad",
-    options: [
-      { value: "ok", label: "Compatible" },
-      { value: "blocked", label: "Bloqueado" },
-    ],
-  },
-];
-
-const STATUS_TABS = [
-  { value: "all", label: "Todos" },
-  { value: "INSTALLED", label: "Instalados" },
-  { value: "DISABLED", label: "Deshabilitados" },
-  { value: "UNINSTALLED", label: "Sin instalar" },
-];
 
 export default function ModuleCatalog() {
   const location = useLocation();
@@ -749,288 +434,6 @@ export default function ModuleCatalog() {
     if (!isModuleAvailable(module)) return;
     navigate(getModuleLaunchPath(module));
     setSelectedModule(null);
-  }
-
-  // ---- Sheet action panel ----
-  function SheetActions({ module }) {
-    const inFlight =
-      lifecycleMutation.isPending &&
-      lifecycleMutation.variables?.module?.key === module.key;
-    const locked = isLocked(module);
-    const canOpen = isModuleAvailable(module);
-    const canSyncModule =
-      canOpen && module.updateAvailable && canInstallModules;
-    const canInstall = module.status === "UNINSTALLED";
-    const canDisable =
-      module.status === "INSTALLED" && module.enabled && !locked;
-    const canEnable = module.status === "DISABLED" && !locked;
-    const canRetryInstall = module.status === "ERROR" && !locked;
-    const canClearError = module.status === "ERROR" && !locked;
-    const canCleanupFailedInstall =
-      module.status === "ERROR" &&
-      !locked &&
-      canUninstallModules &&
-      Array.isArray(module?.lifecycleConfig?.ownedTables) &&
-      module.lifecycleConfig.ownedTables.length > 0;
-    const canUninstall =
-      (module.status === "INSTALLED" || module.status === "DISABLED") &&
-      !locked;
-    const canPurge =
-      canPurgeModules &&
-      (module.status === "UNINSTALLED" || module.status === "DISABLED") &&
-      !module.core;
-    const [purgeDialogOpen, setPurgeDialogOpen] = useState(false);
-    const [isPurging, setIsPurging] = useState(false);
-
-    async function handlePurge() {
-      if (!token) return;
-      setIsPurging(true);
-      const toastId = toast.loading(`Purgando ${module.name}...`);
-      try {
-        const result = await runly.modules.purgeModule(module.key, token);
-        if (result?.error) {
-          toast.error(result.error, { id: toastId });
-          return;
-        }
-        toast.success(`Módulo ${module.name} eliminado del servidor`, {
-          id: toastId,
-        });
-        setSelectedModule(null);
-        queryClient.invalidateQueries({ queryKey: ["modules"] });
-        queryClient.invalidateQueries({ queryKey: ["runtime-modules"] });
-      } catch (err) {
-        toast.error("Error al purgar el módulo", {
-          id: toastId,
-          description: err?.message ?? "Error desconocido",
-        });
-      } finally {
-        setIsPurging(false);
-        setPurgeDialogOpen(false);
-      }
-    }
-    const couldHaveOrphanedTables =
-      module.status === "UNINSTALLED" &&
-      !locked &&
-      canUninstallModules &&
-      ((Array.isArray(module?.lifecycleConfig?.ownedTables) &&
-        module.lifecycleConfig.ownedTables.length > 0) ||
-        module?.manifest?.lifecycle?.defaultUninstallPolicy ===
-          "purge-owned-tables");
-
-    const orphanQuery = useQuery({
-      queryKey: ["module-orphan-tables", module.key],
-      queryFn: () =>
-        runly.modules.uninstallDryRun(module.key, token, "purge-owned-tables"),
-      enabled: Boolean(couldHaveOrphanedTables && token),
-      staleTime: 60000,
-      retry: false,
-    });
-
-    const hasOrphanedTables = (
-      orphanQuery.data?.data?.ownedTablePurge?.tableChecks ?? []
-    ).some((t) => t.exists);
-    const canPurgeOrphanedTables = couldHaveOrphanedTables && hasOrphanedTables;
-    return (
-      <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
-          Acciones del módulo
-        </p>
-        {canOpen && (
-          <Button
-            className="w-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400"
-            disabled={inFlight}
-            onClick={() => openModule(module)}
-          >
-            <ExternalLink className="h-4 w-4" />
-            Abrir módulo
-          </Button>
-        )}
-        {canSyncModule && (
-          <Button
-            className="w-full bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
-            disabled={inFlight}
-            onClick={() =>
-              lifecycleMutation.mutate({ action: "sync-module", module })
-            }
-          >
-            <RefreshCw className="h-4 w-4" />
-            {inFlight ? "Sincronizando..." : "Sincronizar este módulo"}
-          </Button>
-        )}
-        {!locked && module.status === "INSTALLED" && module.enabled && (
-          <Button
-            className="w-full"
-            variant="outline"
-            disabled={inFlight}
-            onClick={() => lifecycleMutation.mutate({ action: "seed", module })}
-          >
-            <Sprout className="h-4 w-4" />
-            {inFlight ? "Ejecutando..." : "Ejecutar seed"}
-          </Button>
-        )}
-        {canInstall && (
-          <Button
-            className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-            disabled={!canInstallModules || inFlight}
-            onClick={() =>
-              lifecycleMutation.mutate({ action: "install", module })
-            }
-          >
-            {inFlight ? "Instalando..." : "Instalar módulo"}
-          </Button>
-        )}
-        {canRetryInstall && (
-          <Button
-            className="w-full bg-amber-400 text-amber-950 hover:bg-amber-500 dark:bg-amber-300 dark:hover:bg-amber-200"
-            disabled={!canInstallModules || inFlight}
-            onClick={() =>
-              lifecycleMutation.mutate({ action: "retry-install", module })
-            }
-          >
-            <RefreshCw className="h-4 w-4" />
-            {inFlight ? "Reintentando..." : "Reintentar instalación"}
-          </Button>
-        )}
-        {canClearError && (
-          <Button
-            className="w-full"
-            variant="outline"
-            disabled={!canDisableModules || inFlight}
-            onClick={() =>
-              lifecycleMutation.mutate({
-                action: "clear-error",
-                module,
-                mode: "preserve-data",
-              })
-            }
-          >
-            Restaurar a sin instalar
-          </Button>
-        )}
-        {canCleanupFailedInstall && (
-          <Button
-            className="w-full"
-            variant="outline"
-            disabled={inFlight}
-            onClick={() => {
-              setConfirmCleanup(module);
-              setSelectedModule(null);
-            }}
-          >
-            Limpiar intento fallido
-          </Button>
-        )}
-        {module.status === "ERROR" && (
-          <Button
-            className="w-full"
-            variant="outline"
-            disabled={inFlight}
-            onClick={() => handleViewError(module)}
-          >
-            Ver error
-          </Button>
-        )}
-        {canEnable && (
-          <Button
-            className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-            disabled={!canDisableModules || inFlight}
-            onClick={() =>
-              lifecycleMutation.mutate({ action: "enable", module })
-            }
-          >
-            <Power className="h-4 w-4" />
-            {inFlight ? "Habilitando..." : "Habilitar"}
-          </Button>
-        )}
-        {canDisable && (
-          <Button
-            className="w-full"
-            variant="outline"
-            disabled={!canDisableModules || inFlight}
-            onClick={() =>
-              lifecycleMutation.mutate({ action: "disable", module })
-            }
-          >
-            <PowerOff className="h-4 w-4" />
-            {inFlight ? "Deshabilitando..." : "Deshabilitar"}
-          </Button>
-        )}
-        {canUninstall && (
-          <Button
-            className="w-full"
-            variant="destructive"
-            disabled={!canUninstallModules || inFlight}
-            onClick={() => {
-              setConfirmUninstall(module);
-              setSelectedModule(null);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-            Desinstalar módulo
-          </Button>
-        )}
-        {canPurgeOrphanedTables && (
-          <Button
-            className="w-full"
-            variant="outline"
-            disabled={inFlight}
-            onClick={() => {
-              setConfirmDbPurge(module);
-              setSelectedModule(null);
-            }}
-          >
-            <Database className="h-4 w-4 text-red-500" />
-            <span className="text-red-600 dark:text-red-400">
-              Purgar tablas de base de datos
-            </span>
-          </Button>
-        )}
-        {locked && !canOpen && (
-          <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] rounded-xl px-3 py-2.5">
-            <Lock className="h-3.5 w-3.5 shrink-0" />
-            Módulo core protegido — no puede modificarse.
-          </div>
-        )}
-        {canPurge && (
-          <>
-            <div className="border-t border-[hsl(var(--border))] pt-3 mt-1">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))] mb-2">
-                Zona de peligro
-              </p>
-              <Button
-                className="w-full border-red-500/50 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-                variant="outline"
-                disabled={isPurging || inFlight}
-                onClick={() => setPurgeDialogOpen(true)}
-              >
-                Eliminar módulo del servidor
-              </Button>
-            </div>
-            <ConfirmDialog
-              open={purgeDialogOpen}
-              onOpenChange={setPurgeDialogOpen}
-              title="Eliminar módulo del servidor"
-              description={`Esta acción elimina permanentemente todos los archivos de "${module.name}" del servidor y su registro en la base de datos. No se puede deshacer.`}
-              confirmLabel="Eliminar permanentemente"
-              cancelLabel="Cancelar"
-              loading={isPurging}
-              onConfirm={handlePurge}
-            />
-          </>
-        )}
-        <Button
-          className="w-full"
-          variant="ghost"
-          onClick={() => {
-            navigate("/app/home");
-            setSelectedModule(null);
-          }}
-        >
-          <Home className="h-4 w-4" />
-          Ir al inicio
-        </Button>
-      </div>
-    );
   }
 
   // ---- Skeleton loading ----
@@ -1424,370 +827,42 @@ export default function ModuleCatalog() {
       </div>
 
       {/* Module detail sheet */}
-      <Sheet
+      <ModuleDetailSheet
+        module={selectedModule}
         open={Boolean(selectedModule)}
         onOpenChange={(v) => !v && setSelectedModule(null)}
-      >
-        <SheetContent className="w-full sm:max-w-md lg:max-w-xl xl:max-w-2xl overflow-y-auto">
-          {selectedModule &&
-            (() => {
-              const visuals = resolveModuleVisuals(selectedModule);
-              const color = visuals.color;
-              const accentColor = visuals.accentColor;
-              const blocked = selectedModule.compatibilityStatus === "BLOCKED";
-              return (
-                <div className="space-y-5">
-                  {/* Hero header */}
-                  <div
-                    className="rounded-2xl p-5 flex items-start gap-4 -mx-1 relative overflow-hidden"
-                    style={{
-                      background: `linear-gradient(135deg, ${toAlphaHexColor(color, "18")} 0%, ${toAlphaHexColor(accentColor, "06")} 100%)`,
-                    }}
-                  >
-                    <div
-                      className="absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-10"
-                      style={{ background: accentColor }}
-                    />
-                    <ModuleIcon module={selectedModule} size="lg" />
-                    <div className="min-w-0 flex-1 pt-1">
-                      <SheetHeader className="p-0">
-                        <SheetTitle className="text-xl leading-tight text-left">
-                          {selectedModule.name}
-                        </SheetTitle>
-                      </SheetHeader>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Building2 className="h-3 w-3 text-[hsl(var(--muted-foreground))] shrink-0" />
-                        <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                          {getPublisher(selectedModule)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+        token={token}
+        canInstallModules={canInstallModules}
+        canDisableModules={canDisableModules}
+        canUninstallModules={canUninstallModules}
+        canPurgeModules={canPurgeModules}
+        lifecycleMutation={lifecycleMutation}
+        queryClient={queryClient}
+        navigate={navigate}
+        onClose={() => setSelectedModule(null)}
+        onOpenModule={openModule}
+        onViewError={handleViewError}
+        onConfirmCleanup={setConfirmCleanup}
+        onConfirmUninstall={setConfirmUninstall}
+        onConfirmDbPurge={setConfirmDbPurge}
+      />
 
-                  {/* Status + badges */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] px-2.5 py-1">
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full shrink-0",
-                          selectedModule.status === "INSTALLED" &&
-                            selectedModule.enabled &&
-                            "shadow-[0_0_6px_rgba(34,197,94,0.65)]",
-                        )}
-                        style={{
-                          backgroundColor:
-                            STATUS_DOT[selectedModule.status] ?? "#94a3b8",
-                        }}
-                      />
-                      <span className="text-xs font-medium">
-                        {statusLabel(selectedModule)}
-                      </span>
-                    </div>
-                    {selectedModule.core && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                        <Lock className="h-3 w-3" />
-                        Protegido
-                      </span>
-                    )}
-                    {blocked ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-red-500/45 dark:border-red-400/35 bg-red-500/20 dark:bg-red-400/20 px-2.5 py-1 text-xs font-medium text-red-800 dark:text-red-200">
-                        <AlertCircle className="h-3 w-3" />
-                        Bloqueado
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/45 dark:border-emerald-400/35 bg-emerald-500/20 dark:bg-emerald-400/20 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Compatible
-                      </span>
-                    )}
-                    {selectedModule.updateAvailable && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/45 dark:border-sky-400/35 bg-sky-500/20 dark:bg-sky-400/20 px-2.5 py-1 text-xs font-medium text-sky-800 dark:text-sky-200">
-                        <RefreshCw className="h-3 w-3" />
-                        Actualización pendiente
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  {(selectedModule.description || selectedModule.summary) && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
-                        Descripción
-                      </p>
-                      <p className="text-sm leading-relaxed text-[hsl(var(--foreground))]">
-                        {selectedModule.description || selectedModule.summary}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Metadata grid */}
-                  <div className="rounded-xl border border-[hsl(var(--border))] overflow-hidden divide-y divide-[hsl(var(--border))]">
-                    {[
-                      {
-                        label: "Tipo",
-                        value:
-                          KIND_LABEL[selectedModule.kind] ??
-                          selectedModule.kind,
-                      },
-                      {
-                        label: "Categoría",
-                        value: getCategoryLabel(selectedModule),
-                      },
-                      { label: "Versión", value: `v${selectedModule.version}` },
-                      ...(selectedModule.localVersion &&
-                      selectedModule.localVersion !== selectedModule.version
-                        ? [
-                            {
-                              label: "Versión local",
-                              value: `v${selectedModule.localVersion}`,
-                            },
-                          ]
-                        : []),
-                      {
-                        label: "Publicado por",
-                        value: getPublisher(selectedModule),
-                      },
-                      { label: "Clave técnica", value: selectedModule.key },
-                    ].map(({ label, value }) => (
-                      <div
-                        key={label}
-                        className="flex items-center justify-between px-3 py-2.5 gap-4"
-                      >
-                        <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">
-                          {label}
-                        </span>
-                        <span className="text-xs font-medium text-right font-mono truncate max-w-[60%]">
-                          {value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Dependencies */}
-                  {selectedModule.compatibility?.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
-                        Dependencias
-                      </p>
-                      <div className="space-y-1.5">
-                        {selectedModule.compatibility.map((dep) => (
-                          <div
-                            key={dep.key}
-                            className="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] px-3 py-2.5 gap-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium truncate">
-                                {dep.name || dep.key}
-                              </p>
-                              <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
-                                {dep.required ? "Requerida" : "Opcional"}
-                                {dep.versionRange
-                                  ? ` · ${dep.versionRange}`
-                                  : ""}
-                              </p>
-                            </div>
-                            <Badge
-                              variant={
-                                dep.active
-                                  ? "success"
-                                  : dep.required
-                                    ? "destructive"
-                                    : "secondary"
-                              }
-                              className="shrink-0 text-xs"
-                            >
-                              {dep.active
-                                ? "Activa"
-                                : dep.required
-                                  ? "Falta"
-                                  : "Inactiva"}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="border-t border-[hsl(var(--border))] pt-4">
-                    <SheetActions module={selectedModule} />
-                  </div>
-                </div>
-              );
-            })()}
-        </SheetContent>
-      </Sheet>
-
-      <Dialog
-        open={Boolean(errorDialog.open)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setErrorDialog({
-              open: false,
-              module: null,
-              loading: false,
-              detail: null,
-            });
-          }
-        }}
-      >
-        <DialogContent size="xl">
-          <DialogHeader>
-            <DialogTitle>Detalle del error del módulo</DialogTitle>
-            <DialogDescription>
-              {errorDialog?.module?.name ?? "Módulo"} ·{" "}
-              {errorDialog?.module?.key ?? "-"}
-            </DialogDescription>
-          </DialogHeader>
-          {errorDialog.loading ? (
-            <LoadingState message="Cargando diagnóstico..." />
-          ) : (
-            <div className="space-y-3">
-              {errorDialog?.detail?.raw && (
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  {errorDialog.detail.raw.stage && (
-                    <span className="rounded-full border border-[hsl(var(--border))] px-2 py-0.5">
-                      Etapa:{" "}
-                      {ERROR_STAGE_LABEL[errorDialog.detail.raw.stage] ??
-                        String(errorDialog.detail.raw.stage)}
-                    </span>
-                  )}
-                  {errorDialog.detail.raw.code && (
-                    <span className="rounded-full border border-[hsl(var(--border))] px-2 py-0.5 font-mono">
-                      {String(errorDialog.detail.raw.code)}
-                    </span>
-                  )}
-                  {errorDialog.detail.raw.requestId && (
-                    <span className="rounded-full border border-[hsl(var(--border))] px-2 py-0.5 font-mono">
-                      RequestId: {String(errorDialog.detail.raw.requestId)}
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30">
-                <pre className="max-h-80 overflow-auto p-3 text-xs leading-relaxed whitespace-pre-wrap break-words font-mono">
-                  {errorDialog?.detail?.copyText ??
-                    "No hay detalle de error disponible."}
-                </pre>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCopyErrorDetails}
-                >
-                  Copiar detalle
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmDialog
-        open={Boolean(confirmUninstall)}
-        onOpenChange={(v) => {
-          if (!v) {
-            setConfirmUninstall(null);
-            setPurgeOnUninstall(false);
-          }
-        }}
-        title="¿Desinstalar módulo?"
-        description="El módulo será desinstalado. Esta acción no se puede deshacer."
-        detail={confirmUninstall?.name}
-        confirmLabel="Desinstalar"
-        onConfirm={() =>
-          lifecycleMutation.mutate({
-            action: "uninstall",
-            module: confirmUninstall,
-            purge: purgeOnUninstall,
-          })
-        }
-        loading={lifecycleMutation.isPending}
-      >
-        {confirmUninstall?.manifest?.lifecycle?.supportsDataPurge && (
-          <div
-            className="flex items-start gap-3 rounded-md border border-[hsl(var(--border))] p-3 cursor-pointer hover:bg-[hsl(var(--muted)/0.4)] transition-colors"
-            onClick={() => setPurgeOnUninstall((v) => !v)}
-          >
-            <Checkbox
-              className="mt-0.5"
-              checked={purgeOnUninstall}
-              onCheckedChange={(v) => setPurgeOnUninstall(Boolean(v))}
-              onClick={(e) => e.stopPropagation()}
-            />
-            <span className="text-sm leading-snug">
-              <span className="font-medium text-[hsl(var(--foreground))]">
-                Eliminar todos los datos
-              </span>
-              <span className="block text-[hsl(var(--muted-foreground))]">
-                {confirmUninstall?.manifest?.lifecycle
-                  ?.defaultUninstallPolicy === "purge-owned-tables"
-                  ? "Se eliminarán permanentemente todos los datos y tablas propias de este módulo."
-                  : "Se borrarán permanentemente todos los registros de este módulo."}
-              </span>
-            </span>
-          </div>
-        )}
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={Boolean(confirmCleanup)}
-        onOpenChange={(v) => {
-          if (!v) {
-            setConfirmCleanup(null);
-            setCleanupConfirmation("");
-          }
-        }}
-        title="¿Limpiar intento fallido?"
-        description='Esta limpieza puede eliminar tablas vacías del módulo. Escribe "ACEPTO" para confirmar.'
-        detail={confirmCleanup?.name}
-        confirmLabel="Limpiar"
-        onConfirm={() => {
-          if (cleanupConfirmation.trim() !== "ACEPTO") {
-            toast.error('Debes escribir "ACEPTO" para continuar.');
-            return;
-          }
-          lifecycleMutation.mutate({
-            action: "cleanup",
-            module: confirmCleanup,
-          });
-        }}
-        loading={lifecycleMutation.isPending}
-      >
-        <TextField
-          label="Confirmación"
-          value={cleanupConfirmation}
-          onChange={(e) => setCleanupConfirmation(e.target.value)}
-          placeholder='Escribe "ACEPTO"'
-        />
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={Boolean(confirmDbPurge)}
-        onOpenChange={(v) => {
-          if (!v) setConfirmDbPurge(null);
-        }}
-        title="¿Purgar tablas de la base de datos?"
-        description="El módulo está desinstalado pero puede tener tablas residuales en la base de datos. Esta acción las eliminará permanentemente junto con todos sus datos. No se puede deshacer."
-        detail={confirmDbPurge?.name}
-        confirmLabel="Purgar base de datos"
-        onConfirm={() =>
-          lifecycleMutation.mutate({
-            action: "purge-orphaned-tables",
-            module: confirmDbPurge,
-          })
-        }
-        loading={lifecycleMutation.isPending}
-      >
-        <div className="flex items-start gap-2 rounded-md border border-red-300 dark:border-red-800 bg-red-100 dark:bg-red-950/30 p-3">
-          <Database className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
-            Se eliminarán todas las tablas propias del módulo y sus registros
-            asociados en la base de datos.
-          </p>
-        </div>
-      </ConfirmDialog>
+      <ModuleCatalogDialogs
+        errorDialog={errorDialog}
+        setErrorDialog={setErrorDialog}
+        onCopyErrorDetails={handleCopyErrorDetails}
+        confirmUninstall={confirmUninstall}
+        setConfirmUninstall={setConfirmUninstall}
+        purgeOnUninstall={purgeOnUninstall}
+        setPurgeOnUninstall={setPurgeOnUninstall}
+        confirmCleanup={confirmCleanup}
+        setConfirmCleanup={setConfirmCleanup}
+        cleanupConfirmation={cleanupConfirmation}
+        setCleanupConfirmation={setCleanupConfirmation}
+        confirmDbPurge={confirmDbPurge}
+        setConfirmDbPurge={setConfirmDbPurge}
+        lifecycleMutation={lifecycleMutation}
+      />
 
       <UploadModuleSheet
         open={uploadSheetOpen}

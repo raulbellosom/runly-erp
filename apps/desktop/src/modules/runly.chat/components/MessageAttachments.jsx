@@ -793,7 +793,7 @@ function ImageGrid({ images, allAttachments, onOpen, startIndex, messageId, isOw
   // 1 image: bounded, more-square preview box (ImageCard clamps its ratio)
   if (count === 1) {
     return (
-      <div className={mt} style={{ width: merged ? "100%" : 240, maxWidth: "100%" }}>
+      <div className={mt} style={{ width: merged ? "100%" : 220, maxWidth: "100%" }}>
         <ImageCard att={images[0]} index={startIndex} allAttachments={allAttachments} onOpen={onOpen} merged={merged} {...tileProps} />
       </div>
     );

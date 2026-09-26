@@ -100,6 +100,7 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const sendMessage = chatData.sendMessage;
   const markReadMutate = chatData.markRead;
   const deleteMessageMutate = chatData.deleteMessage;
+  const editMessageMutate = chatData.editMessage;
   const deleteAttachmentMutate = chatData.deleteAttachment;
   const deletingAttachmentId = chatData.deletingAttachmentId;
   const isDeletingAttachment = deletingAttachmentId != null;
@@ -165,6 +166,7 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const [jumpTarget, setJumpTarget] = useState(null);
   const [threadPanelRootId, setThreadPanelRootId] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
 
   const composerRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -213,6 +215,7 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
     setJumpTarget(null);
     setThreadPanelRootId(null);
     setReplyingTo(null);
+    setEditingMessage(null);
   }, [conversationId, initialFilesView]);
 
   useEffect(() => {
@@ -222,6 +225,11 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
   const handleSend = useCallback(
     async (data) => { await sendMessage(data); },
     [sendMessage],
+  );
+
+  const handleSubmitEdit = useCallback(
+    async (messageId, body) => { await editMessageMutate?.(messageId, body); },
+    [editMessageMutate],
   );
 
   // Ignores the (attachments, activeIndex) pair's CONTENTS beyond the
@@ -695,7 +703,8 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
               onPinMessage={(messageId, pinned) => pinMutate({ messageId, pinned })}
               onToggleReaction={(messageId, emoji, attachmentId) => toggleReactionMutate({ messageId, emoji, attachmentId })}
               onOpenThread={(messageId) => setThreadPanelRootId(messageId)}
-              onReplyToMessage={(msg) => setReplyingTo(msg)}
+              onReplyToMessage={(msg) => { setEditingMessage(null); setReplyingTo(msg); }}
+              onEditMessage={(msg) => { setReplyingTo(null); setEditingMessage(msg); }}
               onAskMirai={
                 isMirai || conversation?.type === "external_support" || miraiStatus?.available === false
                   ? undefined
@@ -790,6 +799,9 @@ export function ChatWindow({ conversation, onClose, initialFilesView = false, in
           conversationType={conversation?.type}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
+          editingMessage={editingMessage}
+          onCancelEdit={() => setEditingMessage(null)}
+          onSubmitEdit={handleSubmitEdit}
           dropZoneDisabled
           edgeInset
           disabled={!canSendMessages || !miraiAvailable}

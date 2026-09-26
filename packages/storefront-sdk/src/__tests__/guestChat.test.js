@@ -78,6 +78,33 @@ test("getSession and sendMessage both forward realtimeToken from the response wi
   assert.equal(msgRes.realtimeToken, "rt-2");
 });
 
+test("sendFileMessage returns the attachment's own fields alongside the message result", async () => {
+  const request = async (method, path, body) => {
+    if (path.endsWith("/attachments/presign")) {
+      return { data: { attachmentId: "att-1", uploadUrl: "https://upload" } };
+    }
+    assert.equal(path, "/public/chat/session/tok/messages");
+    assert.deepEqual(body.metadata, { attachmentId: "att-1", fileName: "foto.png", mimeType: "image/png", sizeBytes: 3 });
+    return { data: { messageId: "m1", createdAt: "t1" } };
+  };
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true });
+  try {
+    const d = createGuestChatDomain(request, "http://x", "anon");
+    const res = await d.sendFileMessage("tok", {
+      fileName: "foto.png", mimeType: "image/png", sizeBytes: 3, file: new Blob(["abc"]),
+    });
+    // The caller (useGuestChat's sendFile) needs these to render the guest's
+    // own upload immediately — the send endpoint itself never returns them.
+    assert.deepEqual(res, {
+      messageId: "m1", createdAt: "t1",
+      attachmentId: "att-1", fileName: "foto.png", mimeType: "image/png", sizeBytes: 3,
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("resumeByCode forwards realtimeToken from the response", async () => {
   const request = async () => ({ data: { token: "resume-tok", conversationId: "conv-1", realtimeToken: "rt-3" } });
   const d = createGuestChatDomain(request, "http://x", "anon");

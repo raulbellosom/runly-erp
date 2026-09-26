@@ -220,7 +220,13 @@ function MediaCaptionBubble({ radiusClass, isOwn, body, searchQuery, replyTo, on
         // Hard width cap so a captioned image never spans the whole bubble
         // (72% of the row on a wide desktop was ~650px) — WhatsApp-style:
         // ~288px, or 72vw on a phone, with the caption wrapping to match.
-        "w-[min(18rem,72vw)] overflow-hidden mt-1",
+        // max-w-full on top of that: 72vw is measured against the whole
+        // browser viewport, not this bubble's actual parent — inside a
+        // narrow container (the ~300-320px MiniChatWindow) 72vw of the FULL
+        // page is still ~1000px+ on desktop, so without this the image blew
+        // straight out of the floating window instead of being clamped by
+        // its own row's real available width.
+        "w-[min(18rem,72vw)] max-w-full overflow-hidden mt-1",
         isOwn ? "bg-(--brand-primary)" : "bg-[hsl(var(--muted))]",
       ].join(" ")}
     >
@@ -248,6 +254,7 @@ export function ChatMessageBubble({
   isLast = true,
   onCopy,
   onDelete,
+  onEdit,
   onHideForMe,
   onForward,
   selectionMode = false,
@@ -620,6 +627,7 @@ export function ChatMessageBubble({
             hasBody={hasBody}
             onCopy={onCopy}
             onDelete={onDelete}
+            onEdit={onEdit ? () => onEdit(message) : undefined}
             onHideForMe={onHideForMe}
             onForward={onForward}
             onEnterSelection={onEnterSelection}
@@ -648,6 +656,7 @@ export function ChatMessageBubble({
           actionProps={{
             hasBody, isOwn: true, canPin, isPinned, canReply,
             onReply: onReply ? () => onReply(message) : undefined,
+            onEdit: onEdit ? () => onEdit(message) : undefined,
             onCopy, onForward, onEnterSelection, onPin, onOpenThread, onDelete, onHideForMe,
             onAskMirai: onAskMirai ? () => onAskMirai(message) : undefined,
             onShowReceipt: onShowReceipt ? () => onShowReceipt(message) : undefined,

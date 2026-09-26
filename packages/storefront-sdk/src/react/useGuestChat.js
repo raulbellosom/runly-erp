@@ -183,9 +183,16 @@ export function useGuestChat(sdk) {
         if (!Array.isArray(msgs)) return
         if (res.operatorLastReadAt) setOperatorLastReadAt(res.operatorLastReadAt)
         setMessages((prev) => {
+          // Merge server truth into existing rows by id (not just append-if-
+          // unknown) — a message added optimistically by sendFile/sendMessage
+          // can be incomplete (e.g. missing `attachments` before the server
+          // round-trip), and the old append-only version never reconciled it,
+          // leaving that placeholder stuck forever.
+          const incomingById = new Map(msgs.map((m) => [m.id, m]))
+          const merged = prev.map((m) => incomingById.get(m.id) ?? m)
           const existingIds = new Set(prev.map((m) => m.id))
           const newOnes = msgs.filter((m) => !existingIds.has(m.id))
-          return newOnes.length ? [...prev, ...newOnes] : prev
+          return [...merged, ...newOnes]
         })
       } catch { /* non-fatal */ }
     }, 8000)
@@ -234,6 +241,12 @@ export function useGuestChat(sdk) {
         sender_type: 'guest',
         message_type: 'file',
         created_at: res.createdAt,
+        // Without this the guest's own upload rendered as bare filename text
+        // (ChatWidget only shows an inline preview/attachment tile when
+        // `attachments` is a non-empty array) — the attachment row is already
+        // linked to this message server-side by this point, so the id
+        // resolves a signed URL immediately via resolveAttUrl.
+        attachments: [{ id: res.attachmentId, fileName: res.fileName, mimeType: res.mimeType, sizeBytes: res.sizeBytes }],
       }])
     } finally {
       setIsSending(false)

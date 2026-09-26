@@ -55,6 +55,7 @@ export function ChatWidget({ sdk, companyName = 'Chat', accentColor = DEFAULT_AC
   const messagesEndRef = useRef(null)
   const prevMsgCountRef = useRef(0)
   const textAreaRef = useRef(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const {
     screen,
@@ -137,7 +138,9 @@ export function ChatWidget({ sdk, companyName = 'Chat', accentColor = DEFAULT_AC
     }
   }, [open, screen, messages.length, markRead])
 
-  // Sound on new operator message when widget is not open
+  // Sound + unread badge on new operator message when widget is not open —
+  // the closed launcher (the "CHAT" side tab) previously gave no visual
+  // signal at all that a reply had arrived, only this beep.
   useEffect(() => {
     const count = messages.length
     const prevCount = prevMsgCountRef.current
@@ -145,10 +148,17 @@ export function ChatWidget({ sdk, companyName = 'Chat', accentColor = DEFAULT_AC
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.sender_type !== 'guest' && !open) {
         playBeep()
+        setUnreadCount((n) => n + 1)
       }
     }
     prevMsgCountRef.current = count
   }, [messages, open])
+
+  // Opening the panel clears the badge (markRead, above, separately tells the
+  // operator side the messages were seen).
+  useEffect(() => {
+    if (open) setUnreadCount(0)
+  }, [open])
 
   const handleStartChat = useCallback(async () => {
     if (!emailInput.trim() || !/\S+@\S+\.\S+/.test(emailInput)) {
@@ -197,6 +207,24 @@ export function ChatWidget({ sdk, companyName = 'Chat', accentColor = DEFAULT_AC
       userSelect: 'none',
       boxShadow: '-2px 0 12px rgba(0,0,0,0.3)',
       display: open ? 'none' : 'block',
+    },
+    unreadBadge: {
+      position: 'absolute',
+      top: -6,
+      left: -6,
+      minWidth: 18,
+      height: 18,
+      padding: '0 4px',
+      borderRadius: 9,
+      background: '#ef4444',
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: 700,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      writingMode: 'horizontal-tb', // undo the tab's vertical-rl for this label
+      boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
     },
     panel: {
       position: 'fixed',
@@ -802,6 +830,9 @@ export function ChatWidget({ sdk, companyName = 'Chat', accentColor = DEFAULT_AC
     <>
       <div style={styles.tab} onClick={() => setOpen(true)} role="button" aria-label="Abrir chat">
         CHAT
+        {unreadCount > 0 && (
+          <span style={styles.unreadBadge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+        )}
       </div>
 
       <div style={styles.panel} role="dialog" aria-label="Chat de soporte">

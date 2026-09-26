@@ -7,6 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { SyncStatusPopover } from "@runly/ui";
 import { NotificationBell } from "./NotificationBell";
+import { ChatBell } from "./ChatBell";
 import { UserMenu } from "./UserMenu";
 import { useOfflineStore } from "@runly/offline";
 
@@ -32,6 +33,10 @@ export function Topbar({
   const canReadNotifications = Boolean(
     userProfile?.isAdmin ||
     (userProfile?.permissions ?? []).includes("notifications.read"),
+  );
+  const canReadChat = Boolean(
+    userProfile?.isAdmin ||
+    (userProfile?.permissions ?? []).includes("chat.conversations.read"),
   );
   const canReadActivity = Boolean(
     userProfile?.isAdmin ||
@@ -165,6 +170,9 @@ export function Topbar({
           <span className="hidden sm:contents">
             <ThemeToggle />
           </span>
+          {token && canReadChat && (
+            <ChatBell onOpen={() => navigate("/app/m/runly.chat/chat/inbox")} />
+          )}
           {token && canReadNotifications && (
             <NotificationBell
               token={token}

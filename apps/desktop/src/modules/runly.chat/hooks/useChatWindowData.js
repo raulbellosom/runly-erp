@@ -3,6 +3,7 @@ import {
   useSendMessage,
   useMarkRead,
   useDeleteMessage,
+  useEditMessage,
   useDeleteAttachment,
   useToggleReaction,
 } from "./useChatMessages";
@@ -18,6 +19,7 @@ function useInternalChatData(conversationId, { enabled }) {
   const { mutateAsync: sendMessage } = useSendMessage(conversationId);
   const { mutate: markRead } = useMarkRead(conversationId);
   const { mutate: deleteMessage } = useDeleteMessage(conversationId);
+  const { mutateAsync: editMessage } = useEditMessage(conversationId);
   const {
     mutate: deleteAttachment,
     isPending: isDeletingAttachment,
@@ -35,6 +37,7 @@ function useInternalChatData(conversationId, { enabled }) {
     sendMessage,
     markRead,
     deleteMessage,
+    editMessage: (messageId, body) => editMessage({ messageId, body }),
     deleteAttachment,
     deletingAttachmentId: isDeletingAttachment ? deletingAttachmentId : null,
     toggleReaction: (messageId, emoji, attachmentId) =>

@@ -311,6 +311,40 @@ export function useDeleteMessage(conversationId) {
   });
 }
 
+export function useEditMessage(conversationId) {
+  const { session } = useAuth();
+  const token = session?.access_token;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ messageId, body }) => runly.chat.editMessage(messageId, { body }, token),
+    onMutate: async ({ messageId, body }) => {
+      await queryClient.cancelQueries({ queryKey: ["chat-messages", conversationId] });
+      const previous = queryClient.getQueryData(["chat-messages", conversationId]);
+      queryClient.setQueryData(["chat-messages", conversationId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: (old.data ?? []).map((m) =>
+            m.id === messageId
+              ? { ...m, body, edited_at: new Date().toISOString() }
+              : m,
+          ),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["chat-messages", conversationId], context.previous);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+    },
+  });
+}
+
 export function usePinMessage(conversationId) {
   const { session } = useAuth();
   const token = session?.access_token;

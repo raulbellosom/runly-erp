@@ -1,5 +1,4 @@
 import { Bold, Italic, Strikethrough, Code } from "lucide-react";
-import { renderRichText } from "@runly/ui";
 
 // Extracted from MessageComposer.jsx (pure move, no behavior change) — same
 // precedent as AttachmentPreviewCard.jsx/VoiceRecordingControls.jsx, to keep
@@ -43,30 +42,4 @@ export function ComposerFormatToolbar({ onApplyFormat }) {
       ))}
     </div>
   );
-}
-
-// Live preview of how the formatting will render once sent — the same
-// renderRichText() ChatMessageBubble uses, so this is exactly the eventual
-// bubble's output, not an approximation. The caller only renders this once
-// real formatting syntax is present, so an unformatted message never gets a
-// redundant second copy of itself.
-export function ComposerFormatPreview({ body }) {
-  return (
-    <div className="mx-2 mb-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 px-2.5 py-1.5">
-      <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-        Vista previa
-      </p>
-      <div className="text-sm leading-relaxed">
-        {renderRichText(body, { paragraphClassName: "text-left whitespace-pre-wrap wrap-break-word" })}
-      </div>
-    </div>
-  );
-}
-
-// Same token shapes chatRichText.jsx actually renders on — a bare stray "*"
-// (e.g. "5 * 3") never matches a *pair*, so it correctly does NOT trigger the
-// preview above (renderRichText would show it unchanged anyway, but there's
-// no point popping a preview that looks identical to the raw text).
-export function hasFormattingSyntax(body) {
-  return /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`|^\s*[-•]\s+|^\s*\d+[.)]\s+)/m.test(body ?? "");
 }
