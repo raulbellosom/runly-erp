@@ -8,6 +8,7 @@ import { CompanySwitcher } from "./CompanySwitcher";
 import { SyncStatusPopover } from "@runly/ui";
 import { NotificationBell } from "./NotificationBell";
 import { ChatBell } from "./ChatBell";
+import { HelpButton } from "./HelpButton";
 import { UserMenu } from "./UserMenu";
 import { useOfflineStore } from "@runly/offline";
 
@@ -180,6 +181,7 @@ export function Topbar({
               onSeeAll={() => navigate("/app/m/runly.notifications")}
             />
           )}
+          {token && <HelpButton />}
           {/* Activity + "instalar modulo" live only in UserMenu now, at every
               breakpoint — was two more always-on icons crowding this cluster
               on top of sync/company/notifications/theme, which is what was
