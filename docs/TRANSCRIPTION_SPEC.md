@@ -1,7 +1,7 @@
 # Especificación técnica: transcripción de llamadas (runly.chat)
 
-**Fecha:** 2026-09-24 (revisión 4 — V1 ya implementado y verificado, ver `docs/TASKS.md`; revisión 3 completó el diseño de V2 (Etapa 3); esta revisión completa el diseño de la Etapa 5 (§7, integración con MirAI); ninguna de las dos añade código nuevo, solo documento)
-**Estado:** V1 implementado. V2 (revisión 3) y Etapa 5 (revisión 4): diseño de datos y arquitectura completo y listo para implementarse — ver el registro de cambios de cada revisión para qué sigue genuinamente bloqueado por una prueba en vivo (V2, contra LiveKit real) o por iteración empírica (Etapa 5, el prompt exacto de Groq) y qué ya se resolvió por análisis
+**Fecha:** 2026-09-24 (revisión 4 — V1 ya implementado y verificado, ver `docs/TASKS.md`; revisión 3 completó el diseño de V2 (Etapa 3); esta revisión completa el diseño de la Etapa 5 (§7, integración con MirAI); ninguna de las dos añade código nuevo, solo documento). **Actualización 2026-09-25**: el código de V2 (Etapa 3) se escribió siguiendo el diseño de la revisión 3 sin cambios — ver `docs/TASKS.md`, sección "Etapa 3 (V2 — identificación de hablantes por captura de pista) — código escrito, 2026-09-25" — pero el bloqueo de esa revisión sigue sin resolverse.
+**Estado:** V1 implementado. V2: **código escrito (2026-09-25), sin validar contra un LiveKit self-hosted real en vivo** — la calidad/formato del audio por pista, el costo real de CPU de N pistas simultáneas y la precisión del alineamiento de marca de tiempo entre pistas siguen sin medirse, exactamente lo que la revisión 3 ya señalaba como bloqueante antes de escribir el código. Etapa 5 (revisión 4): diseño de datos y arquitectura completo, todavía sin código — ver el registro de cambios de cada revisión para el detalle
 **Depende de:** `docs/TRANSCRIPTION_CURRENT_STATE.md` (auditoría del estado real del repositorio)
 **Módulo:** `runly.chat` (extensión de `runly.calls`, no un módulo RME3 nuevo — ver §0.3)
 
@@ -289,7 +289,7 @@ Notas de diseño:
 
 ### 3.2. Migración
 
-`CallTranscript`/`CallTranscriptSegment` ya están aplicados en producción (migraciones `20260924000000_add_call_transcript`/`20260924000001_call_transcript_finalized_at`, V1). `CallTranscriptTrack` (§3.1, nuevo en la revisión 3) **todavía no tiene migración** — es diseño únicamente hasta que la Etapa 3 confirme contra LiveKit real que este modelo de una fila por pista es correcto; sin columnas añadidas a tablas existentes, aditiva de bajo riesgo cuando se cree, mismo perfil que `20260913120000_add_call_recording`.
+`CallTranscript`/`CallTranscriptSegment` ya están aplicados en producción (migraciones `20260924000000_add_call_transcript`/`20260924000001_call_transcript_finalized_at`, V1). `CallTranscriptTrack` (§3.1) tiene migración escrita (`20260925000000_call_transcript_track`, aditiva, sin columnas añadidas a tablas existentes — mismo perfil que `20260913120000_add_call_recording`) pero **todavía no confirmada contra un `pnpm db:migrate` real ni contra un LiveKit en vivo** — la Etapa 3 sigue sin cerrar esa validación.
 
 ---
 

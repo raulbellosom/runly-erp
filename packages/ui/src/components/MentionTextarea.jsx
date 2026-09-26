@@ -146,6 +146,14 @@ const MentionTextarea = forwardRef(function MentionTextarea({
   className = '',
   disabled = false,
   portalContainer = null,
+  // Optional — fires with { start, end, hasSelection } on every native
+  // selectionchange-equivalent event (select/mouseup/keyup) so a caller (e.g.
+  // MessageComposer's WhatsApp-style formatting toolbar) can react to a text
+  // selection without needing DOM access to the textarea this component owns
+  // internally. No consumer passes this today except the chat composer —
+  // purely additive, no behavior change for existing callers (CommentThread,
+  // RoomChatView, etc.) that omit it.
+  onSelectionChange,
 }, ref) {
   const mentionMap = useRef(new Map())
   const [displayValue, setDisplayValue] = useState(() => toDisplay(value, mentionMap.current))
@@ -364,6 +372,20 @@ const MentionTextarea = forwardRef(function MentionTextarea({
     return () => document.removeEventListener('pointerdown', handleClick)
   }, [open])
 
+  // No native 'onselectionchange' React prop exists — 'select' only fires on
+  // an actual selection made via mouse/keyboard, not every caret move, but
+  // that's exactly what a formatting toolbar needs to know about anyway.
+  // mouseup/keyup cover drag-to-select and shift+arrow selection, which
+  // 'select' alone can miss in some browsers.
+  const handleSelectionEvent = useCallback(() => {
+    if (!onSelectionChange) return
+    const ta = textareaRef.current
+    if (!ta) return
+    const start = ta.selectionStart ?? 0
+    const end = ta.selectionEnd ?? 0
+    onSelectionChange({ start, end, hasSelection: end > start })
+  }, [onSelectionChange])
+
   const idRef = useRef(`mention-ta-${Math.random().toString(36).slice(2)}`)
 
   return (
@@ -377,6 +399,9 @@ const MentionTextarea = forwardRef(function MentionTextarea({
         onKeyDown={handleKeyDown}
         onPaste={onPaste}
         onBlur={onBlur}
+        onSelect={handleSelectionEvent}
+        onMouseUp={handleSelectionEvent}
+        onKeyUp={handleSelectionEvent}
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}

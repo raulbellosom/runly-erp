@@ -89,6 +89,68 @@ describe("call-transcript-analysis-service.analyzeTranscript", () => {
     assert.equal(proof.companyId, "c1");
   });
 
+  it("includes a module's proposals (runly.contacts) in the saved analysis when the module is available and Groq returned some", async () => {
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const prisma = {
+      ...basePrisma({ transcript, segments: [{ startMs: 0, text: "hola" }] }),
+      runlyModule: { findUnique: async () => ({ id: "mod-contacts", status: "INSTALLED", enabled: true }) },
+      companyModule: { findMany: async () => [] },
+      contact: { findMany: async () => [] }, // no existing match -> "create"
+    };
+    const draft = {
+      summary: "s", decisions: [], actionItems: [], proposedEvents: [],
+      proposedContacts: [{ name: "Juan Pérez", suggestedType: "customer", email: "juan@acme.com" }],
+    };
+    const fetchImpl = mock.fn(async () => fakeGroqResponse(draft));
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, fetchImpl, tasksService: {}, calendarService: {} });
+
+    const result = await service.analyzeTranscript({ transcriptId: "t1", profileId: "u1" });
+
+    const contactsBucket = result.analysis.moduleProposals?.["runly.contacts"];
+    assert.ok(contactsBucket, "expected a runly.contacts bucket in moduleProposals");
+    assert.equal(contactsBucket.proposed.length, 1);
+    assert.equal(contactsBucket.proposed[0].name, "Juan Pérez");
+    assert.equal(contactsBucket.proposed[0].matchedContactId, null);
+  });
+
+  it("never includes runly.contacts in moduleProposals when the module isn't available for this company", async () => {
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const prisma = {
+      ...basePrisma({ transcript, segments: [{ startMs: 0, text: "hola" }] }),
+      runlyModule: { findUnique: async () => ({ id: "mod-contacts", status: "INSTALLED", enabled: true }) },
+      // Explicitly disabled for THIS company (CompanyModule override).
+      companyModule: { findMany: async () => [{ moduleId: "mod-contacts" }] },
+    };
+    const draft = {
+      summary: "s", decisions: [], actionItems: [], proposedEvents: [],
+      proposedContacts: [{ name: "Juan Pérez", suggestedType: "customer" }],
+    };
+    const fetchImpl = mock.fn(async () => fakeGroqResponse(draft));
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, fetchImpl, tasksService: {}, calendarService: {} });
+
+    const result = await service.analyzeTranscript({ transcriptId: "t1", profileId: "u1" });
+
+    assert.equal(result.analysis.moduleProposals?.["runly.contacts"], undefined);
+  });
+
+  it("passes the call's real startedAt as a reference date, so Groq can resolve relative expressions ('la proxima semana')", async () => {
+    const transcript = { id: "t1", status: "READY", companyId: "c1", call: { startedAt: new Date("2026-09-24T15:00:00.000Z") } };
+    const segments = [{ startMs: 0, text: "Nos vemos la proxima semana." }];
+    const prisma = basePrisma({ transcript, segments });
+    const draft = { summary: "s", decisions: [], actionItems: [], proposedEvents: [] };
+    let capturedBody;
+    const fetchImpl = mock.fn(async (_url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return fakeGroqResponse(draft);
+    });
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, fetchImpl, tasksService: {}, calendarService: {} });
+
+    await service.analyzeTranscript({ transcriptId: "t1", profileId: "u1" });
+
+    const systemMessage = capturedBody.messages.find((m) => m.role === "system");
+    assert.match(systemMessage.content, /2026-09-24T15:00:00\.000Z/);
+  });
+
   it("wraps an unreadable Groq response", async () => {
     const transcript = { id: "t1", status: "READY", companyId: "c1" };
     const prisma = basePrisma({ transcript, segments: [{ startMs: 0, text: "hola" }] });
@@ -156,6 +218,91 @@ describe("call-transcript-analysis-service.commitProposals", () => {
     assert.equal(result.createdEvents.length, 1);
     assert.deepEqual(result.skippedActionItems, []);
     assert.deepEqual(result.skippedEvents, []);
+  });
+
+  it("commits an accepted contact proposal, creating a Contact and recording its id under moduleProposals.committedIds", async () => {
+    const { signAiProof } = await import("../../../lib/ai-proof-token.js");
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = {
+      id: "an-1", transcriptId: "t1", companyId: "c1",
+      actionItems: [], proposedEvents: [],
+      moduleProposals: {
+        "runly.contacts": {
+          proposed: [{ name: "Juan Pérez", suggestedType: "customer", email: "juan@acme.com", phone: null, company: null, matchedContactId: null }],
+          committedIds: [],
+        },
+      },
+      committedAt: null, committedTaskIds: null, committedEventIds: null,
+    };
+    let createdContact = null;
+    const prisma = {
+      ...basePrisma({ transcript, segments: [], analysis }),
+      contact: {
+        create: async ({ data }) => { createdContact = { id: "new-contact-1", ...data }; return createdContact; },
+      },
+      membership: {
+        findFirst: async () => ({ role: { key: "member", permissions: [{ permission: { key: "contacts.contacts.create", active: true } }] } }),
+        findMany: async () => [],
+      },
+      userPermissionGrant: { findMany: async () => [] },
+    };
+    const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService: {}, calendarService: {} });
+
+    const result = await service.commitProposals({
+      transcriptId: "t1", profileId: "u1", proofToken,
+      acceptedActionItems: [], acceptedEvents: [],
+      acceptedModuleProposals: [{ moduleKey: "runly.contacts", index: 0, decision: { type: "customer" } }],
+    });
+
+    assert.equal(createdContact.companyId, "c1");
+    assert.equal(createdContact.name, "Juan Pérez");
+    assert.equal(result.createdModuleRecords.length, 1);
+    assert.equal(result.createdModuleRecords[0].recordId, "new-contact-1");
+    assert.deepEqual(result.skippedModuleProposals, []);
+    assert.deepEqual(result.analysis.moduleProposals["runly.contacts"].committedIds, ["new-contact-1"]);
+  });
+
+  it("rejects an accepted contact proposal when the caller lacks contacts write permission, without affecting other accepted items", async () => {
+    const { signAiProof } = await import("../../../lib/ai-proof-token.js");
+    const transcript = { id: "t1", status: "READY", companyId: "c1" };
+    const analysis = {
+      id: "an-1", transcriptId: "t1", companyId: "c1",
+      actionItems: [{ text: "Enviar propuesta" }], proposedEvents: [],
+      moduleProposals: {
+        "runly.contacts": {
+          proposed: [{ name: "Juan Pérez", suggestedType: "customer", email: null, phone: null, company: null, matchedContactId: null }],
+          committedIds: [],
+        },
+      },
+      committedAt: null, committedTaskIds: null, committedEventIds: null,
+    };
+    const createdTasks = [];
+    const prisma = {
+      ...basePrisma({ transcript, segments: [], analysis }),
+      membership: { findFirst: async () => null, findMany: async () => [] }, // no membership -> no permission at all
+      userPermissionGrant: { findMany: async () => [] },
+    };
+    const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
+    const tasksService = {
+      createTask: async (projectId, createdBy, data) => {
+        const task = { id: `task-${createdTasks.length}`, projectId, createdBy, ...data };
+        createdTasks.push(task);
+        return task;
+      },
+    };
+    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService, calendarService: {} });
+
+    const result = await service.commitProposals({
+      transcriptId: "t1", profileId: "u1", proofToken,
+      acceptedActionItems: [{ index: 0, projectId: "proj-1" }], acceptedEvents: [],
+      acceptedModuleProposals: [{ moduleKey: "runly.contacts", index: 0, decision: { type: "customer" } }],
+    });
+
+    assert.equal(result.createdTasks.length, 1, "the task must still commit even though the contact was rejected");
+    assert.equal(result.createdModuleRecords.length, 0);
+    assert.equal(result.skippedModuleProposals.length, 1);
+    assert.match(result.skippedModuleProposals[0].reason, /permiso/i);
   });
 
   it("skips an out-of-range accepted index instead of throwing, and still commits what succeeded", async () => {

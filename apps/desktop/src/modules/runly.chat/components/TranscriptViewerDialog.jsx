@@ -93,6 +93,12 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
 
         {isError && <ErrorState title="No se pudo cargar la transcripción" onRetry={refetch} />}
 
+        {transcript?.status === "CAPTURING" && (
+          <p className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+            Capturando el audio de cada participante — la transcripción comenzará cuando la llamada termine.
+          </p>
+        )}
+
         {transcript && ["PENDING", "PROCESSING"].includes(transcript.status) && (
           <p className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
             Transcribiendo la llamada…

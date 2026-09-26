@@ -16,7 +16,11 @@ export function useConversationTranscripts(conversationId, enabled = true) {
     staleTime: 15_000,
     refetchInterval: (query) => {
       const rows = unwrap(query.state.data) ?? [];
-      return rows.some((r) => ["PENDING", "PROCESSING"].includes(r.status)) ? 8000 : false;
+      // CAPTURING (V2, mientras la pista sigue grabandose/reconciliandose)
+      // es un estado no terminal igual que PENDING/PROCESSING — sin esto, una
+      // lista abierta durante una captura por pista en curso no refleja la
+      // eventual transicion a PENDING una vez que todas las pistas terminan.
+      return rows.some((r) => ["CAPTURING", "PENDING", "PROCESSING"].includes(r.status)) ? 8000 : false;
     },
     queryFn: () => runly.calls.listTranscripts(conversationId, session.access_token),
   });
@@ -30,7 +34,7 @@ export function useTranscript(transcriptId, enabled = true) {
     staleTime: 15_000,
     refetchInterval: (query) => {
       const row = unwrap(query.state.data);
-      return row && ["PENDING", "PROCESSING"].includes(row.status) ? 5000 : false;
+      return row && ["CAPTURING", "PENDING", "PROCESSING"].includes(row.status) ? 5000 : false;
     },
     queryFn: () => runly.calls.getTranscript(transcriptId, session.access_token),
   });

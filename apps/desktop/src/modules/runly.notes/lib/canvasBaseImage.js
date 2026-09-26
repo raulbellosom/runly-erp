@@ -9,7 +9,11 @@ function getPdfjs() {
     pdfjsPromise = import('pdfjs-dist').then((pdfjsLib) => {
       // Same worker file PDFViewer.jsx already serves — copied to public/ by
       // the app's postinstall script from this same pdfjs-dist dependency.
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+      // Resolve against Vite's BASE_URL, not a root-absolute path: production
+      // serves the SPA under /app/ (VITE_BASE_PATH), where "/pdf.worker.min.mjs"
+      // 404s (nginx has no rule for a root-level path) — same bug already
+      // fixed once for call sounds, see callSounds.js.
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env?.BASE_URL || '/'}pdf.worker.min.mjs`
       return pdfjsLib
     })
   }

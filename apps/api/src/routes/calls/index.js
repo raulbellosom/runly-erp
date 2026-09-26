@@ -85,7 +85,7 @@ export function createCallsRouter({
     await prisma.auditLog.create({ data: { companyId, actorId, entityType, entityId, action, before, after } });
   }
   const transcriptService = transcriptServiceOverride ?? createCallTranscriptService({
-    prisma, supabaseAdmin, logAudit,
+    prisma, supabaseAdmin, logAudit, callService: calls,
     onTranscriptReady: async (t) => {
       const msg = buildTranscriptReadyMessage({ transcriptId: t.id, durationMs: t.durationMs });
       await calls.postSystemMessage(t.conversationId, msg);
@@ -108,6 +108,8 @@ export function createCallsRouter({
     ct.unref?.();
     const trt = setInterval(() => { transcriptService.reconcileReadyTranscripts().catch(() => {}); }, 20_000);
     trt.unref?.();
+    const ttt = setInterval(() => { transcriptService.reconcileActiveTranscriptTracks().catch(() => {}); }, 30_000);
+    ttt.unref?.();
     const tct = setInterval(() => { transcriptService.cleanupExpiredTranscripts().catch(() => {}); }, 60 * 60 * 1000);
     tct.unref?.();
   }
@@ -269,6 +271,30 @@ export function createCallsRouter({
         const data = await transcriptService.requestTranscript({ callId, requestedByUserId: profileId, profileId });
         return c.json({ data }, 201);
       } catch (error) { return handleError(c, error, "Error solicitando la transcripción."); }
+    },
+  );
+  // ---- transcripts (V2 — captura por pista, identificación de hablantes) ----
+  internal.post(
+    "/:callId/transcript-tracks/start",
+    requirePermission("chat.calls.transcript.request"),
+    async (c) => {
+      try {
+        const callId = callIdSchema.parse(c.req.param("callId"));
+        const profileId = c.get("userId");
+        const data = await transcriptService.requestTrackTranscription({ callId, requestedByUserId: profileId, profileId });
+        return c.json({ data }, 201);
+      } catch (error) { return handleError(c, error, "Error iniciando la captura por pista."); }
+    },
+  );
+  internal.post(
+    "/:callId/transcript-tracks/stop",
+    requirePermission("chat.calls.transcript.request"),
+    async (c) => {
+      try {
+        const callId = callIdSchema.parse(c.req.param("callId"));
+        const data = await transcriptService.stopTrackTranscription({ callId, profileId: c.get("userId") });
+        return c.json({ data });
+      } catch (error) { return handleError(c, error, "Error deteniendo la captura por pista."); }
     },
   );
   internal.post(

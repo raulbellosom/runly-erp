@@ -6,6 +6,12 @@
 // next to chat-service.js).
 import { signAiProof, verifyAiProof, AiProofTokenError } from "../../lib/ai-proof-token.js";
 import { isReasoningModel } from "../../services/groq-model-helpers.js";
+import {
+  resolveAvailableProposalModules,
+  buildModulePromptAdditions,
+  extractModuleProposals,
+  commitModuleProposals,
+} from "./transcript-proposal-registry.js";
 
 const LOG_PREFIX = "[runly.calls/transcript-analysis]";
 
@@ -32,16 +38,36 @@ function extractJsonObject(text) {
 // sandbox. This is a working starting point, not a calibrated final version:
 // expect to revise the wording (and possibly add few-shot examples) once
 // there is real usage to look at.
-const SYSTEM_PROMPT = [
-  "Eres un asistente que analiza la transcripcion de una llamada o reunion de trabajo.",
-  "Devuelve SOLO un objeto JSON (sin texto fuera del JSON) con esta forma exacta:",
-  '{"summary": string, "decisions": string[], "actionItems": [{"text": string}], "proposedEvents": [{"title": string, "startsAt": string ISO 8601, "endsAt": string ISO 8601 opcional, "description": string opcional}]}',
-  "summary: minuta breve en espanol, 3-6 oraciones, en tono neutral.",
-  "decisions: acuerdos concretos ya tomados en la reunion, cada uno una oracion corta.",
-  "actionItems: tareas pendientes que alguien debe hacer despues de la reunion, en infinitivo (ej. 'Enviar la propuesta al cliente'). No inventes tareas que no se mencionaron.",
-  "proposedEvents: solo si se menciono explicitamente una fecha/hora concreta para una proxima reunion o entrega; si no se menciono ninguna fecha concreta, devuelve un arreglo vacio. Nunca inventes una fecha.",
-  "Si la transcripcion no tiene contenido suficiente para alguna de estas listas, devuelve un arreglo vacio en vez de inventar contenido.",
-].join(" ");
+// `referenceDateIso` is interpolated per request (the real date the call
+// happened, see analyzeTranscript) — without it, a spoken relative date
+// ("nos vemos la proxima semana", "el lunes que viene") has no anchor to
+// resolve against, and the model would correctly follow the "nunca inventes
+// una fecha" rule below by omitting the event entirely. That produced exactly
+// the bug reported in practice: a task got created from the same meeting, but
+// no calendar event, even though a follow-up was clearly discussed — not a
+// bug in commitProposals (createEvent works fine once given a real date, see
+// call-transcript-analysis-service.test.js), but Groq never proposing one in
+// the first place for lack of a reference point.
+// `moduleAdditions`: extra instructions from transcript-proposal-registry.js
+// for whichever modules are installed+enabled for this transcript's company
+// (docs/superpowers/specs/2026-09-25-transcript-module-proposals-design.md)
+// — appended as additional JSON keys to produce, never replacing the fixed
+// base shape below. Empty string when no additional module applies (the
+// original V1/Etapa-5 behavior, byte-for-byte).
+function buildSystemPrompt(referenceDateIso, moduleAdditions = "") {
+  return [
+    "Eres un asistente que analiza la transcripcion de una llamada o reunion de trabajo.",
+    `Esta reunion ocurrio el ${referenceDateIso} (fecha y hora reales, con zona horaria). Usa esta fecha como referencia para resolver cualquier expresion relativa de tiempo mencionada en la transcripcion (ej. "manana", "la proxima semana", "el lunes que viene", "en quince dias") a una fecha absoluta ISO 8601 concreta.`,
+    "Devuelve SOLO un objeto JSON (sin texto fuera del JSON) con esta forma exacta:",
+    '{"summary": string, "decisions": string[], "actionItems": [{"text": string}], "proposedEvents": [{"title": string, "startsAt": string ISO 8601, "endsAt": string ISO 8601 opcional, "description": string opcional}]}',
+    "summary: minuta breve en espanol, 3-6 oraciones, en tono neutral.",
+    "decisions: acuerdos concretos ya tomados en la reunion, cada uno una oracion corta.",
+    "actionItems: tareas pendientes que alguien debe hacer despues de la reunion, en infinitivo (ej. 'Enviar la propuesta al cliente'). No inventes tareas que no se mencionaron.",
+    "proposedEvents: cualquier proxima reunion, entrega o cita mencionada con una referencia de tiempo (absoluta o relativa a la fecha de esta reunion) que puedas resolver con la fecha de referencia de arriba. Si de verdad no se menciono ninguna referencia de tiempo, devuelve un arreglo vacio. Nunca inventes una fecha sin ninguna referencia en la transcripcion.",
+    "Si la transcripcion no tiene contenido suficiente para alguna de estas listas, devuelve un arreglo vacio en vez de inventar contenido.",
+    moduleAdditions,
+  ].join(" ").trim();
+}
 
 export function createCallTranscriptAnalysisService({
   prisma,
@@ -51,7 +77,7 @@ export function createCallTranscriptAnalysisService({
   fetchImpl = null,
   logAudit = null,
 }) {
-  async function callGroq(transcriptText) {
+  async function callGroq(transcriptText, referenceDateIso, moduleAdditions) {
     const apiKey = env.GROQ_API_KEY;
     if (!apiKey) throw new CallTranscriptAnalysisError("Analisis con IA no configurado (falta GROQ_API_KEY).", 503);
     const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
@@ -64,7 +90,7 @@ export function createCallTranscriptAnalysisService({
       max_completion_tokens: 2000,
       ...(isReasoningModel(model) ? { reasoning_format: "hidden", reasoning_effort: "low" } : {}),
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildSystemPrompt(referenceDateIso, moduleAdditions) },
         { role: "user", content: transcriptText.slice(0, 60000) },
       ],
     };
@@ -132,7 +158,12 @@ export function createCallTranscriptAnalysisService({
   async function analyzeTranscript({ transcriptId, profileId }) {
     const transcript = await prisma.callTranscript.findUnique({
       where: { id: transcriptId },
-      include: { segments: { orderBy: { startMs: "asc" } } },
+      include: {
+        segments: { orderBy: { startMs: "asc" } },
+        // Real wall-clock date the meeting happened — see buildSystemPrompt's
+        // comment for why this is required, not cosmetic.
+        call: { select: { startedAt: true } },
+      },
     });
     if (!transcript) throw new CallTranscriptAnalysisError("Transcripción no encontrada.", 404);
     if (transcript.status !== "READY") {
@@ -144,9 +175,22 @@ export function createCallTranscriptAnalysisService({
     const transcriptText = segments
       .map((s) => (s.speakerLabel ? `${s.speakerLabel}: ${s.text}` : s.text))
       .join("\n");
+    // call.startedAt is the ground truth; createdAt/now() are only fallbacks
+    // for a transcript whose Call row somehow has no startedAt recorded.
+    const referenceDateIso = (transcript.call?.startedAt ?? transcript.createdAt ?? new Date()).toISOString();
 
-    const { obj, model } = await callGroq(transcriptText);
+    // Tenancy gate (spec §19 point 1): resolved BEFORE building the prompt —
+    // a module not installed+enabled for transcript.companyId never gets its
+    // prompt fragment sent to Groq at all, so this company's data never even
+    // implies that capability exists.
+    const availableModules = await resolveAvailableProposalModules({ prisma, companyId: transcript.companyId });
+    const moduleAdditions = buildModulePromptAdditions(availableModules);
+
+    const { obj, model } = await callGroq(transcriptText, referenceDateIso, moduleAdditions);
     const draft = normalizeDraft(obj);
+    const moduleProposals = await extractModuleProposals({
+      prisma, companyId: transcript.companyId, obj, availableModules,
+    });
 
     const saved = await prisma.callTranscriptAnalysis.upsert({
       where: { transcriptId },
@@ -157,6 +201,7 @@ export function createCallTranscriptAnalysisService({
         decisions: draft.decisions,
         actionItems: draft.actionItems,
         proposedEvents: draft.proposedEvents,
+        moduleProposals,
         model,
         generatedByUserId: profileId,
       },
@@ -165,6 +210,7 @@ export function createCallTranscriptAnalysisService({
         decisions: draft.decisions,
         actionItems: draft.actionItems,
         proposedEvents: draft.proposedEvents,
+        moduleProposals,
         model,
         generatedByUserId: profileId,
         generatedAt: new Date(),
@@ -236,7 +282,7 @@ export function createCallTranscriptAnalysisService({
   //   re-runs Groq instead of showing the stored draft, which is the
   //   opposite of what spec §7.1 says persistence is for. A real gap, not by
   //   design — deferred here for scope, not forgotten.
-  async function commitProposals({ transcriptId, profileId, proofToken, acceptedActionItems, acceptedEvents }) {
+  async function commitProposals({ transcriptId, profileId, proofToken, acceptedActionItems, acceptedEvents, acceptedModuleProposals }) {
     const transcript = await prisma.callTranscript.findUnique({ where: { id: transcriptId } });
     if (!transcript) throw new CallTranscriptAnalysisError("Transcripción no encontrada.", 404);
     const analysis = await prisma.callTranscriptAnalysis.findUnique({ where: { transcriptId } });
@@ -300,11 +346,25 @@ export function createCallTranscriptAnalysisService({
       }
     }
 
+    // Module proposals (contacts today, spec §28 lists future modules) —
+    // dispatched through the registry so this function never imports a
+    // specific module's service directly.
+    const { createdModuleRecords, skippedModuleProposals, committedIdsByModule } = await commitModuleProposals({
+      prisma, profileId, companyId: transcript.companyId,
+      moduleProposals: analysis.moduleProposals, acceptedModuleProposals,
+    });
+    const mergedModuleProposals = { ...(analysis.moduleProposals ?? {}) };
+    for (const [moduleKey, newIds] of Object.entries(committedIdsByModule)) {
+      const bucket = mergedModuleProposals[moduleKey] ?? { proposed: [], committedIds: [] };
+      mergedModuleProposals[moduleKey] = { ...bucket, committedIds: [...(bucket.committedIds ?? []), ...newIds] };
+    }
+
     const updated = await prisma.callTranscriptAnalysis.update({
       where: { transcriptId },
       data: {
         committedTaskIds: [...(analysis.committedTaskIds ?? []), ...createdTasks.map((t) => t.id)],
         committedEventIds: [...(analysis.committedEventIds ?? []), ...createdEvents.map((e) => e.id)],
+        moduleProposals: mergedModuleProposals,
         committedAt: new Date(),
       },
     });
@@ -316,11 +376,18 @@ export function createCallTranscriptAnalysisService({
         entityType: "CallTranscriptAnalysis",
         entityId: analysis.id,
         action: "chat.call_transcript.commit_proposals",
-        after: { taskIds: createdTasks.map((t) => t.id), eventIds: createdEvents.map((e) => e.id) },
+        after: {
+          taskIds: createdTasks.map((t) => t.id),
+          eventIds: createdEvents.map((e) => e.id),
+          moduleRecordIds: createdModuleRecords.map((r) => ({ moduleKey: r.moduleKey, recordId: r.recordId })),
+        },
       }).catch((error) => console.warn(`${LOG_PREFIX} No se pudo escribir el audit log:`, error?.message ?? error));
     }
 
-    return { analysis: updated, createdTasks, createdEvents, skippedActionItems, skippedEvents };
+    return {
+      analysis: updated, createdTasks, createdEvents, skippedActionItems, skippedEvents,
+      createdModuleRecords, skippedModuleProposals,
+    };
   }
 
   return { analyzeTranscript, commitProposals };

@@ -66,6 +66,9 @@ export function createCallsDomain(request, withAuthHeaders) {
 
     // --- transcripts (V1 — audio mezclado de una grabación existente) ---
     requestTranscript: (callId, token) => json(`/calls/${callId}/transcript/request`, "POST", {}, token),
+    // --- transcripts (V2 — captura por pista, identificación de hablantes) ---
+    startTrackTranscription: (callId, token) => json(`/calls/${callId}/transcript-tracks/start`, "POST", {}, token),
+    stopTrackTranscription: (callId, token) => json(`/calls/${callId}/transcript-tracks/stop`, "POST", {}, token),
     retryTranscript: (transcriptId, token) =>
       json(`/calls/transcripts/${encodeURIComponent(transcriptId)}/retry`, "POST", {}, token),
     regenerateTranscript: (transcriptId, token) =>

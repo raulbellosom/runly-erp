@@ -67,6 +67,13 @@ export async function ensureTranscriberRole(pool, password) {
   await pool.query(
     `GRANT SELECT, INSERT, UPDATE, DELETE ON call_transcript, call_transcript_segment TO ${TRANSCRIBER_ROLE_NAME}`,
   );
+  // call_transcript_track (V2, pistas por participante): solo lectura — el
+  // ciclo de vida de cada pista (STARTING/ACTIVE/.../READY|FAILED) lo escribe
+  // exclusivamente call-transcript-service.js via reconciliacion contra
+  // LiveKit Egress, nunca este contenedor. Python solo necesita leer
+  // object_key/speaker_user_id/speaker_guest_id por pista para descargar y
+  // atribuir cada archivo de audio.
+  await pool.query(`GRANT SELECT ON call_transcript_track TO ${TRANSCRIBER_ROLE_NAME}`);
   await pool.query(
     `GRANT SELECT ON ${TRANSCRIBER_READ_TABLES.join(", ")} TO ${TRANSCRIBER_ROLE_NAME}`,
   );
@@ -88,7 +95,7 @@ export async function dropTranscriberRole(pool) {
     await pool.query(`DROP POLICY IF EXISTS "${transcriberSelectPolicyName(table)}" ON ${table}`).catch(() => {});
   }
   await pool.query(
-    `REVOKE ALL PRIVILEGES ON call_transcript, call_transcript_segment, call, call_participant, call_guest, call_recording, user_profile FROM ${TRANSCRIBER_ROLE_NAME}`,
+    `REVOKE ALL PRIVILEGES ON call_transcript, call_transcript_segment, call_transcript_track, call, call_participant, call_guest, call_recording, user_profile FROM ${TRANSCRIBER_ROLE_NAME}`,
   ).catch(() => {});
   await pool.query(`REVOKE USAGE ON SCHEMA public FROM ${TRANSCRIBER_ROLE_NAME}`).catch(() => {});
   await pool.query(`DROP ROLE IF EXISTS ${TRANSCRIBER_ROLE_NAME}`);

@@ -77,4 +77,18 @@ export const callTranscriptCommitProposalsSchema = z.object({
       }),
     )
     .default([]),
+  // Generic extension point for module-registered proposal types (see
+  // docs/superpowers/specs/2026-09-25-transcript-module-proposals-design.md)
+  // — `decision` is module-specific (e.g. runly.contacts sends { type }, the
+  // contact classification the user confirmed) and is re-validated against
+  // that module's own descriptor server-side, never trusted as-is.
+  acceptedModuleProposals: z
+    .array(
+      z.object({
+        moduleKey: z.string().min(1),
+        index: z.number().int().nonnegative(),
+        decision: z.record(z.any()).default({}),
+      }),
+    )
+    .default([]),
 });

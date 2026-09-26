@@ -13,6 +13,7 @@ import { MiniCallBubble } from "./MiniCallBubble";
 import { useCallGuests } from "./hooks/useCallGuests";
 import { useCallEphemeral } from "./hooks/useCallEphemeral";
 import { useCallRecording } from "./hooks/useCallRecording";
+import { useTrackTranscription } from "./hooks/useTrackTranscription";
 import { CallGuestSheet } from "./CallGuestSheet";
 import { CallRoomLayout } from "./CallRoomLayout";
 import { useNativeScreenShare } from './useNativeScreenShare';
@@ -79,7 +80,9 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
 
   const { userProfile } = useAuth();
   const canRecord = Boolean(userProfile?.isAdmin || userProfile?.permissions?.includes("chat.calls.record"));
+  const canTranscribeTracks = Boolean(userProfile?.isAdmin || userProfile?.permissions?.includes("chat.calls.transcript.request"));
   const recording = useCallRecording({ callId: session.call.id, conversationId });
+  const trackTranscription = useTrackTranscription({ callId: session.call.id, conversationId });
 
   // Guest access: only the initiator polls the roster (a non-manager member
   // gets a swallowed 403); the share dialog + roster are hidden otherwise.
@@ -587,6 +590,9 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         canRecord,
         recordingActive: recording.active,
         recordingBusy: recording.busy,
+        canTranscribeTracks,
+        trackTranscriptionActive: trackTranscription.active,
+        trackTranscriptionBusy: trackTranscription.busy,
       }}
       actions={{
         activateAudio: () => room.startAudio().then(() => setNeedsAudio(false)),
@@ -604,6 +610,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         setPinned,
         toggleDirectSwap,
         toggleRecording: recording.active ? recording.stop : recording.start,
+        toggleTrackTranscription: trackTranscription.active ? trackTranscription.stop : trackTranscription.start,
       }}
       chat={{
         isMobile,

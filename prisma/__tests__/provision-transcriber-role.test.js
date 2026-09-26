@@ -53,6 +53,12 @@ describe("ensureTranscriberRole", () => {
     assert.ok(readGrant.sql.includes("call_recording"));
     assert.ok(readGrant.sql.includes("user_profile"));
     assert.ok(!pool.calls.some((c) => /finance|ledger|hr_|contacts/i.test(c.sql)));
+
+    // call_transcript_track (V2) is read-only for this role — its lifecycle is
+    // owned exclusively by call-transcript-service.js's LiveKit reconciliation.
+    const trackGrant = pool.calls.find((c) => c.sql === `GRANT SELECT ON call_transcript_track TO ${TRANSCRIBER_ROLE_NAME}`);
+    assert.ok(trackGrant, "expected a read-only GRANT on call_transcript_track");
+    assert.ok(!writeGrant.sql.includes("call_transcript_track"), "call_transcript_track must not get INSERT/UPDATE/DELETE");
   });
 
   it("creates a permissive SELECT policy for each read table — GRANT alone is not enough once RLS is on", async () => {
@@ -90,7 +96,9 @@ describe("dropTranscriberRole", () => {
   it("revokes privileges and schema usage before dropping, and never throws", async () => {
     const pool = fakePool(true);
     await assert.doesNotReject(dropTranscriberRole(pool));
-    assert.ok(pool.calls.some((c) => c.sql.startsWith("REVOKE ALL PRIVILEGES")));
+    const revokeCall = pool.calls.find((c) => c.sql.startsWith("REVOKE ALL PRIVILEGES"));
+    assert.ok(revokeCall);
+    assert.ok(revokeCall.sql.includes("call_transcript_track"));
     assert.ok(pool.calls.some((c) => c.sql === `REVOKE USAGE ON SCHEMA public FROM ${TRANSCRIBER_ROLE_NAME}`));
     assert.ok(pool.calls.some((c) => c.sql === `DROP ROLE IF EXISTS ${TRANSCRIBER_ROLE_NAME}`));
   });

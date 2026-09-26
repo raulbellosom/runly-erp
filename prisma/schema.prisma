@@ -412,6 +412,7 @@ model UserProfile {
   callRecordingsStarted  CallRecording[]           @relation("CallRecordingStartedBy")
   callTranscriptsRequested CallTranscript[]         @relation("CallTranscriptRequestedBy")
   callTranscriptSegmentsSpoken CallTranscriptSegment[] @relation("CallTranscriptSegmentSpeaker")
+  callTranscriptTracksSpoken CallTranscriptTrack[] @relation("CallTranscriptTrackSpeaker")
 
   projectsOwned      Project[]       @relation("ProjectOwner")
   projectMemberships ProjectMember[] @relation("ProjectMemberUser")
@@ -1842,7 +1843,7 @@ enum CallStatus {
 
 enum CallTranscriptSourceKind {
   MIXED // Alternativa A: audio de la grabacion de sala completa (room composite)
-  PER_TRACK // Alternativa B: pistas individuales por participante (no implementado aun, ver V2)
+  PER_TRACK // Alternativa B: pistas individuales por participante, via CallTranscriptTrack
 }
 
 enum CallParticipantStatus {
@@ -2112,6 +2113,7 @@ model CallGuest {
   admittedBy        UserProfile?             @relation("CallGuestAdmittedBy", fields: [admittedByUserId], references: [id])
   messages          CallMessage[]
   transcriptSegments CallTranscriptSegment[]
+  transcriptTracks  CallTranscriptTrack[]
 
   @@unique([callId, livekitIdentity])
   @@index([callId, status])
@@ -2202,6 +2204,7 @@ model CallTranscript {
   recording   CallRecording?  @relation(fields: [recordingId], references: [id], onDelete: SetNull)
   requestedBy UserProfile     @relation("CallTranscriptRequestedBy", fields: [requestedByUserId], references: [id])
   segments    CallTranscriptSegment[]
+  tracks      CallTranscriptTrack[]
   analysis  CallTranscriptAnalysis?
 
   @@index([callId])
@@ -2210,6 +2213,37 @@ model CallTranscript {
   @@index([status])
   @@index([expiresAt])
   @@map("call_transcript")
+}
+
+// V2 (Alternativa B, identificacion de hablantes) — una fila por cada
+// startTrackEgress invocado para una transcripcion PER_TRACK, no una por
+// transcripcion: N participantes con microfono publicado = N trabajos de
+// egress independientes, cada uno con su propio egressId/estado/ciclo de
+// vida (mismo principio que CallRecording.egressId, aqui multiplicado por
+// pista). Sin esta tabla, una sola fila CallTranscript no podria representar
+// "3 de 4 pistas ya listas, 1 todavia activa, 1 fallo" al mismo tiempo. Ver
+// docs/TRANSCRIPTION_SPEC.md §3.1.
+model CallTranscriptTrack {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  transcriptId    String   @db.Uuid @map("transcript_id")
+  egressId        String   @map("egress_id")
+  livekitIdentity String   @map("livekit_identity")
+  speakerUserId   String?  @db.Uuid @map("speaker_user_id")
+  speakerGuestId  String?  @db.Uuid @map("speaker_guest_id")
+  objectKey       String?  @map("object_key")
+  status          String   @default("STARTING") @map("status") // STARTING | ACTIVE | PROCESSING | READY | FAILED — mismo vocabulario libre que CallRecording.status
+  failureReason   String?  @map("failure_reason")
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+
+  transcript   CallTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  speakerUser  UserProfile?   @relation("CallTranscriptTrackSpeaker", fields: [speakerUserId], references: [id])
+  speakerGuest CallGuest?     @relation(fields: [speakerGuestId], references: [id])
+
+  @@unique([transcriptId, livekitIdentity])
+  @@index([status])
+  @@map("call_transcript_track")
 }
 
 model CallTranscriptSegment {
@@ -2252,6 +2286,13 @@ model CallTranscriptAnalysis {
   committedTaskIds  Json?     @map("committed_task_ids")  // uuid[]
   committedEventIds Json?     @map("committed_event_ids") // uuid[]
   committedAt       DateTime? @map("committed_at")
+  // Generic per-module proposal bucket, indexed by moduleKey — deliberately
+  // NOT a typed column per module (unlike actionItems/proposedEvents above):
+  // docs/superpowers/specs/2026-09-25-transcript-module-proposals-design.md
+  // §10. Shape: { [moduleKey]: { proposed: [...], committedIds: [uuid] } }.
+  // Nullable; application code treats a missing key/null as "no proposals
+  // from that module", never requires a migration to add a new module.
+  moduleProposals   Json?     @map("module_proposals")
 
   transcript CallTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
 

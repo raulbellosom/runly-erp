@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { TrackType } from "livekit-server-sdk";
 import { createCallTranscriptService, CallTranscriptError } from "../call-transcript-service.js";
 
 const CALL = "11111111-1111-4111-8111-111111111111";
@@ -255,6 +256,27 @@ describe("createCallTranscriptService access control — stricter than recording
     assert.equal(out.id, TRANSCRIPT);
     assert.equal(out.segments.length, 1);
   });
+
+  it("flattens a PER_TRACK segment's resolved speakerUser/speakerGuest name onto speakerLabel", async () => {
+    const prisma = {
+      callTranscript: {
+        findUnique: async () => ({
+          id: TRANSCRIPT, conversationId: CONV, callId: CALL, requestedByUserId: USER,
+          segments: [
+            { id: "seg-1", startMs: 0, endMs: 1000, text: "hola", speakerUser: { displayName: "Raúl" }, speakerGuest: null },
+            { id: "seg-2", startMs: 1000, endMs: 2000, text: "hola de vuelta", speakerUser: null, speakerGuest: { displayName: "Invitado" } },
+            { id: "seg-3", startMs: 2000, endMs: 3000, text: "sin atribuir", speakerUser: null, speakerGuest: null },
+          ],
+        }),
+      },
+      $queryRaw: async (strings, ...values) => (values[0] === CONV ? memberRows() : []),
+    };
+    const svc = createCallTranscriptService({ prisma });
+    const out = await svc.getTranscript({ transcriptId: TRANSCRIPT, profileId: USER });
+    assert.equal(out.segments[0].speakerLabel, "Raúl");
+    assert.equal(out.segments[1].speakerLabel, "Invitado");
+    assert.equal(out.segments[2].speakerLabel, null);
+  });
 });
 
 describe("createCallTranscriptService.deleteTranscript", () => {
@@ -368,5 +390,214 @@ describe("createCallTranscriptService.cleanupExpiredTranscripts", () => {
     const count = await svc.cleanupExpiredTranscripts();
     assert.equal(count, 0);
     assert.equal(deleteManyCalled, false);
+  });
+});
+
+// --- V2 (Alternativa B, identificación de hablantes por pista) ---
+
+function env() {
+  return {
+    LIVEKIT_MODE: "embedded",
+    LIVEKIT_URL: "wss://rtc.example.test",
+    LIVEKIT_INTERNAL_URL: "http://livekit:7880",
+    LIVEKIT_API_KEY: "api-key",
+    LIVEKIT_API_SECRET: "super-secret",
+    SUPABASE_S3_ENDPOINT: "https://supabase.example.test/storage/v1/s3",
+    SUPABASE_S3_ACCESS_KEY_ID: "s3-key",
+    SUPABASE_S3_SECRET_ACCESS_KEY: "s3-secret",
+    SUPABASE_S3_REGION: "us-east-1",
+  };
+}
+
+const liveCall = { id: CALL, conversationId: CONV, status: "ACTIVE", livekitRoomName: `call_${CALL}` };
+const GUEST_IDENTITY = "guest_88888888-8888-4888-8888-888888888888";
+const GUEST_ID = "99999999-9999-4999-8999-999999999999";
+
+class FakeRoomService {
+  constructor(participants) { this.participants = participants; }
+  async listParticipants() { return this.participants; }
+}
+
+class FakeTrackEgress {
+  constructor() { this.started = []; this.stopped = []; }
+  async startTrackEgress(roomName, output, trackId) {
+    this.started.push({ roomName, output, trackId });
+    return { egressId: `egress_${trackId}` };
+  }
+  async stopEgress(egressId) { this.stopped.push(egressId); return { egressId }; }
+  async listEgress() { return []; }
+}
+
+describe("createCallTranscriptService.requestTrackTranscription", () => {
+  it("rejects (422) when no participant has a published audio track", async () => {
+    let calls = 0;
+    const prisma = {
+      $queryRaw: async () => { calls += 1; return calls === 1 ? memberRows() : [{ company_id: COMPANY }]; },
+      callTranscript: { findFirst: async () => null },
+    };
+    const svc = createCallTranscriptService({
+      prisma, env: env(),
+      callService: { getLiveCallOrThrow: async () => liveCall },
+      RoomServiceClientImpl: new FakeRoomService([{ identity: USER, tracks: [] }]),
+    });
+    await assert.rejects(
+      svc.requestTrackTranscription({ callId: CALL, requestedByUserId: USER, profileId: USER }),
+      (e) => e instanceof CallTranscriptError && e.status === 422,
+    );
+  });
+
+  it("rejects (409) when a transcript is already CAPTURING/PENDING/PROCESSING for this call", async () => {
+    const prisma = {
+      $queryRaw: async () => memberRows(),
+      callTranscript: { findFirst: async () => ({ id: TRANSCRIPT, status: "CAPTURING" }) },
+    };
+    const svc = createCallTranscriptService({
+      prisma, env: env(),
+      callService: { getLiveCallOrThrow: async () => liveCall },
+      RoomServiceClientImpl: new FakeRoomService([{ identity: USER, tracks: [{ sid: "TR_A", type: TrackType.AUDIO }] }]),
+    });
+    await assert.rejects(
+      svc.requestTrackTranscription({ callId: CALL, requestedByUserId: USER, profileId: USER }),
+      (e) => e instanceof CallTranscriptError && e.status === 409,
+    );
+  });
+
+  it("starts one track egress per attributable participant with a published mic, skipping unknown identities", async () => {
+    const egress = new FakeTrackEgress();
+    const trackRows = [];
+    let queryRawCalls = 0;
+    const prisma = {
+      $queryRaw: async () => { queryRawCalls += 1; return queryRawCalls === 1 ? memberRows() : [{ company_id: COMPANY }]; },
+      callTranscript: {
+        findFirst: async () => null,
+        create: async ({ data }) => ({ id: TRANSCRIPT, ...data }),
+        update: async () => {},
+      },
+      callTranscriptTrack: {
+        create: async ({ data }) => { trackRows.push(data); return { id: `track-${trackRows.length}`, ...data }; },
+      },
+      callParticipant: { findMany: async () => [{ livekitIdentity: USER, userId: USER }] },
+      callGuest: { findMany: async () => [{ livekitIdentity: GUEST_IDENTITY, id: GUEST_ID }] },
+    };
+    const svc = createCallTranscriptService({
+      prisma, env: env(),
+      callService: { getLiveCallOrThrow: async () => liveCall },
+      EgressClientImpl: egress,
+      RoomServiceClientImpl: new FakeRoomService([
+        { identity: USER, tracks: [{ sid: "TR_USER", type: TrackType.AUDIO }] },
+        { identity: GUEST_IDENTITY, tracks: [{ sid: "TR_GUEST", type: TrackType.AUDIO }] },
+        { identity: "unknown-identity", tracks: [{ sid: "TR_UNKNOWN", type: TrackType.AUDIO }] },
+      ]),
+    });
+
+    const out = await svc.requestTrackTranscription({ callId: CALL, requestedByUserId: USER, profileId: USER });
+    assert.equal(out.status, "CAPTURING");
+    assert.equal(out.tracksStarted, 2);
+    assert.equal(egress.started.length, 2, "the unknown identity must be skipped, never captured");
+    assert.equal(trackRows.length, 2);
+    assert.ok(trackRows.some((t) => t.speakerUserId === USER && !t.speakerGuestId));
+    assert.ok(trackRows.some((t) => t.speakerGuestId === GUEST_ID && !t.speakerUserId));
+    assert.ok(trackRows.every((t) => t.status === "ACTIVE"));
+  });
+});
+
+describe("createCallTranscriptService.stopTrackTranscription", () => {
+  it("rejects (404) when there is no CAPTURING transcript for this call", async () => {
+    const prisma = { callTranscript: { findFirst: async () => null } };
+    const svc = createCallTranscriptService({ prisma, env: env() });
+    await assert.rejects(
+      svc.stopTrackTranscription({ callId: CALL, profileId: USER }),
+      (e) => e instanceof CallTranscriptError && e.status === 404,
+    );
+  });
+
+  it("stops every active/starting track's egress and marks them PROCESSING", async () => {
+    const egress = new FakeTrackEgress();
+    let updateManyWhere;
+    const prisma = {
+      $queryRaw: async () => memberRows(),
+      callTranscript: { findFirst: async () => ({ id: TRANSCRIPT, conversationId: CONV, status: "CAPTURING" }) },
+      callTranscriptTrack: {
+        findMany: async () => [
+          { id: "track-1", egressId: "egress_1", status: "ACTIVE" },
+          { id: "track-2", egressId: "egress_2", status: "STARTING" },
+        ],
+        updateMany: async ({ where }) => { updateManyWhere = where; return { count: 2 }; },
+      },
+    };
+    const svc = createCallTranscriptService({ prisma, env: env(), EgressClientImpl: egress });
+    const out = await svc.stopTrackTranscription({ callId: CALL, profileId: USER });
+    assert.equal(out.id, TRANSCRIPT);
+    assert.deepEqual(egress.stopped.sort(), ["egress_1", "egress_2"]);
+    assert.deepEqual(updateManyWhere.id.in.sort(), ["track-1", "track-2"]);
+  });
+});
+
+describe("createCallTranscriptService.reconcileActiveTranscriptTracks", () => {
+  it("promotes a CAPTURING transcript to PENDING once every track is READY/FAILED with at least one READY", async () => {
+    let transcriptUpdateData;
+    const trackUpdates = {};
+    const prisma = {
+      callTranscript: {
+        findMany: async () => [{
+          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING",
+          tracks: [
+            { id: "track-1", egressId: "egress_1", status: "ACTIVE", livekitIdentity: USER },
+            { id: "track-2", egressId: "egress_2", status: "PROCESSING", livekitIdentity: GUEST_IDENTITY },
+          ],
+        }],
+        update: async ({ data }) => { transcriptUpdateData = data; },
+      },
+      callTranscriptTrack: {
+        update: async ({ where, data }) => { trackUpdates[where.id] = data; },
+        findMany: async () => [
+          { id: "track-1", status: trackUpdates["track-1"]?.status ?? "READY" },
+          { id: "track-2", status: trackUpdates["track-2"]?.status ?? "FAILED" },
+        ],
+      },
+    };
+    const egress = {
+      listEgress: async ({ egressId }) => {
+        if (egressId === "egress_1") return [{ status: 3 /* EGRESS_COMPLETE */, fileResults: [{ duration: 5_000_000_000 }] }];
+        if (egressId === "egress_2") return [{ status: 4 /* EGRESS_FAILED */, error: "boom" }];
+        return [];
+      },
+      stopEgress: async () => {},
+    };
+    const svc = createCallTranscriptService({
+      prisma, env: env(), EgressClientImpl: egress,
+      callService: { getLiveCallOrThrow: async () => liveCall },
+    });
+    await svc.reconcileActiveTranscriptTracks();
+    assert.equal(trackUpdates["track-1"].status, "READY");
+    assert.equal(trackUpdates["track-2"].status, "FAILED");
+    assert.equal(transcriptUpdateData.status, "PENDING");
+  });
+
+  it("marks the transcript FAILED (not PENDING) when every track fails", async () => {
+    let transcriptUpdateData;
+    const prisma = {
+      callTranscript: {
+        findMany: async () => [{
+          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING",
+          tracks: [{ id: "track-1", egressId: "egress_1", status: "ACTIVE", livekitIdentity: USER }],
+        }],
+        update: async ({ data }) => { transcriptUpdateData = data; },
+      },
+      callTranscriptTrack: {
+        update: async () => {},
+        findMany: async () => [{ id: "track-1", status: "FAILED" }],
+      },
+    };
+    const egress = {
+      listEgress: async () => [{ status: 5 /* EGRESS_ABORTED */, error: "aborted" }],
+      stopEgress: async () => {},
+    };
+    const svc = createCallTranscriptService({
+      prisma, env: env(), EgressClientImpl: egress,
+      callService: { getLiveCallOrThrow: async () => liveCall },
+    });
+    await svc.reconcileActiveTranscriptTracks();
+    assert.equal(transcriptUpdateData.status, "FAILED");
   });
 });

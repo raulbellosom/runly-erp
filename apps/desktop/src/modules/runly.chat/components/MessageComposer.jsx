@@ -3,6 +3,7 @@ import {
   useRef,
   useCallback,
   useEffect,
+  useMemo,
   useImperativeHandle,
   forwardRef,
 } from "react";
@@ -13,6 +14,7 @@ import {
 import {
   Send, Paperclip, Smile, X, Loader2, AlertCircle, Plus, Link2,
 } from "lucide-react";
+import { ComposerFormatToolbar, ComposerFormatPreview, hasFormattingSyntax } from "./ComposerFormatting";
 import { toast } from "sonner";
 import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
 import { useChatUpload } from "../hooks/useChatUpload";
@@ -115,6 +117,10 @@ export const MessageComposer = forwardRef(function MessageComposer(
   ref,
 ) {
   const [body, setBody] = useState("");
+  // WhatsApp-style formatting toolbar (desktop only, see `coarse` gate below —
+  // touch devices already get the OS's own text-selection menu, and the
+  // keyboard shortcuts this toolbar mirrors are gated the same way).
+  const [selection, setSelection] = useState({ start: 0, end: 0, hasSelection: false });
   const [isSending, setIsSending] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [emojiModalOpen, setEmojiModalOpen] = useState(false);
@@ -572,6 +578,18 @@ export const MessageComposer = forwardRef(function MessageComposer(
     handleSendRef.current();
   }, [pendingFiles]);
 
+  // Shared by the keyboard shortcuts below and the selection toolbar's
+  // buttons — both are just two named entry points to the same wrap action.
+  const applyFormat = useCallback((marker) => {
+    mentionTaRef.current?.wrapSelection?.(marker);
+  }, []);
+
+  const handleSelectionChange = useCallback(({ start, end, hasSelection }) => {
+    setSelection({ start, end, hasSelection });
+  }, []);
+
+  const showFormatPreview = useMemo(() => hasFormattingSyntax(body), [body]);
+
   const handleKeyDown = useCallback(
     (e) => {
       // On touch devices Enter is a line break; sending is the send button
@@ -586,13 +604,13 @@ export const MessageComposer = forwardRef(function MessageComposer(
       const mod = e.ctrlKey || e.metaKey;
       if (mod && !e.altKey) {
         const key = e.key.toLowerCase();
-        if (key === "b") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("*"); return; }
-        if (key === "i") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("_"); return; }
-        if (e.shiftKey && key === "x") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("~"); return; }
-        if (e.shiftKey && key === "m") { e.preventDefault(); mentionTaRef.current?.wrapSelection?.("`"); return; }
+        if (key === "b") { e.preventDefault(); applyFormat("*"); return; }
+        if (key === "i") { e.preventDefault(); applyFormat("_"); return; }
+        if (e.shiftKey && key === "x") { e.preventDefault(); applyFormat("~"); return; }
+        if (e.shiftKey && key === "m") { e.preventDefault(); applyFormat("`"); return; }
       }
     },
-    [handleSend, coarse],
+    [handleSend, coarse, applyFormat],
   );
 
   function handleFileInputChange(e) {
@@ -751,6 +769,10 @@ export const MessageComposer = forwardRef(function MessageComposer(
         />
       ) : (
         <div className="chat-glass flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl">
+          {!coarse && selection.hasSelection && (
+            <ComposerFormatToolbar onApplyFormat={applyFormat} />
+          )}
+
           {/* Textarea (with @mention autocomplete) — its own full-width row,
               above the action toolbar, so typing space is never squeezed by
               icons sitting beside it. MentionTextarea bakes a boxed look
@@ -779,6 +801,7 @@ export const MessageComposer = forwardRef(function MessageComposer(
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
+              onSelectionChange={handleSelectionChange}
               members={mentionMembers}
               placeholder={placeholder}
               // Rests at 1 line now (was a fixed 3, always tall even empty)
@@ -796,6 +819,8 @@ export const MessageComposer = forwardRef(function MessageComposer(
               ].join(" ")}
             />
           </div>
+
+          {showFormatPreview && <ComposerFormatPreview body={body} />}
 
           {/* Mobile quick-emoji strip — a normal in-flow row (full composer
               width) so it can never render off-screen the way the Popover

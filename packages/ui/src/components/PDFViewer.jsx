@@ -14,8 +14,13 @@ import {
   RotateCw,
 } from "lucide-react";
 
-// Worker served from public/ — copied there via pnpm postinstall (see package.json)
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+// Worker served from public/ — copied there via pnpm postinstall (see package.json).
+// A root-absolute "/pdf.worker.min.mjs" 404s in production, where the SPA is
+// served under a base path (VITE_BASE_PATH=/app/, infra/docker/web.Dockerfile)
+// and nginx has no rule for a root-level path — same class of bug already
+// fixed once for call sounds (see callSounds.js). Resolve against Vite's
+// BASE_URL so it becomes "/app/pdf.worker.min.mjs" in prod, "/pdf.worker.min.mjs" in dev.
+pdfjs.GlobalWorkerOptions.workerSrc = `${import.meta.env?.BASE_URL || "/"}pdf.worker.min.mjs`;
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;

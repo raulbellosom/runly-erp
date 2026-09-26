@@ -664,7 +664,12 @@ export function ChatMessageBubble({
           onPick={(emoji) => onToggleReaction?.(message.id, emoji)}
           anchorAlign="end"
         >
-          <div data-msg-bubble className="flex flex-col items-end max-w-[72%] sm:max-w-[65%]">
+          {/* min-w-0: without it, a flex item's default min-width:auto lets a
+              fixed-px child (e.g. ImageGrid's 240px single-image box) refuse
+              to shrink below its own content width, ignoring max-w-[72%]/65%
+              entirely — worst in the 300px-wide MiniChatWindow, where a
+              single image then overflows the whole floating window. */}
+          <div data-msg-bubble className="flex flex-col items-end min-w-0 max-w-[72%] sm:max-w-[65%]">
             {forwardedMark}
             {/* Quote sits INSIDE the text bubble (below) when there's a body,
                 tinted to match it; only floats on its own when the reply has
@@ -890,7 +895,10 @@ export function ChatMessageBubble({
         onPick={(emoji) => onToggleReaction?.(message.id, emoji)}
         anchorAlign="start"
       >
-        <div data-msg-bubble className="flex flex-col items-start max-w-[72%] sm:max-w-[65%]">
+        {/* min-w-0: same fix as the "own message" bubble above — without it a
+            fixed-px attachment (image grid, file card, audio player) can
+            overflow past max-w-[72%]/65% instead of being capped by it. */}
+        <div data-msg-bubble className="flex flex-col items-start min-w-0 max-w-[72%] sm:max-w-[65%]">
           {isFirst && (
             <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))] mb-1 ml-1 truncate max-w-full">
               {isAssistant ? <AssistantWordmark /> : senderName}

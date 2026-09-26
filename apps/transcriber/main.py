@@ -108,7 +108,7 @@ def claim_next_job(conn):
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING id, call_id, conversation_id, company_id, recording_id, attempts
+            RETURNING id, call_id, conversation_id, company_id, recording_id, source_kind, attempts
             """,
             {"lease_minutes": LEASE_MINUTES, "worker_id": WORKER_INSTANCE_ID},
         )
@@ -195,6 +195,66 @@ def download_recording_audio(conn, recording_id, workdir: Path) -> Path:
     return audio_wav
 
 
+def download_track_audio(conn, transcript_id, workdir: Path):
+    """V2 (PER_TRACK, spec §2.2/§3.1): descarga el archivo de audio de cada
+    pista READY de esta transcripcion. A diferencia de la grabacion mezclada
+    (un manifest HLS con muchos segmentos .ts), cada pista es un unico
+    objeto (DirectFileOutput via startTrackEgress) — no hay manifest que
+    resolver. Devuelve una lista de dicts {path, speaker_user_id,
+    speaker_guest_id}; una pista individual que falle al descargar/procesar
+    se omite (se loguea) en vez de abortar toda la transcripcion — las demas
+    pistas siguen siendo utiles."""
+    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        cur.execute(
+            "SELECT object_key, speaker_user_id, speaker_guest_id, livekit_identity "
+            "FROM call_transcript_track WHERE transcript_id = %s AND status = 'READY' AND object_key IS NOT NULL",
+            (transcript_id,),
+        )
+        tracks = cur.fetchall()
+    if not tracks:
+        raise PermanentError("No hay pistas de audio listas para esta transcripción.")
+
+    s3 = s3_client()
+    result = []
+    for i, track in enumerate(tracks):
+        raw_path = workdir / f"track_{i}.ogg"
+        try:
+            obj = s3.get_object(Bucket=RECORDING_BUCKET, Key=track["object_key"])
+            with open(raw_path, "wb") as out:
+                out.write(obj["Body"].read())
+        except Exception as error:  # noqa: BLE001
+            print(f"{LOG_PREFIX} No se pudo descargar la pista {track['livekit_identity']} (se omite): {error}", file=sys.stderr)
+            continue
+
+        wav_path = workdir / f"track_{i}.wav"
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", str(raw_path),
+                    "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                    str(wav_path),
+                ],
+                check=True, capture_output=True, timeout=600,
+            )
+        except subprocess.CalledProcessError as error:
+            print(f"{LOG_PREFIX} ffmpeg no pudo procesar la pista {track['livekit_identity']} (se omite): "
+                  f"{error.stderr.decode(errors='replace')[:300]}", file=sys.stderr)
+            continue
+        except subprocess.TimeoutExpired as error:
+            print(f"{LOG_PREFIX} ffmpeg excedió el tiempo límite en la pista {track['livekit_identity']} (se omite): {error}", file=sys.stderr)
+            continue
+
+        result.append({
+            "path": wav_path,
+            "speaker_user_id": track["speaker_user_id"],
+            "speaker_guest_id": track["speaker_guest_id"],
+        })
+
+    if not result:
+        raise TransientError("Ninguna pista de audio se pudo descargar o procesar; se reintentará.")
+    return result
+
+
 _model_cache = {}
 
 
@@ -222,6 +282,38 @@ def transcribe(audio_path: Path):
     return segments, duration_ms, getattr(info, "language", None)
 
 
+def transcribe_tracks(tracks):
+    """V2 (PER_TRACK, spec §2.2): transcribe cada pista por separado y fusiona
+    los segmentos por marca de tiempo absoluta, atribuyendo cada uno a la
+    identidad ya conocida de esa pista — sin ejecutar ningun modelo de
+    diarizacion acustica.
+
+    Simplificacion deliberada: cada pista arranca su propio egress dentro de
+    la MISMA llamada a requestTrackTranscription (el bucle en
+    call-transcript-service.js es sincronico), por lo que sus puntos de
+    inicio quedan lo bastante cerca entre si como para fusionar directamente
+    por start_ms sin un offset de correccion. La correccion fina por
+    CallParticipant.joinedAt/CallGuest.admittedAt que el plan de
+    implementacion menciona como posible refinamiento queda pendiente de
+    validarse contra una llamada real con varios participantes (spec §9
+    riesgo 4) antes de implementarse — no se inventa aqui sin poder medirla."""
+    all_segments = []
+    max_duration_ms = 0
+    detected_language = None
+    for track in tracks:
+        segments, duration_ms, language = transcribe(track["path"])
+        max_duration_ms = max(max_duration_ms, duration_ms)
+        detected_language = detected_language or language
+        for seg in segments:
+            all_segments.append({
+                **seg,
+                "speaker_user_id": track["speaker_user_id"],
+                "speaker_guest_id": track["speaker_guest_id"],
+            })
+    all_segments.sort(key=lambda s: s["start_ms"])
+    return all_segments, max_duration_ms, detected_language
+
+
 def write_result(conn, transcript_id, segments, duration_ms, language):
     """Escritura idempotente y transaccional — spec §5.6: si este trabajo fue
     reclamado dos veces por error (lease vencido de forma espuria), el
@@ -232,9 +324,19 @@ def write_result(conn, transcript_id, segments, duration_ms, language):
         cur.execute("DELETE FROM call_transcript_segment WHERE transcript_id = %s", (transcript_id,))
         if segments:
             cur.executemany(
-                "INSERT INTO call_transcript_segment (transcript_id, start_ms, end_ms, text) "
-                "VALUES (%(transcript_id)s, %(start_ms)s, %(end_ms)s, %(text)s)",
-                [{**seg, "transcript_id": transcript_id} for seg in segments],
+                "INSERT INTO call_transcript_segment "
+                "(transcript_id, start_ms, end_ms, text, speaker_user_id, speaker_guest_id) "
+                "VALUES (%(transcript_id)s, %(start_ms)s, %(end_ms)s, %(text)s, %(speaker_user_id)s, %(speaker_guest_id)s)",
+                [
+                    {
+                        **seg,
+                        "transcript_id": transcript_id,
+                        # MIXED segments (V1) never set these — .get() defaults to NULL.
+                        "speaker_user_id": seg.get("speaker_user_id"),
+                        "speaker_guest_id": seg.get("speaker_guest_id"),
+                    }
+                    for seg in segments
+                ],
             )
         cur.execute(
             "UPDATE call_transcript SET status = 'READY', duration_ms = %s, completed_at = now(), "
@@ -274,8 +376,12 @@ def process_job(conn, job):
     try:
         with tempfile.TemporaryDirectory(prefix=f"transcript-{transcript_id}-") as tmp:
             workdir = Path(tmp)
-            audio_path = download_recording_audio(conn, job["recording_id"], workdir)
-            segments, duration_ms, language = transcribe(audio_path)
+            if job["source_kind"] == "PER_TRACK":
+                tracks = download_track_audio(conn, transcript_id, workdir)
+                segments, duration_ms, language = transcribe_tracks(tracks)
+            else:
+                audio_path = download_recording_audio(conn, job["recording_id"], workdir)
+                segments, duration_ms, language = transcribe(audio_path)
             write_result(conn, transcript_id, segments, duration_ms, language)
             print(f"{LOG_PREFIX} Transcripción {transcript_id} lista — {len(segments)} segmentos, {duration_ms}ms.")
     except TransientError as error:

@@ -3,6 +3,8 @@ import { Button } from "@runly/ui";
 import {
   Camera,
   CameraOff,
+  Captions,
+  CaptionsOff,
   Circle,
   Flashlight,
   FlashlightOff,
@@ -102,6 +104,9 @@ export function CallRoomLayout({ view, actions, chat }) {
     canRecord = false,
     recordingActive = false,
     recordingBusy = false,
+    canTranscribeTracks = false,
+    trackTranscriptionActive = false,
+    trackTranscriptionBusy = false,
   } = view;
 
   const {
@@ -334,6 +339,19 @@ export function CallRoomLayout({ view, actions, chat }) {
             title={recordingActive ? "Detener grabación" : "Grabar llamada"}
           >
             {recordingActive ? <StopCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+          </Button>
+        )}
+        {canTranscribeTracks && (
+          <Button
+            type="button"
+            variant={trackTranscriptionActive ? "destructive" : "secondary"}
+            size="icon"
+            disabled={!engineReady || trackTranscriptionBusy}
+            className="h-11 w-11 rounded-full disabled:opacity-40"
+            onClick={actions.toggleTrackTranscription}
+            title={trackTranscriptionActive ? "Detener transcripción con hablantes" : "Transcribir con identificación de hablantes"}
+          >
+            {trackTranscriptionActive ? <CaptionsOff className="h-5 w-5" /> : <Captions className="h-5 w-5" />}
           </Button>
         )}
         <Button type="button" variant="destructive" size="icon" className="h-11 w-11 rounded-full sm:w-auto sm:px-6" onClick={actions.leave} title="Colgar">
