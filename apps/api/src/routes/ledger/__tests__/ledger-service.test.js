@@ -91,3 +91,34 @@ describe('ledger-service — account access is never implicitly shared', () => {
     assert.equal(row.id, ACCOUNT_ID)
   })
 })
+
+describe('ledger-service — listDisabledTransactions', () => {
+  it('returns only disabled rows for the account, with pagination', async () => {
+    const disabledRow = {
+      id: 'tx-1', account_id: ACCOUNT_ID, company_id: COMPANY_ID, enabled: false,
+      fecha: '2026-01-05', nombre: 'Movimiento eliminado', _total_count: 1,
+    }
+    const prisma = buildPrismaMock(async (strings) => {
+      if (sqlContains(strings, 'enabled = false')) return [disabledRow]
+      return []
+    })
+    const service = createLedgerService({ prisma })
+    const result = await service.listDisabledTransactions({
+      companyId: COMPANY_ID, accountId: ACCOUNT_ID, page: 1, pageSize: 20,
+    })
+    assert.equal(result.data.length, 1)
+    assert.equal(result.data[0].nombre, 'Movimiento eliminado')
+    assert.equal(result.data[0]._total_count, undefined)
+    assert.equal(result.pagination.total, 1)
+  })
+
+  it('returns an empty page when there are no disabled transactions', async () => {
+    const prisma = buildPrismaMock(async () => [])
+    const service = createLedgerService({ prisma })
+    const result = await service.listDisabledTransactions({
+      companyId: COMPANY_ID, accountId: ACCOUNT_ID, page: 1, pageSize: 20,
+    })
+    assert.deepEqual(result.data, [])
+    assert.equal(result.pagination.total, 0)
+  })
+})

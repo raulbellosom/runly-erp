@@ -465,8 +465,41 @@ export function createLedgerService({ prisma }) {
     return row
   }
 
+  async function listDisabledTransactions({ companyId, accountId, page, pageSize, maxPageSize = 500 }) {
+    const pag = normalizePagination({ page, pageSize, maxPageSize })
+    try {
+      const rows = await prisma.$queryRaw`
+        WITH filtered AS (
+          SELECT t.*, tt.code AS tipo_code, tt.name AS tipo_name
+          FROM ledger_transaction t
+          JOIN ledger_account a ON a.id = t.account_id AND a.company_id = ${companyId}::uuid
+          LEFT JOIN ledger_transaction_type tt ON tt.id = t.tipo_id
+          WHERE t.account_id = ${accountId}::uuid
+            AND t.company_id = ${companyId}::uuid
+            AND t.enabled = false
+        ),
+        paged AS (
+          SELECT *, COUNT(*) OVER()::int4 AS _total_count
+          FROM filtered
+          ORDER BY updated_at DESC
+          LIMIT ${pag.pageSize} OFFSET ${pag.offset}
+        )
+        SELECT * FROM paged
+      `
+      const total = rows.length > 0 ? (rows[0]._total_count ?? rows.length) : 0
+      const data = rows.map(({ _total_count, ...r }) => r)
+      return {
+        data,
+        pagination: { page: pag.page, pageSize: pag.pageSize, total: toCount(total) },
+      }
+    } catch (err) {
+      if (isTableNotFoundError(err)) throw new LedgerServiceError('El modulo Ledger no esta instalado.', 503)
+      throw err
+    }
+  }
+
   return {
     listAccounts, getAccount, getAccountUnchecked, createAccount, canReadAccount, canWriteAccount, updateAccount, setAccountEnabled, setAccountGroup,
-    listTransactions, createTransaction, updateTransaction, setTransactionEnabled,
+    listTransactions, createTransaction, updateTransaction, setTransactionEnabled, listDisabledTransactions,
   }
 }
