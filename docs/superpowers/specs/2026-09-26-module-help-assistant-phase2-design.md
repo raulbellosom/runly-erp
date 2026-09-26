@@ -310,6 +310,36 @@ persistencia (§6.1).
    se llama `POST /help/ask`, then la API responde 502 con un mensaje
    legible, sin lanzar una excepción no controlada.
 
+**Verificado: 2026-09-26** (implementación Fase 2 completa)
+
+1. Verificado — `help-assistant-service.test.js` ("ask() returns mode:'ai'
+   with an answer + sources when configured and context exists"), Groq
+   simulado con `groqStub`.
+2. Verificado — `help-assistant-service.test.js` ("ask() returns
+   mode:'fallback' with search results when GROQ_API_KEY is missing") +
+   `help-routes.test.js` ("POST /help/ask with a valid body and no
+   GROQ_API_KEY -> 200 mode:fallback").
+3. Verificado — `help-routes.test.js` ("GET /help/assistant/status without
+   permission -> 403", "POST /help/ask without permission -> 403").
+4. Verificado indirectamente — el servicio recorta `history` a las últimas 6
+   entradas antes de armar los mensajes para Groq (`history.slice(-MAX_HISTORY)`);
+   cubierto por el validador (`helpAskBodySchema` rechaza >6 entradas en el
+   *body*) más lectura de código para el recorte silencioso interno. No hay
+   un test que inspeccione el payload exacto enviado a Groq con >6 entradas
+   ya validadas — riesgo bajo, es una sola línea determinista.
+5. Verificado — `help-assistant-service.test.js` ("ask() enforces the rate
+   limit (20/60s) per actor").
+6. Verificado — `help-assistant-service.test.js` ("ask() maps a persistent
+   Groq 500 to a 502 HelpAssistantServiceError").
+
+Suites completas verificadas en verde el 2026-09-26:
+`apps/api/src/routes/help/__tests__/*.test.js` (18 pass),
+`packages/validators/src/__tests__/*.test.js` (22 pass),
+`packages/sdk/src/__tests__/*.test.js` (39 pass), `pnpm lint` (sin errores),
+`pnpm build` (build completo del monorepo, incluyendo el instalador nativo
+Tauri, verde). Ningún test de esta fase llama a Groq real — `fetchImpl`
+siempre es un stub inyectado.
+
 ## 26. Verification plan
 
 - `node --test apps/api/src/routes/help/__tests__/help-assistant-service.test.js`
