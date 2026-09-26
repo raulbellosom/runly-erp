@@ -5,7 +5,8 @@
 // CLAUDE.md already asks for elsewhere (e.g. chat-message-send-service.js
 // next to chat-service.js).
 import { signAiProof, verifyAiProof, AiProofTokenError } from "../../lib/ai-proof-token.js";
-import { isReasoningModel } from "../../services/groq-model-helpers.js";
+import { createAiRouter } from "../../services/ai/ai-router.js";
+import { isLocalEnabled } from "../../services/ai/ai-providers.js";
 import {
   resolveAvailableProposalModules,
   buildModulePromptAdditions,
@@ -78,51 +79,26 @@ export function createCallTranscriptAnalysisService({
   logAudit = null,
 }) {
   async function callGroq(transcriptText, referenceDateIso, moduleAdditions) {
-    const apiKey = env.GROQ_API_KEY;
-    if (!apiKey) throw new CallTranscriptAnalysisError("Analisis con IA no configurado (falta GROQ_API_KEY).", 503);
-    const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
-    const model = env.CHAT_TRANSCRIPT_ANALYSIS_MODEL || env.CHAT_MIRAI_MODEL || "openai/gpt-oss-120b";
-    const fetchFn = fetchImpl ?? globalThis.fetch;
-    const body = {
-      model,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2000,
-      ...(isReasoningModel(model) ? { reasoning_format: "hidden", reasoning_effort: "low" } : {}),
-      messages: [
-        { role: "system", content: buildSystemPrompt(referenceDateIso, moduleAdditions) },
-        { role: "user", content: transcriptText.slice(0, 60000) },
-      ],
-    };
-    let lastErr;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
-      let res;
-      try {
-        res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify(body),
-        });
-      } catch (err) {
-        lastErr = new CallTranscriptAnalysisError(`No se pudo contactar al servicio de IA: ${err.message}`, 502);
-        continue;
-      }
-      if (res.status === 429 || res.status >= 500) {
-        lastErr = new CallTranscriptAnalysisError(`El servicio de IA respondio ${res.status}.`, 502);
-        continue;
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new CallTranscriptAnalysisError(`El servicio de IA rechazo la peticion (${res.status}): ${detail.slice(0, 300)}`);
-      }
-      const payload = await res.json();
-      const content = payload?.choices?.[0]?.message?.content;
-      const obj = extractJsonObject(content);
-      if (!obj) throw new CallTranscriptAnalysisError("El servicio de IA no devolvio un JSON legible.");
-      return { obj, model: payload.model ?? model };
+    if (!env.GROQ_API_KEY && !isLocalEnabled(env)) {
+      throw new CallTranscriptAnalysisError("Analisis con IA no configurado (falta GROQ_API_KEY).", 503);
     }
-    throw lastErr ?? new CallTranscriptAnalysisError("El servicio de IA no respondio.", 502);
+    const aiRouter = createAiRouter({ env, fetchImpl });
+    const messages = [
+      { role: "system", content: buildSystemPrompt(referenceDateIso, moduleAdditions) },
+      { role: "user", content: transcriptText.slice(0, 60000) },
+    ];
+    let result;
+    try {
+      result = await aiRouter.runTask({
+        task: "transcript_analysis", messages, jsonMode: true, reasoningEffort: "low", useMaxCompletionTokens: true, maxTokens: 2000,
+        validateResponse: (msg) => Boolean(extractJsonObject(msg?.content)),
+      });
+    } catch (err) {
+      throw new CallTranscriptAnalysisError(err.message ?? "El servicio de IA no respondio.", 502);
+    }
+    const obj = extractJsonObject(result.message?.content);
+    if (!obj) throw new CallTranscriptAnalysisError("El servicio de IA no devolvio un JSON legible.");
+    return { obj, model: result.model };
   }
 
   function normalizeDraft(obj) {
