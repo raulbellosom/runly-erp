@@ -51,9 +51,9 @@ describe('help-assistant-service', () => {
     assert.equal(result.sources[0].moduleKey, 'custom.fleet')
   })
 
-  it('ask() short-circuits to a "no encontre informacion" answer without calling Groq when there is no context', async () => {
+  it('ask() still calls Groq (general-knowledge answer) when there is no matching Runly documentation', async () => {
     let called = false
-    const fetchImpl = async () => { called = true; return groqStub([])() }
+    const fetchImpl = async (...args) => { called = true; return groqStub([finalMsg('En general, en un ERP esto se hace asi...')])(...args) }
     const service = createHelpAssistantService({
       helpService: makeHelpServiceStub({ search: [] }),
       env: { GROQ_API_KEY: 'x' },
@@ -61,8 +61,9 @@ describe('help-assistant-service', () => {
     })
     const result = await service.ask({ actorId: 'a1', path: '/unknown', question: 'algo que no existe' })
     assert.equal(result.mode, 'ai')
-    assert.match(result.answer, /no encontre/i)
-    assert.equal(called, false)
+    assert.equal(result.answer, 'En general, en un ERP esto se hace asi...')
+    assert.deepEqual(result.sources, [])
+    assert.equal(called, true)
   })
 
   it('ask() enforces the rate limit (20/60s) per actor', async () => {
