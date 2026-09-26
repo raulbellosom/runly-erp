@@ -101,20 +101,19 @@ function createGroqAdapter({ env, fetchImpl }) {
         ],
       },
     ];
-    let payload;
+    let result;
     try {
-      const result = await aiRouter.runTask({ task: "pfm_vision", model, messages, jsonMode: true, reasoningEffort: "low", useMaxCompletionTokens: true, maxTokens: maxTokens || DEFAULT_MAX_TOKENS, timeoutMs, retryDelayMs });
-      payload = { model: result.model, choices: [{ message: result.message }] };
+      result = await aiRouter.runTask({ task: "pfm_vision", model, messages, jsonMode: true, reasoningEffort: "low", useMaxCompletionTokens: true, maxTokens: maxTokens || DEFAULT_MAX_TOKENS, timeoutMs, retryDelayMs });
     } catch (err) {
       throw new VisionServiceError(err.message ?? "El servicio de vision no respondio.");
     }
-    const content = payload?.choices?.[0]?.message?.content;
+    const content = result.message?.content;
     const obj = extractJsonObject(content);
     if (!obj) {
-      if (allowTextFallback && typeof content === 'string' && content.trim()) return { parsed: { rawText: content.trim().slice(0, 8000), observations: [], warnings: ['La IA devolvió una respuesta sin campos estructurados. Se muestra el texto recibido para revisión manual.'] }, model: payload.model ?? model };
+      if (allowTextFallback && typeof content === 'string' && content.trim()) return { parsed: { rawText: content.trim().slice(0, 8000), observations: [], warnings: ['La IA devolvió una respuesta sin campos estructurados. Se muestra el texto recibido para revisión manual.'] }, model: result.model ?? model };
       throw new VisionServiceError("El servicio de vision no devolvio un JSON legible.");
     }
-    return { parsed: normalize(obj), rawResponse: payload, model: payload.model ?? model };
+    return { parsed: normalize(obj), rawResponse: result, model: result.model ?? model };
   }
 
   // Generic image description for the MirAI chat assistant. Same Groq
