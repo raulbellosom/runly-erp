@@ -46,6 +46,20 @@ describe('ai-client chatComplete', () => {
     assert.equal(seenBody.reasoning_format, 'hidden')
   })
 
+  it('does not set reasoning_effort unless explicitly requested, even for a reasoning model', async () => {
+    let seenBody
+    const fetchImpl = async (url, opts) => { seenBody = JSON.parse(opts.body); return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) } }
+    await chatComplete(baseArgs({ model: 'qwen/qwen3.8-27b', fetchImpl }))
+    assert.equal('reasoning_effort' in seenBody, false)
+  })
+
+  it('sets reasoning_effort when explicitly requested for a reasoning model', async () => {
+    let seenBody
+    const fetchImpl = async (url, opts) => { seenBody = JSON.parse(opts.body); return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) } }
+    await chatComplete(baseArgs({ model: 'qwen/qwen3.8-27b', reasoningEffort: 'low', fetchImpl }))
+    assert.equal(seenBody.reasoning_effort, 'low')
+  })
+
   it('sets response_format json_object when jsonMode is true', async () => {
     let seenBody
     const fetchImpl = async (url, opts) => { seenBody = JSON.parse(opts.body); return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '{}' } }] }) } }

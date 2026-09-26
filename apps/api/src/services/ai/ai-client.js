@@ -3,11 +3,15 @@
 // Generic OpenAI-compatible chat-completions transport, shared by every AI
 // task in Runly. Groq and local Ollama speak the same wire format, so one
 // function handles both — the caller (ai-router.js) supplies baseUrl/apiPath/
-// apiKey per provider. Retries once on 429/5xx or a network error; throws
-// AiClientError otherwise. Domain error classes (ChatServiceError,
-// PfmServiceError, VisionServiceError, ...) are NOT thrown here — each
-// service's own callGroq*-style wrapper translates AiClientError into its
-// own error type, exactly as it did with the raw fetch it replaces.
+// apiKey per provider. It consolidates the retry/transport pattern common to
+// all 6 services it unifies; `reasoning_effort` is an explicit per-caller
+// opt-in (via the `reasoningEffort` param) that preserves each service's own
+// prior behavior, rather than being extracted verbatim from any single one.
+// Retries once on 429/5xx or a network error; throws AiClientError
+// otherwise. Domain error classes (ChatServiceError, PfmServiceError,
+// VisionServiceError, ...) are NOT thrown here — each service's own
+// callGroq*-style wrapper translates AiClientError into its own error type,
+// exactly as it did with the raw fetch it replaces.
 import { isReasoningModel } from "../groq-model-helpers.js";
 
 const DEFAULT_TIMEOUT_MS = 25_000;
@@ -35,6 +39,7 @@ export async function chatComplete({
   temperature = 0.2,
   maxTokens = 1000,
   jsonMode = false,
+  reasoningEffort,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retryDelayMs = DEFAULT_RETRY_DELAY_MS,
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
@@ -48,7 +53,7 @@ export async function chatComplete({
     max_tokens: maxTokens,
     ...(tools ? { tools, tool_choice: toolChoice ?? "auto" } : {}),
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
-    ...(isReasoningModel(model) ? { reasoning_format: "hidden", reasoning_effort: "low" } : {}),
+    ...(isReasoningModel(model) ? { reasoning_format: "hidden", ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}) } : {}),
     messages,
   };
   let lastErr;
