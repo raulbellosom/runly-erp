@@ -1,10 +1,10 @@
 import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, EyeOff, Tag, ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from 'lucide-react'
+import { Plus, Pencil, EyeOff, Eye, RotateCcw, Tag, ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from 'lucide-react'
 import {
   PageHeader, Badge, Button, EmptyState, ErrorState, ConfirmDialog, Card,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -52,8 +52,15 @@ export default function CategoriesScreen() {
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deactivateTarget, setDeactivateTarget] = useState(null)
+  const [showDisabled, setShowDisabled] = useState(false)
 
   const { data, isLoading, isError, refetch } = useLedgerCategories()
+
+  const { data: disabledData, isLoading: disabledLoading } = useQuery({
+    queryKey: ['ledger-categories-disabled', token],
+    queryFn: () => apiRequest('GET', '/ledger/categories?includeDisabled=true', token),
+    enabled: showDisabled && !!token,
+  })
 
   const form = useForm({
     resolver: zodResolver(categorySchema),
@@ -91,9 +98,18 @@ export default function CategoriesScreen() {
     },
   })
 
+  const restoreMutation = useMutation({
+    mutationFn: (categoryId) => apiRequest('PATCH', `/ledger/categories/${categoryId}/enabled`, token, { enabled: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ledger-categories'] })
+      queryClient.invalidateQueries({ queryKey: ['ledger-categories-disabled'] })
+    },
+  })
+
   const categories = data?.data ?? []
   const system = categories.filter(c => c.is_system)
   const personal = categories.filter(c => !c.is_system)
+  const disabledCategories = (disabledData?.data ?? []).filter(c => !c.enabled)
 
   function renderRows(rows, showActions) {
     return rows.map(cat => (
@@ -140,6 +156,39 @@ export default function CategoriesScreen() {
     ))
   }
 
+  function renderDisabledRows(rows) {
+    return rows.map(cat => (
+      <tr key={cat.id} className="border-b border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--muted)/0.3)] transition-colors opacity-70">
+        <td className="px-4 py-3">
+          <span className="flex items-center gap-3">
+            <span
+              className="inline-block h-6 w-6 shrink-0 rounded-lg border border-[hsl(var(--border)/0.5)] shadow-sm"
+              style={{ backgroundColor: cat.color ?? '#94a3b8' }}
+            />
+            <span className="font-medium text-sm">{cat.name}</span>
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <Badge variant={KIND_BADGE_VARIANT[cat.kind] ?? 'secondary'}>
+            {KIND_OPTIONS.find(o => o.value === cat.kind)?.label ?? cat.kind}
+          </Badge>
+        </td>
+        <td className="px-4 py-3 text-right">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={() => restoreMutation.mutate(cat.id)}
+            disabled={restoreMutation.isPending}
+          >
+            <RotateCcw size={13} className="mr-1" />
+            Restaurar
+          </Button>
+        </td>
+      </tr>
+    ))
+  }
+
   return (
     <div className="p-4 md:p-6 min-h-dvh">
       <PageHeader
@@ -147,10 +196,16 @@ export default function CategoriesScreen() {
         title="Categorias"
         description="Agrupa movimientos por naturaleza. Las categorias de sistema son visibles para todos; las personales solo para ti."
         actions={
-          <Button onClick={openCreate} disabled={!canEdit}>
-            <Plus size={15} className="mr-1.5" />
-            Nueva categoria
-          </Button>
+          <span className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowDisabled((v) => !v)}>
+              {showDisabled ? <EyeOff size={15} className="mr-1.5" /> : <Eye size={15} className="mr-1.5" />}
+              {showDisabled ? 'Ocultar desactivadas' : 'Mostrar desactivadas'}
+            </Button>
+            <Button onClick={openCreate} disabled={!canEdit}>
+              <Plus size={15} className="mr-1.5" />
+              Nueva categoria
+            </Button>
+          </span>
         }
       />
 
@@ -225,6 +280,37 @@ export default function CategoriesScreen() {
             </tbody>
           </table>
         </Card>
+      )}
+
+      {showDisabled && !disabledLoading && disabledCategories.length > 0 && (
+        <Card variant="solid" className="rounded-xl mt-4 p-0 overflow-hidden">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Nombre</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Tipo</th>
+                <th className="px-4 py-2.5 w-48" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-[hsl(var(--muted)/0.4)]">
+                <td colSpan={3} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                  Desactivadas
+                </td>
+              </tr>
+              {renderDisabledRows(disabledCategories)}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {showDisabled && !disabledLoading && disabledCategories.length === 0 && (
+        <EmptyState
+          className="mt-4"
+          icon={EyeOff}
+          title="Sin categorias desactivadas"
+          description="Las categorias personales que desactives aparecerán aquí."
+        />
       )}
 
       {/* Create / Edit dialog */}
