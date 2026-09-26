@@ -41,6 +41,7 @@ import { verifySupabaseJwt } from "./services/jwt-verification.js";
 import { createCompanyRouter } from "./routes/company-routes.js";
 import { createContactsRouter } from "./routes/contacts-routes.js";
 import { createHrRouter } from "./routes/hr-routes.js";
+import { createHelpRouter } from "./routes/help/help-routes.js";
 import { createIdentityRouter } from "./routes/identity/index.js";
 import { createInventoryService, InventoryServiceError } from "./services/inventory-service.js";
 import { createInventoryNotificationService } from "./services/inventory-notification-service.js";
@@ -272,7 +273,7 @@ async function authMiddleware(c, next) {
 }
 
 const ADMIN_ROLE_KEYS = new Set(["runly.admin", "system.admin"]);
-const BASE_PERMISSION_KEYS = new Set(["profile.self.read"]);
+const BASE_PERMISSION_KEYS = new Set(["profile.self.read", "runly.help.read"]);
 
 const _userContextInFlight = new Map();
 
@@ -2190,6 +2191,7 @@ function mountWithAuth(baseApp, router) {
 mountWithAuth(app, createCompanyRouter({ prisma, supabaseAdmin, requirePermission, cacheDel }));
 mountWithAuth(app, createContactsRouter({ prisma, requirePermission }));
 mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }));
+mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));
 mountWithAuth(app, createIdentityRouter({
   prisma,
   supabaseAdmin,

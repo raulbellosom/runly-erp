@@ -128,6 +128,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "core",
     order: 30,
   },
+  "runly.help.read": {
+    displayNameEs: "Ver ayuda del sistema",
+    descriptionEs: "Permite consultar la ayuda y documentacion de los modulos instalados.",
+    groupKey: "core",
+    order: 15,
+  },
   "core.modules.read": {
     displayNameEs: "Ver catalogo de modulos de core",
     descriptionEs: "Permite consultar el catalogo administrativo de modulos.",
