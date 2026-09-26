@@ -249,11 +249,24 @@ vivo: la pantalla de inicio del shell — `/home` — no pertenece a la
 navegación de ningún módulo, así que mostraba "sin ayuda" incluso
 teniéndola disponible en general): si `path` no matchea ningún
 `navigation[].path` de ningún módulo, el owner cae por defecto a
-`runly.core` (siempre instalado) y se devuelve su `overview` como
-orientación general — nunca `view`. Sólo se devuelve
+`runly.core` (siempre instalado). Sólo se devuelve
 `{ moduleKey: null, overview: null, view: null }` en el caso extremo de que
 ni siquiera `runly.core` esté instalado (no debería ocurrir en una
 instancia real).
+
+**Refinado 2026-09-26** (segundo feedback del usuario: ver "Runly Core" como
+encabezado en la pantalla de inicio del shell se sentía incorrecto — esa
+pantalla no es realmente "parte de" Runly Core desde la perspectiva del
+usuario, aunque técnicamente caiga ahí por el fallback de arriba): el
+fallback ya no se limita a devolver el `overview` genérico del módulo — usa
+el mismo matching de `view` que un módulo real (contra `viewKey`
+traducido con `toModuleApiPath`), así que un módulo puede declarar contenido
+propio para una pantalla que no está en su navegación (ver
+`runly.core/views/inicio.md`, `viewKey: /app/home`). Cuando ese `view`
+existe, se devuelve solo ese (más específico) y se omite el `overview`
+genérico — mostrar ambos sería redundante en una pantalla de bienvenida. Si
+no hay `view` propio para esa ruta (un path realmente desconocido), se sigue
+devolviendo el `overview` genérico como antes.
 
 ### GET /help/search?q=<query>
 
