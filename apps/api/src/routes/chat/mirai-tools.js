@@ -10,6 +10,7 @@
 // search_runly (ERP reach, Fase A) reuses the global-search providers, gated
 // per provider by the caller's own permissions.
 import { SEARCH_PROVIDERS } from "../../services/search-providers.js";
+import { createHelpService } from "../../services/help-service.js";
 import {
   resolveActiveMembership,
   computeScopedPermissions,
@@ -113,6 +114,18 @@ export const TOOL_DEFS = [
   {
     type: "function",
     function: {
+      name: "search_module_help",
+      description: "Busca en la documentacion de ayuda de los modulos de Runly (que es cada modulo, para que sirve, como se usa cada pantalla, limites y alcances). Usalo cuando el usuario pregunta como funciona el ERP o un modulo especifico. NO uses esto para datos de negocio (contactos, inventario, cuentas, etc.) — para eso estan search_runly/search_inventory/list_bank_accounts.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "Palabras clave sobre que modulo o funcionalidad quiere entender el usuario." } },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "search_inventory",
       description: "Busca activos/equipos del inventario de la empresa por nombre, etiqueta o numero de serie. Ej: 'cuantas laptops hay', 'donde esta el activo ABC-123'.",
       parameters: {
@@ -202,6 +215,7 @@ export function buildToolRunners({
     cacheSet,
     ttlSeconds: TTL.PERMISSIONS,
   });
+  const helpService = createHelpService({ prisma });
 
   // Resolve the caller's RBAC context, SCOPED TO ctx.companyId (the caller's
   // validated active company, sourced from c.get("companyId") upstream in
@@ -384,6 +398,20 @@ export function buildToolRunners({
     return groups.length ? { groups } : { note: "Sin resultados en contactos, usuarios ni empleados." };
   }
 
+  async function search_module_help(args) {
+    const q = String(args?.query ?? "").trim();
+    if (q.length < 2) return { error: "Da al menos 2 caracteres para buscar en la ayuda." };
+    const results = await helpService.searchHelp(q);
+    if (!results.length) return { note: "No encontre ayuda sobre eso en la documentacion de los modulos." };
+    return {
+      resultados: results.slice(0, 5).map((r) => ({
+        modulo: r.moduleName,
+        titulo: r.title,
+        fragmento: r.snippet,
+      })),
+    };
+  }
+
   async function search_inventory(args, ctx) {
     if (!inventoryService?.listItems) return { error: "El modulo de inventario no esta disponible." };
     const c = await erpContext(ctx, "inventory.item.read");
@@ -541,7 +569,7 @@ export function buildToolRunners({
 
   return {
     get_recent_messages, get_conversation_messages, search_my_conversations,
-    list_conversation_files, describe_image, search_runly,
+    list_conversation_files, describe_image, search_runly, search_module_help,
     search_inventory, list_bank_accounts, list_my_calendar, list_my_tasks,
     list_call_transcripts, get_call_transcript,
   };

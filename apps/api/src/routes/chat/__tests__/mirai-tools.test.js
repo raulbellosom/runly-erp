@@ -23,7 +23,7 @@ test("TOOL_DEFS lists every read tool with JSON schemas", () => {
   assert.deepEqual(names, [
     "describe_image", "get_call_transcript", "get_conversation_messages", "get_recent_messages",
     "list_bank_accounts", "list_call_transcripts", "list_conversation_files", "list_my_calendar",
-    "list_my_tasks", "search_inventory", "search_my_conversations", "search_runly",
+    "list_my_tasks", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
   ]);
   for (const t of TOOL_DEFS) assert.equal(t.type, "function");
 });
@@ -135,6 +135,44 @@ test("search_runly: caller with no search permission is refused", async () => {
   const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext });
   const out = await runners.search_runly({ query: "Juan" }, { actorAuthUserId: "a", companyId: "co1" });
   assert.match(out.error, /permiso/i);
+});
+
+function helpPrismaStub(rows) {
+  return {
+    blueprint: {
+      findMany: async ({ where }) => rows.filter((r) => {
+        if (where?.kind && r.kind !== where.kind) return false
+        if (where?.enabled !== undefined && r.enabled !== where.enabled) return false
+        return true
+      }),
+    },
+    runlyModule: { findMany: async () => [], findFirst: async () => null },
+  };
+}
+
+test("search_module_help: searches the Fase 1 help bank and maps rows to the safe shape", async () => {
+  const rows = [{
+    kind: "HELP", enabled: true,
+    module: { key: "runly.core", name: "Runly Core", status: "INSTALLED", enabled: true },
+    schema: { scope: "module", viewKey: null, title: "Runly Core", summary: "Nucleo del sistema.", content: "Administra modulos y configuracion." },
+  }];
+  const runners = buildToolRunners({ prisma: helpPrismaStub(rows), listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x" });
+  const out = await runners.search_module_help({ query: "modulos" });
+  assert.equal(out.resultados.length, 1);
+  assert.equal(out.resultados[0].modulo, "Runly Core");
+  assert.equal(out.resultados[0].titulo, "Runly Core");
+});
+
+test("search_module_help: rejects a 1-char query", async () => {
+  const runners = buildToolRunners({ prisma: helpPrismaStub([]), listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x" });
+  const out = await runners.search_module_help({ query: "a" });
+  assert.match(out.error, /2 caracteres/i);
+});
+
+test("search_module_help: returns a note when nothing matches", async () => {
+  const runners = buildToolRunners({ prisma: helpPrismaStub([]), listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x" });
+  const out = await runners.search_module_help({ query: "algo que no existe" });
+  assert.match(out.note, /no encontre/i);
 });
 
 test("get_recent_messages trims rows to the safe shape", async () => {
