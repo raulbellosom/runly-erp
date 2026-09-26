@@ -69,6 +69,14 @@ describe('ai-router resolution rules', () => {
     assert.equal(seenBody.reasoning_effort, 'low')
   })
 
+  it('forwards useMaxCompletionTokens through to chatComplete unchanged', async () => {
+    let seenBody
+    const fetchImpl = async (url, opts) => { seenBody = JSON.parse(opts.body); return groqOk('ok')(url) }
+    const router = createAiRouter({ env: { GROQ_API_KEY: 'gk' }, fetchImpl })
+    await router.runTask({ task: 'ledger_import_text', messages: [{ role: 'user', content: 'x' }], maxTokens: 900, useMaxCompletionTokens: true })
+    assert.equal(seenBody.max_completion_tokens, 900)
+  })
+
   it('unknown task throws synchronously', async () => {
     const router = createAiRouter({ env: {} })
     await assert.rejects(() => router.runTask({ task: 'not_a_real_task', messages: [] }), /Tarea de IA desconocida/)

@@ -67,6 +67,22 @@ describe('ai-client chatComplete', () => {
     assert.deepEqual(seenBody.response_format, { type: 'json_object' })
   })
 
+  it('sends max_tokens by default (useMaxCompletionTokens not set)', async () => {
+    let seenBody
+    const fetchImpl = async (url, opts) => { seenBody = JSON.parse(opts.body); return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) } }
+    await chatComplete(baseArgs({ maxTokens: 900, fetchImpl }))
+    assert.equal(seenBody.max_tokens, 900)
+    assert.equal('max_completion_tokens' in seenBody, false)
+  })
+
+  it('sends max_completion_tokens instead when useMaxCompletionTokens is true', async () => {
+    let seenBody
+    const fetchImpl = async (url, opts) => { seenBody = JSON.parse(opts.body); return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) } }
+    await chatComplete(baseArgs({ maxTokens: 900, useMaxCompletionTokens: true, fetchImpl }))
+    assert.equal(seenBody.max_completion_tokens, 900)
+    assert.equal('max_tokens' in seenBody, false)
+  })
+
   it('retries once on a network error, then succeeds', async () => {
     let attempts = 0
     const fetchImpl = async () => {

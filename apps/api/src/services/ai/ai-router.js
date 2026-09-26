@@ -59,11 +59,11 @@ export function createAiRouter({ env = process.env, fetchImpl } = {}) {
   }
 
   async function runTask({
-    task, model, messages, tools, toolChoice, temperature, maxTokens, jsonMode, reasoningEffort,
+    task, model, messages, tools, toolChoice, temperature, maxTokens, jsonMode, useMaxCompletionTokens, reasoningEffort,
     timeoutMs, retryDelayMs, maxAttempts, respectRateLimit, validateResponse,
   }) {
     const resolved = resolve({ task, explicitModel: model });
-    const shared = { messages, tools, toolChoice, temperature, maxTokens, jsonMode, reasoningEffort, timeoutMs, retryDelayMs, maxAttempts, respectRateLimit, fetchImpl };
+    const shared = { messages, tools, toolChoice, temperature, maxTokens, jsonMode, useMaxCompletionTokens, reasoningEffort, timeoutMs, retryDelayMs, maxAttempts, respectRateLimit, fetchImpl };
 
     if (resolved.provider !== "ollama") {
       return chatComplete({ ...resolved, ...shared });

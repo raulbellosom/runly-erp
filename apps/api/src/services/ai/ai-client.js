@@ -39,6 +39,7 @@ export async function chatComplete({
   temperature = 0.2,
   maxTokens = 1000,
   jsonMode = false,
+  useMaxCompletionTokens = false,
   reasoningEffort,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retryDelayMs = DEFAULT_RETRY_DELAY_MS,
@@ -50,7 +51,7 @@ export async function chatComplete({
   const body = {
     model,
     temperature,
-    max_tokens: maxTokens,
+    [useMaxCompletionTokens ? "max_completion_tokens" : "max_tokens"]: maxTokens,
     ...(tools ? { tools, tool_choice: toolChoice ?? "auto" } : {}),
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     ...(isReasoningModel(model) ? { reasoning_format: "hidden", ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}) } : {}),
