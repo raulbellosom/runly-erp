@@ -484,7 +484,7 @@ export const companyMap = createModuleManifest({
 export const runlyLedgerManifest = createModuleManifest({
   key: "runly.ledger",
   name: "Libro de cuentas",
-  version: "0.1.3",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -577,6 +577,7 @@ export const runlyLedgerManifest = createModuleManifest({
         table: { columns: ["fecha", "nombre", "referencia", "deposito", "retiro"] },
       },
     },
+    ...loadHelpBlueprints("runly.ledger", path.join(HELP_DIR, "runly.ledger")),
   ],
   navigation: [
     {
@@ -620,7 +621,7 @@ export const runlyLedgerManifest = createModuleManifest({
 export const runlyFleetManifest = createModuleManifest({
   key: "runly.fleet",
   name: "Flota",
-  version: "0.5.1",
+  version: "0.6.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -828,6 +829,7 @@ export const runlyFleetManifest = createModuleManifest({
         table: { columns: ["firstName", "lastName", "phone", "licenseNumber", "status"] },
       },
     },
+    ...loadHelpBlueprints("runly.fleet", path.join(HELP_DIR, "runly.fleet")),
   ],
   navigation: [
     {
@@ -912,7 +914,7 @@ export const runlyCalendarManifest = createModuleManifest({
   name: "Calendario",
   description:
     "Calendario personal y compartido con eventos, recordatorios y vistas por dia, semana y mes.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -965,13 +967,16 @@ export const runlyCalendarManifest = createModuleManifest({
     "calendar.getEvents": "function",
   },
   consumes: ["runly.files"],
+  blueprints: [
+    ...loadHelpBlueprints("runly.calendar", path.join(HELP_DIR, "runly.calendar")),
+  ],
 });
 
 export const runlyCatalogManifest = createModuleManifest({
   key: "runly.catalog",
   name: "Catalogo",
   description: "Gestiona productos, categorias, variantes e inventario",
-  version: "2.1.0",
+  version: "2.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -1110,6 +1115,7 @@ export const runlyCatalogManifest = createModuleManifest({
         table: { columns: ["name", "slug", "description"] },
       },
     },
+    ...loadHelpBlueprints("runly.catalog", path.join(HELP_DIR, "runly.catalog")),
   ],
 });
 
@@ -1117,7 +1123,7 @@ export const runlyPosManifest = createModuleManifest({
   key: "runly.pos",
   name: "POS",
   description: "Punto de venta para restaurante, tienda y operaciones hibridas.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -1292,7 +1298,9 @@ export const runlyPosManifest = createModuleManifest({
       permissionKey: "pos.admin.read",
     },
   ],
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.pos", path.join(HELP_DIR, "runly.pos")),
+  ],
   consumes: ["runly.files", "runly.ledger", "runly.notifications"],
   exposes: [],
 });
@@ -1302,7 +1310,7 @@ export const inventoryMap = createModuleManifest({
   key: 'runly.inventory',
   name: 'Inventario',
   description: 'Gestion de inventario y activos de la empresa',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -1368,7 +1376,9 @@ export const inventoryMap = createModuleManifest({
       'inventory.customfield.manage': 'inventory.customfield.manage',
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.inventory", path.join(HELP_DIR, "runly.inventory")),
+  ],
   exposes: [],
   consumes: [],
 });
@@ -1376,7 +1386,7 @@ export const inventoryMap = createModuleManifest({
 export const notesMap = createModuleManifest({
   key: 'runly.notes',
   name: 'Notas',
-  version: '0.1.0',
+  version: '0.2.0',
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -1419,12 +1429,15 @@ export const notesMap = createModuleManifest({
     { key: 'notes.shares.update', name: 'Editar acceso compartido', description: 'Puede cambiar permisos de notas compartidas' },
     { key: 'notes.shares.delete', name: 'Revocar acceso compartido', description: 'Puede revocar el acceso a notas compartidas' },
   ],
+  blueprints: [
+    ...loadHelpBlueprints('runly.notes', path.join(HELP_DIR, 'runly.notes')),
+  ],
 });
 
 export const runlyPfmManifest = createModuleManifest({
   key: "runly.pfm",
   name: "Finanzas personales",
-  version: "0.5.0",
+  version: "0.6.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -1530,7 +1543,9 @@ export const runlyPfmManifest = createModuleManifest({
       "pfm.assistant.use": "pfm.assistant.use",
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints("runly.pfm", path.join(HELP_DIR, "runly.pfm")),
+  ],
   exposes: {},
   consumes: {},
 });
