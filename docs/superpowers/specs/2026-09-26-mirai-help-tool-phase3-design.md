@@ -152,3 +152,20 @@ chat.
 - `node --test apps/api/src/routes/chat/__tests__/mirai-tools.test.js`
   (todos los tests del archivo, no sólo los nuevos).
 - `pnpm lint`, `pnpm build`.
+
+**Verificado: 2026-09-26** (implementación completa)
+
+1. Verificado — `mirai-tools.test.js` ("search_module_help: searches the
+   Fase 1 help bank and maps rows to the safe shape").
+2. Verificado — `mirai-tools.test.js` ("search_module_help: rejects a
+   1-char query").
+3. Verificado — `mirai-tools.test.js` ("search_module_help: returns a note
+   when nothing matches").
+4. Verificado — `mirai-tools.test.js` ("TOOL_DEFS lists every read tool
+   with JSON schemas") actualizado a 13 nombres, en verde.
+
+Suite completa `mirai-tools.test.js`: 21/21 pass. Suite ampliada
+`mirai-*.test.js` (todos los archivos de test relacionados con MirAI, para
+confirmar cero regresión por el import nuevo): 91/91 pass. `pnpm lint` sin
+errores. `pnpm build` completo del monorepo (incluyendo el instalador nativo
+Tauri) verde.
