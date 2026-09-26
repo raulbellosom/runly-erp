@@ -1351,3 +1351,12 @@ export * from './chat.js';
 export * from './calls.js';
 export * from './notes.js';
 export * from './support.js';
+
+// Module help system (docs/superpowers/specs/2026-09-26-module-help-system-design.md)
+export const helpSearchQuerySchema = z.object({
+  q: z.string().min(2).max(200),
+});
+
+export const helpResolvePathQuerySchema = z.object({
+  path: z.string().min(1).max(500),
+});
