@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, ChevronDown, X, Download } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "../lib/utils.js";
+import { Badge } from "./Badge.jsx";
 import {
   FleetVehicleIcon,
   resolveModuleIcon,
@@ -32,6 +33,7 @@ export function ModuleSidebar({
   contained = false,
   sidebarSlot = null,
   editionName = "Jaguar",
+  navBadges = {},
 }) {
   if (!module) return null;
 
@@ -254,6 +256,14 @@ export function ModuleSidebar({
                 >
                   {item.label}
                 </span>
+                {navBadges[item.fullPath] > 0 && !collapsed && (
+                  <Badge
+                    variant="destructive"
+                    className="ml-auto shrink-0 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] leading-none"
+                  >
+                    {navBadges[item.fullPath]}
+                  </Badge>
+                )}
               </a>
             );
           }
@@ -359,6 +369,14 @@ export function ModuleSidebar({
                             }}
                           />
                           <span className="truncate">{child.label}</span>
+                          {navBadges[child.fullPath] > 0 && (
+                            <Badge
+                              variant="destructive"
+                              className="ml-auto shrink-0 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] leading-none"
+                            >
+                              {navBadges[child.fullPath]}
+                            </Badge>
+                          )}
                         </a>
                       );
                     })}
