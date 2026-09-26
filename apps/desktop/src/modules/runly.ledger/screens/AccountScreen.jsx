@@ -384,7 +384,7 @@ export default function AccountScreen() {
                     navigate(`/app/m/runly.ledger/accounts/${accountId}/import`)
                   }
                 >
-                  <FileSpreadsheet size={13} className="mr-2" /> Importar CSV manual
+                  <FileSpreadsheet size={13} className="mr-2" /> Importar movimientos (CSV/XLSX)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
