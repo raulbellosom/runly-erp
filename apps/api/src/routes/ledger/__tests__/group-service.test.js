@@ -138,6 +138,41 @@ describe('group-service', () => {
     assert.deepEqual(result, { ok: true })
   })
 
+  it('inviteMember creates a pending membership, not an immediately active one', async () => {
+    const groupRow = {
+      id: GROUP_ID,
+      name: 'Grupo Test',
+      company_id: COMPANY_ID,
+      created_by: OTHER_ID,
+      role: 'admin',
+      status: 'active',
+    }
+    let insertStrings = null
+
+    const prisma = buildPrismaMock(async (strings, ...values) => {
+      if (sqlContains(strings, 'from ledger_group g')) return [groupRow]
+      if (sqlContains(strings, 'display_name')) return [{ display_name: 'Test Actor' }]
+      if (sqlContains(strings, 'insert into ledger_group_member')) {
+        insertStrings = strings
+        return []
+      }
+      return []
+    })
+
+    const service = createGroupService({ prisma })
+    await service.inviteMember({
+      companyId: COMPANY_ID,
+      groupId: GROUP_ID,
+      actorId: ACTOR_ID,
+      actorName: 'Test Actor',
+      data: { user_id: TARGET_ID, role: 'viewer' },
+    })
+
+    assert.ok(insertStrings, 'expected an INSERT INTO ledger_group_member call')
+    assert.ok(sqlContains(insertStrings, "'pending'"), 'a fresh invite must insert status pending')
+    assert.ok(sqlContains(insertStrings, 'case when'), 'conflict update must preserve an already-active membership')
+  })
+
   it('requireGroupAccess throws 403 when actor is not a member and not creator', async () => {
     // Group exists but actor is not creator and has no active membership
     const groupRow = {

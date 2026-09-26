@@ -182,9 +182,10 @@ export function createGroupService({ prisma }) {
     try {
       await prisma.$queryRaw`
         INSERT INTO ledger_group_member (group_id, user_id, role, invited_by, status)
-        VALUES (${groupId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'active')
+        VALUES (${groupId}::uuid, ${targetUserId}::uuid, ${role}, ${actorId}::uuid, 'pending')
         ON CONFLICT (group_id, user_id) DO UPDATE
-          SET role = EXCLUDED.role, status = 'active', invited_by = EXCLUDED.invited_by, invited_at = NOW()
+          SET role = EXCLUDED.role, invited_by = EXCLUDED.invited_by, invited_at = NOW(),
+              status = CASE WHEN ledger_group_member.status = 'active' THEN 'active' ELSE 'pending' END
       `
     } catch (err) {
       if (err.message?.includes('violates foreign key')) {
