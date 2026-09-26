@@ -9,14 +9,15 @@
 // user_profile.company_id present on live DB: NO (checked 2026-09-07)
 import crypto from "node:crypto";
 import { toLocalIso, toLocalMonth } from "@runly/core";
-import { isReasoningModel } from "../../services/groq-model-helpers.js";
+import { createAiRouter } from "../../services/ai/ai-router.js";
+import { AiClientError } from "../../services/ai/ai-client.js";
+import { isLocalEnabled } from "../../services/ai/ai-providers.js";
 import { stripMentionTokens } from "../../lib/mention-utils.js";
 import { ChatServiceError } from "./chat-service-error.js";
 import { TOOL_DEFS, buildToolRunners, CHANNEL_TOOL_DEFS, buildChannelToolRunners } from "./mirai-tools.js";
 
 const DEFAULT_MIRAI_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_WEB_MODEL = "groq/compound-mini";
-const DEFAULT_ROUTER_MODEL = "openai/gpt-oss-120b";
 const MAX_TOOL_ITERATIONS = 8;
 const HISTORY_LIMIT = 20;
 const RATE_MAX = 20;
@@ -197,17 +198,19 @@ export function createMiraiService({
   callTranscriptService = null,
 }) {
   const fetchFn = fetchImpl ?? globalThis.fetch;
+  const aiRouter = createAiRouter({ env, fetchImpl: fetchFn });
+  // Kept as informational defaults (audit rows, _internals) — the actual
+  // provider/model used per call is decided by aiRouter, not by these.
   const model = env.CHAT_MIRAI_MODEL || DEFAULT_MIRAI_MODEL;
   const webModel = env.CHAT_MIRAI_WEB_MODEL || DEFAULT_WEB_MODEL;
-  const routerModel = env.CHAT_MIRAI_ROUTER_MODEL || DEFAULT_ROUTER_MODEL;
   const tavilyKey = env.TAVILY_API_KEY || "";
   const webKillSwitch = String(env.CHAT_MIRAI_WEB ?? "true").toLowerCase() === "false";
   // Prefer Tavily (works on the free tier); fall back to a Groq compound model
   // only if one is explicitly configured. `null` => no web path, `live` turns
-  // degrade to "no internet".
+  // degrade to "no internet". Unchanged: `live` always needs Groq (compound)
+  // or Tavily+Groq-phrasing — mirai_web is not local-capable.
   const webProvider = webKillSwitch ? null : (tavilyKey ? "tavily" : (env.CHAT_MIRAI_WEB_MODEL ? "compound" : null));
   const webEnabled = webProvider !== null && Boolean(env.GROQ_API_KEY);
-  const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
 
   const runners = buildToolRunners({
     prisma, listMessages, chatSearchService, visionService, resolveUserContext,
@@ -226,7 +229,7 @@ export function createMiraiService({
   const channelRunners = buildChannelToolRunners({ prisma, callTranscriptService });
 
   function isConfigured() {
-    return Boolean(env.GROQ_API_KEY);
+    return Boolean(env.GROQ_API_KEY) || isLocalEnabled(env);
   }
 
   function checkRate(actorProfileId) {
@@ -357,51 +360,25 @@ export function createMiraiService({
     return json;
   }
 
-  // One place for the Groq HTTP call: retry once on 429/5xx or a network error,
-  // abort after timeoutMs. Returns the assistant `message` object or throws.
-  // Shared by the chat loop (callGroq), the turn classifier, and the web turn.
-  async function callGroqRaw({ model: m, messages, tools, toolChoice, maxTokens = 1000, timeoutMs = GROQ_TIMEOUT_MS, respectRateLimit = false }) {
-    const body = {
-      model: m,
-      temperature: 0.2,
-      max_tokens: maxTokens,
-      ...(tools ? { tools, tool_choice: toolChoice ?? "auto" } : {}),
-      ...(isReasoningModel(m) ? { reasoning_format: "hidden" } : {}),
-      messages,
-    };
-    let lastErr;
-    let retryDelay = 1200;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, retryDelay));
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      let res;
-      try {
-        res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.GROQ_API_KEY}` },
-          body: JSON.stringify(body), signal: controller.signal,
-        });
-      } catch (err) { lastErr = err; clearTimeout(timer); continue; }
-      clearTimeout(timer);
-      if (res.status === 429 || res.status >= 500) {
-        lastErr = new Error(`Groq ${res.status}`);
-        if (respectRateLimit && res.status === 429) {
-          lastErr = new ChatServiceError('La IA alcanzó el límite temporal del proveedor. Espera un momento y vuelve a enviar; no se ha creado ningún registro.', 429);
-          const retrySeconds = Number(res.headers.get('retry-after'));
-          if (Number.isFinite(retrySeconds) && retrySeconds > 0) retryDelay = Math.min(30000, Math.max(15000, retrySeconds * 1000 + 5000));
-        }
-        continue;
+  // Thin wrapper: the actual HTTP transport, retry, local/Groq routing and
+  // fallback all live in ai-router.js/ai-client.js. This function only adds
+  // the one piece of behavior that's specific to MirAI: translating a
+  // rate-limited Groq response into ChatServiceError when the caller asked
+  // to respect the provider's rate limit (answerWithTools's respectRateLimit).
+  async function callGroqRaw({ task, model: m, messages, tools, toolChoice, maxTokens = 1000, timeoutMs = GROQ_TIMEOUT_MS, respectRateLimit = false }) {
+    try {
+      const { message } = await aiRouter.runTask({ task, model: m, messages, tools, toolChoice, maxTokens, timeoutMs, respectRateLimit });
+      return message;
+    } catch (err) {
+      if (respectRateLimit && err instanceof AiClientError && err.status === 429) {
+        throw new ChatServiceError('La IA alcanzó el límite temporal del proveedor. Espera un momento y vuelve a enviar; no se ha creado ningún registro.', 429);
       }
-      if (!res.ok) { const d = await res.text().catch(() => ""); throw new Error(`Groq ${res.status}: ${d.slice(0, 160)}`); }
-      const payload = await res.json();
-      return payload?.choices?.[0]?.message ?? null;
+      throw err;
     }
-    throw lastErr ?? new Error("Groq sin respuesta");
   }
 
   async function callGroq(messages) {
-    return callGroqRaw({ model, messages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 1000, timeoutMs: GROQ_TIMEOUT_MS });
+    return callGroqRaw({ task: "mirai_chat", messages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 1000, timeoutMs: GROQ_TIMEOUT_MS });
   }
 
   async function loadHistory(conversationId) {
@@ -448,7 +425,7 @@ export function createMiraiService({
         { role: "user", content: String(userText).slice(0, 500) },
       ];
       const msg = await callGroqRaw({
-        model: routerModel, messages, maxTokens: ROUTER_MAX_TOKENS, timeoutMs: ROUTER_TIMEOUT_MS,
+        task: "mirai_classify", messages, maxTokens: ROUTER_MAX_TOKENS, timeoutMs: ROUTER_TIMEOUT_MS,
       });
       const word = String(msg?.content ?? "").trim().toLowerCase().split(/[^a-z]+/).filter(Boolean)[0];
       routerFailStreak = 0;
@@ -516,6 +493,7 @@ export function createMiraiService({
       ].filter(Boolean).join("\n\n");
       if (!evidence.trim()) return "";
       const msg = await callGroqRaw({
+        task: "mirai_web",
         model,
         maxTokens: 700,
         timeoutMs: GROQ_TIMEOUT_MS,
@@ -531,7 +509,7 @@ export function createMiraiService({
       { role: "system", content: liveSystemPrompt() },
       ...(await loadWebHistory(conversationId)),
     ];
-    const m = await callGroqRaw({ model: webModel, messages, maxTokens: 1000, timeoutMs: WEB_TIMEOUT_MS });
+    const m = await callGroqRaw({ task: "mirai_web", model: webModel, messages, maxTokens: 1000, timeoutMs: WEB_TIMEOUT_MS });
     return String(m?.content ?? "").trim();
   }
 
@@ -732,7 +710,7 @@ export function createMiraiService({
     for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter += 1) {
       if (iter === MAX_TOOL_ITERATIONS - 1) return { text: "No pude terminar de revisarlo; se mas concreto.", toolLog };
       const msg = await callGroqRaw({
-        model, messages: llmMessages, tools: CHANNEL_TOOL_DEFS, toolChoice: "auto",
+        task: "mirai_chat", model, messages: llmMessages, tools: CHANNEL_TOOL_DEFS, toolChoice: "auto",
         maxTokens: 800, timeoutMs: GROQ_TIMEOUT_MS,
       });
       const toolCalls = msg?.tool_calls ?? [];
@@ -912,7 +890,7 @@ export function createMiraiService({
       try {
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter += 1) {
           if (iter === MAX_TOOL_ITERATIONS - 1) { finalText = "No pude terminar de revisarlo; se mas concreto."; break; }
-          const msg = await callGroqRaw({ model, messages: llmMessages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 900, timeoutMs: GROQ_TIMEOUT_MS });
+          const msg = await callGroqRaw({ task: "mirai_chat", model, messages: llmMessages, tools: TOOL_DEFS, toolChoice: "auto", maxTokens: 900, timeoutMs: GROQ_TIMEOUT_MS });
           const toolCalls = msg?.tool_calls ?? [];
           if (!toolCalls.length) {
             const answer = String(msg?.content ?? "").trim();
@@ -969,7 +947,7 @@ export function createMiraiService({
     const started = Date.now();
     let calls = 0;
     for (let step = 0; step < 5 && Date.now() - started < 60_000; step++) {
-      const reply = await callGroqRaw({ model, messages: transcript, tools, toolChoice: 'auto', maxTokens: 1200, respectRateLimit: true });
+      const reply = await callGroqRaw({ task: "mirai_chat", model, messages: transcript, tools, toolChoice: 'auto', maxTokens: 1200, respectRateLimit: true });
       if (!reply?.tool_calls?.length) {
         if (!reply?.content?.trim()) throw new ChatServiceError('La IA no pudo responder. Intenta de nuevo.', 502);
         return { text: reply.content.trim().slice(0, 6000), model, calls };
