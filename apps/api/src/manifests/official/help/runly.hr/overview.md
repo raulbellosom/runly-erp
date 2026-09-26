@@ -2,14 +2,16 @@
 title: Recursos Humanos
 summary: Colaboradores, organigrama, catalogos de departamentos/puestos y expediente digital.
 ---
-Runly RRHH administra la informacion de las personas que trabajan en tu compania.
+Runly RRHH administra la informacion de las personas que trabajan en tu compania: su expediente digital, la estructura de reporte y los catalogos que mantienen esa informacion consistente.
 
-- **Colaboradores**: expediente de cada persona (datos personales, laborales, contacto de emergencia, estado).
-- **Organigrama**: quien reporta a quien.
-- **Catalogos**: departamentos y puestos reutilizables al dar de alta colaboradores.
+- **Colaboradores**: expediente completo de cada persona (datos personales, laborales, contacto de emergencia, puesto, departamento, supervisor, tipo de empleo y estado).
+- **Organigrama**: visualiza quien reporta a quien en toda la compania, calculado automaticamente a partir del supervisor de cada colaborador.
+- **Catalogos**: departamentos y puestos reutilizables al dar de alta o editar un colaborador, para que el mismo puesto o departamento siempre se llame igual.
+- Cada expediente lleva una bitacora de auditoria propia: cambios de puesto, de estado o de datos sensibles quedan registrados con fecha y autor.
 
 ### Alcances y limites
 
-- Un colaborador puede o no tener una cuenta de usuario asociada (para iniciar sesion) — son conceptos relacionados pero separados.
-- Los archivos adjuntos al expediente de un colaborador (contratos, identificaciones) usan el modulo de Archivos por debajo.
-- Dar de baja a un colaborador cambia su estado a "terminado"; no borra su expediente.
+- Un colaborador puede o no tener una cuenta de usuario asociada (para iniciar sesion en Runly) — son conceptos relacionados pero separados y se gestionan en el modulo de Identidad.
+- Los archivos adjuntos al expediente de un colaborador (contratos, identificaciones, comprobantes) usan el modulo de Archivos por debajo; puedes verlos directo desde el expediente sin navegar a otro modulo.
+- Dar de baja a un colaborador cambia su estado a "terminado"; no borra su expediente ni su historial — sigue disponible para consulta y auditoria.
+- RRHH no calcula nomina ni procesa pagos; es el expediente y la estructura organizacional, no un modulo de nomina.

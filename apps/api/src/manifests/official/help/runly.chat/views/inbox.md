@@ -5,6 +5,7 @@ summary: "Tus conversaciones: mensajes directos, grupos, canales y MirAI."
 ---
 Aqui ves todas tus conversaciones activas, ordenadas por la mas reciente.
 
+- Busca una conversacion o un contacto por nombre para no perder tiempo desplazandote por la lista.
 - Puedes iniciar una conversacion directa, crear un grupo o unirte a un canal.
 - Los adjuntos (imagenes, archivos) se comparten directo en el mensaje.
 - Las llamadas de voz/video se inician desde una conversacion; si tienes permiso, puedes grabarlas y pedir su transcripcion despues.
