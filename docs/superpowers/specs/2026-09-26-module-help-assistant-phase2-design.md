@@ -53,9 +53,16 @@ sólo cuando hay un motor de IA disponible; en instancias sin
 1. El mismo panel de ayuda (`HelpButton`/Sheet de la Fase 1) gana una caja de
    pregunta libre debajo del contenido contextual.
 2. Con `GROQ_API_KEY` configurada: la pregunta se responde con una frase
-   generada por IA, basada ÚNICAMENTE en los artículos de ayuda relevantes
-   (nunca inventa funcionalidades), citando de qué módulo/vista salió cada
-   fuente.
+   generada por IA, priorizando los artículos de ayuda relevantes (citando de
+   qué módulo/vista salió cada fuente cuando los usa). **Actualizado
+   2026-09-27** (feedback del usuario: la versión inicial se sentía
+   demasiado limitada — rechazaba responder cualquier cosa no escrita ya en
+   la documentación): cuando la documentación de Runly no cubre la
+   pregunta, el modelo responde igual con su conocimiento general sobre
+   sistemas ERP y tareas administrativas, dejando claro que esa parte no es
+   documentación oficial de Runly. Nunca inventa detalles específicos de
+   esta instancia (nombres exactos de botones, ubicaciones exactas) que no
+   estén documentados.
 3. Sin `GROQ_API_KEY`: la misma caja de pregunta sigue funcionando — devuelve
    los mismos fragmentos que ya calcula `help-service.searchHelp()` (Fase 1),
    sin frase generada, con un aviso claro de que la respuesta es una
@@ -92,12 +99,31 @@ sólo cuando hay un motor de IA disponible; en instancias sin
 
 ## 8. UX requirements
 
-Debajo del contenido contextual ya existente en el Sheet de `HelpButton`
-(overview + vista, o `EmptyState`), se agrega:
+**Revisado 2026-09-27** (feedback del usuario: volcar todo el contenido
+(overview + vista) de una sola vez, sin nada que "preguntar", contradecía
+la idea de un chat; también, el header y el composer vivían dentro del
+mismo contenedor que hacía scroll que el cuerpo, así que al hacer scroll
+se perdían de vista — y en móvil se perdía la ceja de arrastre del propio
+Sheet. Ver la memoria de convención de modales:
+`feedback_modal_structure.md`):
 
-- Un separador visual y un `Textarea`/`Input` de `@runly/ui` con placeholder
-  "Escribe tu pregunta..." + botón enviar (Enter envía, Shift+Enter salto de
-  línea — mismo patrón que el composer de PFM).
+- El Sheet ya NO vuelca `overview`/`view` completos como texto plano al
+  abrir. En su lugar, un solo mensaje corto (1 frase, el `summary` de la
+  vista o si no del overview) más 2-3 chips de pregunta sugerida
+  (contextuales: "¿Qué puedo hacer aquí?", "¿Cómo empiezo?", y si hay
+  título de contexto, "Cuéntame más sobre \<título\>"). Click en un chip =
+  lo mismo que escribirlo y enviarlo.
+- Estructura fija: `SheetHeader` (título + descripción) y el composer
+  (dentro de `SheetFooter`) quedan **fuera** del área con scroll — solo la
+  conversación (chips iniciales + turnos de chat) hace scroll, en un `div`
+  propio `flex-1 min-h-0 overflow-y-auto`. En móvil, la superficie del
+  Sheet trae su propio `overflow-y-auto` (`bottom-sheet-shared.jsx`) que se
+  sobreescribe puntualmente con `overflow-hidden` vía `cn()`/tailwind-merge
+  (último valor gana), sin tocar el componente compartido ni otros
+  consumidores de `Sheet`/`Dialog`.
+- Un `Textarea`/`Input` de `@runly/ui` con placeholder "Escribe tu
+  pregunta..." + botón enviar (Enter envía, Shift+Enter salto de línea —
+  mismo patrón que el composer de PFM).
 - Mientras se espera respuesta: estado de carga (no bloquea el resto del
   panel).
 - Respuesta en modo IA: burbuja con el texto + una lista pequeña de
@@ -109,7 +135,7 @@ Debajo del contenido contextual ya existente en el Sheet de `HelpButton`
 - Errores (429/502): burbuja de sistema con el mensaje, sin romper el resto
   del panel — mismo patrón que `AssistantMessage` de PFM con `role: "ERROR"`.
 - El historial de la conversación (preguntas + respuestas de esta sesión) se
-  muestra en orden, más reciente abajo, dentro del mismo scroll del Sheet.
+  muestra en orden, más reciente abajo, dentro del área con scroll.
 
 ## 9. Routes/screens
 
@@ -282,9 +308,11 @@ persistencia (§6.1).
    artículos de ayuda recortados que ya devuelve `searchHelp()` (máx. ~8 KB
    por resultado, tope de 20 resultados — en la práctica se inyectan sólo
    los primeros 5).
-2. Riesgo: el modelo alucina funcionalidad que no existe. Mitigación: system
-   prompt explícito "responde solo con la documentacion dada"; sin
-   tool-calling no hay superficie para que el modelo "actúe", sólo para que
+2. Riesgo: el modelo alucina detalles específicos de esta instancia que no
+   existen. Mitigación: system prompt explícito — puede usar conocimiento
+   general de ERPs para preguntas no documentadas, pero nunca debe inventar
+   nombres/ubicaciones exactos de esta instancia que no vengan de la
+   documentación; sin tool-calling no hay superficie para que el modelo "actúe", sólo para que
    hable.
 3. Riesgo: confusión de UX entre modo IA y modo fallback si no se distingue
    claramente. Mitigación: el modo fallback se etiqueta explícitamente
