@@ -670,6 +670,16 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         });
       },
     },
+    help: {
+      listModules: (token) =>
+        request("/help/modules", { headers: withAuthHeaders(token) }),
+      getModuleHelp: (moduleKey, token) =>
+        request(`/help/modules/${encodeURIComponent(moduleKey)}`, { headers: withAuthHeaders(token) }),
+      resolveHelp: (path, token) =>
+        request(`/help/resolve?path=${encodeURIComponent(path)}`, { headers: withAuthHeaders(token) }),
+      searchHelp: (query, token) =>
+        request(`/help/search?q=${encodeURIComponent(query)}`, { headers: withAuthHeaders(token) }),
+    },
     contacts: {
       list: (token, options = {}) => {
         const params = new URLSearchParams();
