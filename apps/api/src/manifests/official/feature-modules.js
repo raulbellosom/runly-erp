@@ -1,4 +1,9 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createModuleManifest, MODULE_KINDS } from "@runly/core";
+import { loadHelpBlueprints } from "@runly/module-engine";
+
+const HELP_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "help");
 
 export const contactsMap = createModuleManifest({
   key: "runly.contacts",
@@ -814,7 +819,7 @@ export const chatMap = createModuleManifest({
   key: 'runly.chat',
   name: 'Chat',
   description: 'Mensajeria interna en tiempo real y chat de soporte para visitantes externos.',
-  version: '0.2.0',
+  version: '0.3.0',
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -878,5 +883,7 @@ export const chatMap = createModuleManifest({
       'chat.calls.transcript.analyze': 'chat.calls.transcript.analyze',
     },
   },
-  blueprints: [],
+  blueprints: [
+    ...loadHelpBlueprints('runly.chat', path.join(HELP_DIR, 'runly.chat')),
+  ],
 });
