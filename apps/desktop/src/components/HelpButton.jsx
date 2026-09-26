@@ -11,6 +11,7 @@ import {
   SheetFooter,
   Textarea,
   Button,
+  MarkdownViewer,
 } from "@runly/ui";
 import { runly } from "../lib/runly";
 import { useAuth } from "../auth/AuthProvider";
@@ -164,7 +165,7 @@ export function HelpButton() {
               // assistant
               return (
                 <div key={i} className="max-w-[95%] rounded-2xl px-3 py-2 text-sm bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]">
-                  {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
+                  {m.content && <MarkdownViewer value={m.content} />}
                   {m.sources?.length > 0 && (
                     <div className="mt-2 space-y-0.5">
                       <p className="text-xs text-[hsl(var(--muted-foreground))]">Fuentes:</p>
