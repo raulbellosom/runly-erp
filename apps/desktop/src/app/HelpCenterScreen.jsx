@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   PageHeader,
@@ -13,8 +14,11 @@ import { useAuth } from "../auth/AuthProvider";
 export function HelpCenterScreen() {
   const { session } = useAuth();
   const token = session?.access_token;
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = useState("");
-  const [selectedModuleKey, setSelectedModuleKey] = useState(null);
+  // Deep-linked from the Ctrl+K search palette's "Ayuda" results
+  // (search-providers.js's helpProvider.target), which pass ?module=<key>.
+  const [selectedModuleKey, setSelectedModuleKey] = useState(() => searchParams.get("module"));
 
   const modulesQuery = useQuery({
     queryKey: ["help", "modules"],

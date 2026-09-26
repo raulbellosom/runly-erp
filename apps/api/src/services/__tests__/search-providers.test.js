@@ -10,14 +10,15 @@ function bySource(source) {
 }
 
 describe("search providers", () => {
-  it("exposes contacts, users and employees with permissions and targets", () => {
+  it("exposes contacts, users, employees and help with permissions and targets", () => {
     assert.deepEqual(
       SEARCH_PROVIDERS.map((p) => p.source),
-      ["contacts", "users", "employees"],
+      ["contacts", "users", "employees", "help"],
     );
     assert.equal(bySource("contacts").permission, "contacts.contacts.read");
     assert.equal(bySource("users").permission, "identity.users.read");
     assert.equal(bySource("employees").permission, "hr.employee.read");
+    assert.equal(bySource("help").permission, "runly.help.read");
     assert.equal(
       bySource("contacts").target("abc"),
       "/app/m/runly.contacts/contacts/abc",
@@ -30,6 +31,7 @@ describe("search providers", () => {
       bySource("employees").target("e1"),
       "/app/m/runly.hr/hr/employees/e1",
     );
+    assert.equal(bySource("help").target("runly.chat"), "/app/help?module=runly.chat");
   });
 
   it("contacts: company-scoped, enabled-only, mapped with subtitle precedence", async () => {
@@ -130,5 +132,26 @@ describe("search providers", () => {
       { id: "e1", title: "Ana Lopez", subtitle: "Ventas", icon: "UserCheck" },
       { id: "e2", title: "Beto Ruiz", subtitle: "E-2", icon: "UserCheck" },
     ]);
+  });
+
+  it("help: searches module help content and maps to the safe shape, capped at limit", async () => {
+    const prisma = {
+      blueprint: {
+        findMany: async () => [
+          {
+            kind: "HELP",
+            enabled: true,
+            module: { key: "runly.chat", name: "Chat", status: "INSTALLED", enabled: true },
+            schema: { scope: "module", viewKey: null, title: "Chat", summary: "Mensajeria interna.", content: "Chat interno, MirAI y soporte externo." },
+          },
+        ],
+      },
+    };
+    const items = await bySource("help").run({ prisma, companyId: "co1", q: "mensajeria", limit: 5 });
+    assert.equal(items.length, 1);
+    assert.equal(items[0].id, "runly.chat");
+    assert.equal(items[0].title, "Chat");
+    assert.equal(items[0].icon, "BookOpen");
+    assert.match(items[0].subtitle, /Chat/);
   });
 });

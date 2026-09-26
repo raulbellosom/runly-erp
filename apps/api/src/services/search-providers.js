@@ -1,8 +1,12 @@
 // Global record-search providers used by GET /search.
 //
 // Each provider is permission-gated by the route; `run` is pure data access and
-// never sees the Hono context. All three v1 sources are core Prisma-managed
-// tables (not RME3), so model accessors are fine here.
+// never sees the Hono context. The first three sources are core Prisma-managed
+// tables (not RME3), so model accessors are fine here. The "help" source
+// reuses help-service.js (module help system,
+// docs/superpowers/specs/2026-09-26-module-help-system-design.md) rather than
+// querying Blueprint rows directly, to avoid duplicating the search ranking.
+import { createHelpService } from "./help-service.js";
 
 function firstNonEmpty(...values) {
   for (const value of values) {
@@ -128,8 +132,27 @@ const employeesProvider = {
   },
 };
 
+const helpProvider = {
+  source: "help",
+  label: "Ayuda",
+  permission: "runly.help.read",
+  icon: "BookOpen",
+  target: (id) => `/app/help?module=${encodeURIComponent(id)}`,
+  async run({ prisma, q, limit }) {
+    const helpService = createHelpService({ prisma });
+    const results = await helpService.searchHelp(q);
+    return results.slice(0, limit).map((r) => ({
+      id: r.moduleKey,
+      title: r.title,
+      subtitle: `${r.moduleName} · ${r.snippet}`.slice(0, 140),
+      icon: "BookOpen",
+    }));
+  },
+};
+
 export const SEARCH_PROVIDERS = [
   contactsProvider,
   usersProvider,
   employeesProvider,
+  helpProvider,
 ];
