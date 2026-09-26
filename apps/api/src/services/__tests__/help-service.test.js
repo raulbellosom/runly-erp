@@ -106,19 +106,44 @@ describe('help-service', () => {
     assert.equal(result, null)
   })
 
-  it('resolveHelp matches the view by exact path and returns both view + overview', async () => {
+  it('resolveHelp matches the view by the real, module-prefixed frontend path', async () => {
+    // Manifests declare navigation.path/viewKey relative to the module's own
+    // screen ("/fleet/vehicles"); the real frontend route is always
+    // /m/<moduleKey>/... (ModuleSidebar's buildFullPath) — resolveHelp must
+    // translate before comparing, not match the raw manifest value directly.
     const service = createHelpService({ prisma: makePrisma() })
-    const result = await service.resolveHelp('/fleet/vehicles')
+    const result = await service.resolveHelp('/m/custom.fleet/fleet/vehicles')
     assert.equal(result.moduleKey, 'custom.fleet')
     assert.equal(result.view.title, 'Vehiculos')
     assert.equal(result.overview.title, 'Flotas')
   })
 
+  it('resolveHelp does not match on the raw, unprefixed manifest path (regression guard)', async () => {
+    const service = createHelpService({ prisma: makePrisma() })
+    const result = await service.resolveHelp('/fleet/vehicles')
+    assert.notEqual(result.moduleKey, 'custom.fleet')
+  })
+
   it('resolveHelp falls back to overview-only when no view matches', async () => {
     const service = createHelpService({ prisma: makePrisma() })
-    const result = await service.resolveHelp('/modules')
+    const result = await service.resolveHelp('/m/runly.core/modules')
     assert.equal(result.moduleKey, 'runly.core')
     assert.equal(result.view, null)
+  })
+
+  it('resolveHelp honors an explicit /app/-prefixed nav path (top-level route, bypasses the module prefix)', async () => {
+    const coreWithTopLevelHelp = {
+      ...CORE_MODULE,
+      manifest: { ...CORE_MODULE.manifest, navigation: [...CORE_MODULE.manifest.navigation, { path: '/app/help', label: 'Ayuda' }] },
+    }
+    const service = createHelpService({
+      prisma: makePrisma({
+        modules: [coreWithTopLevelHelp, FLEET_MODULE],
+        helpRows: HELP_ROWS.map((row) => (row.moduleId === 'mod-core' ? { ...row, module: coreWithTopLevelHelp } : row)),
+      }),
+    })
+    const result = await service.resolveHelp('/help')
+    assert.equal(result.moduleKey, 'runly.core')
   })
 
   it('resolveHelp falls back to runly.core general orientation when the path belongs to no known module', async () => {

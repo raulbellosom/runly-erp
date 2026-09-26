@@ -22,7 +22,7 @@ export const runlyCoreMap = createModuleManifest({
   name: "Runly Core",
   description:
     "Nucleo del sistema: modulos, permisos, bitacora y configuracion de instancia.",
-  version: "0.2.0",
+  version: "0.2.1",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -48,7 +48,11 @@ export const runlyCoreMap = createModuleManifest({
     },
     {
       label: "Ayuda",
-      path: "/help",
+      // Absolute /app/ path: bypasses ModuleSidebar's buildFullPath prefixing
+      // (packages/ui/src/components/ModuleSidebar.jsx) so this links straight
+      // to the top-level /app/help route (AppEntry.jsx), which isn't routed
+      // through ModuleOutlet/SCREEN_MAP like this module's other screens.
+      path: "/app/help",
       icon: "BookOpen",
       layout: "main",
       permissionKey: "runly.help.read",

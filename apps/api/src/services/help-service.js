@@ -8,6 +8,21 @@ function pickArticle(schema) {
   return { title: schema.title, summary: schema.summary, content: schema.content }
 }
 
+// Manifests declare navigation.path / a HELP view's viewKey relative to the
+// module's own screen (e.g. "/modules", "/company/address", "/"). The real
+// frontend route is always prefixed with /app/m/<moduleKey>/... UNLESS the
+// path opts out with an explicit "/app/" prefix (ModuleSidebar's
+// buildFullPath, packages/ui/src/components/ModuleSidebar.jsx, has the exact
+// same two rules) — e.g. runly.core's "Ayuda" nav entry points at the
+// already-top-level /app/help screen, not a ModuleOutlet-routed one.
+// currentPath here is already post-toApiPath (the /app prefix stripped), so
+// this mirrors buildFullPath minus that prefix.
+function toModuleApiPath(moduleKey, navPath) {
+  if (!navPath) return null
+  if (navPath.startsWith('/app/')) return navPath.slice(4) || '/'
+  return navPath === '/' ? `/m/${moduleKey}` : `/m/${moduleKey}${navPath}`
+}
+
 function normalize(value) {
   return String(value ?? '')
     .toLowerCase()
@@ -71,7 +86,9 @@ export function createHelpService({ prisma }) {
     })
 
     const candidates = modules.flatMap((module_) =>
-      (module_.manifest?.navigation ?? []).map((nav) => ({ module: module_, navPath: nav.path })),
+      (module_.manifest?.navigation ?? [])
+        .map((nav) => ({ module: module_, navPath: toModuleApiPath(module_.key, nav.path) }))
+        .filter((c) => c.navPath),
     )
     const matchedOwner = candidates
       .filter((c) => currentPath === c.navPath || currentPath.startsWith(`${c.navPath}/`))
@@ -95,8 +112,9 @@ export function createHelpService({ prisma }) {
     const viewRow = matchedOwner
       ? rows
           .filter((r) => r.schema?.scope === 'view')
-          .filter((r) => currentPath === r.schema.viewKey || currentPath.startsWith(`${r.schema.viewKey}/`))
-          .sort((a, b) => b.schema.viewKey.length - a.schema.viewKey.length)[0]
+          .map((r) => ({ row: r, apiPath: toModuleApiPath(owner.module.key, r.schema.viewKey) }))
+          .filter(({ apiPath }) => apiPath && (currentPath === apiPath || currentPath.startsWith(`${apiPath}/`)))
+          .sort((a, b) => b.apiPath.length - a.apiPath.length)[0]?.row
       : undefined
 
     return {
