@@ -234,6 +234,27 @@ export function createAccountsRouter({ prisma, requirePermission }) {
     },
   );
 
+  app.get(
+    "/ledger/accounts/:id/transactions/disabled",
+    requirePermission("ledger.transactions.read"),
+    async (c) => {
+      try {
+        const companyId = getCompanyId(c)
+        const actorId   = getActorId(c)
+        const accountId = c.req.param("id")
+        if (!(await service.canReadAccount({ companyId, accountId, actorId }))) {
+          return c.json({ error: 'No tienes permisos para ver esta cuenta.' }, 403)
+        }
+        const { page, pageSize } = c.req.query();
+        return c.json(
+          await service.listDisabledTransactions({ companyId, accountId, page, pageSize }),
+        );
+      } catch (err) {
+        return handleError(c, err, "No se pudieron listar los movimientos eliminados.");
+      }
+    },
+  );
+
   app.post(
     "/ledger/accounts/:id/transactions",
     requirePermission("ledger.transactions.create"),
