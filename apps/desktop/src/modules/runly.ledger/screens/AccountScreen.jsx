@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import SpreadsheetRegister from "./SpreadsheetRegister.jsx";
 import AccountSummary from "./AccountSummary.jsx";
+import DeletedTransactionsSheet from "../components/DeletedTransactionsSheet.jsx";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
@@ -90,6 +91,7 @@ export default function AccountScreen() {
   const [dateTo, setDateTo] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState(null);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -388,6 +390,16 @@ export default function AccountScreen() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7"
+              onClick={() => setTrashOpen(true)}
+              disabled={isUsingLocalLedger}
+            >
+              <Trash2 size={12} />
+              Movimientos eliminados
+            </Button>
           </div>
         )}
       </div>
@@ -708,6 +720,13 @@ export default function AccountScreen() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <DeletedTransactionsSheet
+        accountId={accountId}
+        currency={account?.currency}
+        open={trashOpen}
+        onOpenChange={setTrashOpen}
+      />
     </div>
   );
 }
