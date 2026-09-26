@@ -108,7 +108,7 @@ function OnlineUserPill({ user, currentUserId, conversations, onOpen }) {
 
 // --- Conversation picker panel ---
 
-function ConversationPanel({ conversations, externalConversations, isLoading, edge, bottomPx, zIndex = 45, currentUserId }) {
+function ConversationPanel({ conversations, externalConversations, isLoading, edge, placement, anchorPx, maxHeightPx, zIndex = 45, currentUserId }) {
   const { openChat, close } = useChatFloatStore();
   const navigate = useNavigate();
   const { onlineUsers, isUserOnline } = useGlobalPresence();
@@ -173,13 +173,20 @@ function ConversationPanel({ conversations, externalConversations, isLoading, ed
   }
 
   const offset = BM + BS + GAP;
-  const clampedBottom = Math.max(BM, bottomPx);
   const hasExternal = filteredExternal.length > 0;
+  // Anchors adjacent to the bubble on whichever side (above/below it) has
+  // more room — previously this always grew upward from the bubble's bottom
+  // edge with nothing capping how far that could push it, so a bubble
+  // dragged near the top of the screen sent the panel off-screen above the
+  // visible viewport instead of flipping to grow downward.
+  const anchorStyle = placement === "below"
+    ? { top: Math.max(BM, anchorPx) }
+    : { bottom: Math.max(BM, anchorPx) };
 
   return (
     <>
       <div
-        style={{ position: "fixed", [edge]: offset, bottom: clampedBottom, width: 272, zIndex, maxHeight: "calc(100dvh - 80px)" }}
+        style={{ position: "fixed", [edge]: offset, ...anchorStyle, width: 272, zIndex, maxHeight: maxHeightPx }}
         className="rounded-xl shadow-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] overflow-hidden flex flex-col"
       >
         {/* Search + new conversation header */}
@@ -537,8 +544,21 @@ function FloatingChatHubInner() {
     ? { position: "fixed", left: dragPos.x - BS / 2, top: dragPos.y - BS / 2, zIndex: Z_BUBBLE }
     : { position: "fixed", [edge]: BM, top: effectiveY, zIndex: Z_BUBBLE };
 
-  // Panel anchors its bottom to the bubble's bottom edge so it's always adjacent
-  const panelBottomPx = window.innerHeight - effectiveY - BS;
+  // Panel grows toward whichever side of the bubble has more vertical room —
+  // "above" (its bottom pinned to the bubble's bottom, growing upward, the
+  // original/common layout when the bubble sits low on screen) or "below"
+  // (its top pinned to the bubble's top, growing downward, needed when the
+  // bubble has been dragged near the top of the screen). maxHeightPx caps it
+  // to whatever room actually exists on that side so it can never push past
+  // the opposite edge either.
+  const PANEL_GAP = 8;
+  const spaceAbove = effectiveY - PANEL_GAP;
+  const spaceBelow = window.innerHeight - (effectiveY + BS) - PANEL_GAP;
+  const panelPlacement = spaceAbove >= spaceBelow ? "above" : "below";
+  const panelAnchorPx = panelPlacement === "above"
+    ? window.innerHeight - effectiveY - BS // bubble's bottom edge, panel grows up from there
+    : effectiveY; // bubble's top edge, panel grows down from there
+  const panelMaxHeightPx = Math.max(160, (panelPlacement === "above" ? spaceAbove : spaceBelow) - BM);
 
   return createPortal(
     <>
@@ -565,7 +585,9 @@ function FloatingChatHubInner() {
             externalConversations={externalConversations}
             isLoading={isLoading}
             edge={edge}
-            bottomPx={panelBottomPx}
+            placement={panelPlacement}
+            anchorPx={panelAnchorPx}
+            maxHeightPx={panelMaxHeightPx}
             zIndex={Z_PANEL}
             currentUserId={userProfile?.id}
           />
