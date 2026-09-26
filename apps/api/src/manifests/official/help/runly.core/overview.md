@@ -8,7 +8,7 @@ Desde aqui se administra:
 
 - **Modulos**: instalar, habilitar, deshabilitar o desinstalar los demas modulos del sistema.
 - **Configuracion**: ajustes generales de la instancia (nombre de la empresa, zona horaria, preferencias).
-- **Bitacora de auditoria**: quien hizo que y cuando, sobre cualquier entidad del sistema.
+- **Bitacora de auditoria**: quien hizo que y cuando, en cualquier parte del sistema.
 
 ### Alcances y limites
 

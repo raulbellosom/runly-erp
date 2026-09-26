@@ -12,6 +12,6 @@ Tambien incluye:
 
 ### Alcances y limites
 
-- Grabar una llamada y pedir su transcripcion requiere permisos especificos (`chat.calls.record`, `chat.calls.transcript.request`/`manage`).
-- Analizar una transcripcion con MirAI requiere el permiso `chat.calls.transcript.analyze` y que la instancia tenga IA configurada.
-- La bandeja externa es solo para el equipo de soporte (`chat.support.manage`), no para todos los usuarios.
+- Grabar una llamada y pedir su transcripcion son permisos aparte; pidele a un administrador que te los asigne si no los ves disponibles.
+- Analizar una transcripcion con MirAI tambien requiere permiso, ademas de que la instancia tenga IA configurada.
+- La bandeja externa es solo para el equipo de soporte, no para todos los usuarios.
