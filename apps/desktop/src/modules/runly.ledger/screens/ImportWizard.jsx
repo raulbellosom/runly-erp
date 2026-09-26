@@ -50,6 +50,7 @@ export default function ImportWizard() {
   const token = session?.access_token ?? null
 
   const [step, setStep]       = useState(STEP_UPLOAD)
+  const [parsing, setParsing] = useState(false)
   const [rawRows, setRawRows] = useState([])
   const [headers, setHeaders] = useState([])
   const [mapping, setMapping] = useState({})
@@ -71,65 +72,56 @@ export default function ImportWizard() {
 
   // ── Step 1: Upload ────────────────────────────────────────────────────────────
 
-  function handleFile(file) {
+  async function handleFile(file) {
     if (!file) return
     const ext = file.name.split('.').pop().toLowerCase()
-    if (ext !== 'csv') {
-      toast.error('Solo se aceptan archivos CSV. Exporta tu hoja de calculo como CSV e intenta de nuevo.')
+    if (ext !== 'csv' && ext !== 'xlsx') {
+      toast.error('Solo se aceptan archivos CSV o XLSX.')
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const text = e.target.result
-        const lines = text.split(/\r?\n/).filter(Boolean)
-        if (lines.length < 2) { toast.error('El archivo no tiene datos.'); return }
-
-        const parsecsv = (line) => {
-          const result = []; let cur = ''; let inQ = false
-          for (const ch of line) {
-            if (ch === '"') { inQ = !inQ }
-            else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = '' }
-            else cur += ch
-          }
-          result.push(cur.trim())
-          return result
-        }
-
-        const firstLine = lines[0].replace(/^﻿/, '') // Strip BOM
-        const hdrs = parsecsv(firstLine)
-        setHeaders(hdrs)
-
-        const rows = lines.slice(1).map((line) => {
-          const vals = parsecsv(line)
-          return Object.fromEntries(hdrs.map((h, i) => [h, vals[i] ?? '']))
-        })
-        setRawRows(rows)
-
-        // Auto-map by header similarity
-        const autoMap = {}
-        TARGET_FIELDS.forEach(({ key }) => {
-          const match = hdrs.find((h) => {
-            const lower = h.toLowerCase()
-            if (key === 'fecha')      return lower.includes('fecha')
-            if (key === 'nombre')     return lower.includes('nombre') || lower.includes('descripci')
-            if (key === 'deposito')   return lower.includes('dep') || lower.includes('abono')
-            if (key === 'retiro')     return lower.includes('ret') || lower.includes('cargo') || lower.includes('egreso')
-            if (key === 'numero')     return lower.includes('num') || lower.includes('folio')
-            if (key === 'referencia') return lower.includes('ref')
-            if (key === 'concepto')   return lower.includes('concepto') || lower.includes('nota')
-            return lower.includes(key)
-          })
-          if (match) autoMap[key] = match
-        })
-        setMapping(autoMap)
-        setStep(STEP_MAPPING)
-      } catch {
-        toast.error('No se pudo leer el archivo.')
+    setParsing(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await companyFetch(`${API_BASE}/ledger/accounts/${accountId}/import/parse`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'No se pudo leer el archivo.')
       }
+      const { rows, headers: hdrs } = await res.json()
+      if (!rows.length) { toast.error('El archivo no tiene datos.'); return }
+
+      setHeaders(hdrs)
+      setRawRows(rows)
+
+      // Auto-map by header similarity
+      const autoMap = {}
+      TARGET_FIELDS.forEach(({ key }) => {
+        const match = hdrs.find((h) => {
+          const lower = h.toLowerCase()
+          if (key === 'fecha')      return lower.includes('fecha')
+          if (key === 'nombre')     return lower.includes('nombre') || lower.includes('descripci')
+          if (key === 'deposito')   return lower.includes('dep') || lower.includes('abono')
+          if (key === 'retiro')     return lower.includes('ret') || lower.includes('cargo') || lower.includes('egreso')
+          if (key === 'numero')     return lower.includes('num') || lower.includes('folio')
+          if (key === 'referencia') return lower.includes('ref')
+          if (key === 'concepto')   return lower.includes('concepto') || lower.includes('nota')
+          return lower.includes(key)
+        })
+        if (match) autoMap[key] = match
+      })
+      setMapping(autoMap)
+      setStep(STEP_MAPPING)
+    } catch (err) {
+      toast.error(err.message ?? 'No se pudo leer el archivo.')
+    } finally {
+      setParsing(false)
     }
-    reader.readAsText(file, 'utf-8')
   }
 
   // ── Step 2: Preview mutation ──────────────────────────────────────────────────
@@ -185,7 +177,7 @@ export default function ImportWizard() {
       <div className="px-6 pt-5 pb-4 border-b border-[hsl(var(--border))] shrink-0 space-y-4">
         <PageHeader
           className="pb-0"
-          eyebrow="Runly Ledger · Importación CSV"
+          eyebrow="Runly Ledger · Importación de movimientos"
           onBack={() => navigate(`/app/m/runly.ledger/accounts/${accountId}`)}
           backLabel={account ? account.name : 'Cuenta'}
           title="Importar movimientos"
@@ -246,17 +238,18 @@ export default function ImportWizard() {
         {step === STEP_UPLOAD && (
           <div className="max-w-lg mx-auto">
             <p className="text-sm text-[hsl(var(--muted-foreground))] mb-6">
-              Sube un archivo CSV con tus movimientos bancarios. La primera fila debe contener los encabezados de columna.
+              Sube un archivo CSV o XLSX con tus movimientos bancarios. La primera fila debe contener los encabezados de columna.
             </p>
             <DistDropZone
-              accept=".csv"
+              accept=".csv,.xlsx"
               maxSizeMB={20}
               fullScreenOverlay
-              overlayLabel="Suelta tu archivo CSV aqui"
-              overlayHint="CSV — primera fila debe ser encabezados"
+              isUploading={parsing}
+              overlayLabel="Suelta tu archivo aqui"
+              overlayHint="CSV o XLSX — primera fila debe ser encabezados"
               onFile={handleFile}
-              emptyLabel="Arrastra tu archivo CSV aqui"
-              emptyHint="CSV — primera fila debe ser encabezados"
+              emptyLabel="Arrastra tu archivo CSV o XLSX aqui"
+              emptyHint="CSV o XLSX — primera fila debe ser encabezados"
             />
           </div>
         )}
