@@ -19,6 +19,7 @@ import { useGlobalPresence } from "../../../providers/RealtimeProvider";
 import { MiniChatWindow, AvatarCircle, getAvatarUrl, getAvatarEmoji } from "./MiniChatWindow";
 import { ConversationRowActions } from "./ConversationRowActions";
 import { useConversationActionHandler } from "../hooks/useChatConversations";
+import { ChatPreferencesProvider, useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
 
 const BS = 56;     // bubble size px
 const BM = 16;     // margin from edge px
@@ -407,6 +408,7 @@ function FloatingChatHubInner() {
     useChatFloatStore();
   const queryClient = useQueryClient();
   const { on } = useRealtimeContext();
+  const { prefs } = useChatPreferences();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["chat-conversations"],
@@ -561,7 +563,17 @@ function FloatingChatHubInner() {
   const panelMaxHeightPx = Math.max(160, (panelPlacement === "above" ? spaceAbove : spaceBelow) - BM);
 
   return createPortal(
-    <>
+    // chat-glass-theme + chatPreferencesStyle: this whole tree is portaled
+    // straight to document.body, as a SIBLING of (not nested inside) the
+    // .chat-glass-theme element ChatScreen/MiniChatWindow render — CSS custom
+    // properties only inherit down the DOM tree, so without its own copy of
+    // this wrapper the bubble, its avatar and the conversation-list panel's
+    // avatars/text never saw the user's chosen accent color (or font-scale/
+    // wallpaper prefs), always falling back to the company's raw brand color
+    // regardless of what was picked in chat settings. position:fixed
+    // descendants are unaffected — a plain div with no transform/filter/
+    // perspective doesn't become their containing block.
+    <div className="chat-glass-theme" style={chatPreferencesStyle(prefs)}>
       {openChats.slice(0, maxWins).map((entry, i) => {
         const freshConv = conversations.find((c) => c.id === entry.id);
         const liveEntry = freshConv ? { ...entry, conversation: freshConv } : entry;
@@ -649,7 +661,7 @@ function FloatingChatHubInner() {
           )}
         </button>
       </div>
-    </>,
+    </div>,
     document.body,
   );
 }
@@ -657,5 +669,14 @@ function FloatingChatHubInner() {
 export function FloatingChatHub() {
   const { session } = useAuth();
   if (!session) return null;
-  return <FloatingChatHubInner />;
+  // Own Provider instance, same pattern as MiniChatWindow's — reads/writes
+  // the same server-backed preference key, so a change made anywhere (the
+  // main ChatScreen's settings dialog, another open MiniChatWindow) is
+  // reflected here too (see the cross-instance sync fix in
+  // useChatPreferences.jsx's update()).
+  return (
+    <ChatPreferencesProvider>
+      <FloatingChatHubInner />
+    </ChatPreferencesProvider>
+  );
 }

@@ -9,6 +9,7 @@
 // every chat surface — member messages, MirAI's answers, the MirAI side
 // panel, and the call chat.
 import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { splitMentionSegments } from "../components/MentionTextarea.jsx";
 
 const INLINE_TOKEN_RE = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`)/g;
@@ -140,27 +141,47 @@ function groupLines(text) {
   return blocks;
 }
 
+// Always dark, regardless of the app's light/dark theme or the bubble color
+// it sits in (own bubble = brand color, received = --muted) — a code block
+// that borrows either of those blends straight into its surroundings (the
+// bug: in light theme, this used bg-[hsl(var(--muted))], the exact same
+// token the received-message bubble itself uses, so on a light theme the
+// "code canvas" was invisible against its own background). Matches the
+// universal editor/GitHub convention of a dark code canvas independent of
+// the surrounding UI theme, so it always reads clearly as code.
 function CodeBlock({ code, lang }) {
   const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }
   return (
-    <div className="my-1.5 overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-      <div className="flex items-center justify-between px-2 py-1 text-[10px] text-[hsl(var(--muted-foreground))]">
-        <span>{lang || "codigo"}</span>
+    // w-[min(22rem,80vw)]: a code block's own preferred width would
+    // otherwise be driven by its longest unwrapped line (white-space: pre) —
+    // min-w-0/overflow-hidden alone don't stop that from propagating up
+    // through the bubble's own fit-content sizing (the bubble hugs its text,
+    // so it isn't a fixed width to begin with), which is exactly how one long
+    // line still blew the whole bubble/window out. Giving this box a
+    // definite preferred width instead breaks that propagation at the
+    // source; max-w-full then reclamps it down for a narrow container (the
+    // ~300px MiniChatWindow) where even that would still be too wide — same
+    // two-part fix already used for captioned images (MediaCaptionBubble).
+    <div className="my-1.5 min-w-0 w-[min(22rem,80vw)] max-w-full overflow-hidden rounded-lg border border-white/10 bg-[#1e1e2e]">
+      <div className="flex items-center justify-between gap-2 bg-black/25 px-2.5 py-1 text-[10px] text-slate-400">
+        <span className="truncate">{lang || "codigo"}</span>
         <button
           type="button"
-          className="hover:text-[hsl(var(--foreground))]"
-          onClick={() => {
-            navigator.clipboard?.writeText(code).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }).catch(() => {});
-          }}
+          className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-white/10 hover:text-slate-200"
+          onClick={handleCopy}
         >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           {copied ? "Copiado" : "Copiar"}
         </button>
       </div>
-      <pre className="overflow-x-auto px-3 py-2 text-xs leading-relaxed">
-        <code className="font-mono whitespace-pre">{code}</code>
+      <pre className="min-w-0 max-w-full overflow-x-auto px-3 py-2 text-xs leading-relaxed">
+        <code className="whitespace-pre font-mono text-slate-100">{code}</code>
       </pre>
     </div>
   );
@@ -181,7 +202,18 @@ export function renderRichText(text, opts = {}) {
     highlightQuery = "",
     codeClassName = "rounded bg-[hsl(var(--muted))] px-1 py-0.5 font-mono text-[0.85em]",
     listClassName = "",
-    paragraphClassName = "text-left whitespace-pre-wrap wrap-break-word",
+    // wrap-anywhere (overflow-wrap: anywhere), not wrap-break-word
+    // (overflow-wrap: break-word) — a long unbroken run (a token, hash, URL)
+    // still overflows a flex-sized bubble under break-word: per spec, that
+    // value is deliberately excluded from the browser's min-content size
+    // calculation (kept for CSS2.1 back-compat), so the bubble's own min
+    // width is computed as if the word couldn't break at all, and only THEN
+    // does actual line-breaking apply — too late, the box already sized
+    // itself around the unbroken word. `anywhere` is the one MDN recommends
+    // specifically for flex/grid contexts because it IS counted toward
+    // min-content, so the bubble can actually shrink below one long word's
+    // width instead of forcing everything wider to make room for it.
+    paragraphClassName = "text-left whitespace-pre-wrap wrap-anywhere",
   } = opts;
   if (!text) return null;
   const highlightRe = buildHighlightRegex(highlightQuery);

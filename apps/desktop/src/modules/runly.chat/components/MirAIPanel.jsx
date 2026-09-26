@@ -46,15 +46,18 @@ function Bubble({ role, content, ttsEnabled, speech }) {
         className={[
           // min-w-0: this bubble is a flex-row item — without it, a long
           // unbroken run of characters floors its width at min-content and
-          // overflows past max-w-[80%] regardless of wrap-break-word (see
-          // the matching note in ChatMessageBubble.jsx).
-          "min-w-0 max-w-[80%] wrap-break-word rounded-2xl px-3 py-2 text-sm",
+          // overflows past max-w-[80%]. wrap-anywhere (not wrap-break-word):
+          // break-word is spec-excluded from the min-content calculation
+          // (CSS2.1 back-compat), so it alone doesn't fix this even with
+          // min-w-0 present — anywhere is the value that actually counts
+          // toward min-content in a flex/grid context (see chatRichText.jsx).
+          "min-w-0 max-w-[80%] wrap-anywhere rounded-2xl px-3 py-2 text-sm",
           isUser
             ? "whitespace-pre-wrap bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
             : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
         ].join(" ")}
       >
-        {renderRichText(content, { paragraphClassName: isUser ? "whitespace-pre-wrap wrap-break-word" : "text-left whitespace-pre-wrap wrap-break-word" })}
+        {renderRichText(content, { paragraphClassName: isUser ? "whitespace-pre-wrap wrap-anywhere" : "text-left whitespace-pre-wrap wrap-anywhere" })}
       </div>
       {!isUser && ttsEnabled && (
         <button

@@ -47,7 +47,7 @@ export function PinnedMessagesSheet({ open, onOpenChange, conversationId, curren
                 <span className="text-xs font-medium truncate">{msg.sender?.displayName ?? "Usuario"}</span>
                 <span className="text-[10px] text-[hsl(var(--muted-foreground))] shrink-0">{formatMessageTime(msg.created_at)}</span>
               </div>
-              <p className="text-sm line-clamp-3 whitespace-pre-wrap wrap-break-word">
+              <p className="text-sm line-clamp-3 whitespace-pre-wrap wrap-anywhere">
                 {msg.body ? renderMentionText(msg.body) : <span className="italic text-[hsl(var(--muted-foreground))]">Archivo adjunto</span>}
               </p>
               <div className="flex items-center gap-2 mt-2">

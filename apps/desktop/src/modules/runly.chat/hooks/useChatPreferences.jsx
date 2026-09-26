@@ -14,7 +14,7 @@
 // to re-render with it immediately. Independent hook instances each reading
 // their own state wouldn't see each other's writes.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { runly } from "../../../lib/runly";
 import { useAuth } from "../../../auth/AuthProvider";
 
@@ -102,6 +102,7 @@ export function ChatPreferencesProvider({ children }) {
   const token = session?.access_token;
   const [prefs, setPrefs] = useState(loadLocalPrefs);
   const saveTimerRef = useRef(null);
+  const queryClient = useQueryClient();
 
   // React Query dedupes this across every simultaneously-mounted Provider
   // (multiple floating MiniChatWindows each have their own) — same
@@ -132,6 +133,13 @@ export function ChatPreferencesProvider({ children }) {
     (patch) => {
       setPrefs((prev) => {
         const next = { ...prev, ...patch };
+        // Every mounted ChatPreferencesProvider (ChatScreen's own, plus one
+        // per open MiniChatWindow) reads this same PREF_QUERY_KEY cache entry
+        // — without pushing the change there too, an already-open floating
+        // window kept showing its stale color/font/wallpaper choice until
+        // closed and reopened, since only THIS instance's own local state
+        // (and the PUT below) knew about the change.
+        queryClient.setQueryData(PREF_QUERY_KEY, next);
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => {
           if (token) runly.profile.setPreference(PREF_KEY, next, token).catch(() => {});
@@ -139,7 +147,7 @@ export function ChatPreferencesProvider({ children }) {
         return next;
       });
     },
-    [token],
+    [token, queryClient],
   );
 
   return (

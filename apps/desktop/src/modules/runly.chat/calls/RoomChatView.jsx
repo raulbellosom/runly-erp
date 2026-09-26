@@ -153,7 +153,7 @@ function MessageRow({ m, mine, onResolveAttachmentUrl }) {
             <div className="px-3 py-2 text-sm text-white">
               {renderRichText(m.body, {
                 codeClassName: RICH_TEXT_CODE_CLASS,
-                paragraphClassName: "whitespace-pre-wrap wrap-break-word",
+                paragraphClassName: "whitespace-pre-wrap wrap-anywhere",
               })}
             </div>
           </div>
@@ -162,13 +162,16 @@ function MessageRow({ m, mine, onResolveAttachmentUrl }) {
             // min-w-0: flex-item of the min-w-0/items-end column above — without
             // its own min-w-0 a long unbroken run of characters still floors
             // this bubble's width at min-content and overflows past max-w-[85%].
+            // wrap-anywhere (not wrap-break-word) below is equally load-bearing:
+            // break-word is spec-excluded from the min-content calculation, so
+            // it doesn't fix this even with min-w-0 present.
             className={`min-w-0 px-3 py-1.5 text-sm ${radius} ${
               mine ? "bg-violet-600 text-white" : "bg-white/10 text-slate-100"
             }`}
           >
             {renderRichText(m.body, {
               codeClassName: RICH_TEXT_CODE_CLASS,
-              paragraphClassName: "whitespace-pre-wrap wrap-break-word",
+              paragraphClassName: "whitespace-pre-wrap wrap-anywhere",
             })}
           </div>
         ) : null}

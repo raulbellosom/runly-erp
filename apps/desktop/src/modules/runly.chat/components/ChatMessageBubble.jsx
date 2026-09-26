@@ -237,7 +237,8 @@ function MediaCaptionBubble({ radiusClass, isOwn, body, searchQuery, replyTo, on
         )}
         {renderRichText(body, {
           highlightQuery: searchQuery,
-          paragraphClassName: ["text-left whitespace-pre-wrap wrap-break-word", isOwn ? "text-(--brand-primary-foreground)" : "text-[hsl(var(--foreground))]"].join(" "),
+          // wrap-anywhere, not wrap-break-word — see the note in chatRichText.jsx's default.
+          paragraphClassName: ["text-left whitespace-pre-wrap wrap-anywhere", isOwn ? "text-(--brand-primary-foreground)" : "text-[hsl(var(--foreground))]"].join(" "),
         })}
       </div>
     </div>

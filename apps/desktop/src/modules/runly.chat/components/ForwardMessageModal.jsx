@@ -34,7 +34,7 @@ function SourcePreviewRow({ message }) {
   const body = (message.body ?? "").trim();
   if (body) {
     return (
-      <p className="text-sm text-[hsl(var(--foreground))] leading-relaxed line-clamp-2 whitespace-pre-wrap wrap-break-word">
+      <p className="text-sm text-[hsl(var(--foreground))] leading-relaxed line-clamp-2 whitespace-pre-wrap wrap-anywhere">
         {renderMentionText(body)}
       </p>
     );
