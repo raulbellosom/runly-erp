@@ -3,7 +3,7 @@
 // First AI integration in the repo. Vision LLM adapter for runly.pfm receipt
 // parsing. Provider + model + key all come from env; with no key the caller
 // gets a 503 and the module still boots.
-import { isReasoningModel } from "./groq-model-helpers.js";
+import { createAiRouter } from "./ai/ai-router.js";
 
 export class VisionServiceError extends Error {
   constructor(message, status = 502) {
@@ -84,81 +84,37 @@ const DEFAULT_MAX_TOKENS = 900;
 
 function createGroqAdapter({ env, fetchImpl }) {
   const apiKey = env.GROQ_API_KEY;
-  const baseUrl = (env.GROQ_BASE_URL || "https://api.groq.com").replace(/\/$/, "");
   const model = env.PFM_VISION_MODEL || DEFAULT_VISION_MODEL;
   const timeoutMs = Number(env.PFM_VISION_TIMEOUT_MS) || 20000;
   const retryDelayMs = Number(env.PFM_VISION_RETRY_DELAY_MS) || 1500;
-  const fetchFn = fetchImpl ?? globalThis.fetch;
+  const aiRouter = createAiRouter({ env, fetchImpl });
 
   async function call({ imageBase64, mimeType, systemPrompt = RECEIPT_SYSTEM_PROMPT, question = "Extrae los datos de este ticket.", normalize = normalizeParsed, maxTokens, allowTextFallback = false }) {
     if (!apiKey) throw new VisionServiceError("OCR no configurado (falta GROQ_API_KEY).", 503);
-    const body = {
-      model,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      max_completion_tokens: maxTokens || DEFAULT_MAX_TOKENS,
-      ...(isReasoningModel(model) ? { reasoning_format: "hidden", reasoning_effort: "low" } : {}),
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: question },
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` },
-            },
-          ],
-        },
-      ],
-    };
-
-    let lastErr;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, retryDelayMs));
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), timeoutMs);
-      let res;
-      try {
-        res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch (err) {
-        lastErr = new VisionServiceError(
-          `No se pudo contactar al servicio de vision: ${err.message}`,
-        );
-        clearTimeout(t);
-        continue;
-      }
-      clearTimeout(t);
-
-      if (res.status === 429 || res.status >= 500) {
-        lastErr = new VisionServiceError(`El servicio de vision respondio ${res.status}.`, 502);
-        continue;
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new VisionServiceError(
-          `El servicio de vision rechazo la peticion (${res.status}): ${detail.slice(0, 400)}`,
-        );
-      }
-
-      const payload = await res.json();
-      const content = payload?.choices?.[0]?.message?.content;
-      const obj = extractJsonObject(content);
-      if (!obj) {
-        if (allowTextFallback && typeof content === 'string' && content.trim()) return { parsed: { rawText: content.trim().slice(0, 8000), observations: [], warnings: ['La IA devolvió una respuesta sin campos estructurados. Se muestra el texto recibido para revisión manual.'] }, model: payload.model ?? model };
-        throw new VisionServiceError("El servicio de vision no devolvio un JSON legible.");
-      }
-      return { parsed: normalize(obj), rawResponse: payload, model: payload.model ?? model };
+    const messages = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: question },
+          { type: "image_url", image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` } },
+        ],
+      },
+    ];
+    let payload;
+    try {
+      const result = await aiRouter.runTask({ task: "pfm_vision", model, messages, jsonMode: true, reasoningEffort: "low", useMaxCompletionTokens: true, maxTokens: maxTokens || DEFAULT_MAX_TOKENS, timeoutMs, retryDelayMs });
+      payload = { model: result.model, choices: [{ message: result.message }] };
+    } catch (err) {
+      throw new VisionServiceError(err.message ?? "El servicio de vision no respondio.");
     }
-    throw lastErr ?? new VisionServiceError("El servicio de vision no respondio.");
+    const content = payload?.choices?.[0]?.message?.content;
+    const obj = extractJsonObject(content);
+    if (!obj) {
+      if (allowTextFallback && typeof content === 'string' && content.trim()) return { parsed: { rawText: content.trim().slice(0, 8000), observations: [], warnings: ['La IA devolvió una respuesta sin campos estructurados. Se muestra el texto recibido para revisión manual.'] }, model: payload.model ?? model };
+      throw new VisionServiceError("El servicio de vision no devolvio un JSON legible.");
+    }
+    return { parsed: normalize(obj), rawResponse: payload, model: payload.model ?? model };
   }
 
   // Generic image description for the MirAI chat assistant. Same Groq
@@ -169,57 +125,27 @@ function createGroqAdapter({ env, fetchImpl }) {
     const prompt = (question && String(question).trim())
       ? String(question).trim().slice(0, 500)
       : "Describe con precision y en espanol lo que se ve en esta imagen: texto legible, cifras, objetos y contexto. Se conciso.";
-    const body = {
-      model,
-      temperature: 0,
-      max_completion_tokens: DEFAULT_MAX_TOKENS,
-      ...(isReasoningModel(model) ? { reasoning_format: "hidden", reasoning_effort: "low" } : {}),
-      messages: [
-        { role: "system", content: "Eres un asistente que describe imagenes para otro asistente. Responde solo con la descripcion, sin preambulos." },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` } },
-          ],
-        },
-      ],
-    };
-    let lastErr;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, retryDelayMs));
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), timeoutMs);
-      let res;
-      try {
-        res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch (err) {
-        lastErr = new VisionServiceError(`No se pudo contactar al servicio de vision: ${err.message}`);
-        clearTimeout(t);
-        continue;
-      }
-      clearTimeout(t);
-      if (res.status === 429 || res.status >= 500) {
-        lastErr = new VisionServiceError(`El servicio de vision respondio ${res.status}.`, 502);
-        continue;
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new VisionServiceError(`El servicio de vision rechazo la peticion (${res.status}): ${detail.slice(0, 300)}`);
-      }
-      const payload = await res.json();
-      const content = payload?.choices?.[0]?.message?.content;
-      if (!content || !String(content).trim()) {
-        throw new VisionServiceError("El servicio de vision no devolvio una descripcion.");
-      }
-      return { description: String(content).trim().slice(0, 4000), model: payload.model ?? model };
+    const messages = [
+      { role: "system", content: "Eres un asistente que describe imagenes para otro asistente. Responde solo con la descripcion, sin preambulos." },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` } },
+        ],
+      },
+    ];
+    let result;
+    try {
+      result = await aiRouter.runTask({ task: "pfm_vision", model, messages, reasoningEffort: "low", useMaxCompletionTokens: true, maxTokens: DEFAULT_MAX_TOKENS, timeoutMs, retryDelayMs });
+    } catch (err) {
+      throw new VisionServiceError(err.message ?? "El servicio de vision no respondio.");
     }
-    throw lastErr ?? new VisionServiceError("El servicio de vision no respondio.");
+    const content = result.message?.content;
+    if (!content || !String(content).trim()) {
+      throw new VisionServiceError("El servicio de vision no devolvio una descripcion.");
+    }
+    return { description: String(content).trim().slice(0, 4000), model: result.model ?? model };
   }
 
   return { call, describe };
