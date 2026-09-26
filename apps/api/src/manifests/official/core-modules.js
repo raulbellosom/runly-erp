@@ -158,10 +158,11 @@ export const identityMap = createModuleManifest({
         table: { columns: ["key", "name", "system", "enabled"] },
       },
     },
+    ...loadHelpBlueprints("runly.identity", path.join(HELP_DIR, "runly.identity")),
   ],
   name: "Identidad",
   description: "Usuarios, roles, permisos, membresias y control de acceso.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -266,7 +267,7 @@ export const filesMap = createModuleManifest({
   key: "runly.files",
   name: "Archivos",
   description: "Gestion de archivos, carga, almacenamiento y acceso seguro.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -333,6 +334,7 @@ export const filesMap = createModuleManifest({
         table: { columns: ["originalName", "mimeType", "sizeBytes", "visibility", "enabled"] },
       },
     },
+    ...loadHelpBlueprints("runly.files", path.join(HELP_DIR, "runly.files")),
   ],
 });
 
@@ -341,7 +343,7 @@ export const companyMap = createModuleManifest({
   name: "Empresa",
   description:
     "Perfil de empresa, direccion, marca visual e identidad corporativa.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -475,6 +477,7 @@ export const companyMap = createModuleManifest({
         ],
       },
     },
+    ...loadHelpBlueprints("runly.company", path.join(HELP_DIR, "runly.company")),
   ],
 });
 

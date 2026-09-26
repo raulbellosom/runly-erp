@@ -9,7 +9,7 @@ export const contactsMap = createModuleManifest({
   key: "runly.contacts",
   name: "Contactos",
   description: "Clientes, proveedores, personas y empresas.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -99,6 +99,7 @@ export const contactsMap = createModuleManifest({
         table: { columns: ["type", "name", "email", "phone", "taxId"] },
       },
     },
+    ...loadHelpBlueprints("runly.contacts", path.join(HELP_DIR, "runly.contacts")),
   ],
 });
 
@@ -106,7 +107,7 @@ export const hrMap = createModuleManifest({
   key: "runly.hr",
   name: "Recursos Humanos",
   description: "Colaboradores, notas internas y expedientes.",
-  version: "0.1.0",
+  version: "0.2.0",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -265,6 +266,7 @@ export const hrMap = createModuleManifest({
         ],
       },
     },
+    ...loadHelpBlueprints("runly.hr", path.join(HELP_DIR, "runly.hr")),
   ],
 });
 
