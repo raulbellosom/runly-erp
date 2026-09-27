@@ -267,9 +267,9 @@ export function Calendar({ value, onChange, onClose }) {
                       !sel &&
                       !tod &&
                       "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
-                    tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
+                    tod && !sel && "font-semibold text-primary ring-1 ring-inset ring-primary",
                     sel &&
-                      "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:bg-[hsl(var(--primary))]/90",
+                      "bg-primary text-primary-foreground font-semibold hover:bg-primary/90",
                   )}
                 >
                   {day}
@@ -293,8 +293,8 @@ export function Calendar({ value, onChange, onClose }) {
                 className={cn(
                   "h-10 rounded-lg text-xs font-medium transition-colors",
                   !sel && !tod && "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
-                  tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
-                  sel && "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]",
+                  tod && !sel && "font-semibold text-primary ring-1 ring-inset ring-primary",
+                  sel && "bg-primary text-primary-foreground",
                 )}
               >
                 {label.slice(0, 3)}
@@ -317,8 +317,8 @@ export function Calendar({ value, onChange, onClose }) {
                 className={cn(
                   "h-10 rounded-lg text-xs font-medium transition-colors",
                   !sel && !tod && "hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
-                  tod && !sel && "font-semibold text-[hsl(var(--primary))] ring-1 ring-inset ring-[hsl(var(--primary))]",
-                  sel && "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]",
+                  tod && !sel && "font-semibold text-primary ring-1 ring-inset ring-primary",
+                  sel && "bg-primary text-primary-foreground",
                 )}
               >
                 {year}

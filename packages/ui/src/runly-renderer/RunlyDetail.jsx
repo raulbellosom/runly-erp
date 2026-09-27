@@ -31,6 +31,7 @@ import { MarkdownViewer } from "../components/MarkdownViewer.jsx";
 import { normalizeSpanishLabel } from "./renderer-adapters.js";
 import { resolveColorHex } from "./runly-form-utils.js";
 import { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
+import { DetailSectionShell } from "./detail-section-shell.jsx";
 import {
   resolveHeroModel,
   resolveKpis,
@@ -429,7 +430,23 @@ function normalizeSections(schema, fieldMap) {
         fields: fieldNames,
       };
     })
+    .map((section, i) =>
+      section ? withCollapseConfig(section, rawSections[i]) : null,
+    )
     .filter(Boolean);
+}
+
+// Optional per-section collapse: `collapsible: true` renders a toggle header;
+// `defaultCollapsed` is true | false | "mobile" (collapsed only below lg).
+function withCollapseConfig(section, entry) {
+  const dc = entry?.defaultCollapsed;
+  const collapsible = entry?.collapsible === true || dc === true || dc === "mobile";
+  if (!collapsible) return section;
+  return {
+    ...section,
+    collapsible: true,
+    defaultCollapsed: dc === "mobile" ? "mobile" : dc === true,
+  };
 }
 
 function renderValue(field, value, record = {}) {
@@ -983,7 +1000,7 @@ export function RunlyDetail({
     () => (data && typeof data === "object" ? resolveKpis(schema, data) : []),
     [schema, data],
   );
-  const { twoColumn, main: mainSections, aside: asideSections } = useMemo(
+  const { twoColumn, main: mainSections, aside: asideSections, full: fullSections } = useMemo(
     () => splitSectionsByColumn(sections, schema?.layout),
     [sections, schema?.layout],
   );
@@ -1021,27 +1038,14 @@ export function RunlyDetail({
     ) : null;
 
   const renderSection = (section) => (
-    <div
+    <DetailSectionShell
       key={section.id}
+      section={section}
       className={cn(
-        "glass-shell-flat rounded-xl px-5 py-4 space-y-4",
         section.type === "fields" &&
           "border-l-2 border-l-(--brand-primary) shadow-[inset_10px_0_16px_-14px_var(--brand-primary)]",
       )}
     >
-      {section.title ? (
-        <div className="pb-3 border-b border-[hsl(var(--border))] flex items-center gap-2">
-          {(() => {
-            const SectionIcon = section.icon ? LucideIcons[section.icon] : null;
-            return SectionIcon ? (
-              <SectionIcon className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
-            ) : null;
-          })()}
-          <h4 className="text-sm font-semibold text-[hsl(var(--foreground))]">
-            {section.title}
-          </h4>
-        </div>
-      ) : null}
 
       {section.type === "attachments" ? (
         <AttachmentsPanel
@@ -1144,7 +1148,7 @@ export function RunlyDetail({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </DetailSectionShell>
   );
 
   return (
@@ -1198,6 +1202,11 @@ export function RunlyDetail({
           <div className="min-w-0 space-y-6">
             {asideSections.map(renderSection)}
           </div>
+          {fullSections.length > 0 && (
+            <div className="min-w-0 space-y-6 lg:col-span-3">
+              {fullSections.map(renderSection)}
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-6">{sections.map(renderSection)}</div>

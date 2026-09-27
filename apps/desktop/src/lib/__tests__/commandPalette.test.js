@@ -324,3 +324,17 @@ test("child nav entries are expanded into their own items", () => {
     ["/app/m/atlas.web/pages", "/app/m/atlas.web/blog"].sort(),
   );
 });
+
+test("help search group is placed after modules, tools and pages", () => {
+  const { sections } = buildCommandItems({
+    availableModules: [contacts],
+    query: "contactos",
+    searchGroups: [
+      { source: "help", label: "Ayuda", items: [{ id: "h1", title: "Contactos", target: "/help/x" }] },
+      { source: "contacts", label: "Contactos", items: [{ id: "c1", title: "Ana", target: "/c/1" }] },
+    ],
+  });
+  const ids = sections.map((s) => s.id);
+  assert.equal(ids.at(-1), "search:help");
+  assert.equal(ids[0], "search:contacts");
+});

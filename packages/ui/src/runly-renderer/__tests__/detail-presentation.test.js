@@ -201,3 +201,13 @@ test("normalizeComponentSection falls back to a generated id", () => {
   );
   assert.equal(section.id, "section-2");
 });
+
+test("splitSectionsByColumn: column full goes to the bottom row", () => {
+  assert.equal(normalizeSectionColumn("full"), "full");
+  const r = splitSectionsByColumn(
+    [{ id: "a", column: "main" }, { id: "p", column: "full" }, { id: "b", column: "aside" }],
+    "two-column",
+  );
+  assert.deepEqual(r.full.map((s) => s.id), ["p"]);
+  assert.deepEqual(r.main.map((s) => s.id), ["a"]);
+});

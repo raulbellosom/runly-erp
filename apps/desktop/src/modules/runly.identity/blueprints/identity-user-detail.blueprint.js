@@ -68,14 +68,6 @@ export const IDENTITY_USER_DETAIL = {
         component: "runly.identity:MembershipsSection",
       },
       {
-        id: "permission-grants",
-        type: "component",
-        label: "Permisos",
-        icon: "KeyRound",
-        column: "main",
-        component: "runly.identity:PermissionGrantsSection",
-      },
-      {
         id: "activity",
         type: "component",
         label: "Actividad",
@@ -90,6 +82,17 @@ export const IDENTITY_USER_DETAIL = {
         icon: "LogIn",
         column: "aside",
         component: "runly.identity:UserSessionSection",
+      },
+      // Long permission tree: full-width at the very bottom, collapsed by
+      // default on mobile.
+      {
+        id: "permission-grants",
+        type: "component",
+        label: "Permisos",
+        icon: "KeyRound",
+        column: "full",
+        defaultCollapsed: "mobile",
+        component: "runly.identity:PermissionGrantsSection",
       },
     ],
   },

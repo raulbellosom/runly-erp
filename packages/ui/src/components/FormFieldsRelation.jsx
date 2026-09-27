@@ -4,14 +4,23 @@
 // 2026-09-25 to keep that file under the CLAUDE.md 1000-line limit —
 // re-exported from FormFields.jsx unchanged so every existing import path
 // (package index and sibling components) keeps working without edits.
-import { useEffect } from "react";
+import { useEffect, useRef, useId } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Search, X, Check, Plus } from "lucide-react";
+import { ChevronDown, X, Check } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { useIsolatedScroll } from "../hooks/useIsolatedScroll.js";
 import { useComboboxPopover } from "../hooks/useComboboxPopover.js";
 import { LoadingState } from "./LoadingState.jsx";
 import { fieldCls, InputIcon, FieldWrapper } from "./form-field-base.jsx";
+import {
+  dropdownPanelCls,
+  optionCls,
+  shouldOfferCreate,
+  useListboxNav,
+  triggerKeyDown,
+  SearchRow,
+  CreateOption,
+} from "./combobox-parts.jsx";
 
 // ─── ComboboxField ────────────────────────────────────────────────────────────
 
@@ -63,6 +72,17 @@ export function ComboboxField({
     close();
   }
 
+  const listRef = useRef(null);
+  const listId = useId();
+  const nav = useListboxNav({
+    open,
+    count: filtered.length,
+    initialIndex: Math.max(0, filtered.findIndex((o) => o.value === value)),
+    onPick: (i) => handleSelect(filtered[i]),
+    onClose: close,
+    listRef,
+  });
+
   return (
     <FieldWrapper
       label={label}
@@ -76,6 +96,7 @@ export function ComboboxField({
           type="button"
           id={id}
           onClick={handleOpen}
+          onKeyDown={triggerKeyDown(open, handleOpen)}
           className={cn(
             fieldCls(
               externalError,
@@ -122,37 +143,24 @@ export function ComboboxField({
                 pointerEvents: "auto",
               }}
               className={cn(
-                "glass-shell rounded-xl overflow-hidden",
+                dropdownPanelCls,
                 dropdownStyle.flipped && "flex flex-col-reverse",
               )}
             >
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-2",
-                dropdownStyle.flipped ? "border-t border-border" : "border-b border-border",
-              )}>
-                <Search
-                  size={13}
-                  className="text-muted-foreground shrink-0"
-                />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={searchPlaceholder}
-                  className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="flex items-center justify-center h-4 w-4 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-              </div>
-              <div className="max-h-52 overflow-y-auto overscroll-contain" role="listbox">
+              <SearchRow
+                inputRef={searchRef}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  nav.resetActive(1);
+                }}
+                onClear={() => setSearch("")}
+                onKeyDown={nav.onKeyDown}
+                placeholder={searchPlaceholder}
+                flipped={dropdownStyle.flipped}
+                activeId={nav.activeIndex >= 0 ? `${listId}-${nav.activeIndex}` : undefined}
+              />
+              <div ref={listRef} className="max-h-52 overflow-y-auto overscroll-contain p-1" role="listbox">
                 {search.length < minSearchLength ? (
                   <p className="px-3 py-4 text-xs text-muted-foreground text-center">
                     Escribe al menos {minSearchLength} letras para buscar
@@ -162,19 +170,21 @@ export function ComboboxField({
                     {emptyText}
                   </p>
                 ) : (
-                  filtered.map((opt) => (
+                  filtered.map((opt, i) => (
                     <button
                       key={opt.value}
+                      id={`${listId}-${i}`}
+                      data-nav-index={i}
                       type="button"
+                      tabIndex={-1}
                       role="option"
                       aria-selected={opt.value === value}
                       onClick={() => handleSelect(opt)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 text-sm transition-colors duration-100 flex items-center gap-2",
-                        opt.value === value
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-foreground hover:bg-muted/50",
-                      )}
+                      onMouseEnter={() => nav.setActiveIndex(i)}
+                      className={optionCls({
+                        active: nav.activeIndex === i,
+                        selected: opt.value === value,
+                      })}
                     >
                       <span className="flex-1 truncate">{opt.label}</span>
                       {opt.value === value && (
@@ -289,16 +299,36 @@ export function RelationSelectField({
     : options;
 
   const trimmedSearch = search.trim();
+  // The create row only appears once the user has typed something that does
+  // not already exist ("empty-search" keeps the legacy open-a-blank-form row).
   const canShowCreate =
     typeof onCreate === "function" &&
-    (createActionMode === "always" ||
-      (createActionMode === "empty-search" && trimmedSearch.length === 0) ||
-      (createActionMode === "has-search" && trimmedSearch.length > 0));
-  const createLabel = (() => {
-    if (createFromSearch && trimmedSearch.length > 0)
-      return `Crear "${trimmedSearch}"`;
-    return createActionLabel || "Crear nuevo";
-  })();
+    !loading &&
+    !loadError &&
+    (createActionMode === "empty-search"
+      ? trimmedSearch.length === 0
+      : shouldOfferCreate(search, options));
+  const createFixedText =
+    createActionMode === "empty-search" ? createActionLabel || "Crear nuevo" : null;
+
+  const listRef = useRef(null);
+  const listId = useId();
+  const listOptions = loading || loadError ? [] : filtered;
+  const navCount = listOptions.length + (canShowCreate ? 1 : 0);
+  const nav = useListboxNav({
+    open,
+    count: navCount,
+    initialIndex: Math.max(
+      0,
+      listOptions.findIndex((o) => String(o.value) === String(value)),
+    ),
+    onPick: (i) => {
+      if (i < listOptions.length) handleSelect(listOptions[i]);
+      else handleCreate();
+    },
+    onClose: close,
+    listRef,
+  });
 
   return (
     <FieldWrapper
@@ -313,6 +343,7 @@ export function RelationSelectField({
           type="button"
           id={id}
           onClick={handleOpen}
+          onKeyDown={triggerKeyDown(open, handleOpen)}
           className={cn(
             fieldCls(
               externalError,
@@ -380,40 +411,27 @@ export function RelationSelectField({
                 pointerEvents: "auto",
               }}
               className={cn(
-                "glass-shell rounded-xl overflow-hidden",
+                dropdownPanelCls,
                 dropdownStyle.flipped && "flex flex-col-reverse",
               )}
             >
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-2",
-                dropdownStyle.flipped ? "border-t border-border" : "border-b border-border",
-              )}>
-                <Search
-                  size={13}
-                  className="text-muted-foreground shrink-0"
-                />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={search}
-                  onChange={handleSearchChange}
-                  placeholder="Buscar..."
-                  className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch("");
-                      onSearchChange?.("");
-                    }}
-                    className="flex items-center justify-center h-4 w-4 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-              </div>
-              <div className="max-h-52 overflow-y-auto overscroll-contain" role="listbox">
+              <SearchRow
+                inputRef={searchRef}
+                value={search}
+                onChange={(e) => {
+                  handleSearchChange(e);
+                  nav.resetActive(1);
+                }}
+                onClear={() => {
+                  setSearch("");
+                  onSearchChange?.("");
+                }}
+                onKeyDown={nav.onKeyDown}
+                placeholder="Buscar..."
+                flipped={dropdownStyle.flipped}
+                activeId={nav.activeIndex >= 0 ? `${listId}-${nav.activeIndex}` : undefined}
+              />
+              <div ref={listRef} className="max-h-52 overflow-y-auto overscroll-contain p-1" role="listbox">
                 {loading ? (
                   <LoadingState size="sm" message="Cargando opciones..." />
                 ) : loadError ? (
@@ -432,55 +450,55 @@ export function RelationSelectField({
                     )}
                   </div>
                 ) : filtered.length === 0 ? (
-                  <p className="px-3 py-4 text-sm text-muted-foreground text-center">
-                    {options.length === 0
-                      ? "Sin opciones disponibles"
-                      : "Sin resultados"}
-                  </p>
+                  !canShowCreate && (
+                    <p className="px-3 py-4 text-sm text-muted-foreground text-center">
+                      {options.length === 0
+                        ? typeof onCreate === "function"
+                          ? "Escribe para crear un nuevo valor"
+                          : "Sin opciones disponibles"
+                        : "Sin resultados"}
+                    </p>
+                  )
                 ) : (
-                  filtered.map((opt) => {
+                  filtered.map((opt, i) => {
                     const isSelected = String(opt.value) === String(value);
                     return (
                       <button
                         key={opt.value}
+                        id={`${listId}-${i}`}
+                        data-nav-index={i}
                         type="button"
+                        tabIndex={-1}
                         role="option"
                         aria-selected={isSelected}
                         onClick={() => handleSelect(opt)}
+                        onMouseEnter={() => nav.setActiveIndex(i)}
                         disabled={opt.disabled}
                         className={cn(
-                          "w-full text-left px-3 transition-colors duration-100 flex items-center gap-2",
-                          opt.meta ? "py-2.5" : "py-2",
-                          isSelected
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-foreground hover:bg-muted/50",
-                          opt.disabled &&
-                            "opacity-50 cursor-not-allowed pointer-events-none",
+                          optionCls({
+                            active: nav.activeIndex === i,
+                            selected: isSelected,
+                            disabled: opt.disabled,
+                          }),
+                          opt.meta && "py-2.5",
                         )}
                       >
                         {opt.meta ? (
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {opt.meta.badge ? (
-                                <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary shrink-0">
+                                <span className="inline-flex items-center rounded bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-foreground shrink-0">
                                   {opt.meta.badge}
                                 </span>
                               ) : null}
                               {opt.meta.title ? (
-                                <span
-                                  className={cn(
-                                    "text-sm font-medium truncate",
-                                    isSelected
-                                      ? "text-primary"
-                                      : "text-foreground",
-                                  )}
-                                >
+                                <span className="text-sm font-medium truncate text-foreground">
                                   {opt.meta.title}
                                 </span>
                               ) : null}
                             </div>
                             {opt.meta.subtitle ? (
-                              <p className="text-xs text-[hsl(var(--muted-foreground))] truncate mt-0.5">
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">
                                 {opt.meta.subtitle}
                               </p>
                             ) : null}
@@ -491,33 +509,26 @@ export function RelationSelectField({
                           </span>
                         )}
                         {isSelected && (
-                          <Check size={13} className="shrink-0 text-primary" />
+                          <Check size={14} strokeWidth={2.5} className="shrink-0 text-primary" />
                         )}
                       </button>
                     );
                   })
                 )}
                 {canShowCreate && (
-                  <>
-                    <div className="mx-3 my-1 border-t border-border" />
-                    <button
-                      type="button"
-                      role="option"
+                  <div className={cn(filtered.length > 0 && "mt-1 pt-1 border-t border-foreground/10")}>
+                    <CreateOption
+                      index={listOptions.length}
+                      id={`${listId}-${listOptions.length}`}
+                      active={nav.activeIndex === listOptions.length}
+                      term={trimmedSearch}
+                      text={createFixedText}
+                      isCreating={isCreating}
+                      disabled={createDisabled}
                       onClick={handleCreate}
-                      disabled={createDisabled || isCreating}
-                      className={cn(
-                        "w-full text-left px-3 py-2 text-sm transition-colors duration-100 flex items-center gap-2",
-                        "text-primary hover:bg-primary/5",
-                        (createDisabled || isCreating) &&
-                          "opacity-50 cursor-not-allowed",
-                      )}
-                    >
-                      <Plus size={14} className="shrink-0" />
-                      <span className="font-medium">
-                        {isCreating ? "Creando..." : createLabel}
-                      </span>
-                    </button>
-                  </>
+                      onHover={() => nav.setActiveIndex(listOptions.length)}
+                    />
+                  </div>
                 )}
               </div>
             </div>,

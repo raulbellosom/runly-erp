@@ -232,12 +232,15 @@ export function buildCommandItems({
     .filter((section) => section.items.length > 0);
 
   // Records the user explicitly searched for sit just under the active module's
-  // own actions and above the generic module list.
-  const searchSections = mapSearchGroups(searchGroups);
+  // own actions and above the generic module list. Help articles are reference
+  // material, so they go last, after modules/tools/pages.
+  const allSearchSections = mapSearchGroups(searchGroups);
+  const helpSections = allSearchSections.filter((s) => s.id === "search:help");
+  const searchSections = allSearchSections.filter((s) => s.id !== "search:help");
   const hasActive = localSections[0]?.id === "active";
   const sections = hasActive
-    ? [localSections[0], ...searchSections, ...localSections.slice(1)]
-    : [...searchSections, ...localSections];
+    ? [localSections[0], ...searchSections, ...localSections.slice(1), ...helpSections]
+    : [...searchSections, ...localSections, ...helpSections];
 
   const flat = sections.flatMap((section) => section.items);
 

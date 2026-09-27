@@ -168,16 +168,20 @@ export const DateTimeField = forwardRef(function DateTimeField(
     if (!next) onBlur?.();
   }
 
-  function commit() {
+  // Every pick (day or time) is applied immediately so the trigger always
+  // shows the value being built; "Listo" only closes the picker.
+  function updateDraft(patch) {
+    const nextDraft = { ...draft, ...patch };
+    setDraft(nextDraft);
     const next = composeDateTimeValue(
-      draft.date,
-      draft.hour,
-      draft.minute,
-      draft.meridiem,
+      nextDraft.date,
+      nextDraft.hour,
+      nextDraft.minute,
+      nextDraft.meridiem,
     );
+    if (!next) return;
     if (validate) setLocalError(validate(next) || "");
     onChange?.({ target: { name, value: next } });
-    setOpen(false);
   }
 
   const displayValue = formatDateTimeDisplay(value);
@@ -230,24 +234,22 @@ export const DateTimeField = forwardRef(function DateTimeField(
               type="button"
               size="sm"
               className="w-full mt-3"
-              onClick={commit}
+              onClick={() => handleOpenChange(false)}
             >
-              Aceptar
+              Listo
             </Button>
           }
         >
           <Calendar
             value={draft.date}
-            onChange={(nextDate) =>
-              setDraft((d) => ({ ...d, date: nextDate }))
-            }
+            onChange={(nextDate) => updateDraft({ date: nextDate })}
             onClose={() => {}}
           />
           <TimeWheel
             hour={draft.hour}
             minute={draft.minute}
             meridiem={draft.meridiem}
-            onChange={(next) => setDraft((d) => ({ ...d, ...next }))}
+            onChange={(next) => updateDraft(next)}
           />
         </DateSelectorShell>
       </div>

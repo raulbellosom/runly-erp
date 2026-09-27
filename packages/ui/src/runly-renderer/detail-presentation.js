@@ -157,21 +157,25 @@ export function resolveKpis(schema, record) {
 // splitSectionsByColumn below (and every normalizeSections branch in
 // RunlyDetail.jsx) expects: "aside" or "main".
 export function normalizeSectionColumn(value) {
-  return String(value ?? "").trim().toLowerCase() === "aside" ? "aside" : "main";
+  const v = String(value ?? "").trim().toLowerCase();
+  // "full": full-width row rendered below both columns (last on mobile too).
+  return v === "aside" || v === "full" ? v : "main";
 }
 
 export function splitSectionsByColumn(sections, layout) {
   const list = Array.isArray(sections) ? sections : [];
   if (String(layout ?? "") !== "two-column") {
-    return { twoColumn: false, main: list, aside: [] };
+    return { twoColumn: false, main: list, aside: [], full: [] };
   }
   const main = [];
   const aside = [];
+  const full = [];
   for (const section of list) {
     if (section?.column === "aside") aside.push(section);
+    else if (section?.column === "full") full.push(section);
     else main.push(section);
   }
-  return { twoColumn: true, main, aside };
+  return { twoColumn: true, main, aside, full };
 }
 
 export function normalizeComponentSection(entry, sectionIndex, title, icon) {

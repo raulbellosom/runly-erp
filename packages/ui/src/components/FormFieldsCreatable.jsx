@@ -5,13 +5,22 @@
 // under the CLAUDE.md 1000-line limit — re-exported from FormFields.jsx
 // unchanged so every existing import path (package index and sibling
 // components) keeps working without edits.
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Search, X, Check } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { useIsolatedScroll } from "../hooks/useIsolatedScroll.js";
 import { useComboboxPopover, computeDropdownStyle } from "../hooks/useComboboxPopover.js";
 import { fieldCls, InputIcon, FieldWrapper } from "./form-field-base.jsx";
+import {
+  dropdownPanelCls,
+  optionCls,
+  shouldOfferCreate,
+  useListboxNav,
+  triggerKeyDown,
+  SearchRow,
+  CreateOption,
+} from "./combobox-parts.jsx";
 
 // ─── CreatableComboboxField ───────────────────────────────────────────────────
 // Same as ComboboxField but shows a "+ Crear «X»" option when the search term
@@ -49,9 +58,7 @@ export function CreatableComboboxField({
 
   const trimmed = search.trim();
   const showCreate =
-    typeof onCreate === "function" &&
-    trimmed.length > 0 &&
-    !options.some((o) => o.label.toLowerCase() === trimmed.toLowerCase());
+    typeof onCreate === "function" && shouldOfferCreate(search, options);
 
   function handleOpen() {
     handlePopoverOpen();
@@ -68,6 +75,20 @@ export function CreatableComboboxField({
     close();
   }
 
+  const listRef = useRef(null);
+  const listId = useId();
+  const nav = useListboxNav({
+    open,
+    count: filtered.length + (showCreate ? 1 : 0),
+    initialIndex: Math.max(0, filtered.findIndex((o) => o.value === value)),
+    onPick: (i) => {
+      if (i < filtered.length) handleSelect(filtered[i]);
+      else handleCreate();
+    },
+    onClose: close,
+    listRef,
+  });
+
   return (
     <FieldWrapper
       label={label}
@@ -81,6 +102,7 @@ export function CreatableComboboxField({
           type="button"
           id={id}
           onClick={handleOpen}
+          onKeyDown={triggerKeyDown(open, handleOpen)}
           className={cn(
             fieldCls(
               externalError,
@@ -127,86 +149,65 @@ export function CreatableComboboxField({
                 pointerEvents: "auto",
               }}
               className={cn(
-                "glass-shell rounded-xl overflow-hidden",
+                dropdownPanelCls,
                 dropdownStyle.flipped && "flex flex-col-reverse",
               )}
             >
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-2",
-                dropdownStyle.flipped ? "border-t border-border" : "border-b border-border",
-              )}>
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && showCreate) {
-                      e.preventDefault();
-                      handleCreate();
-                    }
-                  }}
-                  placeholder={searchPlaceholder}
-                  className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-              <div className="max-h-52 overflow-y-auto overscroll-contain" role="listbox">
+              <SearchRow
+                inputRef={searchRef}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  nav.resetActive(1);
+                }}
+                onClear={() => setSearch("")}
+                onKeyDown={nav.onKeyDown}
+                placeholder={searchPlaceholder}
+                flipped={dropdownStyle.flipped}
+                activeId={nav.activeIndex >= 0 ? `${listId}-${nav.activeIndex}` : undefined}
+              />
+              <div ref={listRef} className="max-h-52 overflow-y-auto overscroll-contain p-1" role="listbox">
                 {filtered.length === 0 && !showCreate && (
                   <p className="px-3 py-4 text-sm text-muted-foreground text-center">
-                    {emptyText}
+                    {options.length === 0 && typeof onCreate === "function"
+                      ? "Escribe para crear un nuevo valor"
+                      : emptyText}
                   </p>
                 )}
-                {filtered.map((opt) => (
+                {filtered.map((opt, i) => (
                   <button
                     key={opt.value}
+                    id={`${listId}-${i}`}
+                    data-nav-index={i}
                     type="button"
+                    tabIndex={-1}
                     role="option"
                     aria-selected={opt.value === value}
                     onClick={() => handleSelect(opt)}
-                    className={cn(
-                      "w-full text-left px-3 py-2 text-sm transition-colors duration-100",
-                      opt.value === value
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-foreground hover:bg-muted/50",
-                    )}
+                    onMouseEnter={() => nav.setActiveIndex(i)}
+                    className={optionCls({
+                      active: nav.activeIndex === i,
+                      selected: opt.value === value,
+                    })}
                   >
-                    {opt.label}
+                    <span className="flex-1 truncate">{opt.label}</span>
+                    {opt.value === value && (
+                      <Check size={14} strokeWidth={2.5} className="shrink-0 text-primary" />
+                    )}
                   </button>
                 ))}
                 {showCreate && (
-                  <>
-                    {filtered.length > 0 && (
-                      <div className="mx-3 my-1 border-t border-border" />
-                    )}
-                    <button
-                      type="button"
-                      role="option"
-                      disabled={isCreating}
+                  <div className={cn(filtered.length > 0 && "mt-1 pt-1 border-t border-foreground/10")}>
+                    <CreateOption
+                      index={filtered.length}
+                      id={`${listId}-${filtered.length}`}
+                      active={nav.activeIndex === filtered.length}
+                      term={trimmed}
+                      isCreating={isCreating}
                       onClick={handleCreate}
-                      className="w-full text-left px-3 py-2 text-sm transition-colors duration-100 flex items-center gap-2 text-primary hover:bg-primary/5 disabled:opacity-50 disabled:cursor-wait font-medium"
-                    >
-                      <span className="text-base leading-none">+</span>
-                      {isCreating ? (
-                        <span>Creando...</span>
-                      ) : (
-                        <span>
-                          Crear{" "}
-                          <span className="text-foreground font-semibold">
-                            &ldquo;{trimmed}&rdquo;
-                          </span>
-                        </span>
-                      )}
-                    </button>
-                  </>
+                      onHover={() => nav.setActiveIndex(filtered.length)}
+                    />
+                  </div>
                 )}
               </div>
             </div>,
