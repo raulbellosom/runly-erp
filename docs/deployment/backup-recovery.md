@@ -103,10 +103,21 @@ machine.
 Run this any time (also suitable for wiring into external monitoring), from
 your `infra/installer` checkout:
 
+`docker compose` alone does not know the `supabase-storage-data` volume local
+mode's `runly-backup-local` service mounts — it is declared in
+`supabase/docker-compose.supabase.yml`, a separate file the installer always
+passes alongside the rest. Running without it fails with `refers to
+undefined volume supabase-storage-data: invalid compose project`. Pass the
+same files the installer itself uses (add `-f docker-compose.linux.yml` only
+if that file exists in your checkout, which it does on Linux):
+
 ```bash
-docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
-# or, in external mode:
-docker compose --profile backup-external run --rm runly-backup-external ./verify-backup.sh
+# local mode
+docker compose -f docker-compose.yml -f docker-compose.linux.yml -f supabase/docker-compose.supabase.yml \
+  --profile backup-local run --rm runly-backup-local ./verify-backup.sh
+# external mode
+docker compose -f docker-compose.yml -f docker-compose.linux.yml \
+  --profile backup-external run --rm runly-backup-external ./verify-backup.sh
 ```
 
 Exits non-zero if the latest snapshot is older than half the retention

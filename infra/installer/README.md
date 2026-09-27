@@ -601,8 +601,22 @@ necesitar estas credenciales.
 
 ### Verificar que los backups funcionan
 
+`docker compose` por si solo no conoce el volumen `supabase-storage-data`
+(modo `local`) — esta declarado en `supabase/docker-compose.supabase.yml`, un
+archivo distinto que el instalador siempre pasa junto con los demas. Un
+`docker compose --profile ...` sin esos mismos `-f` falla con
+`refers to undefined volume supabase-storage-data: invalid compose project`.
+Usa los mismos archivos que usa el instalador (agrega `docker-compose.linux.yml`
+solo si existe en tu instalacion, que es el caso en Linux):
+
 ```bash
-docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
+# modo local
+docker compose -f docker-compose.yml -f docker-compose.linux.yml -f supabase/docker-compose.supabase.yml \
+  --profile backup-local run --rm runly-backup-local ./verify-backup.sh
+
+# modo external
+docker compose -f docker-compose.yml -f docker-compose.linux.yml \
+  --profile backup-external run --rm runly-backup-external ./verify-backup.sh
 ```
 
 ### Desactivar
