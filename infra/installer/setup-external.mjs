@@ -293,6 +293,16 @@ const OPTIONAL_VAR_GROUPS = [
   },
   {
     header: [
+      "# ── Reportar bug (opcional) ───────────────────────────────────────────────────",
+      "# Destino del boton \"Reportar bug\". Se envia por el SMTP de plataforma",
+      "# configurado en Ajustes -> SMTP. Vacio deshabilita el boton en esta instancia.",
+    ],
+    vars: [
+      { key: "RUNLY_SUPPORT_EMAIL", placeholder: "", comment: null },
+    ],
+  },
+  {
+    header: [
       "# ── Runly Calls / LiveKit ──────────────────────────────────────────────────",
       "# embedded starts LiveKit + Redis; external uses an existing RTC server; disabled hides calls.",
     ],

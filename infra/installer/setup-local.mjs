@@ -755,6 +755,7 @@ async function writeLocalEnv(supabaseInput, identity) {
   const ollamaBaseUrl   = fromLocalEnv("OLLAMA_BASE_URL") || "http://localhost:11434";
   const ollamaModelLight = fromLocalEnv("OLLAMA_MODEL_LIGHT") || "qwen3:4b";
   const ollamaModelHeavy = fromLocalEnv("OLLAMA_MODEL_HEAVY") || "qwen3:8b";
+  const supportEmail = fromLocalEnv("RUNLY_SUPPORT_EMAIL");
   // LiveKit Egress → Supabase Storage (call recordings) — optional. In
   // selfhosted mode these four are NOT independent user secrets to preserve
   // across re-runs like the rest of fromLocalEnv's fallbacks — client
@@ -965,6 +966,12 @@ AI_LOCAL_ENABLED=${aiLocalEnabled}
 OLLAMA_BASE_URL=${ollamaBaseUrl}
 OLLAMA_MODEL_LIGHT=${ollamaModelLight}
 OLLAMA_MODEL_HEAVY=${ollamaModelHeavy}
+
+# ── Reportar bug (opcional) ───────────────────────────────────────────────────
+# Destino del boton "Reportar bug". Se envia por el SMTP de plataforma
+# configurado en Ajustes -> SMTP (o el de la empresa activa si el de
+# plataforma no esta configurado). Vacio deshabilita el boton en esta instancia.
+RUNLY_SUPPORT_EMAIL=${supportEmail}
 
 # ── LiveKit Egress → Supabase Storage (call recordings, optional) ───────────
 # Get these from the self-hosted Supabase Storage container's own S3-compatible
