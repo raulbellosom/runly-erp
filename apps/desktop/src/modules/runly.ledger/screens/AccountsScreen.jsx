@@ -217,8 +217,8 @@ export default function AccountsScreen() {
       )
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 pt-5">
+    <div className="flex flex-col">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-5">
         <PageHeader
           eyebrow="Runly Ledger"
           title="Cuentas bancarias"
@@ -282,7 +282,7 @@ export default function AccountsScreen() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
+      <div className="px-4 sm:px-6 pb-6 pt-4">
         {offlineLedgerView && (
           <div className="mb-4 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.25)] px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]">
             Mostrando la cache local de ledger. La separación por compartidas y grupos vuelve al reconectar.

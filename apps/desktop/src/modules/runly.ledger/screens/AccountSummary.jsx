@@ -228,7 +228,7 @@ export default function AccountSummary({ accountId, currency = 'MXN', dateFrom, 
   const barH = Math.max(180, barData.length * 52 + 32)
 
   return (
-    <div className="p-6 overflow-y-auto h-full space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KpiCard label="Saldo inicial" value={kpis.opening_balance} currency={currency} icon={Wallet} tone="neutral" />
         <KpiCard label="Saldo actual" value={kpis.current_balance} currency={currency} icon={TrendingUp} tone="brand" />

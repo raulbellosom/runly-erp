@@ -65,8 +65,8 @@ export default function GroupsScreen() {
   if (isError) return <ErrorState description="No se pudieron cargar los grupos." onRetry={refetch} />
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 pt-5">
+    <div className="flex flex-col">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-5">
         <PageHeader
           eyebrow="Runly Ledger"
           title="Grupos"
@@ -90,7 +90,7 @@ export default function GroupsScreen() {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
+      <div className="px-4 sm:px-6 pb-6 pt-4">
         {groups.length === 0 ? (
           <EmptyState
             icon={FolderOpen}

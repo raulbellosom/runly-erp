@@ -250,8 +250,8 @@ export default function GroupScreen() {
   const canWrite = myRole === 'editor' || myRole === 'admin'
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 pt-5">
+    <div className="flex flex-col">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-5">
         <PageHeader
           eyebrow="Runly Ledger"
           onBack={() => navigate('/app/m/runly.ledger/groups')}
@@ -318,7 +318,7 @@ export default function GroupScreen() {
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
+      <div className="px-4 sm:px-6 pb-6 pt-4">
         {activeTab === 'cuentas' && (
           accounts.length === 0
             ? (

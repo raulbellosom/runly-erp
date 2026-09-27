@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOfflineStatus } from '@runly/offline'
 import { toast } from 'sonner'
-import { Plus, Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
-import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar, DatePickerField } from '@runly/ui'
+import { Plus, Wallet, ArrowDownLeft, ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react'
+import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar, DatePickerField, ViewModeSwitch, getStoredViewMode } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useAccountTransactions, useAccountSummary, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
 import { useTransactionMutations } from '../hooks/useTransactionMutations.js'
@@ -43,7 +43,27 @@ export default function SpreadsheetRegister({
   const [mobileSheet, setMobileSheet] = useState(null) // { mode: 'new' | 'edit', draft }
   const [search, setSearch] = useState('')
   const [filterValue, setFilterValue] = useState({ tipo: '', categoria: '' })
+  // Mobile only: 'cards' (touch list + sheet editor) or 'table' (the same
+  // inline spreadsheet grid desktop uses). Desktop always shows the grid.
+  const [mobileView, setMobileView] = useState(() => getStoredViewMode('ledger-register-mobile', 'cards'))
+  // CSS overlay rather than the browser Fullscreen API: dialogs, sheets and
+  // date pickers portal to <body> and would be invisible outside the
+  // fullscreen element.
+  const [fullscreen, setFullscreen] = useState(false)
   const tableRef = useRef(null)
+  const mobileTable = mobileView === 'table'
+
+  useEffect(() => {
+    if (!fullscreen) return undefined
+    function onKey(e) {
+      if (e.key !== 'Escape' || document.querySelector('[role="dialog"]')) return
+      // Escape inside a grid cell cancels the edit; don't also exit.
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target?.tagName)) return
+      setFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
   const canEdit = isOnline && !!token && canWrite
 
   const queryKey = ['ledger-transactions', accountId, dateFrom ?? null, dateTo ?? null, limit, isUsingLocalLedger ? 'local' : 'remote']
@@ -173,12 +193,12 @@ export default function SpreadsheetRegister({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <div className="flex items-center justify-between px-3 py-2 border-b border-[hsl(var(--border))]">
           <div className="h-3.5 w-24 rounded bg-[hsl(var(--muted))] animate-pulse" />
           <div className="h-7 w-20 rounded-lg bg-[hsl(var(--muted))] animate-pulse" />
         </div>
-        <div className="flex-1 overflow-hidden p-3 space-y-2">
+        <div className="p-3 space-y-2">
           {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="h-9 rounded bg-[hsl(var(--muted)/0.4)] animate-pulse" />
           ))}
@@ -196,8 +216,14 @@ export default function SpreadsheetRegister({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {statItems.length > 0 && (
+    <div
+      className={
+        fullscreen
+          ? 'fixed inset-0 z-50 flex flex-col bg-[hsl(var(--background))]'
+          : 'flex flex-col'
+      }
+    >
+      {statItems.length > 0 && !fullscreen && (
         <div className="px-3 pt-3">
           <LedgerStatStrip items={statItems} />
         </div>
@@ -254,7 +280,7 @@ export default function SpreadsheetRegister({
           <Button
             variant="ghost"
             size="sm"
-            className="hidden sm:inline-flex shrink-0"
+            className={`${mobileTable ? 'inline-flex' : 'hidden sm:inline-flex'} shrink-0`}
             onClick={() => setNewRow({ ...emptyRow(accountId), numero: String(total + 1) })}
             disabled={!!newRow || !canEdit}
           >
@@ -264,12 +290,30 @@ export default function SpreadsheetRegister({
           <Button
             variant="ghost"
             size="sm"
-            className="sm:hidden shrink-0"
+            className={`${mobileTable ? 'hidden' : 'sm:hidden'} shrink-0`}
             onClick={openMobileNew}
             disabled={!canEdit}
           >
             <Plus size={13} className="mr-1" />
             Agregar
+          </Button>
+          <div className="sm:hidden">
+            <ViewModeSwitch
+              modes={['cards', 'table']}
+              value={mobileView}
+              onChange={setMobileView}
+              storageKey="ledger-register-mobile"
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            onClick={() => setFullscreen((v) => !v)}
+            title={fullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+            aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          >
+            {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </Button>
         </>
       </div>
@@ -327,7 +371,13 @@ export default function SpreadsheetRegister({
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
+      <div
+        className={
+          fullscreen
+            ? 'flex-1 min-h-0 overflow-auto'
+            : `${mobileTable ? 'overflow-auto max-h-[calc(100dvh-5rem)]' : 'overflow-x-auto'} sm:overflow-auto sm:max-h-[calc(100dvh-5rem)]`
+        }
+      >
         {hasMore && (
           <div className="flex justify-center py-2 border-b border-[hsl(var(--border)/0.6)]">
             <Button variant="ghost" size="sm" onClick={() => setLimit((l) => l + PAGE_STEP)}>
@@ -341,6 +391,7 @@ export default function SpreadsheetRegister({
           canEdit={canEdit}
           onEdit={openMobileEdit}
           onDelete={setDeleteTarget}
+          hidden={mobileTable}
         />
 
         <DesktopTransactionTable
@@ -358,6 +409,7 @@ export default function SpreadsheetRegister({
           newRow={newRow}
           setNewRow={setNewRow}
           onDelete={setDeleteTarget}
+          alwaysVisible={mobileTable}
         />
       </div>
 

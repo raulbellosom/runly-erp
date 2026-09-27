@@ -15,7 +15,7 @@ const tdClass = 'border-b border-[hsl(var(--border)/0.5)] p-0 align-middle'
 export default function DesktopTransactionTable({
   tableRef, rows, visibleRowIds, types, categories, canEdit,
   getDraft, setDraft, handleKeyDown, handleRowBlur, saveRow,
-  newRow, setNewRow, onDelete,
+  newRow, setNewRow, onDelete, alwaysVisible = false,
 }) {
   const totals = rows.reduce(
     (acc, row) => {
@@ -32,7 +32,7 @@ export default function DesktopTransactionTable({
   return (
     <table
       ref={tableRef}
-      className="hidden sm:table w-full min-w-262.5 border-collapse text-sm"
+      className={`${alwaysVisible ? 'table' : 'hidden sm:table'} w-full min-w-262.5 border-collapse text-sm`}
       onFocus={(e) => {
         const el = e.target
         if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {

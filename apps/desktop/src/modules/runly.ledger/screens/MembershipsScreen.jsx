@@ -96,8 +96,8 @@ export default function MembershipsScreen() {
   const isEmpty = !hasPending && groups.length === 0 && accounts.length === 0
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 pt-5">
+    <div className="flex flex-col">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-5">
         <PageHeader
           eyebrow="Runly Ledger"
           title="Mis membresías"
@@ -116,7 +116,7 @@ export default function MembershipsScreen() {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-8 max-w-2xl">
+      <div className="px-4 sm:px-6 pb-6 pt-4 space-y-8 max-w-2xl">
         {isEmpty && (
           <EmptyState
             icon={LogOut}

@@ -294,7 +294,7 @@ export default function AccountScreen() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[hsl(var(--border))] shrink-0">
         <PageHeader
           className="pb-0"
@@ -442,7 +442,7 @@ export default function AccountScreen() {
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div>
         {activeTab === "registro" && (
           <SpreadsheetRegister
             accountId={accountId}
@@ -468,7 +468,7 @@ export default function AccountScreen() {
         )}
 
         {activeTab === "acceso" && account && (
-          <div className="px-6 pb-6 pt-4 space-y-6 max-w-2xl mx-auto">
+          <div className="px-4 sm:px-6 pb-6 pt-4 space-y-6 max-w-2xl mx-auto">
             {isUsingLocalLedger ? (
               <Card variant="solid" className="rounded-xl p-4 text-sm text-[hsl(var(--muted-foreground))]">
                 Los accesos, invitaciones y movimientos entre grupos siguen

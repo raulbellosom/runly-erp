@@ -2,7 +2,8 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import { fmtDecimal, toDateValue } from '../lib/spreadsheet-helpers.js'
 
-export default function MobileTransactionList({ rows, canEdit, onEdit, onDelete }) {
+export default function MobileTransactionList({ rows, canEdit, onEdit, onDelete, hidden = false }) {
+  if (hidden) return null
   return (
     <div className="sm:hidden divide-y divide-[hsl(var(--border)/0.5)]">
       {rows.length === 0 && (
