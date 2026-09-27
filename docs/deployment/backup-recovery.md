@@ -55,9 +55,13 @@ after fixing the underlying disk issue):
 docker run --rm \
   --network <compose-project>_default \
   -v "$PWD/restore:/restore" \
-  <api-image> \
+  raulbellosom/runlyerp:backup-latest \
   pg_restore --clean --if-exists -d "$DATABASE_URL" /restore/<scratch-dir-name>/db.dump
 ```
+
+`--network <compose-project>_default` is only needed when `DATABASE_URL` resolves a
+Docker Compose service name (local mode) — omit it when the target Postgres is
+reachable directly (typical for external mode).
 
 Verify: connect and confirm `Company`/`Membership`/module tables have the
 expected row counts for the snapshot's date.
@@ -84,12 +88,13 @@ machine.
 
 ## 6. Verify a backup without restoring anything
 
-Run this any time (also suitable for wiring into external monitoring):
+Run this any time (also suitable for wiring into external monitoring), from
+your `infra/installer` checkout:
 
 ```bash
-docker compose run --rm runly-backup-local ./verify-backup.sh
+docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
 # or, in external mode:
-docker compose run --rm runly-backup-external ./verify-backup.sh
+docker compose --profile backup-external run --rm runly-backup-external ./verify-backup.sh
 ```
 
 Exits non-zero if the latest snapshot is older than half the retention

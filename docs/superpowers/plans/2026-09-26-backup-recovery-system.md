@@ -1397,9 +1397,15 @@ after fixing the underlying disk issue):
 docker run --rm \
   --network <compose-project>_default \
   -v "$PWD/restore:/restore" \
-  <api-image> \
+  raulbellosom/runlyerp:backup-latest \
   pg_restore --clean --if-exists -d "$DATABASE_URL" /restore/<scratch-dir-name>/db.dump
 ```
+
+`--network <compose-project>_default` is only needed when `DATABASE_URL` resolves a
+Docker Compose service name (local mode) — omit it when the target Postgres is
+reachable directly (typical for external mode). Use `raulbellosom/runlyerp:backup-latest`
+here, not the API image — the API image is `node:22-alpine`-based and has no
+`pg_restore`; the backup image is `postgres:17-alpine`-based specifically so it does.
 
 Verify: connect and confirm `Company`/`Membership`/module tables have the
 expected row counts for the snapshot's date.
@@ -1426,12 +1432,13 @@ machine.
 
 ## 6. Verify a backup without restoring anything
 
-Run this any time (also suitable for wiring into external monitoring):
+Run this any time (also suitable for wiring into external monitoring), from
+your `infra/installer` checkout:
 
 ```bash
-docker compose run --rm runly-backup-local ./verify-backup.sh
+docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
 # or, in external mode:
-docker compose run --rm runly-backup-external ./verify-backup.sh
+docker compose --profile backup-external run --rm runly-backup-external ./verify-backup.sh
 ```
 
 Exits non-zero if the latest snapshot is older than half the retention
@@ -1534,7 +1541,7 @@ necesitar estas credenciales.
 ### Verificar que los backups funcionan
 
 ```bash
-docker compose run --rm runly-backup-local ./verify-backup.sh
+docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
 ```
 
 ### Desactivar
@@ -1587,8 +1594,8 @@ Run `node setup-local.mjs` and confirm:
 - [ ] **Step 3: Trigger a manual backup run and inspect it**
 
 ```bash
-docker compose run --rm runly-backup-local ./run-backup.sh
-docker compose run --rm runly-backup-local ./verify-backup.sh
+docker compose --profile backup-local run --rm runly-backup-local ./run-backup.sh
+docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
 ```
 Confirm the snapshot contains `db.dump`, `storage/`, and `config/` (e.g. via
 `restic ls latest` against the test repo), and `verify-backup.sh` reports
