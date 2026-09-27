@@ -78,11 +78,12 @@ export function createCallTranscriptAnalysisService({
   fetchImpl = null,
   logAudit = null,
 }) {
+  const aiRouter = createAiRouter({ env, fetchImpl });
+
   async function callGroq(transcriptText, referenceDateIso, moduleAdditions) {
     if (!env.GROQ_API_KEY && !isLocalEnabled(env)) {
       throw new CallTranscriptAnalysisError("Analisis con IA no configurado (falta GROQ_API_KEY).", 503);
     }
-    const aiRouter = createAiRouter({ env, fetchImpl });
     const messages = [
       { role: "system", content: buildSystemPrompt(referenceDateIso, moduleAdditions) },
       { role: "user", content: transcriptText.slice(0, 60000) },
