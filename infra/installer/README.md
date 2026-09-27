@@ -546,6 +546,74 @@ por separado — a diferencia de la transcripcion, no se creo ninguno.
 
 ---
 
+## Backup y Recovery (restic, opcional)
+
+> Runbook completo de restore en
+> [docs/deployment/backup-recovery.md](../../docs/deployment/backup-recovery.md)
+> y diseno completo en
+> [docs/superpowers/specs/2026-09-26-backup-recovery-system-design.md](../../docs/superpowers/specs/2026-09-26-backup-recovery-system-design.md).
+
+Respaldo diario cifrado de Postgres + Supabase Storage + config de la
+instancia a un bucket S3-compatible (Backblaze B2, AWS S3, MinIO, etc), en un
+contenedor propio (`runly-backup-local`/`runly-backup-external`) via
+`restic`. En modo `local` requiere `RUNLY_SUPABASE_MODE=selfhosted` (el
+volumen de Storage que monta no existe en modo `cli-dev`).
+
+```bash
+BACKUP_MODE=disabled
+BACKUP_SCHEDULE_CRON=0 3 * * *
+BACKUP_RETENTION_DAYS=14
+BACKUP_S3_ENDPOINT=
+BACKUP_S3_BUCKET=
+BACKUP_S3_REGION=us-east-1
+BACKUP_S3_ACCESS_KEY_ID=
+BACKUP_S3_SECRET_ACCESS_KEY=
+RESTIC_PASSWORD=
+BACKUP_STORAGE_S3_ENDPOINT=
+BACKUP_STORAGE_S3_ACCESS_KEY_ID=
+BACKUP_STORAGE_S3_SECRET_ACCESS_KEY=
+```
+
+| Modo | Comportamiento |
+|------|----------------|
+| `enabled` | Instala y ejecuta `runly-backup-*`; respalda cada noche y poda snapshots mas viejos que `BACKUP_RETENTION_DAYS`. |
+| `disabled` (default) | No se instala ningun contenedor de backup — ninguna instalacion existente se ve afectada al actualizar. |
+
+`RESTIC_PASSWORD` se **autogenera una sola vez** y nunca se regenera —
+guardala fuera de esta VPS de inmediato (gestor de contrasenas). Perderla
+vuelve irrecuperables todos los backups remotos ya subidos: restic no puede
+recuperar snapshots cifrados sin ella.
+
+`BACKUP_STORAGE_S3_*` solo aplica a modo `external`: modo `local` respalda
+Storage montando el volumen `supabase-storage-data` directamente, sin
+necesitar estas credenciales.
+
+### Activar en una instalacion ya existente
+
+1. Edita `.env.local`/`.env.external` a mano: agrega `BACKUP_MODE=enabled` y
+   las credenciales `BACKUP_S3_*` de tu proveedor. El script de actualizacion
+   nunca edita el archivo de entorno por si solo — este paso es siempre
+   manual.
+2. Ejecuta `pnpm runly:update:local` (o `pnpm runly:update:external`). El
+   script genera `RESTIC_PASSWORD` la primera vez, descarga la imagen de
+   `runly-backup`, y la agrega al `docker compose up` sin reiniciar los
+   servicios que no cambiaron.
+
+### Verificar que los backups funcionan
+
+```bash
+docker compose --profile backup-local run --rm runly-backup-local ./verify-backup.sh
+```
+
+### Desactivar
+
+Poner `BACKUP_MODE=disabled` y volver a correr el instalador detiene y
+elimina el contenedor de backup automaticamente. Los backups remotos ya
+subidos al bucket **no** se borran al desactivar — quedan disponibles para
+un restore o una reactivacion futura.
+
+---
+
 ## Multiples instancias de Runly en el mismo host
 
 Cada carpeta de instalador (copia de `infra/installer`) es **una instancia**
