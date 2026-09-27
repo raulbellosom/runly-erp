@@ -14,7 +14,11 @@ RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 MAX_AGE_SECONDS=$(( RETENTION_DAYS * 24 * 3600 / 2 ))
 
 echo "[verify] listing snapshots in ${RESTIC_REPOSITORY}..."
-LATEST_JSON="$(restic snapshots --json --host "${RUNLY_INSTANCE_ID}" | jq -c 'sort_by(.time) | last')"
+if ! SNAPSHOTS_JSON="$(restic snapshots --json --host "${RUNLY_INSTANCE_ID}")"; then
+  echo "[verify] FAILED: unable to list snapshots for host ${RUNLY_INSTANCE_ID} (see restic output above)." >&2
+  exit 1
+fi
+LATEST_JSON="$(echo "$SNAPSHOTS_JSON" | jq -c 'sort_by(.time) | last')"
 
 if [ -z "$LATEST_JSON" ] || [ "$LATEST_JSON" = "null" ]; then
   echo "[verify] FAILED: no snapshots found for host ${RUNLY_INSTANCE_ID}." >&2
@@ -22,6 +26,8 @@ if [ -z "$LATEST_JSON" ] || [ "$LATEST_JSON" = "null" ]; then
 fi
 
 LATEST_TIME="$(echo "$LATEST_JSON" | jq -r '.time')"
+# Requires GNU coreutils' `date -d` (not BusyBox's) — the Dockerfile must
+# install the `coreutils` package for this to parse restic's RFC3339 timestamps.
 LATEST_EPOCH="$(date -d "$LATEST_TIME" +%s)"
 NOW_EPOCH="$(date +%s)"
 AGE_SECONDS=$(( NOW_EPOCH - LATEST_EPOCH ))

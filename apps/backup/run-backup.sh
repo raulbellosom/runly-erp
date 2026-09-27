@@ -60,7 +60,7 @@ if ! restic snapshots >/dev/null 2>&1; then
   echo "[backup] initializing restic repository..."
   restic init
 fi
-restic unlock || true
+restic unlock || echo "[backup] WARNING: restic unlock failed (continuing)" >&2
 
 echo "[backup] creating restic snapshot..."
 restic backup "$SCRATCH_DIR" --tag runly --host "${RUNLY_INSTANCE_ID}"
