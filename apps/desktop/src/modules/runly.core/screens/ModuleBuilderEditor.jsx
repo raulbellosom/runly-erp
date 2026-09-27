@@ -34,7 +34,12 @@ import { PublishDialog } from "../components/builder/PublishDialog";
 const AUTOSAVE_DELAY_MS = 1200;
 
 export default function ModuleBuilderEditor() {
-  const { id } = useParams();
+  // ModuleOutlet.jsx mounts every module screen behind a single catch-all
+  // route (no literal :id segment ever reaches react-router), so the id must
+  // be parsed out of the wildcard remainder — same pattern ContactsScreen.jsx
+  // and every other dynamic-detail screen in this codebase already uses.
+  const { "*": wildcard } = useParams();
+  const id = wildcard?.match(/^module-builder\/([^/]+)$/)?.[1] ?? null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session } = useAuth();
@@ -155,19 +160,24 @@ export default function ModuleBuilderEditor() {
     error: "Error al guardar",
   })[saveStatus], [saveStatus]);
 
+  // Order matters: a settled-but-failed/empty query must win over the
+  // "still loading" branch below. definition stays null forever whenever
+  // project never resolves (the effect that hydrates it only runs on
+  // success), so checking `definition === null` first would keep this stuck
+  // on the skeleton forever instead of ever showing the real error.
+  if (!projectQuery.isLoading && (projectQuery.isError || !project)) {
+    return (
+      <div className="p-6">
+        <ErrorState title="No se encontró el proyecto" description={projectQuery.error?.message} />
+      </div>
+    );
+  }
+
   if (projectQuery.isLoading || definition === null) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-10 w-1/3" />
         <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
-    );
-  }
-
-  if (projectQuery.isError || !project) {
-    return (
-      <div className="p-6">
-        <ErrorState title="No se encontró el proyecto" description={projectQuery.error?.message} />
       </div>
     );
   }
