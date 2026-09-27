@@ -279,6 +279,39 @@ services:
           memory: ${TTS_MEMORY_LIMIT:-1024m}
     restart: unless-stopped
 
+  # Backup opcional (restic) — ver docs/superpowers/specs/2026-09-26-backup-recovery-system-design.md.
+  # Split local/external por la misma razon que runly-transcriber-*: la ruta
+  # de acceso a Supabase Storage difiere por completo entre modos (volumen
+  # Docker compartido en local, endpoint S3 remoto en external). Todos los
+  # valores (incluyendo defaults como BACKUP_SCHEDULE_CRON) ya vienen
+  # resueltos en .env.local/.env.external por setup-local.mjs/setup-external.mjs,
+  # asi que env_file basta — no hace falta un bloque `environment:` aparte.
+  # Sin `build:` por la misma razon que runly-api-*/transcriber-*: se publica
+  # via `pnpm docker:release:backup` y bootstrap-local.sh no descarga el
+  # monorepo completo.
+  runly-backup-local:
+    image: ${RUNLY_BACKUP_IMAGE:-raulbellosom/runlyerp:backup-latest}
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-backup-local
+    profiles: ["backup-local"]
+    env_file:
+      - ./.env.local
+    volumes:
+      # Solo lectura: el backup nunca debe poder modificar Storage.
+      - supabase-storage-data:/storage-source:ro
+      - ./.env.local:/config-source/.env.local:ro
+      - ./supabase/volumes/db:/config-source/supabase-db-init:ro
+    restart: unless-stopped
+
+  runly-backup-external:
+    image: ${RUNLY_BACKUP_IMAGE:-raulbellosom/runlyerp:backup-latest}
+    container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-backup-external
+    profiles: ["backup-external"]
+    env_file:
+      - ./.env.external
+    volumes:
+      - ./.env.external:/config-source/.env.external:ro
+    restart: unless-stopped
+
   livekit-caddy:
     image: ${LIVEKIT_CADDY_IMAGE:-caddy:2-alpine}
     container_name: ${RUNLY_CONTAINER_PREFIX:-runly}-livekit-caddy
