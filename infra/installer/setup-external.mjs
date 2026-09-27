@@ -276,6 +276,21 @@ const OPTIONAL_VAR_GROUPS = [
   },
   {
     header: [
+      "# ── Local AI routing (optional) ─────────────────────────────────────────────",
+      "# Alternate MirAI/help-assistant/PFM-assistant/transcript-analysis/ledger-import",
+      "# between Groq and a local Ollama server (qwen3:4b for light tasks, qwen3:8b for",
+      "# heavy ones). Vision tasks (receipt OCR, inventory photos, scanned statements)",
+      "# always use Groq — local models have no vision. Default: disabled (Groq only).",
+    ],
+    vars: [
+      { key: "AI_LOCAL_ENABLED",   placeholder: "false", comment: null },
+      { key: "OLLAMA_BASE_URL",    placeholder: "http://localhost:11434", comment: null },
+      { key: "OLLAMA_MODEL_LIGHT", placeholder: "qwen3:4b", comment: null },
+      { key: "OLLAMA_MODEL_HEAVY", placeholder: "qwen3:8b", comment: null },
+    ],
+  },
+  {
+    header: [
       "# ── Runly Calls / LiveKit ──────────────────────────────────────────────────",
       "# embedded starts LiveKit + Redis; external uses an existing RTC server; disabled hides calls.",
     ],
@@ -558,6 +573,8 @@ async function configureLiveKit(filePath) {
     values: {
       mode,
       domain,
+      // Keep an explicit empty file value; only an absent key falls back to the shell.
+      nodeIp: parseEnvValue(content, "LIVEKIT_NODE_IP") ?? process.env.LIVEKIT_NODE_IP ?? "",
       tlsMode: parseEnvValue(content, "LIVEKIT_TLS_MODE"),
       publicUrl: parseEnvValue(content, "LIVEKIT_URL"),
       internalUrl: parseEnvValue(content, "LIVEKIT_INTERNAL_URL"),
@@ -569,6 +586,7 @@ async function configureLiveKit(filePath) {
   for (const [key, value] of [
     ["LIVEKIT_MODE", config.mode],
     ["LIVEKIT_DOMAIN", config.domain],
+    ["LIVEKIT_NODE_IP", config.nodeIp],
     ["LIVEKIT_TLS_MODE", config.tlsMode],
     ["LIVEKIT_URL", config.publicUrl],
     ["LIVEKIT_INTERNAL_URL", config.internalUrl],

@@ -736,6 +736,11 @@ async function writeLocalEnv(supabaseInput, identity) {
   const chatMiraiWeb             = fromLocalEnv("CHAT_MIRAI_WEB") || "true";
   const tavilyApiKey             = fromLocalEnv("TAVILY_API_KEY");
   const chatMiraiWebModel        = fromLocalEnv("CHAT_MIRAI_WEB_MODEL");
+  // Local AI routing — optional, default disabled (Groq only, unchanged behavior).
+  const aiLocalEnabled  = fromLocalEnv("AI_LOCAL_ENABLED") || "false";
+  const ollamaBaseUrl   = fromLocalEnv("OLLAMA_BASE_URL") || "http://localhost:11434";
+  const ollamaModelLight = fromLocalEnv("OLLAMA_MODEL_LIGHT") || "qwen3:4b";
+  const ollamaModelHeavy = fromLocalEnv("OLLAMA_MODEL_HEAVY") || "qwen3:8b";
   // LiveKit Egress → Supabase Storage (call recordings) — optional. In
   // selfhosted mode these four are NOT independent user secrets to preserve
   // across re-runs like the rest of fromLocalEnv's fallbacks — client
@@ -779,6 +784,8 @@ async function writeLocalEnv(supabaseInput, identity) {
     values: {
       mode: fromLocalEnv("LIVEKIT_MODE"),
       domain: fromLocalEnv("LIVEKIT_DOMAIN"),
+      // An explicit empty value restores automatic discovery, even with a stale shell value.
+      nodeIp: parseEnvValue(existingEnvContent, "LIVEKIT_NODE_IP") ?? process.env.LIVEKIT_NODE_IP ?? "",
       tlsMode: fromLocalEnv("LIVEKIT_TLS_MODE"),
       publicUrl: fromLocalEnv("LIVEKIT_URL"),
       internalUrl: fromLocalEnv("LIVEKIT_INTERNAL_URL"),
@@ -866,7 +873,7 @@ DIRECT_URL=${supabase.dbUrl}
 VITE_SUPABASE_URL=${browserSupabaseUrl}
 VITE_SUPABASE_ANON_KEY=${supabase.anonKey}
 RUNLY_SUPABASE_PUBLIC_URL=${deploymentValues.RUNLY_SUPABASE_PUBLIC_URL ?? ""}
-VITE_ATLAS_API_URL=http://localhost:4010
+VITE_ATLAS_API_URL=${publicApiUrl || "http://localhost:4010"}
 CORS_ORIGIN=${corsOrigin}
 
 # ── Identity-level SMTP (password reset, cross-company mail) ─────────────────
@@ -918,6 +925,13 @@ CHAT_MIRAI_WEB=${chatMiraiWeb}
 TAVILY_API_KEY=${tavilyApiKey}
 CHAT_MIRAI_WEB_MODEL=${chatMiraiWebModel}
 
+# ── Local AI routing (optional) — alternate with Ollama instead of only Groq ─
+# AI_LOCAL_ENABLED=false keeps everything on Groq (default, no behavior change).
+AI_LOCAL_ENABLED=${aiLocalEnabled}
+OLLAMA_BASE_URL=${ollamaBaseUrl}
+OLLAMA_MODEL_LIGHT=${ollamaModelLight}
+OLLAMA_MODEL_HEAVY=${ollamaModelHeavy}
+
 # ── LiveKit Egress → Supabase Storage (call recordings, optional) ───────────
 # Get these from the self-hosted Supabase Storage container's own S3-compatible
 # config — NOT the same as SUPABASE_SERVICE_ROLE_KEY. Leave empty to disable.
@@ -929,6 +943,7 @@ SUPABASE_S3_REGION=${supabaseS3Region}
 # ── Runly Calls / LiveKit ──────────────────────────────────────────────────
 LIVEKIT_MODE=${liveKit.mode}
 LIVEKIT_DOMAIN=${liveKit.domain}
+LIVEKIT_NODE_IP=${liveKit.nodeIp}
 LIVEKIT_TLS_MODE=${liveKit.tlsMode}
 LIVEKIT_URL=${liveKit.publicUrl}
 LIVEKIT_INTERNAL_URL=${liveKit.internalUrl}
