@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import { aiImportCommitSchema } from './validators.js'
 import { createAiImportService, AiImportServiceError } from './ai-import-service.js'
+import { createAiRouter } from '../../services/ai/ai-router.js'
 import {
   ExtractionError, extractPdfPages, extractRowsFromText, extractStatementRows, suggestColumnMapping,
 } from './ai-import-extraction.js'
@@ -46,6 +47,7 @@ async function finishRecognize({ rawRows, documentText, companyId, actorId, serv
 export function createAiImportRouter({ prisma, requirePermission }) {
   const app = new Hono()
   const service = createAiImportService({ prisma })
+  const aiRouter = createAiRouter({ env: process.env })
 
   app.post('/ledger/imports/recognize', requirePermission('ledger.import'), async (c) => {
     try {
@@ -68,7 +70,7 @@ export function createAiImportRouter({ prisma, requirePermission }) {
         const { pages } = await extractPdfPages(buffer)
         const { rows: rawRows } = await extractStatementRows({
           pages,
-          extractText: extractRowsFromText,
+          extractText: (args) => extractRowsFromText({ ...args, aiRouter }),
           extractVisionPage: service.vision.extractLedgerStatementPage,
         })
         const documentText = pages.map((p) => p.text).join('\n')
@@ -101,7 +103,7 @@ export function createAiImportRouter({ prisma, requirePermission }) {
         const rawHeaderRows = await parseImportBuffer(buffer, isCsv ? 'csv' : 'xlsx')
         if (rawHeaderRows.length === 0) return c.json({ error: 'El archivo no tiene datos.' }, 422)
         const headers = Object.keys(rawHeaderRows[0])
-        const mapping = await suggestColumnMapping({ headers })
+        const mapping = await suggestColumnMapping({ headers, aiRouter })
         // nombre is required downstream (validateImportRows rejects rows without
         // it), but many real bank exports have no dedicated counterparty column,
         // only a general "Concepto"/"Descripcion" one — confirmed against a live

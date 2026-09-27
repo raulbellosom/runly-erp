@@ -1,6 +1,7 @@
 import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
-import { isReasoningModel } from '../../services/groq-model-helpers.js'
+import { createAiRouter } from '../../services/ai/ai-router.js'
+import { isLocalEnabled } from '../../services/ai/ai-providers.js'
 import { isValidRow } from './ai-import-dedup.js'
 
 const WORKER_PATH = fileURLToPath(new URL('../../services/ledger-import-pdf-worker.js', import.meta.url))
@@ -73,61 +74,33 @@ function extractJsonObject(text) {
 // and JSON-object parsing — used by both extractRowsFromText (statement row
 // extraction) and suggestColumnMapping (CSV/XLSX header mapping) so neither
 // duplicates the HTTP/retry plumbing.
-async function callGroqText({ systemPrompt, userContent, env = process.env, fetchImpl }) {
-  const apiKey = env.GROQ_API_KEY
-  if (!apiKey) {
+async function callGroqText({ systemPrompt, userContent, env = process.env, fetchImpl, aiRouter }) {
+  if (!env.GROQ_API_KEY && !isLocalEnabled(env)) {
     throw new ExtractionError('Importacion con IA no configurada (falta GROQ_API_KEY).', 503)
   }
-  const baseUrl = (env.LEDGER_IMPORT_BASE_URL || env.GROQ_BASE_URL || 'https://api.groq.com').replace(/\/$/, '')
-  const model = env.LEDGER_IMPORT_MODEL || 'openai/gpt-oss-120b'
-  const fetchFn = fetchImpl ?? globalThis.fetch
-  const body = {
-    model,
-    temperature: 0,
-    response_format: { type: 'json_object' },
-    max_completion_tokens: 8000,
-    ...(isReasoningModel(model) ? { reasoning_format: 'hidden', reasoning_effort: 'low' } : {}),
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent.slice(0, 60000) },
-    ],
+  const router = aiRouter ?? createAiRouter({ env, fetchImpl })
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userContent.slice(0, 60000) },
+  ]
+  let result
+  try {
+    result = await router.runTask({
+      task: 'ledger_import_text', messages, jsonMode: true, reasoningEffort: 'low', useMaxCompletionTokens: true, maxTokens: 8000,
+      validateResponse: (msg) => Boolean(extractJsonObject(msg?.content)),
+    })
+  } catch (err) {
+    throw new ExtractionError(err.message ?? 'El servicio de IA no respondio.', 502)
   }
-
-  let lastErr
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500))
-    let res
-    try {
-      res = await fetchFn(`${baseUrl}/openai/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify(body),
-      })
-    } catch (err) {
-      lastErr = new ExtractionError(`No se pudo contactar al servicio de IA: ${err.message}`, 502)
-      continue
-    }
-    if (res.status === 429 || res.status >= 500) {
-      lastErr = new ExtractionError(`El servicio de IA respondio ${res.status}.`, 502)
-      continue
-    }
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      throw new ExtractionError(`El servicio de IA rechazo la peticion (${res.status}): ${detail.slice(0, 300)}`)
-    }
-    const payload = await res.json()
-    const content = payload?.choices?.[0]?.message?.content
-    const obj = extractJsonObject(content)
-    if (!obj) throw new ExtractionError('El servicio de IA no devolvio un JSON legible.')
-    return { obj, model: payload.model ?? model }
-  }
-  throw lastErr
+  const obj = extractJsonObject(result.message?.content)
+  if (!obj) throw new ExtractionError('El servicio de IA no devolvio un JSON legible.')
+  return { obj, model: result.model }
 }
 
 // Text-only sibling of vision-service.js's Groq adapter — same transport,
 // retries and reasoning-model handling, but no image content block.
-export async function extractRowsFromText({ text, env = process.env, fetchImpl }) {
-  const { obj, model } = await callGroqText({ systemPrompt: STATEMENT_SYSTEM_PROMPT, userContent: text, env, fetchImpl })
+export async function extractRowsFromText({ text, env = process.env, fetchImpl, aiRouter }) {
+  const { obj, model } = await callGroqText({ systemPrompt: STATEMENT_SYSTEM_PROMPT, userContent: text, env, fetchImpl, aiRouter })
   if (!obj.rows) throw new ExtractionError('El servicio de IA no devolvio un JSON legible.')
   return { rows: obj.rows, model }
 }
@@ -141,8 +114,8 @@ const COLUMN_MAPPING_SYSTEM_PROMPT = [
 // Asks the model to map a CSV/XLSX header row onto the fixed statement-row
 // field names, so the caller can feed the result straight into the existing
 // validateImportRows(rawRows, mapping) — no separate parsing/transport path.
-export async function suggestColumnMapping({ headers, env = process.env, fetchImpl }) {
-  const { obj } = await callGroqText({ systemPrompt: COLUMN_MAPPING_SYSTEM_PROMPT, userContent: headers.join(', '), env, fetchImpl })
+export async function suggestColumnMapping({ headers, env = process.env, fetchImpl, aiRouter }) {
+  const { obj } = await callGroqText({ systemPrompt: COLUMN_MAPPING_SYSTEM_PROMPT, userContent: headers.join(', '), env, fetchImpl, aiRouter })
   return obj
 }
 
