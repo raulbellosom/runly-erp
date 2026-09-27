@@ -21,7 +21,8 @@ export function createCategoriesRouter({ productSvc, prisma, requirePermission }
 
       if (page || pageSize) {
         const limit  = Math.min(Number.parseInt(pageSize, 10) || 20, 200)
-        const offset = (Math.max(Number.parseInt(page, 10) || 1, 1) - 1) * limit
+        const safePage = Math.max(Number.parseInt(page, 10) || 1, 1)
+        const offset = (safePage - 1) * limit
         const result = await productSvc.listCategoriesPaginated({
           companyId,
           search: search || undefined,
@@ -30,7 +31,10 @@ export function createCategoriesRouter({ productSvc, prisma, requirePermission }
           limit,
           offset,
         })
-        return c.json(result)
+        return c.json({
+          data: result.data,
+          pagination: { page: safePage, pageSize: limit, total: result.total },
+        })
       }
 
       const data = await productSvc.listCategoriesTree({ companyId })

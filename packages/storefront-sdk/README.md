@@ -593,27 +593,27 @@ try {
 
 ### `sdk.catalog.products(options?)`
 
-**Description:** Lists products from the catalog. Returns the raw API response envelope (not just the data array) so pagination metadata is accessible.
+**Description:** Lists published products from the catalog (`GET /public/catalog/products`). Returns the raw API response envelope (not just the data array) so pagination metadata is accessible.
 
 **Parameters (all optional):**
 
 | Name | Type | Description |
 |---|---|---|
-| `page` | `number` | Page number, 1-based. Defaults to 1 |
-| `limit` | `number` | Items per page. Defaults to server default (typically 20) |
-| `search` | `string` | Full-text search term |
-| `categoryId` | `string` | Filter by category UUID |
-| `sort` | `string` | Sort field, e.g. `'name'`, `'price'` |
-| `order` | `'asc' \| 'desc'` | Sort direction |
+| `limit` | `number` | Items per page. Server clamps to 1-200, defaults to 20 |
+| `offset` | `number` | Number of items to skip, for pagination. Defaults to 0 |
+| `search` | `string` | Matches against the product name (`ILIKE`) |
+| `categorySlug` | `string` | Filter by category slug (not id) |
 
-**Returns:** `Promise<{ data: Array<product>, total: number, page: number, limit: number }>`
+There is no server-side `sort`/`order` yet — results are always ordered by newest first.
 
-Each product object has at minimum `{ id, name, price }`. Additional fields depend on the ERP configuration and which blueprints are installed.
+**Returns:** `Promise<{ data: Array<product>, total: number }>`
+
+Each product includes `{ id, name, slug, description, product_type, price, compare_price, currency, stock, track_stock, cover_asset_id, images, category_id, category_name, category_slug }`. Company-internal fields (`sku`, `barcode`, `meta_title`, `meta_description`) are never exposed on this endpoint.
 
 **Example:**
 
 ```js
-const result = await sdk.catalog.products({ page: 1, limit: 10, search: 'zapato' })
+const result = await sdk.catalog.products({ limit: 10, offset: 0, search: 'zapato', categorySlug: 'calzado' })
 console.log(`Mostrando ${result.data.length} de ${result.total} productos`)
 for (const product of result.data) {
   console.log(product.name, product.price)
@@ -622,23 +622,23 @@ for (const product of result.data) {
 
 ---
 
-### `sdk.catalog.getProduct(id)`
+### `sdk.catalog.getProduct(idOrSlug)`
 
-**Description:** Returns a single product by its UUID.
+**Description:** Returns a single published product (`GET /public/catalog/products/:idOrSlug`). Accepts either the product's `slug` (the natural value to use when linking from a product list, since `slug` is what `products()` returns) or its `id` (UUID) — the backend tries both.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `id` | `string` | Yes | Product UUID |
+| `idOrSlug` | `string` | Yes | Product `slug` or `id` |
 
-**Returns:** `Promise<product>` — a single product object
+**Returns:** `Promise<product>` — a single product object. `VARIABLE` products also include a `variants` array.
 
 **Example:**
 
 ```js
 try {
-  const product = await sdk.catalog.getProduct('01933b7e-0000-7000-8000-000000000002')
+  const product = await sdk.catalog.getProduct('camiseta-basica-azul') // slug
   console.log(product.name, product.price)
 } catch (err) {
   if (err.code === 'NOT_FOUND') {
@@ -651,25 +651,20 @@ try {
 
 ### `sdk.catalog.categories(options?)`
 
-**Description:** Lists product categories. Returns the raw API response envelope.
+**Description:** Lists enabled product categories (`GET /public/catalog/categories`), nested one level (each root category has a `children` array). Returns the raw API response envelope.
 
-**Parameters (all optional):**
+**Parameters:** none — this endpoint returns the full category tree, unfiltered and unpaginated.
 
-| Name | Type | Description |
-|---|---|---|
-| `page` | `number` | Page number, 1-based |
-| `limit` | `number` | Items per page |
+**Returns:** `Promise<{ data: Array<category> }>`
 
-**Returns:** `Promise<{ data: Array<category>, total: number, page: number, limit: number }>`
-
-Each category object has at minimum `{ id, name }`.
+Each category has `{ id, name, slug, description, parent_id, cover_asset_id, position, product_count, children }`.
 
 **Example:**
 
 ```js
 const result = await sdk.catalog.categories()
 for (const category of result.data) {
-  console.log(category.id, category.name)
+  console.log(category.id, category.name, category.product_count)
 }
 ```
 

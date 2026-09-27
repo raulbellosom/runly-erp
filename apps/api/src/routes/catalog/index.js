@@ -18,7 +18,7 @@ export function createCatalogRouter({ prisma, requirePermission, requireAnyPermi
   app.route('/', createCategoriesRouter({ productSvc, prisma, requirePermission }))
   app.route('/', createProductsRouter({ productSvc, prisma, requirePermission }))
   app.route('/', createVariantsRouter({ variantSvc, requirePermission }))
-  app.route('/', createStockRouter({ stockSvc, prisma, requirePermission, requireAnyPermission }))
+  app.route('/', createStockRouter({ stockSvc, productSvc, prisma, requirePermission, requireAnyPermission }))
 
   return app
 }

@@ -135,4 +135,14 @@ describe("catalog-public-service — getPublicProductBySlug projection", () => {
     }
     assert.ok(selectList.includes("p.name") && selectList.includes("p.price"));
   });
+
+  it("resolves by slug OR raw id, since sdk.catalog.getProduct(idOrSlug) accepts either", async () => {
+    const seen = [];
+    const svc = createCatalogPublicService({
+      prisma: fakePrisma([["from catalog_product p", [{ id: "p1", product_type: "SIMPLE", name: "X" }]]], seen),
+    });
+    await svc.getPublicProductBySlug({ companyId: COMPANY, slug: "01900000-0000-7000-8000-00000000abcd" });
+    const q = seen[0].text.toLowerCase();
+    assert.ok(q.includes("p.slug =") && q.includes("p.id::text ="), "must match against both slug and id");
+  });
 });

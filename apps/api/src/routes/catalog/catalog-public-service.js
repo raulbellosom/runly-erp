@@ -43,6 +43,8 @@ export function createCatalogPublicService({ prisma }) {
   async function getPublicProductBySlug({ companyId, slug }) {
     // Public storefront endpoint (no auth): expose only shopper-facing columns,
     // never company_id / internal SEO / stock-tracking flags.
+    // Accepts either the product slug or its id, since the SDK's getProduct(id)
+    // and slug-based storefront links both resolve through this one lookup.
     const rows = await prisma.$queryRaw`
       SELECT p.id, p.name, p.slug, p.description, p.product_type,
              p.price, p.compare_price, p.currency, p.weight,
@@ -52,7 +54,7 @@ export function createCatalogPublicService({ prisma }) {
       FROM catalog_product p
       LEFT JOIN catalog_category c ON c.id = p.category_id
       WHERE p.company_id = ${companyId}::uuid
-        AND p.slug = ${slug}
+        AND (p.slug = ${slug} OR p.id::text = ${slug})
         AND p.enabled = true
         AND p.published = true
       LIMIT 1

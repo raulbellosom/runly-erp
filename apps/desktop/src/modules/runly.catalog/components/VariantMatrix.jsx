@@ -1,10 +1,12 @@
 // apps/desktop/src/modules/runly.catalog/components/VariantMatrix.jsx
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, Input, cn } from '@runly/ui'
+import { Badge, Button, ConfirmDialog, Input, cn } from '@runly/ui'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { runly } from '../../../lib/runly.js'
+import { pickCategoryStyle } from '../lib/categoryVisuals.js'
+import { getStockStatus, STOCK_STATUS_META } from '../lib/stockStatus.js'
 
 export default function VariantMatrix({ token, productId, variants = [] }) {
   const queryClient  = useQueryClient()
@@ -43,9 +45,9 @@ export default function VariantMatrix({ token, productId, variants = [] }) {
     setEdits(prev => ({ ...prev, [variantId]: { ...(prev[variantId] ?? {}), [field]: value } }))
   }
 
-  function getLabel(optionValues) {
-    if (!optionValues || typeof optionValues !== 'object') return 'Default'
-    return Object.values(optionValues).filter(Boolean).join(' / ') || 'Default'
+  function getValuePairs(optionValues) {
+    if (!optionValues || typeof optionValues !== 'object') return []
+    return Object.entries(optionValues).filter(([, v]) => v)
   }
 
   return (
@@ -75,9 +77,27 @@ export default function VariantMatrix({ token, productId, variants = [] }) {
               {variants.map(v => {
                 const e       = edits[v.id] ?? {}
                 const isDirty = Boolean(edits[v.id])
+                const pairs   = getValuePairs(v.option_values)
+                const stockVal = Number(e.stock ?? v.stock ?? 0)
+                const status  = getStockStatus({ trackStock: true, stock: stockVal })
                 return (
                   <tr key={v.id} className={cn('transition-colors', isDirty && 'bg-blue-50/30 dark:bg-blue-900/10')}>
-                    <td className="px-4 py-2 font-medium text-sm">{getLabel(v.option_values)}</td>
+                    <td className="px-4 py-2">
+                      {pairs.length === 0 ? (
+                        <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Default</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {pairs.map(([key, value]) => {
+                            const style = pickCategoryStyle(key)
+                            return (
+                              <span key={key} className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', style.bg, style.fg)}>
+                                {value}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-2">
                       <Input value={e.sku ?? v.sku ?? ''} onChange={ev => edit(v.id, 'sku', ev.target.value)} className="h-7 w-28 text-xs" placeholder="SKU" />
                     </td>
@@ -88,7 +108,12 @@ export default function VariantMatrix({ token, productId, variants = [] }) {
                       <Input type="number" min="0" step="0.01" value={e.price ?? v.price ?? 0} onChange={ev => edit(v.id, 'price', Number(ev.target.value))} className="h-7 w-24 text-xs" />
                     </td>
                     <td className="px-4 py-2">
-                      <Input type="number" min="0" value={e.stock ?? v.stock ?? 0} onChange={ev => edit(v.id, 'stock', Number(ev.target.value))} className="h-7 w-20 text-xs" />
+                      <div className="flex items-center gap-1.5">
+                        <Input type="number" min="0" value={e.stock ?? v.stock ?? 0} onChange={ev => edit(v.id, 'stock', Number(ev.target.value))} className="h-7 w-20 text-xs" />
+                        <Badge variant={STOCK_STATUS_META[status].tone} className="h-5 shrink-0 px-1.5 text-[9px]">
+                          {STOCK_STATUS_META[status].label}
+                        </Badge>
+                      </div>
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1">

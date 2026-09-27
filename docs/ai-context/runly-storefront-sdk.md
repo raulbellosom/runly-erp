@@ -98,6 +98,24 @@ if (user?.hasErpAccess) {
 }
 ```
 
+## Catalog (sdk.catalog)
+
+Available whenever `runly.catalog` is installed and enabled. Read-only, no auth — backed by
+`GET /public/catalog/{categories,products,products/:idOrSlug}`
+(`apps/api/src/routes/public-website.js` → `catalog-public-service.js`).
+
+```js
+const { data, total } = await sdk.catalog.products({ limit: 20, offset: 0, search: 'zapato', categorySlug: 'calzado' })
+const product = await sdk.catalog.getProduct(data[0].slug) // accepts slug or id
+const { data: categories } = await sdk.catalog.categories() // full tree, one level of children
+```
+
+Query params are `limit`, `offset`, `search` (name `ILIKE`), `categorySlug` — there is no
+`page`, `categoryId`, `sort`, or `order` on this endpoint. `categories()` takes no params and
+always returns the whole enabled tree. `getProduct` resolves by `slug` first, falling back to
+`id`, since product lists only expose `slug` for linking. The public projection never includes
+`company_id`, `sku`, `barcode`, `meta_title`, or `meta_description`.
+
 ## Capture API v1
 
 Public endpoints:

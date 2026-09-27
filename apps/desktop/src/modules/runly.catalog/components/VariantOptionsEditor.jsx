@@ -2,9 +2,10 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Input, cn } from '@runly/ui'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Tag, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { runly } from '../../../lib/runly.js'
+import { pickCategoryStyle } from '../lib/categoryVisuals.js'
 
 export default function VariantOptionsEditor({ token, productId, options = [] }) {
   const queryClient = useQueryClient()
@@ -83,6 +84,7 @@ export default function VariantOptionsEditor({ token, productId, options = [] })
 
 function OptionRow({ option, onDelete, onAddValue, onRemoveValue }) {
   const [newVal, setNewVal] = useState('')
+  const style = pickCategoryStyle(option.name)
 
   function handleKeyDown(e) {
     if (e.key !== 'Enter') return
@@ -92,9 +94,14 @@ function OptionRow({ option, onDelete, onAddValue, onRemoveValue }) {
   }
 
   return (
-    <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-3">
+    <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-[hsl(var(--foreground))]">{option.name}</p>
+        <div className="flex items-center gap-2">
+          <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', style.bg, style.fg)}>
+            <Tag className="h-3.5 w-3.5" />
+          </span>
+          <p className="text-sm font-semibold text-[hsl(var(--foreground))]">{option.name}</p>
+        </div>
         <button
           type="button"
           onClick={onDelete}
@@ -105,7 +112,7 @@ function OptionRow({ option, onDelete, onAddValue, onRemoveValue }) {
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         {option.values.map(v => (
-          <span key={v.id} className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--foreground))]">
+          <span key={v.id} className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium', style.bg, style.fg)}>
             {v.value}
             <button type="button" onClick={() => onRemoveValue(v.value)} className="hover:text-red-500 ml-0.5">
               <X className="h-3 w-3" />

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { createCatalogPublicService } from './catalog/catalog-public-service.js'
 import { createDistServeService } from '../services/dist-serve-service.js'
 import { resolvePublicSupabaseUrl } from '../lib/supabase-public-url.js'
+import { getCompanySlugHeader } from '../lib/public-request-headers.js'
 
 const ERP_PREFIXES = ['runly.', 'atlas.', 'website.', 'contacts.', 'hr.', 'finance.', 'fleet.']
 
@@ -211,7 +212,16 @@ export function createPublicCatalogRouter({ prisma }) {
   const publicSvc = createCatalogPublicService({ prisma })
   const siteResolver = createDistServeService({ prisma })
 
+  // The npm storefront-sdk (packages/storefront-sdk) always sends
+  // X-Runly-Company and has no concept of the request's Host — honor that
+  // header first. Uploaded `dist` sites and the Website Builder's own
+  // in-editor preview don't send it, so they still resolve by Host.
   async function getActiveCompanyId(c) {
+    const companySlug = getCompanySlugHeader(c)
+    if (companySlug) {
+      const company = await prisma.company.findUnique({ where: { slug: companySlug } })
+      if (company) return company.id
+    }
     const site = await siteResolver.resolveSiteForRequest(c)
     return site?.company_id ?? null
   }

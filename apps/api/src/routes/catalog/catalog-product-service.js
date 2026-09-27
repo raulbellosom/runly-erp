@@ -6,6 +6,10 @@ const PUBLIC_BUCKET  = 'runly-website'
 const SIGNED_URL_TTL = 3600
 const IMAGE_VARIANT  = 'product'
 
+// Shared with the "Stock" filter and the KPI strip on CatalogProductsScreen —
+// keep both in sync with this value.
+const LOW_STOCK_THRESHOLD = 10
+
 export class CatalogRefError extends Error {
   constructor(message) {
     super(message)
@@ -88,11 +92,14 @@ export function createCatalogProductService({ prisma, supabaseAdmin }) {
 
   async function listCategories({ companyId }) {
     return prisma.$queryRaw`
-      SELECT id, name, slug, description, parent_id, cover_asset_id,
-             position, enabled, created_at, updated_at
-      FROM catalog_category
-      WHERE company_id = ${companyId}::uuid AND enabled = true
-      ORDER BY position ASC, name ASC
+      SELECT c.id, c.name, c.slug, c.description, c.parent_id, c.cover_asset_id,
+             c.position, c.enabled, c.created_at, c.updated_at,
+             COUNT(p.id)::int AS product_count
+      FROM catalog_category c
+      LEFT JOIN catalog_product p ON p.category_id = c.id AND p.enabled = true
+      WHERE c.company_id = ${companyId}::uuid AND c.enabled = true
+      GROUP BY c.id
+      ORDER BY c.position ASC, c.name ASC
     `
   }
 
@@ -201,18 +208,36 @@ export function createCatalogProductService({ prisma, supabaseAdmin }) {
     )
   }
 
-  async function listProducts({ companyId, categoryId, type, published, search, limit = 50, offset = 0 }) {
+  // stockStatus: 'out' (tracked, stock = 0) | 'low' (tracked, 0 < stock <= threshold) | 'ok' (untracked, or tracked above threshold)
+  function stockStatusClause(paramIndex) {
+    return `(
+      $${paramIndex}::text IS NULL OR (
+        ($${paramIndex} = 'out' AND p.track_stock = true AND p.stock = 0) OR
+        ($${paramIndex} = 'low' AND p.track_stock = true AND p.stock > 0 AND p.stock <= ${LOW_STOCK_THRESHOLD}) OR
+        ($${paramIndex} = 'ok'  AND (p.track_stock = false OR p.stock > ${LOW_STOCK_THRESHOLD}))
+      )
+    )`
+  }
+
+  async function listProducts({ companyId, categoryId, type, published, stockStatus, search, limit = 50, offset = 0 }) {
     const safeLimit  = Math.min(Math.max(Number.parseInt(String(limit  ?? 50),  10) || 50,  1), 500)
     const safeOffset = Math.max(Number.parseInt(String(offset ?? 0),   10) || 0,  0)
     const likeSearch = search ? `%${String(search).trim()}%` : null
     const catId      = categoryId ?? null
     const prodType   = type ?? null
     const pubFilter  = published === undefined ? null : (published === 'true' || published === true)
+    const stockParam = ['out', 'low', 'ok'].includes(stockStatus) ? stockStatus : null
 
     const rows = await prisma.$queryRawUnsafe(
-      `SELECT p.id, p.name, p.slug, p.product_type, p.price, p.currency,
+      `SELECT p.id, p.name, p.slug, p.sku, p.product_type, p.price, p.compare_price, p.currency,
               p.stock, p.track_stock, p.cover_asset_id, p.published,
-              p.created_at, c.name AS category_name
+              p.created_at, c.name AS category_name,
+              CASE
+                WHEN p.track_stock = false THEN 'ok'
+                WHEN p.stock = 0 THEN 'out'
+                WHEN p.stock <= ${LOW_STOCK_THRESHOLD} THEN 'low'
+                ELSE 'ok'
+              END AS stock_status
        FROM catalog_product p
        LEFT JOIN catalog_category c ON c.id = p.category_id
        WHERE p.company_id = $1::uuid
@@ -221,9 +246,10 @@ export function createCatalogProductService({ prisma, supabaseAdmin }) {
          AND ($3::text IS NULL OR p.product_type = $3)
          AND ($4::boolean IS NULL OR p.published = $4)
          AND ($5::text IS NULL OR p.name ILIKE $5)
+         AND ${stockStatusClause(6)}
        ORDER BY p.created_at DESC
-       LIMIT $6 OFFSET $7`,
-      companyId, catId, prodType, pubFilter, likeSearch, safeLimit, safeOffset,
+       LIMIT $7 OFFSET $8`,
+      companyId, catId, prodType, pubFilter, likeSearch, stockParam, safeLimit, safeOffset,
     )
 
     const [{ total }] = await prisma.$queryRawUnsafe(
@@ -234,12 +260,35 @@ export function createCatalogProductService({ prisma, supabaseAdmin }) {
          AND ($2::uuid IS NULL OR p.category_id = $2::uuid)
          AND ($3::text IS NULL OR p.product_type = $3)
          AND ($4::boolean IS NULL OR p.published = $4)
-         AND ($5::text IS NULL OR p.name ILIKE $5)`,
-      companyId, catId, prodType, pubFilter, likeSearch,
+         AND ($5::text IS NULL OR p.name ILIKE $5)
+         AND ${stockStatusClause(6)}`,
+      companyId, catId, prodType, pubFilter, likeSearch, stockParam,
     )
 
     const enriched = await resolveImageUrls(rows)
     return { data: enriched, total }
+  }
+
+  async function getProductStats({ companyId }) {
+    const rows = await prisma.$queryRaw`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE published = true)::int AS published,
+        COUNT(*) FILTER (WHERE published = false)::int AS draft,
+        COUNT(*) FILTER (WHERE track_stock = true AND stock = 0)::int AS out_of_stock,
+        COUNT(*) FILTER (WHERE track_stock = true AND stock > 0 AND stock <= ${LOW_STOCK_THRESHOLD})::int AS low_stock
+      FROM catalog_product
+      WHERE company_id = ${companyId}::uuid AND enabled = true
+    `
+    const row = rows[0] ?? { total: 0, published: 0, draft: 0, out_of_stock: 0, low_stock: 0 }
+    return {
+      total: row.total,
+      published: row.published,
+      draft: row.draft,
+      outOfStock: row.out_of_stock,
+      lowStock: row.low_stock,
+      lowStockThreshold: LOW_STOCK_THRESHOLD,
+    }
   }
 
   async function getProductById({ companyId, id }) {
@@ -387,6 +436,7 @@ export function createCatalogProductService({ prisma, supabaseAdmin }) {
     deleteCategory,
     reorderCategories,
     listProducts,
+    getProductStats,
     getProductById,
     getFullProductById,
     createProduct,

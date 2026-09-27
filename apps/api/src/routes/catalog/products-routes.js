@@ -12,20 +12,46 @@ export function createProductsRouter({ productSvc, prisma, requirePermission }) 
   app.get('/catalog/products', requirePermission('catalog.products.read'), async (c) => {
     try {
       const companyId = c.get('companyId')
-      const { categoryId, type, published, search, limit, offset } = c.req.query()
+      const { categoryId, type, published, stockStatus, search, page, pageSize, limit, offset } = c.req.query()
+      // RunlyTable (packages/ui) always sends page/pageSize; limit/offset are
+      // kept as a fallback for direct API callers.
+      const safePageSize = Math.min(Math.max(Number.parseInt(pageSize ?? limit, 10) || 50, 1), 500)
+      const safeOffset = page !== undefined
+        ? (Math.max(Number.parseInt(page, 10) || 1, 1) - 1) * safePageSize
+        : (offset ? Number(offset) : 0)
       const result = await productSvc.listProducts({
         companyId,
-        categoryId: categoryId || undefined,
-        type:       type       || undefined,
-        published:  published  !== undefined ? published === 'true' : undefined,
-        search:     search     || undefined,
-        limit:      limit  ? Number(limit)  : 50,
-        offset:     offset ? Number(offset) : 0,
+        categoryId:  categoryId  || undefined,
+        type:        type        || undefined,
+        published:   published   !== undefined ? published === 'true' : undefined,
+        stockStatus: stockStatus || undefined,
+        search:      search      || undefined,
+        limit:       safePageSize,
+        offset:      safeOffset,
       })
-      return c.json(result)
+      return c.json({
+        data: result.data,
+        pagination: {
+          page: Math.floor(safeOffset / safePageSize) + 1,
+          pageSize: safePageSize,
+          total: result.total,
+        },
+      })
     } catch (err) {
       if (err?.status && err.status < 500) return c.json({ error: err.message }, err.status)
       console.error('[GET /catalog/products]', err?.message)
+      return c.json({ error: 'Internal error' }, 500)
+    }
+  })
+
+  app.get('/catalog/products/stats', requirePermission('catalog.products.read'), async (c) => {
+    try {
+      const companyId = c.get('companyId')
+      const stats = await productSvc.getProductStats({ companyId })
+      return c.json({ data: stats })
+    } catch (err) {
+      if (err?.status && err.status < 500) return c.json({ error: err.message }, err.status)
+      console.error('[GET /catalog/products/stats]', err?.message)
       return c.json({ error: 'Internal error' }, 500)
     }
   })

@@ -3,70 +3,97 @@ import { companyFetch } from '../../../lib/companyFetch.js'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Badge,
   Button,
   ComboboxField,
   ConfirmDialog,
+  EmptyState,
   MarkdownField,
   PageHeader,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  Skeleton,
   SortableList,
   TextField,
 } from '@runly/ui'
-import { GripVertical, Pencil, Trash2, Plus } from 'lucide-react'
+import { FolderTree, GripVertical, Pencil, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { pickCategoryStyle } from '../lib/categoryVisuals.js'
+import CategoryCoverUploader from '../components/CategoryCoverUploader.jsx'
 
 function slugify(s) {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/(^-|-$)/g, '')
 }
 
-function CategoryRow({ item, onEdit, onDelete, dragHandleProps, isDragging }) {
+function CategoryRow({ item, coverUrl, onEdit, onDelete, dragHandleProps, isDragging }) {
+  const style = pickCategoryStyle(item.name)
+  const productCount = Number(item.product_count ?? 0)
   return (
     <div
       className={[
-        'flex items-center gap-2 px-3 py-2.5 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg group',
+        'flex items-center gap-3 px-3 py-2.5 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-sm hover:shadow-md transition-all group',
         isDragging ? 'opacity-50 shadow-lg' : '',
       ].join(' ')}
     >
       <button
         {...dragHandleProps}
         type="button"
-        className="cursor-grab text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] touch-none shrink-0"
+        className="cursor-grab text-[hsl(var(--muted-foreground))]/60 hover:text-[hsl(var(--foreground))] touch-none shrink-0"
         aria-label="Arrastrar para reordenar"
       >
         <GripVertical size={14} />
       </button>
-      <span className="flex-1 text-sm font-medium text-[hsl(var(--foreground))] truncate">
-        {item.name}
-      </span>
-      <span className="text-xs text-[hsl(var(--muted-foreground))] font-mono hidden sm:block truncate max-w-35">
-        {item.slug}
-      </span>
-      {item.parent_name && (
-        <span className="text-xs text-[hsl(var(--muted-foreground))] hidden md:block truncate max-w-30">
-          {item.parent_name}
+
+      {coverUrl ? (
+        <img src={coverUrl} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+      ) : (
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${style.bg} ${style.fg}`}>
+          <FolderTree size={16} />
         </span>
       )}
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-[hsl(var(--foreground))] truncate">
+            {item.name}
+          </span>
+          {item.parent_name && (
+            <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0 h-5">
+              en {item.parent_name}
+            </Badge>
+          )}
+        </div>
+        <span className="text-xs text-[hsl(var(--muted-foreground))] font-mono truncate">
+          {item.slug}
+        </span>
+      </div>
+
+      <Badge variant={productCount > 0 ? 'success' : 'outline'} className="shrink-0 hidden sm:inline-flex">
+        {productCount} producto{productCount !== 1 ? 's' : ''}
+      </Badge>
+
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <button
           type="button"
           onClick={() => onEdit(item)}
-          className="p-1 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          className="p-1.5 rounded-lg hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          title="Editar"
         >
-          <Pencil size={12} />
+          <Pencil size={14} />
         </button>
         <button
           type="button"
           onClick={() => onDelete(item)}
-          className="p-1 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--destructive))]"
+          className="p-1.5 rounded-lg hover:bg-red-50 text-[hsl(var(--muted-foreground))] hover:text-red-500"
+          title="Eliminar"
         >
-          <Trash2 size={12} />
+          <Trash2 size={14} />
         </button>
       </div>
     </div>
@@ -86,7 +113,7 @@ export default function CatalogCategoriesScreen() {
   const [sheetOpen,     setSheetOpen]     = useState(false)
   const [editing,       setEditing]       = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [form, setForm] = useState({ name: '', slug: '', description: '', parent_id: '' })
+  const [form, setForm] = useState({ name: '', slug: '', description: '', parent_id: '', cover_asset_id: null })
   const [localOrder, setLocalOrder] = useState(null)
 
   const flatQuery = useQuery({
@@ -97,6 +124,15 @@ export default function CatalogCategoriesScreen() {
   })
   const flatCats = flatQuery.data?.data ?? []
   const orderedCats = localOrder ?? flatCats
+
+  const coverIds = [...new Set(flatCats.map(c => c.cover_asset_id).filter(Boolean))]
+  const coverUrlsQuery = useQuery({
+    queryKey: ['catalog-category-covers', coverIds.join(','), token],
+    queryFn: () => runly.files.batchSignedUrls(coverIds, token),
+    enabled: Boolean(token) && coverIds.length > 0,
+    staleTime: 60_000,
+  })
+  const coverUrls = coverUrlsQuery.data?.data ?? {}
 
   const saveMutation = useMutation({
     mutationFn: data => editing
@@ -136,17 +172,18 @@ export default function CatalogCategoriesScreen() {
 
   function openCreate() {
     setEditing(null)
-    setForm({ name: '', slug: '', description: '', parent_id: '' })
+    setForm({ name: '', slug: '', description: '', parent_id: '', cover_asset_id: null })
     setSheetOpen(true)
   }
 
   function openEdit(row) {
     setEditing(row)
     setForm({
-      name:        row.name        ?? '',
-      slug:        row.slug        ?? '',
-      description: row.description ?? '',
-      parent_id:   row.parent_id   ?? '',
+      name:           row.name           ?? '',
+      slug:           row.slug           ?? '',
+      description:    row.description    ?? '',
+      parent_id:      row.parent_id      ?? '',
+      cover_asset_id: row.cover_asset_id ?? null,
     })
     setSheetOpen(true)
   }
@@ -161,11 +198,12 @@ export default function CatalogCategoriesScreen() {
     e.preventDefault()
     const nextPosition = orderedCats.length * 10
     saveMutation.mutate({
-      name:        form.name,
-      slug:        form.slug,
-      description: form.description || undefined,
-      parent_id:   form.parent_id   || null,
-      position:    editing ? undefined : nextPosition,
+      name:           form.name,
+      slug:           form.slug,
+      description:    form.description || undefined,
+      parent_id:      form.parent_id   || null,
+      cover_asset_id: form.cover_asset_id || null,
+      position:       editing ? undefined : nextPosition,
     })
   }
 
@@ -188,21 +226,32 @@ export default function CatalogCategoriesScreen() {
         title="Categorías"
         description="Organiza tus productos en categorías y subcategorías. Arrastra para reordenar."
         actions={
-          canCreate && (
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" /> Nueva categoría
-            </Button>
-          )
+          <div className="flex items-center gap-3">
+            {orderedCats.length > 0 && (
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                {orderedCats.length} categoría{orderedCats.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+            {canCreate && (
+              <Button onClick={openCreate}>
+                <Plus className="mr-2 h-4 w-4" /> Nueva categoría
+              </Button>
+            )}
+          </div>
         }
       />
 
       {flatQuery.isLoading ? (
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">Cargando categorías...</p>
-      ) : orderedCats.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[hsl(var(--border))] p-10 text-center">
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">No hay categorías registradas.</p>
-          {canCreate && <Button className="mt-4" onClick={openCreate}>Nueva categoría</Button>}
+        <div className="space-y-1.5">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
+      ) : orderedCats.length === 0 ? (
+        <EmptyState
+          icon={FolderTree}
+          title="No hay categorías registradas"
+          description="Crea tu primera categoría para empezar a organizar el catálogo."
+          action={canCreate ? { label: 'Nueva categoría', onClick: openCreate } : undefined}
+        />
       ) : (
         <div className="space-y-1.5">
           <SortableList
@@ -211,6 +260,7 @@ export default function CatalogCategoriesScreen() {
             renderItem={(item, { dragHandleProps, isDragging }) => (
               <CategoryRow
                 item={item}
+                coverUrl={item.cover_asset_id ? coverUrls[item.cover_asset_id] : null}
                 dragHandleProps={canUpdate ? dragHandleProps : {}}
                 isDragging={isDragging}
                 onEdit={canUpdate ? openEdit : () => {}}
@@ -227,6 +277,11 @@ export default function CatalogCategoriesScreen() {
             <SheetTitle>{editing ? 'Editar categoría' : 'Nueva categoría'}</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+            <CategoryCoverUploader
+              token={token}
+              coverId={form.cover_asset_id}
+              onChange={id => setForm(f => ({ ...f, cover_asset_id: id }))}
+            />
             <TextField
               label="Nombre"
               value={form.name}

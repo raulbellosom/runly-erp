@@ -4,19 +4,37 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  Button, Card, ComboboxField, EmptyState, MarkdownField, NumberField,
-  SelectField, Skeleton, Switch, TextareaField, TextField, cn,
+  Badge, Button, Card, ComboboxField, ConfirmDialog, CurrencyField, EmptyState,
+  MarkdownField, NumberField, Popover, PopoverContent, PopoverTrigger, SelectField,
+  Skeleton, SortableList, Switch, TextareaField, TextField, cn,
 } from '@runly/ui'
-import { ArrowLeft, EyeOff, Globe, Package, TrendingDown, TrendingUp } from 'lucide-react'
+import {
+  ArrowLeft, Boxes, ChevronDown, EyeOff, FileEdit, FileSpreadsheet, FileText,
+  Globe, GripVertical, History, Images, Layers, Package, Search, Tag, Trash2,
+  TrendingDown, TrendingUp,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
+import { companyFetch } from '../../../lib/companyFetch.js'
 import { runly } from '../../../lib/runly.js'
+import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { aggregateMovementsByMonth } from '../lib/aggregateMovements.js'
+import { getStockStatus, STOCK_STATUS_META } from '../lib/stockStatus.js'
+import MovementsTrendChart  from '../components/MovementsTrendChart.jsx'
 import ProductImageManager  from '../components/ProductImageManager.jsx'
 import StockMovementModal   from '../components/StockMovementModal.jsx'
 import VariantOptionsEditor from '../components/VariantOptionsEditor.jsx'
 import VariantMatrix        from '../components/VariantMatrix.jsx'
 
-const ALL_TABS = ['General', 'Imagenes', 'Precios', 'Variantes', 'Inventario', 'SEO']
+const API_BASE = getApiUrl()
+
+const ALL_TABS = [
+  { key: 'General',    label: 'General',                icon: FileEdit },
+  { key: 'Precios',    label: 'Precio e inventario',     icon: Tag },
+  { key: 'Variantes',  label: 'Variantes',               icon: Layers },
+  { key: 'Historial',  label: 'Historial de movimientos', icon: History },
+  { key: 'SEO',        label: 'SEO y meta',              icon: Search },
+]
 
 const CURRENCY_OPTIONS = [
   { value: 'USD', label: 'USD — Dólar estadounidense' },
@@ -30,11 +48,35 @@ const CURRENCY_OPTIONS = [
   { value: 'GTQ', label: 'GTQ — Quetzal guatemalteco' },
 ]
 
-function SectionCard({ title, children, className }) {
+// Colored icon-chip header, same tone vocabulary as CatalogStatCard — flat
+// muted-gray icons read as "unfinished" next to the rest of the redesign.
+const SECTION_TONE = {
+  brand:       'bg-(--brand-soft) text-(--brand-primary)',
+  success:     'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  destructive: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+  amber:       'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  violet:      'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+  neutral:     'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]',
+}
+
+function SectionCard({ title, icon: Icon, tone = 'neutral', meta, actions, children, className }) {
   return (
     <Card variant="solid" className={cn('p-5 space-y-4', className)}>
-      {title && (
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">{title}</h3>
+      {(title || meta || actions) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {title && (
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+              {Icon && (
+                <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-lg', SECTION_TONE[tone] ?? SECTION_TONE.neutral)}>
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+              )}
+              {title}
+            </h3>
+          )}
+          {meta && <span className="shrink-0 text-xs text-[hsl(var(--muted-foreground))]">{meta}</span>}
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        </div>
       )}
       {children}
     </Card>
@@ -54,6 +96,8 @@ export default function CatalogProductDetailScreen() {
 
   const [tab, setTab] = useState('General')
   const [stockModalOpen, setStockModalOpen] = useState(false)
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false)
+  const [confirmTypeChange, setConfirmTypeChange] = useState(null)
 
   const { data: productData, isPending } = useQuery({
     queryKey: ['catalog-product', id, token],
@@ -72,7 +116,7 @@ export default function CatalogProductDetailScreen() {
   const { data: movementsData } = useQuery({
     queryKey: ['catalog-stock-movements', id, token],
     queryFn: () => runly.catalog.listStockMovements(id, token, { limit: 50 }),
-    enabled: Boolean(token && id && tab === 'Inventario'),
+    enabled: Boolean(token && id && tab === 'Historial'),
     staleTime: 30_000,
   })
 
@@ -94,6 +138,28 @@ export default function CatalogProductDetailScreen() {
     },
     onError: err => toast.error(err?.message ?? 'Error'),
   })
+
+  const typeMutation = useMutation({
+    mutationFn: type => runly.catalog.updateProduct(id, { product_type: type }, token),
+    onSuccess: () => {
+      toast.success('Tipo de producto actualizado')
+      queryClient.invalidateQueries({ queryKey: ['catalog-product', id] })
+    },
+    onError: err => toast.error(err?.message ?? 'No se pudo cambiar el tipo de producto'),
+  })
+
+  function requestTypeChange(nextType) {
+    setTypeMenuOpen(false)
+    if (nextType === product?.product_type) return
+    // VARIABLE -> SIMPLE hides the Variantes tab; existing option/variant rows
+    // stay in the database (nothing is deleted) but become unreachable from
+    // the UI until the product is switched back — worth a confirmation.
+    if (nextType === 'SIMPLE' && product?.product_type === 'VARIABLE') {
+      setConfirmTypeChange(nextType)
+      return
+    }
+    typeMutation.mutate(nextType)
+  }
 
   if (isPending) {
     return (
@@ -118,7 +184,8 @@ export default function CatalogProductDetailScreen() {
   const movements  = movementsData?.data  ?? []
   const movTotal   = movementsData?.total ?? 0
   const isVariable = product.product_type === 'VARIABLE'
-  const visibleTabs = ALL_TABS.filter(t => t !== 'Variantes' || isVariable)
+  const visibleTabs = ALL_TABS.filter(t => t.key !== 'Variantes' || isVariable)
+  const stockStatus = getStockStatus({ trackStock: product.track_stock, stock: product.stock ?? 0 })
 
   return (
     <div className="flex flex-col min-h-dvh">
@@ -135,15 +202,64 @@ export default function CatalogProductDetailScreen() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-sm font-semibold text-[hsl(var(--foreground))] truncate">{product.name}</h1>
-              <span className="shrink-0 inline-flex items-center rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))]">
-                {isVariable ? 'Variable' : 'Simple'}
-              </span>
+              {canUpdate ? (
+                <Popover open={typeMenuOpen} onOpenChange={setTypeMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+                    >
+                      {isVariable ? 'Variable' : 'Simple'}
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-64 p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => requestTypeChange('SIMPLE')}
+                      className={cn(
+                        'flex w-full flex-col items-start gap-0.5 rounded-lg p-2 text-left transition-colors',
+                        !isVariable ? 'bg-[hsl(var(--muted))]' : 'hover:bg-[hsl(var(--muted))]',
+                      )}
+                    >
+                      <span className="text-xs font-semibold text-[hsl(var(--foreground))]">Producto Simple</span>
+                      <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Inventario único, sin variantes.</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => requestTypeChange('VARIABLE')}
+                      className={cn(
+                        'flex w-full flex-col items-start gap-0.5 rounded-lg p-2 text-left transition-colors',
+                        isVariable ? 'bg-[hsl(var(--muted))]' : 'hover:bg-[hsl(var(--muted))]',
+                      )}
+                    >
+                      <span className="text-xs font-semibold text-[hsl(var(--foreground))]">Producto Variable</span>
+                      <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Múltiples SKUs por talla, color u otro atributo.</span>
+                    </button>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="shrink-0 inline-flex items-center rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))]">
+                  {isVariable ? 'Variable' : 'Simple'}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', product.published ? 'bg-emerald-500' : 'bg-amber-400')} />
+              <span className={cn(
+                'h-1.5 w-1.5 rounded-full shrink-0',
+                product.published ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse',
+              )} />
               <span className="text-xs text-[hsl(var(--muted-foreground))]">
                 {product.published ? 'Publicado' : 'Borrador — no visible al público'}
               </span>
+              {product.track_stock && (
+                <>
+                  <span className="text-[hsl(var(--border))]">·</span>
+                  <Badge variant={STOCK_STATUS_META[stockStatus].tone} className="h-4.5 px-1.5 text-[10px]">
+                    {STOCK_STATUS_META[stockStatus].label}
+                  </Badge>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -166,17 +282,18 @@ export default function CatalogProductDetailScreen() {
         <div className="flex items-center gap-1 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 p-1 w-fit overflow-x-auto">
           {visibleTabs.map(t => (
             <button
-              key={t}
+              key={t.key}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setTab(t.key)}
               className={cn(
-                'flex items-center rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 whitespace-nowrap',
-                tab === t
+                'flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 whitespace-nowrap',
+                tab === t.key
                   ? 'bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm'
                   : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
               )}
             >
-              {t}
+              <t.icon className="h-3.5 w-3.5 shrink-0" />
+              {t.label}
             </button>
           ))}
         </div>
@@ -192,11 +309,10 @@ export default function CatalogProductDetailScreen() {
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18 }}
           >
-            {tab === 'General'   && <GeneralTab   product={product} categories={categories} onSave={updateMutation.mutate} saving={updateMutation.isPending} />}
-            {tab === 'Imagenes'  && <ImagenesTab  product={product} token={token} onSave={updateMutation.mutate} />}
+            {tab === 'General'   && <GeneralTab   product={product} categories={categories} token={token} onSave={updateMutation.mutate} saving={updateMutation.isPending} />}
             {tab === 'Precios'   && <PreciosTab   product={product} onSave={updateMutation.mutate} saving={updateMutation.isPending} onStockAdjust={() => setStockModalOpen(true)} />}
             {tab === 'Variantes' && isVariable && <VariantesTab product={product} token={token} productId={id} />}
-            {tab === 'Inventario' && <InventarioTab movements={movements} total={movTotal} stock={product.stock} onAdjust={() => setStockModalOpen(true)} />}
+            {tab === 'Historial' && <HistorialTab movements={movements} total={movTotal} stock={product.stock} trackStock={product.track_stock} productId={id} token={token} onAdjust={() => setStockModalOpen(true)} />}
             {tab === 'SEO'       && <SeoTab       product={product} onSave={updateMutation.mutate} saving={updateMutation.isPending} />}
           </motion.div>
         </AnimatePresence>
@@ -208,19 +324,35 @@ export default function CatalogProductDetailScreen() {
         token={token}
         productId={id}
       />
+
+      <ConfirmDialog
+        open={Boolean(confirmTypeChange)}
+        onOpenChange={v => !v && setConfirmTypeChange(null)}
+        title="Cambiar a Producto Simple"
+        description="Las opciones y variantes existentes no se eliminarán, pero la pestaña Variantes dejará de estar disponible hasta que vuelvas a marcarlo como Variable."
+        confirmLabel="Cambiar a Simple"
+        onConfirm={() => { typeMutation.mutate(confirmTypeChange); setConfirmTypeChange(null) }}
+        loading={typeMutation.isPending}
+      />
     </div>
   )
 }
 
 // ── Tab components ────────────────────────────────────────────────────────────
 
-function GeneralTab({ product, categories, onSave, saving }) {
+// Attributes are persisted as a plain { key, value } array — order in that
+// array IS the display order. `id` only identifies rows for SortableList's
+// drag-reorder in this session; it's stripped before onSave, never sent to the API.
+let attrLocalIdSeq = 0
+function withLocalId(attr) { return { ...attr, id: attr.id ?? `attr-${attrLocalIdSeq++}` } }
+
+function GeneralTab({ product, categories, token, onSave, saving }) {
   const [form, setForm] = useState({
     name:        product.name        ?? '',
     slug:        product.slug        ?? '',
     description: product.description ?? '',
     category_id: product.category_id ?? '',
-    attributes:  Array.isArray(product.attributes) ? product.attributes : [],
+    attributes:  (Array.isArray(product.attributes) ? product.attributes : []).map(withLocalId),
   })
 
   function slugify(s) {
@@ -241,13 +373,16 @@ function GeneralTab({ product, categories, onSave, saving }) {
       slug:        form.slug,
       description: form.description || undefined,
       category_id: form.category_id || null,
-      attributes:  form.attributes.filter(a => a.key?.trim()),
+      attributes:  form.attributes
+        .filter(a => a.key?.trim())
+        .map(({ key, value }) => ({ key, value })),
     })
   }
 
-  function addAttr()        { setForm(f => ({ ...f, attributes: [...f.attributes, { key: '', value: '' }] })) }
-  function removeAttr(i)    { setForm(f => ({ ...f, attributes: f.attributes.filter((_, idx) => idx !== i) })) }
-  function setAttr(i, k, v) { setForm(f => ({ ...f, attributes: f.attributes.map((a, idx) => idx === i ? { ...a, [k]: v } : a) })) }
+  function addAttr()          { setForm(f => ({ ...f, attributes: [...f.attributes, withLocalId({ key: '', value: '' })] })) }
+  function removeAttr(id)     { setForm(f => ({ ...f, attributes: f.attributes.filter(a => a.id !== id) })) }
+  function setAttr(id, k, v)  { setForm(f => ({ ...f, attributes: f.attributes.map(a => a.id === id ? { ...a, [k]: v } : a) })) }
+  function reorderAttrs(next) { setForm(f => ({ ...f, attributes: next })) }
 
   const categoryOptions = [
     { value: '', label: 'Sin categoría' },
@@ -259,13 +394,18 @@ function GeneralTab({ product, categories, onSave, saving }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main — 2/3 */}
         <div className="lg:col-span-2 space-y-5">
-          <SectionCard title="Información básica">
+          <SectionCard title="Información básica" icon={FileEdit} tone="brand">
             <TextField
               label="Nombre del producto"
               value={form.name}
               onChange={handleNameChange}
               required
             />
+            <div className="flex items-center gap-2 rounded-lg bg-[hsl(var(--muted))]/40 px-3 py-2">
+              <Tag className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+              <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">Identificador:</span>
+              <code className="truncate text-xs font-mono text-[hsl(var(--foreground))]">/p/{form.slug || '—'}</code>
+            </div>
             <TextField
               label="Slug"
               value={form.slug}
@@ -281,42 +421,54 @@ function GeneralTab({ product, categories, onSave, saving }) {
             />
           </SectionCard>
 
-          <SectionCard title="Atributos personalizados">
+          <SectionCard
+            title="Atributos personalizados"
+            icon={Layers}
+            tone="violet"
+            meta="Especificaciones visibles en la ficha técnica"
+          >
             <div className="space-y-2">
               {form.attributes.length === 0 && (
                 <p className="text-xs text-[hsl(var(--muted-foreground))]">
                   Sin atributos. Agrega pares clave-valor para especificaciones adicionales.
                 </p>
               )}
-              {form.attributes.map((a, i) => (
-                <div key={i} className="flex gap-2 items-end">
-                  <TextField
-                    label={i === 0 ? 'Clave' : undefined}
-                    value={a.key}
-                    onChange={e => setAttr(i, 'key', e.target.value)}
-                    placeholder="Ej: Material"
-                    className="w-40"
-                  />
-                  <TextField
-                    label={i === 0 ? 'Valor' : undefined}
-                    value={a.value}
-                    onChange={e => setAttr(i, 'value', e.target.value)}
-                    placeholder="Ej: Aluminio"
-                    className="flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeAttr(i)}
-                    className={cn(
-                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors',
-                      'text-[hsl(var(--muted-foreground))] hover:bg-red-50 hover:text-red-500',
-                      i === 0 && 'mb-0',
-                    )}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+              <SortableList
+                items={form.attributes}
+                onReorder={reorderAttrs}
+                renderItem={(a, { dragHandleProps, isDragging }) => (
+                  <div className={cn('flex gap-2 items-center py-1', isDragging && 'opacity-50')}>
+                    <button
+                      type="button"
+                      {...dragHandleProps}
+                      className="flex h-9 w-5 shrink-0 items-center justify-center text-[hsl(var(--muted-foreground))]/60 cursor-grab touch-none"
+                      aria-label="Arrastrar para reordenar"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+                    <TextField
+                      value={a.key}
+                      onChange={e => setAttr(a.id, 'key', e.target.value)}
+                      placeholder="Ej: Material"
+                      className="w-40"
+                    />
+                    <TextField
+                      value={a.value}
+                      onChange={e => setAttr(a.id, 'value', e.target.value)}
+                      placeholder="Ej: Aluminio"
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAttr(a.id)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-red-50 hover:text-red-500 transition-colors"
+                      aria-label="Eliminar atributo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              />
               <Button type="button" variant="outline" size="sm" onClick={addAttr}>
                 + Agregar atributo
               </Button>
@@ -326,7 +478,16 @@ function GeneralTab({ product, categories, onSave, saving }) {
 
         {/* Sidebar — 1/3 */}
         <div className="space-y-5">
-          <SectionCard title="Organización">
+          <SectionCard title="Imágenes del producto" icon={Images} tone="amber">
+            <ProductImageManager
+              token={token}
+              coverId={product.cover_asset_id}
+              imageIds={Array.isArray(product.images) ? product.images : []}
+              onChange={({ coverId, imageIds }) => onSave({ cover_asset_id: coverId, images: imageIds })}
+            />
+          </SectionCard>
+
+          <SectionCard title="Organización" icon={Boxes} tone="neutral">
             <ComboboxField
               label="Categoría"
               options={categoryOptions}
@@ -346,21 +507,6 @@ function GeneralTab({ product, categories, onSave, saving }) {
         </Button>
       </div>
     </form>
-  )
-}
-
-function ImagenesTab({ product, token, onSave }) {
-  return (
-    <div className="max-w-3xl">
-      <SectionCard title="Imágenes del producto">
-        <ProductImageManager
-          token={token}
-          coverId={product.cover_asset_id}
-          imageIds={Array.isArray(product.images) ? product.images : []}
-          onChange={({ coverId, imageIds }) => onSave({ cover_asset_id: coverId, images: imageIds })}
-        />
-      </SectionCard>
-    </div>
   )
 }
 
@@ -389,19 +535,30 @@ function PreciosTab({ product, onSave, saving, onStockAdjust }) {
     })
   }
 
+  const priceNum = Number(form.price) || 0
+  const comparePriceNum = Number(form.compare_price) || 0
+  const discountPct = comparePriceNum > priceNum && priceNum > 0
+    ? Math.round((1 - priceNum / comparePriceNum) * 100)
+    : null
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main — 2/3 */}
         <div className="lg:col-span-2 space-y-5">
-          <SectionCard title="Precio de venta">
+          <SectionCard
+            title="Precio de venta"
+            icon={Tag}
+            tone="success"
+            meta={discountPct != null ? <Badge variant="destructive">-{discountPct}%</Badge> : undefined}
+          >
             <div className="grid grid-cols-2 gap-4">
-              <NumberField
+              <CurrencyField
                 label="Precio"
                 value={form.price}
-                onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+                onChange={v => setForm(f => ({ ...f, price: String(v) }))}
+                currency={form.currency}
                 min={0}
-                step={0.01}
                 required
               />
               <SelectField
@@ -412,18 +569,18 @@ function PreciosTab({ product, onSave, saving, onStockAdjust }) {
                 placeholder="Seleccionar..."
               />
             </div>
-            <NumberField
+            <CurrencyField
               label="Precio anterior (tachado, opcional)"
-              value={form.compare_price}
-              onChange={e => setForm(f => ({ ...f, compare_price: e.target.value }))}
+              value={form.compare_price || 0}
+              onChange={v => setForm(f => ({ ...f, compare_price: v > 0 ? String(v) : '' }))}
+              currency={form.currency}
               min={0}
-              step={0.01}
-              description="Se muestra tachado junto al precio actual para indicar descuento"
+              hint="Se muestra tachado junto al precio actual para indicar descuento"
             />
           </SectionCard>
 
           {!isVariable && (
-            <SectionCard title="Identificadores y logística">
+            <SectionCard title="Identificadores y logística" icon={Package} tone="neutral">
               <div className="grid grid-cols-2 gap-4">
                 <TextField
                   label="SKU"
@@ -461,7 +618,7 @@ function PreciosTab({ product, onSave, saving, onStockAdjust }) {
         {/* Sidebar — 1/3 */}
         {!isVariable && (
           <div className="space-y-5">
-            <SectionCard title="Inventario">
+            <SectionCard title="Inventario" icon={Boxes} tone="amber">
               <div className="flex items-start gap-3">
                 <Switch
                   id="pr-track"
@@ -475,25 +632,26 @@ function PreciosTab({ product, onSave, saving, onStockAdjust }) {
                 </div>
               </div>
 
-              {form.track_stock && (
-                <div className="rounded-xl bg-[hsl(var(--muted))]/50 p-4 space-y-3">
-                  <div>
-                    <p className="text-xs text-[hsl(var(--muted-foreground))]">Stock actual</p>
-                    <p className={cn(
-                      'text-3xl font-bold tabular-nums',
-                      (product.stock ?? 0) <= 0 ? 'text-red-500' : 'text-[hsl(var(--foreground))]',
-                    )}>
-                      {product.stock ?? 0}
-                    </p>
-                    {(product.stock ?? 0) <= 0 && (
-                      <p className="text-xs text-red-500 mt-0.5">Sin stock disponible</p>
-                    )}
+              {form.track_stock && (() => {
+                const status = getStockStatus({ trackStock: true, stock: product.stock ?? 0 })
+                const meta = STOCK_STATUS_META[status]
+                return (
+                  <div className="rounded-xl bg-[hsl(var(--muted))]/50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-[hsl(var(--muted-foreground))]">Stock actual</p>
+                        <p className="text-3xl font-bold tabular-nums text-[hsl(var(--foreground))]">
+                          {product.stock ?? 0}
+                        </p>
+                      </div>
+                      <Badge variant={meta.tone}>{meta.label}</Badge>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" className="w-full" onClick={onStockAdjust}>
+                      Registrar ajuste
+                    </Button>
                   </div>
-                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={onStockAdjust}>
-                    Registrar ajuste
-                  </Button>
-                </div>
-              )}
+                )
+              })()}
             </SectionCard>
           </div>
         )}
@@ -511,17 +669,19 @@ function PreciosTab({ product, onSave, saving, onStockAdjust }) {
 function VariantesTab({ product, token, productId }) {
   return (
     <div className="space-y-6 max-w-4xl">
-      <SectionCard title="Opciones de variante">
+      <SectionCard title="Opciones de variante" icon={Layers} tone="violet">
         <VariantOptionsEditor token={token} productId={productId} options={product.options ?? []} />
       </SectionCard>
-      <SectionCard title="Combinaciones">
+      <SectionCard title="Combinaciones" icon={Boxes} tone="brand">
         <VariantMatrix token={token} productId={productId} variants={product.variants ?? []} />
       </SectionCard>
     </div>
   )
 }
 
-function InventarioTab({ movements, total, stock, onAdjust }) {
+function HistorialTab({ movements, total, stock, trackStock, productId, token, onAdjust }) {
+  const [exporting, setExporting] = useState(null)
+
   function fmtDate(val) {
     if (!val) return '—'
     try {
@@ -531,18 +691,81 @@ function InventarioTab({ movements, total, stock, onAdjust }) {
     }
   }
 
+  async function handleExport(format) {
+    setExporting(format)
+    try {
+      const res = await companyFetch(
+        `${API_BASE}/catalog/products/${productId}/stock-movements/export/${format}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (!res.ok) {
+        toast.error('No se pudo exportar el archivo')
+        return
+      }
+      const blob = await res.blob()
+      const anchor = document.createElement('a')
+      anchor.href = URL.createObjectURL(blob)
+      anchor.download = `movimientos-${productId}-${Date.now()}.${format}`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(anchor.href)
+    } catch {
+      toast.error('No se pudo exportar el archivo')
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  const status = getStockStatus({ trackStock, stock: stock ?? 0 })
+  const meta = STOCK_STATUS_META[status]
+  const trend = aggregateMovementsByMonth(movements)
+
   return (
     <div className="space-y-5 max-w-3xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold">Movimientos de inventario</h3>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">
-            {total} movimiento{total !== 1 ? 's' : ''} registrado{total !== 1 ? 's' : ''}
-          </p>
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">Stock actual</p>
+          <p className="text-2xl font-bold tabular-nums text-[hsl(var(--foreground))]">{stock ?? 0}</p>
         </div>
-        <Button size="sm" onClick={onAdjust}>Registrar ajuste</Button>
+        {trackStock && <Badge variant={meta.tone}>{meta.label}</Badge>}
       </div>
 
+      {trend.length > 0 && (
+        <SectionCard title="Entradas y salidas por mes" icon={TrendingUp} tone="brand">
+          <MovementsTrendChart data={trend} />
+        </SectionCard>
+      )}
+
+      <SectionCard
+        title="Movimientos de inventario"
+        icon={History}
+        tone="violet"
+        meta={`${total} movimiento${total !== 1 ? 's' : ''} registrado${total !== 1 ? 's' : ''}`}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={Boolean(exporting) || total === 0}
+              onClick={() => handleExport('xlsx')}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+              {exporting === 'xlsx' ? 'Exportando...' : 'Excel'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={Boolean(exporting) || total === 0}
+              onClick={() => handleExport('pdf')}
+            >
+              <FileText className="h-4 w-4 mr-1.5" />
+              {exporting === 'pdf' ? 'Exportando...' : 'PDF'}
+            </Button>
+            <Button size="sm" onClick={onAdjust}>Registrar ajuste</Button>
+          </>
+        }
+      >
       {movements.length === 0 ? (
         <EmptyState
           icon={Package}
@@ -587,6 +810,7 @@ function InventarioTab({ movements, total, stock, onAdjust }) {
           ))}
         </div>
       )}
+      </SectionCard>
     </div>
   )
 }
@@ -607,7 +831,7 @@ function SeoTab({ product, onSave, saving }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main — 2/3 */}
         <div className="lg:col-span-2">
-          <SectionCard title="Metadatos SEO">
+          <SectionCard title="Metadatos SEO" icon={Search} tone="brand">
             <TextField
               label="Título SEO"
               value={form.meta_title}
@@ -630,7 +854,7 @@ function SeoTab({ product, onSave, saving }) {
 
         {/* Sidebar — 1/3 */}
         <div>
-          <SectionCard title="Vista previa en Google">
+          <SectionCard title="Vista previa en Google" icon={Globe} tone="neutral">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))] mb-3">
               Ejemplo de resultado
             </p>
