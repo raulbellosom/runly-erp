@@ -63,6 +63,18 @@ docker run --rm \
 Docker Compose service name (local mode) — omit it when the target Postgres is
 reachable directly (typical for external mode).
 
+**Expect `pg_restore` to report hundreds of ignored errors about event triggers
+(e.g. `issue_pg_cron_access`, `pgrst_ddl_watch`) — this is normal, not a failed
+restore.** The dump includes Supabase's own internal event triggers, which a
+fresh `supabase-db` container already creates from its own init scripts before
+you ever restore anything; `pg_restore` cannot recreate them as the non-superuser
+`postgres` role Supabase self-hosted uses. Verified against a real restore
+(disposable Backblaze B2 bucket, 2026-09-27): despite ~750 such warnings,
+`_prisma_migrations` and every Runly application table (`company`, `membership`,
+`runly_module`, `permission`, `role`, etc.) restored with their exact row counts
+intact. Confirm the restore actually worked by querying your own data, not by
+checking `pg_restore`'s exit code.
+
 Verify: connect and confirm `Company`/`Membership`/module tables have the
 expected row counts for the snapshot's date.
 
