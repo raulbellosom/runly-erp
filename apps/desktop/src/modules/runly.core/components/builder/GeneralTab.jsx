@@ -2,11 +2,18 @@
 // PWA metadata). Module key is immutable once created (module-builder-service
 // re-pins it on every save), shown read-only here.
 import { TextField, TextareaField, SwatchField, IconPickerField, SectionCard } from "@runly/ui";
+import { buildModuleIconOptions } from "../../lib/builderHelpers";
 
-export function GeneralTab({ definition, onChange, readOnly }) {
+export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
   function set(patch) {
     onChange((current) => ({ ...current, ...patch }));
   }
+
+  // Constrains the picker to exactly what @runly/module-compiler's validator
+  // accepts (capabilities.iconNames === MODULE_ICON_NAMES) — otherwise a
+  // perfectly normal-looking pick from IconPickerField's much larger default
+  // catalog fails "Icon is not supported by the module catalog" at Validar.
+  const moduleIcons = buildModuleIconOptions(capabilities?.iconNames);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 pt-4">
@@ -42,6 +49,7 @@ export function GeneralTab({ definition, onChange, readOnly }) {
             value={definition.icon}
             disabled={readOnly}
             onChange={(value) => set({ icon: value })}
+            icons={moduleIcons.length ? moduleIcons : undefined}
           />
           <SwatchField
             label="Color"

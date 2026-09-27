@@ -5,6 +5,24 @@
 // is re-validated server-side by @runly/module-compiler before it can be
 // published, so these helpers don't need to be authoritative — just
 // convenient and non-destructive to sibling data.
+import * as LucideIcons from "lucide-react";
+
+// Turns the server's `capabilities.iconNames` (@runly/module-engine's
+// MODULE_ICON_NAMES — the exact list @runly/module-compiler's validator
+// accepts) into {name, component} pairs resolved against the real
+// lucide-react package, for IconPickerField's `icons` override. Deliberately
+// does NOT go through packages/ui's separate icon-catalog.js — that catalog
+// is its own, differently-curated list (built for runly.pfm's wallet icons)
+// that was never meant to be a superset of MODULE_ICON_NAMES, and filtering
+// through it silently dropped valid module icons the picker should offer.
+// Resolving directly against lucide-react means whatever the server allows,
+// the picker can always show — no separate list to keep in sync.
+export function buildModuleIconOptions(iconNames) {
+  return (iconNames ?? [])
+    .map((name) => ({ name, component: LucideIcons[name] }))
+    .filter((option) => Boolean(option.component));
+}
+
 export const FIELD_TYPE_LABELS = {
   text: "Texto", textarea: "Texto largo", number: "Número", decimal: "Decimal",
   boolean: "Sí/No", select: "Selección única", multiselect: "Selección múltiple",

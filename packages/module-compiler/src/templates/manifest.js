@@ -77,10 +77,10 @@ export function generateManifest(config) {
 
 export default defineRunlyModule({
   key: '${config.key}',
-  name: '${config.name}',
+  name: ${JSON.stringify(config.name)},
   version: '${version}',
   kind: 'FEATURE',
-  description: '${description}',
+  description: ${JSON.stringify(description)},
   icon: '${config.icon}',
   color: '${config.color}',
   pwa: {

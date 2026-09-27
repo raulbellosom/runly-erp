@@ -133,6 +133,85 @@ export const MODULE_ICON_NAMES = Object.freeze([
   'Server',
   'Wifi',
   'Zap',
+
+  // Retail & Sales
+  'BadgePercent',
+  'Gift',
+  'Scan',
+  'ShoppingBasket',
+  'Ticket',
+
+  // Real Estate & Facilities
+  'Bed',
+  'Building',
+  'DoorOpen',
+  'KeyRound',
+
+  // Fleet & Transport
+  'Bike',
+  'BusFront',
+  'Car',
+  'CarFront',
+
+  // Agriculture
+  'Sprout',
+  'Tractor',
+  'TreeDeciduous',
+  'Wheat',
+
+  // Legal & Compliance
+  'BadgeCheck',
+  'FileSignature',
+
+  // Manufacturing & Quality
+  'CircuitBoard',
+  'Cog',
+  'PackageCheck',
+  'PackagePlus',
+  'PackageSearch',
+
+  // Hospitality & Food Service
+  'ChefHat',
+  'Coffee',
+  'Soup',
+  'UtensilsCrossed',
+  'Wine',
+
+  // Health & Pharmacy
+  'Ambulance',
+  'Cross',
+  'Pill',
+  'Syringe',
+  'Thermometer',
+
+  // Education & Training
+  'Pencil',
+  'PenTool',
+  'School',
+
+  // Sports & Wellness
+  'Dumbbell',
+  'Medal',
+  'Trophy',
+
+  // Energy & Environment
+  'Droplet',
+  'Flame',
+  'Recycle',
+  'Sun',
+
+  // General & Misc
+  'Bookmark',
+  'CalendarClock',
+  'Compass',
+  'GitBranch',
+  'Heart',
+  'Info',
+  'Rocket',
+  'ScrollText',
+  'Sparkles',
+  'ThumbsUp',
+  'Workflow',
 ])
 
 const MODULE_ICON_NAME_SET = new Set(MODULE_ICON_NAMES)

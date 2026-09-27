@@ -35,9 +35,11 @@ export function validateModuleDefinition(definition) {
   if (!MODULE_KEY.test(definition.key ?? '')) errors.push(diagnostic('key', 'INVALID_MODULE_KEY', 'Module key must use <namespace>.<slug> lowercase format.'))
   if (RESERVED_NAMESPACES.some((prefix) => definition.key?.startsWith(prefix))) errors.push(diagnostic('key', 'RESERVED_MODULE_NAMESPACE', 'Module namespace is reserved.'))
   if (!definition.name?.trim()) errors.push(diagnostic('name', 'REQUIRED', 'Module name is required.'))
-  for (const [path, value] of [['name', definition.name], ['description', definition.description]]) {
-    if (UNSAFE_SOURCE_TEXT.test(value ?? '')) errors.push(diagnostic(path, 'UNSAFE_SOURCE_TEXT', `${path} contains characters that cannot be emitted safely.`))
-  }
+  // name/description are emitted via JSON.stringify() in generateManifest()
+  // (packages/module-compiler/src/templates/manifest.js), which safely
+  // escapes quotes, backslashes and newlines — unlike entity/field/permission/
+  // navigation labels below, which are still naively interpolated into
+  // single-quoted string literals elsewhere and so still need this check.
   if (!/^\d+\.\d+\.\d+$/.test(definition.version ?? '')) errors.push(diagnostic('version', 'INVALID_SEMVER', 'Version must use x.y.z semver.'))
   if (!isModuleIconName(definition.icon ?? '')) errors.push(diagnostic('icon', 'INVALID_ICON', 'Icon is not supported by the module catalog.'))
   if (!HEX_COLOR.test(definition.color ?? '')) errors.push(diagnostic('color', 'INVALID_COLOR', 'Color must be a six-digit hexadecimal value.'))

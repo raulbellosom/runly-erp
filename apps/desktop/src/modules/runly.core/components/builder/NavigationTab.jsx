@@ -4,10 +4,11 @@
 // a path by hand, per the spec's explicit "no advanced mode by default".
 import { Button, IconPickerField, TextField } from "@runly/ui";
 import { ChevronUp, ChevronDown } from "lucide-react";
-import { navigationItems, updateNavigationItem, moveNavigationItem } from "../../lib/builderHelpers";
+import { navigationItems, updateNavigationItem, moveNavigationItem, buildModuleIconOptions } from "../../lib/builderHelpers";
 
-export function NavigationTab({ definition, onChange, readOnly }) {
+export function NavigationTab({ definition, onChange, capabilities, readOnly }) {
   const items = navigationItems(definition);
+  const moduleIcons = buildModuleIconOptions(capabilities?.iconNames);
 
   return (
     <div className="space-y-2 pt-4 max-w-2xl">
@@ -16,7 +17,12 @@ export function NavigationTab({ definition, onChange, readOnly }) {
       </p>
       {items.map((item, index) => (
         <div key={item.page ?? index} className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] p-2.5">
-          <IconPickerField value={item.icon} disabled={readOnly} onChange={(value) => onChange((d) => updateNavigationItem(d, index, { icon: value }))} />
+          <IconPickerField
+            value={item.icon}
+            disabled={readOnly}
+            onChange={(value) => onChange((d) => updateNavigationItem(d, index, { icon: value }))}
+            icons={moduleIcons.length ? moduleIcons : undefined}
+          />
           <TextField
             className="flex-1"
             value={item.label ?? ""}

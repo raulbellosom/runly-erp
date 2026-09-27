@@ -63,6 +63,29 @@ test('rejects non-JSON values and source-code injection before normalization', (
   assert.throws(() => compileModule(withQuote), (error) => error.diagnostics.errors.some((item) => item.code === 'UNSAFE_SOURCE_TEXT'))
 })
 
+// name/description are JSON.stringify()'d in generateManifest() (unlike
+// entity/field/permission/navigation labels, still naively interpolated
+// above), so ordinary punctuation a user is likely to type — an apostrophe,
+// a quote, a backslash — must validate and compile cleanly instead of
+// tripping UNSAFE_SOURCE_TEXT. Found via a real Module Builder session: the
+// default "inventario ligero" template failed Validar out of the box.
+test('name/description with quotes, apostrophes and backslashes validate and compile safely', () => {
+  const withPunctuation = {
+    ...structuredClone(BASIC),
+    name: "Juan's Fleet \"Ops\"",
+    description: 'Ruta: C:\\datos\\flota — no se pudo importar; revisar \'origen\'.',
+  }
+  const normalized = normalizeModuleDefinition(withPunctuation)
+  assert.equal(validateModuleDefinition(normalized).valid, true)
+  const { files } = compileModule(withPunctuation)
+  const manifestSource = files.find((f) => f.path === 'module.manifest.js').content
+  // The generator must have gone through JSON.stringify() (double-quoted,
+  // backslash/quote-escaped), never naive single-quote interpolation — this
+  // is what makes the apostrophe/quote/backslash above safe to emit at all.
+  assert.ok(manifestSource.includes(`name: ${JSON.stringify(withPunctuation.name)},`))
+  assert.ok(manifestSource.includes(`description: ${JSON.stringify(withPunctuation.description)},`))
+})
+
 test('compiles deterministic manifest, model, views, API and lifecycle ownership', () => {
   const first = compileModule(BASIC)
   const second = compileModule(JSON.parse(JSON.stringify(BASIC)))

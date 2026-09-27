@@ -231,7 +231,7 @@ export default function ModuleBuilderEditor() {
             <ViewsTab definition={definition} onChange={patchDefinition} capabilities={capabilities} readOnly={Boolean(project.detachedAt)} />
           </TabsContent>
           <TabsContent value="navigation">
-            <NavigationTab definition={definition} onChange={patchDefinition} readOnly={Boolean(project.detachedAt)} />
+            <NavigationTab definition={definition} onChange={patchDefinition} capabilities={capabilities} readOnly={Boolean(project.detachedAt)} />
           </TabsContent>
           <TabsContent value="permissions">
             <PermissionsTab definition={definition} />

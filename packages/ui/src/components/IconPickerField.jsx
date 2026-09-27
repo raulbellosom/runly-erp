@@ -7,23 +7,28 @@ import { Label } from "./Label.jsx";
 import { fieldCls } from "./form-field-base.jsx";
 import { cn } from "../lib/utils.js";
 
-const ICONS = ICON_CATALOG;
-
 export function IconPickerField({
   value,
   onChange,
   label,
   placeholder = "Seleccionar icono",
   disabled = false,
+  // Overrides the default general-purpose catalog with a caller-supplied
+  // {name, component} list — used by the Module Builder to constrain the
+  // picker to exactly the icon names @runly/module-compiler's validator
+  // accepts (MODULE_ICON_NAMES), so nothing selectable here can ever fail
+  // validation. Falls back to the full ICON_CATALOG for every other caller
+  // (e.g. runly.pfm's wallet icon), unchanged.
+  icons = ICON_CATALOG,
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const filtered = ICONS.filter((i) =>
+  const filtered = icons.filter((i) =>
     i.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const SelectedIcon = ICONS.find((i) => i.name === value)?.component ?? null;
+  const SelectedIcon = icons.find((i) => i.name === value)?.component ?? null;
 
   return (
     <div className="space-y-1.5">
