@@ -53,7 +53,7 @@ Los reconocimientos llevan una firma HMAC vinculada a usuario/empresa, hash de i
 
 ## Configuración
 
-Se reutilizan `GROQ_API_KEY`, `GROQ_BASE_URL`, `PFM_VISION_MODEL`, `PFM_VISION_TIMEOUT_MS`, `CHAT_MIRAI_MODEL`, `TAVILY_API_KEY` y `CHAT_MIRAI_WEB`. `INVENTORY_AI_SIGNING_SECRET` es opcional; si falta se utiliza la clave Groq para derivar las claves de firma/cifrado. Debe ser igual en todas las réplicas de la API. Rotarlo invalida sesiones y reconocimientos pendientes.
+Se reutilizan `GROQ_API_KEY`, `GROQ_BASE_URL`, `PFM_VISION_MODEL`, `PFM_VISION_TIMEOUT_MS`, `CHAT_MIRAI_MODEL`, `TAVILY_API_KEY` y `CHAT_MIRAI_WEB`. `INVENTORY_AI_SIGNING_SECRET` es opcional; si falta se utiliza la clave Groq para derivar las claves de firma/cifrado. Debe ser igual en todas las réplicas de la API. Rotarlo invalida sesiones y reconocimientos pendientes. El asistente de chat de inventario (no el reconocimiento por foto, que siempre usa Groq) también puede enrutarse a un servidor Ollama local si la instancia tiene `AI_LOCAL_ENABLED=true` — ver `CLAUDE.md` para las variables `OLLAMA_*`.
 
 La prueba con la cuenta configurada devolvió `model_not_found` para `qwen/qwen3.6-27b`. Se verificó `/openai/v1/models` y se actualizó el valor predeterminado, `.env.example` y ese valor concreto del `.env` local a `qwen/qwen3.8-27b`. La [documentación de Groq](https://console.groq.com/docs/model/qwen/qwen3.8-27b) confirma visión y JSON para ese modelo. El proveedor lo presenta como preview: volver a verificar disponibilidad cuando se cambie de cuenta o despliegue.
 
