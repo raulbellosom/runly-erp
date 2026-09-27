@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, User, Settings, LogOut, Monitor, Download, X, Smartphone, Share, Sun, Moon, Activity, MessageSquare, Building2 } from "lucide-react";
+import { ChevronDown, User, Settings, LogOut, Monitor, Download, X, Smartphone, Share, Sun, Moon, Activity, MessageSquare, Building2, Bug } from "lucide-react";
 import { useThemeStore } from "../stores/theme";
 import { useChatFloatStore } from "../modules/runly.chat/store/chatFloatStore";
 import { useChatUnreadCount } from "../modules/runly.chat/hooks/useChatConversations";
@@ -15,6 +15,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  requestBugReport,
 } from "@runly/ui";
 import { useAuth } from "../auth/AuthProvider";
 import { RUNLY_DESKTOP_DOWNLOAD_URL, RUNLY_MOBILE_DOWNLOAD_URL } from "../lib/appConfig.js";
@@ -105,6 +106,14 @@ export function UserMenu({
     e.stopPropagation();
     dismissDesktopReminder();
     setShowReminder(false);
+  }
+
+  function handleReportBug() {
+    requestBugReport({
+      context: activeModuleKey
+        ? `${activeModuleKey} · ${window.location.pathname}`
+        : window.location.pathname,
+    });
   }
 
   const initials = getInitials(userProfile?.firstName, userProfile?.lastName);
@@ -352,6 +361,14 @@ export function UserMenu({
             </DropdownMenuItem>
           </>
         )}
+
+        <div className="lg:hidden">
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleReportBug} className="gap-2 cursor-pointer">
+            <Bug size={14} />
+            Reportar un problema
+          </DropdownMenuItem>
+        </div>
 
         <DropdownMenuSeparator />
         <DropdownMenuItem
