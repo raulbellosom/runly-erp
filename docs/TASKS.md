@@ -1,5 +1,35 @@
 ﻿# Runly ERP - Tasks and Roadmap
 
+## LiveKit RTC addressing [IMPLEMENTED; OPERATIONAL ACCEPTANCE PENDING]
+
+Spec: `docs/superpowers/specs/2026-09-26-livekit-rtc-addressing-design.md`.
+Plan and evidence: `docs/superpowers/plans/2026-09-26-livekit-rtc-addressing.md`.
+
+- [x] Shared IPv4/IPv6 validation and automatic/explicit RTC address rendering via `LIVEKIT_NODE_IP`.
+- [x] Both installers persist the option; an explicit empty file value restores automatic discovery even with a stale process value.
+- [x] Documentation and regression tests for platforms, TLS, env precedence, reruns, mode changes and invalid-input preservation.
+- [ ] Global repository privacy gate: two pre-existing findings in unrelated spec documents, detailed in the plan; no findings in changed feature files.
+- [ ] Real two-participant call across required networks, selected ICE pair and bidirectional audio/video. No deployment or real call performed.
+
+Verified: 2026-09-26 (`node --test` on `livekit-installer.test.js` and `livekit-node-ip-env.test.js`: 66/66 passed; `node --check` on library and both installers; targeted ESLint; `git diff --check` passed). `pnpm check:privacy` exited 1 on the two pre-existing findings; this is not a clean global privacy result.
+
+## Unified AI provider router (Groq + local Ollama) [COMPLETE]
+
+Spec: `docs/superpowers/specs/2026-09-26-unified-ai-provider-router-design.md`.
+Plan: `docs/superpowers/plans/2026-09-26-unified-ai-provider-router.md`.
+
+- [x] Shared `apps/api/src/services/ai/` (`ai-providers.js`, `ai-task-profiles.js`, `ai-client.js`, `ai-router.js`) replacing 6 independently duplicated Groq-calling implementations with one HTTP transport and one deterministic router.
+- [x] `AI_LOCAL_ENABLED`/`OLLAMA_BASE_URL`/`OLLAMA_MODEL_LIGHT`/`OLLAMA_MODEL_HEAVY` let an instance alternate between Groq and a local Ollama server per AI task (qwen3:4b for light tasks, qwen3:8b for heavy ones); default disabled, zero behavior change for Groq-only instances.
+- [x] Vision tasks (receipt OCR, inventory photo intake, scanned bank-statement pages) always resolve to Groq — local models have no vision capability.
+- [x] Automatic fallback to Groq plus a 3-strikes/60s circuit breaker when a local attempt fails, so a dead local server doesn't add latency to every request.
+- [x] All 6 services migrated: `mirai-service.js`, `help-assistant-service.js`, `pfm/assistant-service.js`, `vision-service.js`, `call-transcript-analysis-service.js`, `ledger/ai-import-extraction.js` (+ `ai-import-routes.js`). `inventory-assistant-service.js` and `inventory-intake-service.js` inherit the migration transparently (they compose `mirai-service.js`/`vision-service.js`, no code changes of their own).
+- [x] Installer (`setup-local.mjs`, `setup-external.mjs`, both `.env.*.example`) plumbs the new vars, default disabled.
+- [x] `CLAUDE.md`'s `GROQ_API_KEY` paragraph documents the new vars.
+
+Two real bugs were found and fixed during subagent-driven implementation review (not present in the final code): `ai-client.js` originally hardcoded `reasoning_effort: "low"` for every reasoning model, which would have silently changed MirAI/help-assistant/PFM-assistant's existing Groq behavior (only 3 of 6 services ever sent that field) — made opt-in per caller instead. Two service migrations (`call-transcript-analysis-service.js`, then caught again in `mirai-service.js`'s channel/panel/`answerWithTools` call sites) initially constructed `createAiRouter()` fresh per call instead of once per service instance, which would have silently reset the circuit breaker's failure count on every call, defeating it entirely — fixed to construct once and reuse (in `ai-import-extraction.js`'s case, threaded down as an optional param from `ai-import-routes.js` since that file has no factory to hoist into).
+
+Verified: 2026-09-26 (`node --test "apps/api/src/**/*.test.js"`: 1810/1813 pass, 1810 pass + 2 pre-existing skipped (`RUN_CROSS_TENANT_TESTS` gate) + 1 pre-existing unrelated failure (`storefront-capture-foundation-contract.test.js`, manifest nav drift predating this work); `pnpm lint` exit 0; `node apps/api/src/index.js` boots cleanly, `GET /health` → 200, `GET /help/assistant/status` correctly requires auth (401) confirming the migrated route is mounted and unaffected with `AI_LOCAL_ENABLED` unset).
+
 ## Runly migration [IN PROGRESS]
 
 Spec: `docs/superpowers/specs/2026-09-13-runly-distribution-design.md`.
