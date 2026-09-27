@@ -1,10 +1,24 @@
 import crypto from "node:crypto";
+import { isIP } from "node:net";
 
 export const LIVEKIT_MODES = ["embedded", "external", "disabled"];
 export const LIVEKIT_TLS_MODES = ["managed", "external"];
 
 function clean(value) {
   return String(value ?? "").trim();
+}
+
+function normalizeLiveKitNodeIp(value) {
+  const nodeIp = clean(value);
+  // Go's net.ParseIP rejects scoped IPv6 addresses, unlike Node's isIP.
+  if (nodeIp && (!isIP(nodeIp) || nodeIp.includes("%"))) {
+    const error = new Error(
+      "LIVEKIT_NODE_IP debe estar vacío o contener una única dirección IPv4 o IPv6, sin puerto ni zona.",
+    );
+    error.code = "LIVEKIT_NODE_IP_INVALID";
+    throw error;
+  }
+  return nodeIp;
 }
 
 export function normalizeLiveKitDomain(value) {
@@ -56,6 +70,7 @@ export function resolveLiveKitConfig({
   }
 
   const domain = normalizeLiveKitDomain(values.domain);
+  const nodeIp = normalizeLiveKitNodeIp(values.nodeIp);
   let publicUrl = clean(values.publicUrl);
   let internalUrl = clean(values.internalUrl);
   let apiKey = clean(values.apiKey);
@@ -65,6 +80,7 @@ export function resolveLiveKitConfig({
     return {
       mode,
       domain,
+      nodeIp,
       tlsMode,
       publicUrl,
       internalUrl,
@@ -134,6 +150,7 @@ export function resolveLiveKitConfig({
   return {
     mode,
     domain,
+    nodeIp,
     tlsMode,
     publicUrl,
     internalUrl,
@@ -150,9 +167,10 @@ export function resolveLiveKitConfig({
 // defaults — only the host-side mapping in docker-compose.yml varies, via
 // RUNLY_*_HOST_PORT / LIVEKIT_*_PORT env vars.
 export function renderLiveKitConfig({
-  apiKey, apiSecret, isLinux,
+  apiKey, apiSecret, isLinux, nodeIp,
   httpPort, rtcTcpPort, rtcUdpPort, redisPort,
 }) {
+  const resolvedNodeIp = normalizeLiveKitNodeIp(nodeIp);
   const port = isLinux ? (Number(httpPort) || 7880) : 7880;
   const tcpPort = isLinux ? (Number(rtcTcpPort) || 7881) : 7881;
   const udpPort = isLinux ? (Number(rtcUdpPort) || 7882) : 7882;
@@ -165,7 +183,9 @@ export function renderLiveKitConfig({
     "rtc:",
     `  tcp_port: ${tcpPort}`,
     `  udp_port: ${udpPort}`,
-    "  use_external_ip: true",
+    ...(resolvedNodeIp
+      ? ["  use_external_ip: false", `  node_ip: ${JSON.stringify(resolvedNodeIp)}`]
+      : ["  use_external_ip: true"]),
     "  enable_loopback_candidate: true",
     "",
     "redis:",

@@ -287,6 +287,7 @@ que una actualización no invalide instalaciones existentes:
 ```bash
 LIVEKIT_MODE=embedded
 LIVEKIT_DOMAIN=
+LIVEKIT_NODE_IP=
 LIVEKIT_TLS_MODE=managed
 LIVEKIT_URL=
 LIVEKIT_INTERNAL_URL=
@@ -351,6 +352,83 @@ sudo ufw allow 7882/udp comment 'Runly LiveKit RTC UDP'
 
 Nunca expongas `LIVEKIT_API_SECRET` al frontend. Runly solo entrega tokens de
 sala de corta duracion desde la API.
+
+### Dirección anunciada para audio y video
+
+Las direcciones de señalización y de transporte tienen funciones distintas:
+
+| Variable | Uso |
+|---|---|
+| `LIVEKIT_URL` | WebSocket público al que se conecta el navegador. |
+| `LIVEKIT_INTERNAL_URL` | Endpoint HTTP que usa la API para administrar salas. |
+| `LIVEKIT_NODE_IP` | IP literal anunciada para RTC por el LiveKit integrado. |
+
+Con `LIVEKIT_NODE_IP=` vacío, Runly conserva el descubrimiento automático
+(`rtc.use_external_ip: true`). Para indicar una dirección alcanzable por los
+participantes en una instalación con NAT, una VPN o una red privada, configura
+una única IPv4 o IPv6 en `.env.local` o `.env.external`. Por ejemplo, usando una
+IP de documentación que debes sustituir por la de tu instalación:
+
+```dotenv
+LIVEKIT_NODE_IP=203.0.113.10
+```
+
+El instalador valida el literal y genera `rtc.node_ip` con
+`rtc.use_external_ip: false`. Se aceptan direcciones privadas; no se admiten
+dominios, URLs, CIDR, puertos, listas, corchetes ni zonas IPv6 (`%interfaz`).
+No se deduce la IP del dominio ni del proxy TLS. La opción funciona con TLS
+`managed` y `external`; únicamente se aplica con `LIVEKIT_MODE=embedded`.
+En modo `external` o `disabled` se conserva el valor sin configurar un SFU local.
+
+El valor del archivo prevalece, incluso si está vacío. Solo si la clave está
+ausente se toma `LIVEKIT_NODE_IP` del entorno del proceso; en otro caso se usa
+automático. El instalador persiste el resultado y lo conserva al actualizar.
+Para volver a automático, deja `LIVEKIT_NODE_IP=` vacío en el archivo y vuelve
+a ejecutar el instalador. Programa la regeneración y el reinicio de LiveKit
+fuera de llamadas activas.
+
+La única variable nueva de esta funcionalidad es `LIVEKIT_NODE_IP`. Su creación
+y conservación funcionan así:
+
+| Situación | Resultado al ejecutar el instalador actualizado |
+|---|---|
+| Instalación nueva usando los ejemplos incluidos | La clave ya viene vacía: modo automático. |
+| Instalación existente sin la clave | Se añade automáticamente; toma el valor del proceso si existe, o queda vacía. |
+| Actualización con una IP guardada en el archivo | Se conserva esa IP; no se sustituye por el valor vacío del ejemplo ni por el del proceso. |
+| Archivo con la clave vacía | Se conserva vacía, aunque el proceso tenga otra IP. |
+
+No se genera una IP fija automáticamente: el operador proporciona el literal
+cuando necesita ese modo. En modo automático, LiveKit descubre la dirección
+al arrancar. `setup-local.mjs` regenera el archivo de entorno recuperando esta
+opción guardada; `setup-external.mjs` actualiza el archivo existente conservando
+su valor. Ambos regeneran el YAML a partir de esa configuración. Edita la opción
+en el archivo env, no en `livekit/livekit.yaml`, porque el YAML es un artefacto
+generado y sus ediciones manuales sí se reemplazan. Descargar imágenes Docker
+o reiniciar contenedores por sí solo no ejecuta esta actualización del entorno.
+
+Para mantenimiento por desarrolladores y agentes IA, el contrato completo está
+en la [especificación de dirección RTC](../../docs/superpowers/specs/2026-09-26-livekit-rtc-addressing-design.md)
+y la evidencia de pruebas en el [plan de implementación](../../docs/superpowers/plans/2026-09-26-livekit-rtc-addressing.md).
+
+Esta opción controla el anuncio, no la accesibilidad. Firewall y port forwarding
+deben permitir los puertos RTC efectivos: por defecto `7881/tcp` y `7882/udp`.
+Linux usa los puertos configurados en la red del host; Docker Desktop conserva
+los puertos internos. Traducir a un puerto externo distinto del anunciado puede
+seguir impidiendo la conexión, aunque la IP sea correcta. El proxy HTTPS de
+señalización no sustituye la ruta de tráfico RTC.
+
+Una IP pública puede seguir siendo inaccesible desde la LAN si el router no
+soporta hairpin NAT. CGNAT o redes restrictivas pueden requerir otra ruta de red
+o TURN. Si la IP cambia, actualiza el literal y regenera/reinicia: cambiar
+únicamente DDNS no actualiza esta configuración y no hay fallback automático
+mientras la IP explícita esté definida.
+
+El smoke test crea y elimina salas y comprueba servicios de control; **no prueba
+audio/video ni ICE de extremo a extremo**. Para validar medios, realiza una
+llamada con dos participantes en redes distintas, comprueba el par ICE
+seleccionado y audio/video bidireccional, y repite desde LAN/VPN si esas redes
+también deben funcionar. Un log de STUN o un health check correcto no reemplaza
+esta comprobación.
 
 ---
 

@@ -7,6 +7,7 @@ import {
   buildLiveKitFirewallHint,
   getLiveKitComposeProfiles,
   renderEgressConfig,
+  renderLiveKitConfig,
   renderManagedCaddyfile,
   resolveLiveKitConfig,
 } from "../lib/livekit-config.mjs";
@@ -249,6 +250,7 @@ describe("LiveKit installer contract", () => {
       for (const key of [
         "LIVEKIT_MODE",
         "LIVEKIT_DOMAIN",
+        "LIVEKIT_NODE_IP",
         "LIVEKIT_TLS_MODE",
         "LIVEKIT_URL",
         "LIVEKIT_INTERNAL_URL",
@@ -259,6 +261,7 @@ describe("LiveKit installer contract", () => {
       }
       assert.match(env, /^LIVEKIT_MODE=embedded$/m);
       assert.match(env, /^LIVEKIT_TLS_MODE=managed$/m);
+      assert.match(env, /^LIVEKIT_NODE_IP=$/m);
     }
   });
 
@@ -324,6 +327,121 @@ describe("LiveKit installer contract", () => {
       renderManagedCaddyfile({ domain: "rtc.example.com", isLinux: false }),
       /reverse_proxy livekit:7880/,
     );
+  });
+});
+
+describe("LiveKit RTC addressing", () => {
+  const credentials = { apiKey: "fixture-key", apiSecret: "fixture-secret" };
+  const automaticYaml = `port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: true
+  enable_loopback_candidate: true
+
+redis:
+  address: livekit-redis:6379
+
+room:
+  empty_timeout: 60
+  departure_timeout: 20
+
+keys:
+  "fixture-key": "fixture-secret"
+`;
+
+  it("preserves the complete automatic YAML for absent, empty and whitespace IPs", () => {
+    for (const nodeIp of [undefined, null, "", "  \t "]) {
+      const config = resolveLiveKitConfig({
+        deployment: "local", isLinux: false, values: { ...credentials, nodeIp },
+      });
+      assert.equal(config.nodeIp, "");
+      assert.equal(renderLiveKitConfig({ ...config, isLinux: false }), automaticYaml);
+      assert.equal(renderLiveKitConfig({ ...credentials, isLinux: false, nodeIp }), automaticYaml);
+    }
+  });
+
+  it("renders the complete explicit YAML with a quoted IPv6 literal", () => {
+    assert.equal(renderLiveKitConfig({ ...credentials, isLinux: false, nodeIp: " 2001:db8::10 " }), `port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+  node_ip: "2001:db8::10"
+  enable_loopback_candidate: true
+
+redis:
+  address: livekit-redis:6379
+
+room:
+  empty_timeout: 60
+  departure_timeout: 20
+
+keys:
+  "fixture-key": "fixture-secret"
+`);
+  });
+
+  for (const isLinux of [true, false]) {
+    for (const deployment of ["local", "external"]) {
+      for (const tlsMode of ["managed", "external"]) {
+        it(`supports explicit addresses: linux=${isLinux}, deployment=${deployment}, TLS=${tlsMode}`, () => {
+          // fd00::10 is a synthetic private VPN address, not infrastructure.
+          for (const nodeIp of ["203.0.113.10", "2001:db8::10", "fd00::10"]) {
+            const values = { ...credentials, domain: "rtc.example.com", tlsMode };
+            const automatic = resolveLiveKitConfig({ deployment, isLinux, values });
+            const config = resolveLiveKitConfig({ deployment, isLinux, values: { ...values, nodeIp: ` ${nodeIp} ` } });
+            assert.deepEqual(config, { ...automatic, nodeIp });
+            const ports = { httpPort: 17880, rtcTcpPort: 17881, rtcUdpPort: 17882, redisPort: 16380 };
+            const yaml = renderLiveKitConfig({ ...config, ...ports, isLinux });
+            const baseline = renderLiveKitConfig({ ...automatic, ...ports, isLinux });
+            assert.equal(yaml, baseline.replace("  use_external_ip: true", `  use_external_ip: false\n  node_ip: "${nodeIp}"`));
+            assert.match(yaml, new RegExp(`^port: ${isLinux ? 17880 : 7880}$`, "m"));
+            assert.match(yaml, new RegExp(`^  tcp_port: ${isLinux ? 17881 : 7881}$`, "m"));
+            assert.match(yaml, new RegExp(`^  udp_port: ${isLinux ? 17882 : 7882}$`, "m"));
+            assert.ok(yaml.includes(`address: ${isLinux ? "127.0.0.1:16380" : "livekit-redis:6379"}`));
+            assert.doesNotMatch(yaml, /skip_external_ip_validation|require_ipv4|advertise_internal_ip/);
+          }
+        });
+      }
+    }
+  }
+
+  it("preserves the option for external and disabled LiveKit without enabling Compose profiles", () => {
+    for (const mode of ["external", "disabled"]) {
+      const config = resolveLiveKitConfig({
+        deployment: "external", isLinux: true,
+        values: { ...credentials, mode, tlsMode: "external", publicUrl: "wss://rtc.vendor.example", nodeIp: "203.0.113.10" },
+      });
+      assert.equal(config.nodeIp, "203.0.113.10");
+      assert.deepEqual(getLiveKitComposeProfiles(config), []);
+    }
+  });
+
+  it("rejects malformed addresses in every mode and in direct renderer calls without echoing input", () => {
+    for (const nodeIp of [
+      "rtc.example.com", "https://rtc.example.com", "203.0.113.999", "203.0.113.10:7882",
+      "203.0.113.10/24", "[2001:db8::10]", "2001:db8::10%eth0", "203.0.113.10,2001:db8::10",
+      "203.0.113.10\nkeys: injected", "2001:db8::xyz",
+    ]) {
+      const checkError = (error) => {
+        assert.equal(error.code, "LIVEKIT_NODE_IP_INVALID");
+        assert.match(error.message, /LIVEKIT_NODE_IP/);
+        assert.ok(!error.message.includes(nodeIp));
+        return true;
+      };
+      for (const mode of ["embedded", "external", "disabled"]) {
+        assert.throws(() => resolveLiveKitConfig({
+          deployment: "local", isLinux: false,
+          values: { ...credentials, mode, tlsMode: "external", publicUrl: "wss://rtc.example.com", nodeIp },
+        }), checkError);
+      }
+      assert.throws(() => renderLiveKitConfig({ ...credentials, nodeIp }), checkError);
+    }
   });
 });
 
