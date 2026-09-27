@@ -28,6 +28,7 @@
     "docker:release:worker": "node infra/docker/build-push.mjs --worker",
     "docker:release:transcriber": "node infra/docker/build-push.mjs --transcriber",
     "docker:release:tts": "node infra/docker/build-push.mjs --tts",
+    "docker:release:backup": "node infra/docker/build-push.mjs --backup",
     "db:migrate": "prisma migrate deploy && prisma generate",
     "db:generate": "prisma generate",
     "db:seed": "node prisma/seed.js",

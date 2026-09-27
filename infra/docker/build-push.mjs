@@ -22,6 +22,7 @@
 //   pnpm docker:release:worker # multi-platform build + push worker only
 //   pnpm docker:release:transcriber # multi-platform build + push transcriber only
 //   pnpm docker:release:tts    # multi-platform build + push tts only
+//   pnpm docker:release:backup # multi-platform build + push backup only
 //
 // NOTE: Multi-platform builds (--push / default) use docker buildx and require
 // you to be logged in to Docker Hub (`docker login`). Building for linux/arm64
@@ -74,6 +75,12 @@ const ALL_IMAGES = [
     tag:        `${REGISTRY}:tts-latest`,
     dockerfile: "infra/docker/tts.Dockerfile",
     label:      "TTS",
+  },
+  {
+    key:        "backup",
+    tag:        `${REGISTRY}:backup-latest`,
+    dockerfile: "infra/docker/backup.Dockerfile",
+    label:      "Backup",
   },
 ];
 
