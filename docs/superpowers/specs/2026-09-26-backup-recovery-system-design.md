@@ -78,7 +78,7 @@ New env vars, persisted in `.env.local` / `.env.external` by `lib/backup-config.
 | `BACKUP_S3_REGION` | Region string (provider-dependent) | Operator-provided |
 | `BACKUP_S3_ACCESS_KEY_ID` / `BACKUP_S3_SECRET_ACCESS_KEY` | Credentials for the restic repo bucket | Operator-provided |
 | `RESTIC_PASSWORD` | Encryption password for the restic repo | Auto-generated once, persisted, **never regenerated** |
-| `BACKUP_STORAGE_S3_ENDPOINT` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | Read-only access to Supabase Storage's own S3-protocol endpoint, used to enumerate/copy files for backup | Auto-derived from existing `RUNLY_SUPABASE_PUBLIC_URL` + `S3_PROTOCOL_ACCESS_KEY_ID/SECRET` in `local`/`selfhosted` mode; operator-provided (optional) in `external` mode |
+| `BACKUP_STORAGE_S3_ENDPOINT` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` | Read-only access to Supabase Storage's own S3-protocol endpoint, used only in `external` mode to copy files for backup | Operator-provided (optional), `external` mode only — `local` mode does not need these (see Section 20) |
 
 The restic repository target is constructed as `s3:$BACKUP_S3_ENDPOINT/$BACKUP_S3_BUCKET/$RUNLY_INSTANCE_ID`, reusing the per-instance `RUNLY_INSTANCE_ID` that `setup-local.mjs`/`setup-external.mjs` already generate and persist (see `infra/installer/README.md`, "Multiples instancias de Runly en el mismo host"). This lets two Runly instances safely share one bucket without colliding, and resolves Edge case 8 below.
 
@@ -124,8 +124,8 @@ N/A — backups operate at the whole-database/whole-bucket level, below the `Com
 ## 20. Files/storage impact
 
 This feature reads (never writes, in normal operation) from Supabase Storage:
-- **Local/selfhosted mode:** reads directly from the `supabase-storage-data` Docker volume's backing store via the Storage service's own S3-protocol endpoint (`STORAGE_BACKEND: file` with `S3_PROTOCOL_ACCESS_KEY_ID/SECRET` already enabled in `infra/installer/supabase/docker-compose.supabase.yml`) — no new Storage-side configuration needed.
-- **External mode:** reads via the same S3-protocol mechanism only if the operator's own Supabase instance exposes it and supplies `BACKUP_STORAGE_S3_*`; otherwise this step is skipped with a clear log line, and DB + config backup still proceed normally.
+- **Local/selfhosted mode:** the `runly-backup-local` container mounts the existing `supabase-storage-data` Docker volume read-only (same Compose project/volume namespace as `infra/installer/supabase/docker-compose.supabase.yml`) and copies its contents directly — a plain file-tree copy, not an API/S3 call. This backs up every bucket (`runly-files`, `runly-website`, and any future one) without needing to enumerate bucket names or hold Storage credentials at all.
+- **External mode:** no shared volume is possible (Storage lives on a different host), so this mode instead reads via Supabase Storage's own S3-protocol endpoint (`STORAGE_BACKEND: file` with `S3_PROTOCOL_ACCESS_KEY_ID/SECRET`, the same mechanism `infra/installer/supabase/docker-compose.supabase.yml` already enables for LiveKit Egress), syncing the known bucket names (`runly-files`, `runly-website`) with `rclone`. This only runs if the operator supplies `BACKUP_STORAGE_S3_*`; otherwise this step is skipped with a clear log line, and DB + config backup still proceed normally.
 
 No `FileAsset` metadata is read or written — the backup operates on the physical Storage bucket contents, not through the Runly API.
 
@@ -140,7 +140,7 @@ N/A — no `AuditLog` rows. Backup runs and their outcomes are recorded in `dock
 ## 23. Edge cases
 
 1. `BACKUP_MODE=enabled` but one or more required `BACKUP_S3_*` vars are missing → `lib/backup-config.mjs` fails the setup script with a clear error, rather than starting a container that will fail silently every night.
-2. `BACKUP_STORAGE_S3_*` not available (external mode, operator didn't configure their Supabase's S3 protocol) → storage step is skipped with an explicit log line; DB and config backups still run and succeed.
+2. `BACKUP_STORAGE_S3_*` not available (external mode, operator didn't configure their Supabase's S3 protocol) → storage step is skipped with an explicit log line; DB and config backups still run and succeed. (Local mode never depends on this — see Section 20.)
 3. Restic repository doesn't exist yet at the target bucket path → first run auto-initializes it (`restic init` if `restic snapshots` fails with "repository does not exist").
 4. Backup container restarts mid-run (VPS reboot, OOM) → next scheduled run simply creates a new snapshot; restic's own repository locking prevents a concurrent partial run from corrupting the repo. A stale lock left by a hard-killed process is cleared with `restic unlock` before each run.
 5. `RESTIC_PASSWORD` lost by the operator → explicitly unrecoverable; this is why the setup script prints a one-time, loud, impossible-to-miss warning the first time it generates this secret, telling the operator to store it outside the VPS (password manager), the same way `LIVEKIT_API_SECRET` generation is already handled without one — this is the first secret in this installer where losing it destroys otherwise-intact remote data, so the warning text must say that explicitly.
@@ -159,7 +159,7 @@ N/A — no `AuditLog` rows. Backup runs and their outcomes are recorded in `dock
 ## 25. Acceptance criteria
 
 1. Given a fresh `local`/`selfhosted` install with `BACKUP_MODE=disabled` (default), when `setup-local.mjs` runs, then no backup container is created and no new required env vars block the install.
-2. Given `BACKUP_MODE=enabled` with all `BACKUP_S3_*` vars set, when `setup-local.mjs` runs for the first time, then `RESTIC_PASSWORD` is generated once, `BACKUP_STORAGE_S3_*` is auto-derived from the existing Supabase secrets, and the `backup-local` compose profile is added to `docker compose up`.
+2. Given `BACKUP_MODE=enabled` with all `BACKUP_S3_*` vars set, when `setup-local.mjs` runs for the first time, then `RESTIC_PASSWORD` is generated once and the `backup-local` compose profile (with the `supabase-storage-data` volume mounted read-only) is added to `docker compose up`.
 3. Given `BACKUP_MODE=enabled` but `BACKUP_S3_BUCKET` unset, when `setup-local.mjs` or `setup-external.mjs` runs, then the script exits with a clear error before starting any containers.
 4. Given the `runly-backup-local` container running on schedule, when the nightly job executes successfully, then a new restic snapshot exists in the configured bucket containing the Postgres dump, the Storage files, and the config files, and snapshots older than `BACKUP_RETENTION_DAYS` are pruned.
 5. Given `BACKUP_MODE=enabled` in `external` mode without `BACKUP_STORAGE_S3_*` configured, when the nightly job runs, then the Postgres dump and config are still backed up successfully, and the log clearly states Storage backup was skipped.
