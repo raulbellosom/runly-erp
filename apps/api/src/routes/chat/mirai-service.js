@@ -198,6 +198,13 @@ export function createMiraiService({
   callTranscriptService = null,
 }) {
   const fetchFn = fetchImpl ?? globalThis.fetch;
+  // One router instance serves both mirai_classify (called before every
+  // turn) and mirai_chat (the reply loop) — they share circuit-breaker
+  // fate: repeated local failures on either task will open the circuit for
+  // both for the cooldown window, even if the other task's model was
+  // answering fine. Accepted tradeoff: both tasks safely fall back to
+  // Groq either way, and splitting into two router instances per task
+  // wasn't worth the added complexity for this service.
   const aiRouter = createAiRouter({ env, fetchImpl: fetchFn });
   // Kept as informational defaults (audit rows, _internals) — the actual
   // provider/model used per call is decided by aiRouter, not by these.

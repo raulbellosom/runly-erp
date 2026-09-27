@@ -53,6 +53,17 @@ describe('ai-router resolution rules', () => {
     assert.equal(seenBody.model, 'llama-3.3-70b-versatile')
   })
 
+  it('an array-form envOverrideVar checks vars in order (transcript_analysis: CHAT_TRANSCRIPT_ANALYSIS_MODEL then CHAT_MIRAI_MODEL)', async () => {
+    let seenUrl, seenBody
+    const fetchImpl = async (url, opts) => { seenUrl = url; seenBody = JSON.parse(opts.body); return groqOk('ok')(url) }
+    // Only CHAT_MIRAI_MODEL set (not CHAT_TRANSCRIPT_ANALYSIS_MODEL) — the
+    // second entry in the array should still be honored, forcing Groq.
+    const router = createAiRouter({ env: { AI_LOCAL_ENABLED: 'true', CHAT_MIRAI_MODEL: 'llama-3.3-70b-versatile' }, fetchImpl })
+    await router.runTask({ task: 'transcript_analysis', messages: [{ role: 'user', content: 'x' }] })
+    assert.match(seenUrl, /api\.groq\.com/)
+    assert.equal(seenBody.model, 'llama-3.3-70b-versatile')
+  })
+
   it('ledger_import_text honors LEDGER_IMPORT_BASE_URL when routed to Groq', async () => {
     let seenUrl
     const fetchImpl = async (url) => { seenUrl = url; return groqOk('{}')(url) }

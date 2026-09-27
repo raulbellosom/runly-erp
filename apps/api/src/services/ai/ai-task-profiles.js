@@ -59,6 +59,12 @@ export const TASK_PROFILES = {
   transcript_analysis: {
     weight: "heavy",
     localCapable: true,
+    // NOTE: setting CHAT_MIRAI_MODEL (even if you only meant to pin
+    // MirAI's own chat model) also forces this task to Groq, since any
+    // non-empty override in this array is treated as an explicit operator
+    // choice — this mirrors the pre-migration fallback chain exactly, it's
+    // not new, just newly consequential now that an override means "always
+    // Groq" instead of being inert trivia.
     envOverrideVar: ["CHAT_TRANSCRIPT_ANALYSIS_MODEL", "CHAT_MIRAI_MODEL"],
     groqDefaultModel: "openai/gpt-oss-120b",
   },
