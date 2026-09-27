@@ -8,6 +8,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/desktop/package.json apps/desktop/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/core/package.json packages/core/package.json
+COPY packages/module-compiler/package.json packages/module-compiler/package.json
 COPY packages/module-engine/package.json packages/module-engine/package.json
 COPY packages/offline/package.json packages/offline/package.json
 COPY packages/sdk/package.json packages/sdk/package.json
