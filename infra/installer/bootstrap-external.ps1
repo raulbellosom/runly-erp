@@ -36,6 +36,7 @@ $files = @(
   "lib/livekit-config.mjs",
   "lib/transcriber-db.mjs",
   "lib/instance-identity.mjs",
+  "lib/backup-config.mjs",
   "package.json",
   "setup-external.mjs",
   "setup-external.sh",

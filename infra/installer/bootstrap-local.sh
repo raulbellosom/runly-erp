@@ -39,6 +39,7 @@ files=(
   lib/transcriber-db.mjs
   lib/instance-identity.mjs
   lib/supabase-selfhosted-config.mjs
+  lib/backup-config.mjs
   package.json
   setup-local.mjs
   setup-local.ps1
