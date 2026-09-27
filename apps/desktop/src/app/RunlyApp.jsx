@@ -286,7 +286,12 @@ export function RunlyApp() {
               <Outlet />
             </main>
             {!(getLegacyModuleKey(activeModule?.key ?? moduleKeyFromPath) === "runly.chat" && isFullscreen) && (
-              <BrandFooter className="hidden lg:flex" editionName={RUNLY_EDITION_NAME} tip={helpTip} />
+              <BrandFooter
+                className="hidden lg:flex"
+                editionName={RUNLY_EDITION_NAME}
+                tip={helpTip}
+                activeModuleKey={activeModule?.key ?? moduleKeyFromPath}
+              />
             )}
           </div>
         </div>
