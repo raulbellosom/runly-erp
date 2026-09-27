@@ -19,4 +19,11 @@ if [ "$#" -gt 0 ]; then
 fi
 
 echo "${BACKUP_SCHEDULE_CRON:-0 3 * * *} /app/run-backup.sh" > /app/crontab
-exec supercronic /app/crontab
+# Absolute path is required, not just cosmetic: when the shell resolves a
+# bare "supercronic" via PATH, argv[0] still gets passed to the new process
+# as the literal string "supercronic" (shells don't rewrite argv[0] on PATH
+# resolution). supercronic's own PID-1 reaper does a self-referential
+# fork+exec using argv[0], and the kernel's exec() syscall never searches
+# PATH — only shells do — so that self-exec fails with "no such file or
+# directory" and the container crash-loops. Verified against a real build.
+exec /usr/local/bin/supercronic /app/crontab
