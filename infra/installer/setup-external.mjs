@@ -34,6 +34,7 @@ import {
   toLiveKitHttpUrl,
 } from "./lib/livekit-config.mjs";
 import { buildTranscriberDatabaseUrl, generateTranscriberPassword } from "./lib/transcriber-db.mjs";
+import { resolveBackupConfig, getBackupComposeProfiles } from "./lib/backup-config.mjs";
 
 const argv = new Set(process.argv.slice(2));
 const skipPull    = argv.has("--skip-pull");
@@ -76,6 +77,7 @@ const liveKitCaddyImage = process.env.LIVEKIT_CADDY_IMAGE ?? "caddy:2-alpine";
 const liveKitEgressImage = process.env.LIVEKIT_EGRESS_IMAGE ?? "livekit/egress:v1.9.0";
 const transcriberImage = process.env.RUNLY_TRANSCRIBER_IMAGE ?? "raulbellosom/runlyerp:transcriber-latest";
 const ttsImage = process.env.RUNLY_TTS_IMAGE ?? "raulbellosom/runlyerp:tts-latest";
+const backupImage = process.env.RUNLY_BACKUP_IMAGE ?? "raulbellosom/runlyerp:backup-latest";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -348,6 +350,28 @@ const OPTIONAL_VAR_GROUPS = [
   },
   {
     header: [
+      "# ── Backup and Recovery (restic, optional) ───────────────────────────────────",
+      "# enabled: instala runly-backup-external — respalda Postgres + Storage + config",
+      "# cada noche, cifrado, a un bucket S3-compatible.",
+      "# disabled (default): no se instala ningun contenedor de backup.",
+    ],
+    vars: [
+      { key: "BACKUP_MODE",             placeholder: "disabled", comment: null },
+      { key: "BACKUP_SCHEDULE_CRON",    placeholder: "0 3 * * *", comment: null },
+      { key: "BACKUP_RETENTION_DAYS",   placeholder: "14",       comment: null },
+      { key: "BACKUP_S3_ENDPOINT",      placeholder: "",         comment: null },
+      { key: "BACKUP_S3_BUCKET",        placeholder: "",         comment: null },
+      { key: "BACKUP_S3_REGION",        placeholder: "us-east-1", comment: null },
+      { key: "BACKUP_S3_ACCESS_KEY_ID", placeholder: "",         comment: null },
+      { key: "BACKUP_S3_SECRET_ACCESS_KEY", placeholder: "",     comment: null },
+      { key: "RESTIC_PASSWORD",         placeholder: "",         comment: "# Autogenerada — no editar a mano. Perderla vuelve irrecuperables los backups." },
+      { key: "BACKUP_STORAGE_S3_ENDPOINT",             placeholder: "", comment: "# Opcional: solo si tu Supabase expone el protocolo S3 de Storage" },
+      { key: "BACKUP_STORAGE_S3_ACCESS_KEY_ID",        placeholder: "", comment: null },
+      { key: "BACKUP_STORAGE_S3_SECRET_ACCESS_KEY",    placeholder: "", comment: null },
+    ],
+  },
+  {
+    header: [
       "# ── runly.chat MirAI assistant + runly.pfm/inventory AI extras (optional) ───",
       "# All reuse GROQ_API_KEY. Without it, the model overrides below are unused.",
     ],
@@ -540,6 +564,16 @@ function removeInactiveMiraiTtsServices(mode) {
   ]);
 }
 
+// Same pattern as removeInactiveTranscriptionServices/removeInactiveMiraiTtsServices.
+function removeInactiveBackupServices(mode) {
+  if (mode === "enabled") return;
+  tryRun("docker", [
+    "compose", ...composeFiles,
+    "--profile", "backup-external",
+    "rm", "--stop", "--force", "runly-backup-external",
+  ]);
+}
+
 async function promptForLiveKitDomain() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error(
@@ -668,6 +702,61 @@ async function configureMiraiTts(filePath) {
   try { await fs.chmod(filePath, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
 
   return { mode };
+}
+
+// Same read-modify-write-in-place pattern as configureTranscription/
+// configureMiraiTts. deployment is always "external" here (no cli-dev
+// concept exists in this mode, unlike setup-local.mjs).
+async function configureBackup(filePath) {
+  let content = await fs.readFile(filePath, "utf8");
+  const config = resolveBackupConfig({
+    deployment: "external",
+    values: {
+      mode: parseEnvValue(content, "BACKUP_MODE"),
+      scheduleCron: parseEnvValue(content, "BACKUP_SCHEDULE_CRON"),
+      retentionDays: parseEnvValue(content, "BACKUP_RETENTION_DAYS"),
+      s3Endpoint: parseEnvValue(content, "BACKUP_S3_ENDPOINT"),
+      s3Bucket: parseEnvValue(content, "BACKUP_S3_BUCKET"),
+      s3Region: parseEnvValue(content, "BACKUP_S3_REGION"),
+      s3AccessKeyId: parseEnvValue(content, "BACKUP_S3_ACCESS_KEY_ID"),
+      s3SecretAccessKey: parseEnvValue(content, "BACKUP_S3_SECRET_ACCESS_KEY"),
+      resticPassword: parseEnvValue(content, "RESTIC_PASSWORD"),
+      storageS3Endpoint: parseEnvValue(content, "BACKUP_STORAGE_S3_ENDPOINT"),
+      storageS3AccessKeyId: parseEnvValue(content, "BACKUP_STORAGE_S3_ACCESS_KEY_ID"),
+      storageS3SecretAccessKey: parseEnvValue(content, "BACKUP_STORAGE_S3_SECRET_ACCESS_KEY"),
+    },
+  });
+
+  for (const [key, value] of [
+    ["BACKUP_MODE", config.mode],
+    ["BACKUP_SCHEDULE_CRON", config.scheduleCron],
+    ["BACKUP_RETENTION_DAYS", String(config.retentionDays)],
+    ["BACKUP_S3_ENDPOINT", config.s3Endpoint],
+    ["BACKUP_S3_BUCKET", config.s3Bucket],
+    ["BACKUP_S3_REGION", config.s3Region],
+    ["BACKUP_S3_ACCESS_KEY_ID", config.s3AccessKeyId],
+    ["BACKUP_S3_SECRET_ACCESS_KEY", config.s3SecretAccessKey],
+    ["RESTIC_PASSWORD", config.resticPassword],
+    ["BACKUP_STORAGE_S3_ENDPOINT", config.storageS3Endpoint],
+    ["BACKUP_STORAGE_S3_ACCESS_KEY_ID", config.storageS3AccessKeyId],
+    ["BACKUP_STORAGE_S3_SECRET_ACCESS_KEY", config.storageS3SecretAccessKey],
+  ]) {
+    content = setEnvValue(content, key, value);
+  }
+  await fs.writeFile(filePath, content, { encoding: "utf8", mode: 0o600 });
+  try { await fs.chmod(filePath, 0o600); } catch { /* Windows does not apply POSIX modes. */ }
+
+  if (config.resticPasswordGenerated) {
+    console.warn("");
+    console.warn("[setup-external] RESTIC_PASSWORD generated for encrypted backups (BACKUP_MODE=enabled).");
+    console.warn(`  Save the RESTIC_PASSWORD value from ${filePath} somewhere OUTSIDE this VPS`);
+    console.warn("  right now (a password manager, not another file on this same disk).");
+    console.warn("  Losing it makes every existing remote backup permanently unreadable —");
+    console.warn("  restic cannot recover encrypted snapshots without it.");
+    console.warn("");
+  }
+
+  return config;
 }
 
 function tryCapture(command, args, { cwd = installerDir, env = process.env } = {}) {
@@ -871,9 +960,11 @@ async function main() {
   }
   let transcription = { mode: "disabled" };
   let miraiTts = { mode: "disabled" };
+  let backup = { mode: "disabled" };
   if (!upOnly) {
     transcription = await configureTranscription(envFile);
     miraiTts = await configureMiraiTts(envFile);
+    backup = await configureBackup(envFile);
   }
 
   // When --up-only skips the env check above, still regenerate the compose .env
@@ -885,6 +976,7 @@ async function main() {
     await writeComposeEnv(envFile);
     transcription = await configureTranscription(envFile);
     miraiTts = await configureMiraiTts(envFile);
+    backup = await configureBackup(envFile);
   }
 
   // ── 2. Validate Docker ─────────────────────────────────────────────────────
@@ -922,6 +1014,7 @@ async function main() {
     }
     if (transcription.mode === "local") pullWithRetry(transcriberImage, "Transcriber");
     if (miraiTts.mode === "local") pullWithRetry(ttsImage, "TTS");
+    if (backup.mode === "enabled") pullWithRetry(backupImage, "Backup");
     // Remove dangling layers left behind when `latest` tags are re-pulled.
     // This prevents disk accumulation on every deploy without touching other projects.
     console.log("     Pruning dangling images...");
@@ -953,20 +1046,23 @@ async function main() {
   removeInactiveLiveKitServices(liveKit);
   removeInactiveTranscriptionServices(transcription.mode);
   removeInactiveMiraiTtsServices(miraiTts.mode);
+  removeInactiveBackupServices(backup.mode);
   const liveKitProfiles = getLiveKitComposeProfiles(liveKit, { recordingEnabled: liveKit.recordingEnabled })
     .flatMap((profile) => ["--profile", profile]);
   const transcriptionProfiles = transcription.mode === "local" ? ["--profile", "transcription-external"] : [];
   const miraiTtsProfiles = miraiTts.mode === "local" ? ["--profile", "mirai-tts"] : [];
+  const backupProfiles = getBackupComposeProfiles(backup, "external").flatMap((profile) => ["--profile", profile]);
   // Limit forced restarts to Runly/Calls: an unchanged editor must keep its sessions.
   const services = ["runly-api-external", "runly-worker-external", "runly-web-external",
     ...(liveKit.mode === "embedded" ? ["livekit-redis", "livekit",
       ...(liveKit.managedTls ? ["livekit-caddy"] : []),
       ...(liveKit.recordingEnabled ? ["egress"] : [])] : []),
     ...(transcription.mode === "local" ? ["runly-transcriber-external"] : []),
-    ...(miraiTts.mode === "local" ? ["runly-tts"] : [])];
+    ...(miraiTts.mode === "local" ? ["runly-tts"] : []),
+    ...(backup.mode === "enabled" ? ["runly-backup-external"] : [])];
   run(
     "docker",
-    ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...transcriptionProfiles, ...miraiTtsProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
+    ["compose", ...composeFiles, "--profile", "external", ...liveKitProfiles, ...transcriptionProfiles, ...miraiTtsProfiles, ...backupProfiles, ...office.profiles, "up", "-d", "--force-recreate", ...services],
     {
       env: {
         ...process.env,
