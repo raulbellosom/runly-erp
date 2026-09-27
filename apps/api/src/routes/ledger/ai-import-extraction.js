@@ -78,6 +78,11 @@ async function callGroqText({ systemPrompt, userContent, env = process.env, fetc
   if (!env.GROQ_API_KEY && !isLocalEnabled(env)) {
     throw new ExtractionError('Importacion con IA no configurada (falta GROQ_API_KEY).', 503)
   }
+  // aiRouter should be supplied by any caller that lives longer than one
+  // request (a route factory, a service) so the circuit breaker's state
+  // persists across calls. The self-constructed fallback exists only so
+  // this file's own tests can call these functions directly without wiring
+  // a router — do not rely on it from a new production call site.
   const router = aiRouter ?? createAiRouter({ env, fetchImpl })
   const messages = [
     { role: 'system', content: systemPrompt },
