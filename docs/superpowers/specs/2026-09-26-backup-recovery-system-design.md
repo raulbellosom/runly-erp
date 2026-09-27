@@ -169,7 +169,7 @@ N/A — no `AuditLog` rows. Backup runs and their outcomes are recorded in `dock
 
 ## 26. Verification plan
 
-- `node --test infra/installer/lib/__tests__/backup-config.test.js` (new) — unit tests for env var generation/validation/derivation logic in `lib/backup-config.mjs`.
+- `node --test infra/installer/lib/backup-config.test.mjs` (new) — unit tests for env var generation/validation/derivation logic in `lib/backup-config.mjs`, following the same `.test.mjs`-next-to-source convention as `lib/supabase-selfhosted-config.test.mjs`.
 - `node --check infra/installer/lib/backup-config.mjs` — syntax check.
 - Manual, against a real disposable S3-compatible bucket (documented with evidence in `docs/superpowers/plans/2026-09-26-backup-recovery-system.md`, same convention as `scripts/poc-transcription/RESULTS.md` and `scripts/poc-piper/RESULTS.md`):
   - Run `node setup-local.mjs` with `BACKUP_MODE=enabled` pointed at the test bucket; confirm the container starts and a manual `docker compose run --rm runly-backup-local ./run-backup.sh` produces a snapshot containing DB dump, Storage files, and config.
