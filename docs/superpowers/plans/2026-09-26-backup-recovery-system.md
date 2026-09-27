@@ -743,14 +743,39 @@ BACKUP_STORAGE_S3_ACCESS_KEY_ID=
 BACKUP_STORAGE_S3_SECRET_ACCESS_KEY=
 ```
 
-- [ ] **Step 2: Append the matching block to `.env.external.example`**
+- [ ] **Step 2: Append the corrected block to `.env.external.example`**
 
 In `infra/installer/.env.external.example`, find:
 ```
 # TTS_CPU_LIMIT=1
 # TTS_MEMORY_LIMIT=1024m
 ```
-Replace with the identical new block as Step 1 (same content — both example files stay in sync by convention).
+Replace with (note: the header comment differs from Step 1's — this mode installs `runly-backup-external`, not `runly-backup-local`, and has no `RUNLY_SUPABASE_MODE` concept at all since external mode doesn't run Supabase itself):
+```
+# TTS_CPU_LIMIT=1
+# TTS_MEMORY_LIMIT=1024m
+
+# ── Backup and Recovery (restic, optional) ───────────────────────────────────
+# enabled: instala runly-backup-external — respalda Postgres + config cada
+# noche, cifrado, a un bucket S3-compatible (Backblaze B2, AWS S3, MinIO,
+# etc). Storage solo se respalda si configuras BACKUP_STORAGE_S3_* abajo.
+# disabled (default): no se instala ningun contenedor de backup.
+BACKUP_MODE=disabled
+BACKUP_SCHEDULE_CRON=0 3 * * *
+BACKUP_RETENTION_DAYS=14
+BACKUP_S3_ENDPOINT=
+BACKUP_S3_BUCKET=
+BACKUP_S3_REGION=us-east-1
+BACKUP_S3_ACCESS_KEY_ID=
+BACKUP_S3_SECRET_ACCESS_KEY=
+# Autogenerada la primera vez que BACKUP_MODE=enabled — nunca se regenera.
+# Guardala fuera de esta VPS: perderla vuelve irrecuperables los backups ya subidos.
+RESTIC_PASSWORD=
+# Solo la usa external mode — local mode monta el volumen de Storage directamente.
+BACKUP_STORAGE_S3_ENDPOINT=
+BACKUP_STORAGE_S3_ACCESS_KEY_ID=
+BACKUP_STORAGE_S3_SECRET_ACCESS_KEY=
+```
 
 - [ ] **Step 3: Verify**
 
