@@ -29,6 +29,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@runly/core": "workspace:*",
+    "@tanstack/react-query": "^5.104.0",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "latest",
@@ -39,6 +40,7 @@
     "react-hook-form": "^7.75.0",
     "react-markdown": "^10.1.0",
     "react-pdf": "^10.4.1",
+    "recharts": "^3.8.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0"

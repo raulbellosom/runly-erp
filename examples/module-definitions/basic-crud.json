@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "key": "custom.examplefleet",
+  "name": "Flotilla de ejemplo",
+  "version": "1.0.0",
+  "description": "Ejemplo de ModuleDefinition v1 para un CRUD RME3.",
+  "icon": "Truck",
+  "color": "#2563EB",
+  "pwa": {
+    "shortName": "Flotilla",
+    "startPath": "/vehicles"
+  },
+  "preset": "crud",
+  "entities": [
+    {
+      "key": "vehicle",
+      "label": "Vehículo",
+      "pluralLabel": "Vehículos",
+      "fields": [
+        { "key": "plate", "type": "text", "label": "Placa", "required": true },
+        { "key": "brand", "type": "text", "label": "Marca" },
+        { "key": "mileage", "type": "number", "label": "Kilometraje" }
+      ]
+    }
+  ]
+}

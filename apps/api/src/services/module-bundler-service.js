@@ -77,6 +77,108 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
     }
   }
 
+  async function buildBundleFromDirectory(key, moduleBaseDir, { outputDir } = {}) {
+    const entryPoint = path.join(moduleBaseDir, 'components', 'index.js')
+    try {
+      await fs.access(entryPoint)
+    } catch {
+      return { built: false, reason: 'no-components', hash: null, artifactPath: null }
+    }
+    const hash = await computeSourceHash(path.join(moduleBaseDir, 'components'))
+    const artifactDir = outputDir ?? path.join(moduleBaseDir, '.bundle')
+    await fs.mkdir(artifactDir, { recursive: true })
+    const artifactPath = path.join(artifactDir, `${key}.js`)
+    await esbuild.build({
+      entryPoints: [entryPoint],
+      bundle: true,
+      format: 'esm',
+      jsx: 'automatic',
+      loader: { '.js': 'jsx', '.jsx': 'jsx' },
+      external: BUNDLE_EXTERNALS,
+      outfile: artifactPath,
+      sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
+    })
+    return { built: true, hash, artifactPath }
+  }
+
+  async function snapshotPublishedBundle(key) {
+    const bundlePath = path.join(BUNDLES_DIR, `${key}.js`)
+    const content = await fs.readFile(bundlePath).catch((error) => {
+      if (error?.code === 'ENOENT') return null
+      throw error
+    })
+    const row = await prisma.runlyModule.findUnique({
+      where: { key },
+      select: { hasBundle: true, bundleHash: true },
+    }).catch(() => null)
+    return { content, hasBundle: row?.hasBundle === true, bundleHash: row?.bundleHash ?? null }
+  }
+
+  async function writePublishedBundle(key, content) {
+    await ensureBundlesDir()
+    const target = path.join(BUNDLES_DIR, `${key}.js`)
+    const temporary = path.join(BUNDLES_DIR, `.${key}.${randomSuffix()}.tmp`)
+    await fs.writeFile(temporary, content)
+    await fs.rename(temporary, target).catch(async (error) => {
+      await fs.rm(temporary, { force: true }).catch(() => {})
+      throw error
+    })
+  }
+
+  function randomSuffix() {
+    return `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  async function publishStagedBundle(key, stagedBundle) {
+    const hasBundle = stagedBundle?.built === true
+    const content = hasBundle ? await fs.readFile(stagedBundle.artifactPath) : null
+    if (content) await writePublishedBundle(key, content)
+    else await fs.rm(path.join(BUNDLES_DIR, `${key}.js`), { force: true })
+
+    await ensureStorageBucket()
+    const storage = supabaseAdmin.storage.from(STORAGE_BUCKET)
+    if (content) {
+      const { error } = await storage.upload(`${key}.js`, content, {
+        contentType: 'application/javascript',
+        upsert: true,
+      })
+      if (error) throw error
+    } else {
+      const { error } = await storage.remove([`${key}.js`])
+      if (error) throw error
+    }
+    await prisma.runlyModule.update({
+      where: { key },
+      data: { hasBundle, bundleHash: hasBundle ? stagedBundle.hash : null },
+    }).catch((error) => {
+      if (error?.code !== 'P2025') throw error
+    })
+    return { published: true, hasBundle, hash: stagedBundle?.hash ?? null }
+  }
+
+  async function restorePublishedBundle(key, snapshot) {
+    const storage = supabaseAdmin.storage.from(STORAGE_BUCKET)
+    if (snapshot?.content) {
+      await writePublishedBundle(key, snapshot.content)
+      const { error } = await storage.upload(`${key}.js`, snapshot.content, {
+        contentType: 'application/javascript',
+        upsert: true,
+      })
+      if (error) throw error
+    } else {
+      await fs.rm(path.join(BUNDLES_DIR, `${key}.js`), { force: true })
+      const { error } = await storage.remove([`${key}.js`])
+      if (error) throw error
+    }
+    await prisma.runlyModule.update({
+      where: { key },
+      data: { hasBundle: snapshot?.hasBundle === true, bundleHash: snapshot?.bundleHash ?? null },
+    }).catch((error) => {
+      if (error?.code !== 'P2025') throw error
+    })
+    return { restored: true }
+  }
+
   async function buildModuleBundle(key, { force = false } = {}) {
     const moduleBaseDir = await resolveModuleBaseDir(key)
     if (!moduleBaseDir) {
@@ -139,29 +241,80 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
     return { built: true, hash: newHash }
   }
 
-  async function deleteModuleBundle(key) {
+  async function inspectModuleBundle(key) {
     const bundlePath = path.join(BUNDLES_DIR, `${key}.js`)
+
+    let localExists = false
+    try {
+      await fs.access(bundlePath)
+      localExists = true
+    } catch {
+      // Missing is a valid inventory state.
+    }
+
+    let storageExists = false
+    let storageInspectable = Boolean(supabaseAdmin?.storage)
+    let storageError = null
+    if (storageInspectable) {
+      try {
+        const { data, error } = await supabaseAdmin.storage
+          .from(STORAGE_BUCKET)
+          .list('', { search: `${key}.js`, limit: 100 })
+        if (error) throw error
+        storageExists = Array.isArray(data) && data.some((entry) => entry?.name === `${key}.js`)
+      } catch (error) {
+        storageInspectable = false
+        storageError = error?.message ?? String(error)
+      }
+    }
+
+    return {
+      key,
+      local: { exists: localExists },
+      storage: {
+        bucket: STORAGE_BUCKET,
+        objectKey: `${key}.js`,
+        exists: storageExists,
+        inspectable: storageInspectable,
+        error: storageError,
+      },
+    }
+  }
+
+  async function deleteModuleBundle(key, { strict = false, updateMetadata = true } = {}) {
+    const bundlePath = path.join(BUNDLES_DIR, `${key}.js`)
+    let localDeleted = false
+    let storageDeleted = false
 
     try {
       await fs.unlink(bundlePath)
-    } catch {
-      // File may not exist
+      localDeleted = true
+    } catch (error) {
+      if (error?.code !== 'ENOENT' && strict) throw error
     }
 
     try {
-      await supabaseAdmin.storage.from(STORAGE_BUCKET).remove([`${key}.js`])
+      const { error } = await supabaseAdmin.storage.from(STORAGE_BUCKET).remove([`${key}.js`])
+      if (error) throw error
+      storageDeleted = true
     } catch (err) {
+      if (strict) throw err
       console.warn(`[bundler] Storage delete failed for ${key}:`, err.message)
     }
 
-    try {
-      await prisma.runlyModule.update({
-        where: { key },
-        data: { hasBundle: false, bundleHash: null },
-      })
-    } catch (err) {
-      console.warn(`[bundler] DB update failed for ${key}:`, err.message)
+    if (updateMetadata) {
+      try {
+        await prisma.runlyModule.update({
+          where: { key },
+          data: { hasBundle: false, bundleHash: null },
+        })
+      } catch (err) {
+        if (strict && err?.code !== 'P2025') throw err
+        console.warn(`[bundler] DB update failed for ${key}:`, err.message)
+      }
     }
+
+    return { localDeleted, storageDeleted }
   }
 
   let _devWatcher = null
@@ -280,6 +433,11 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
 
   return {
     buildModuleBundle,
+    buildBundleFromDirectory,
+    snapshotPublishedBundle,
+    publishStagedBundle,
+    restorePublishedBundle,
+    inspectModuleBundle,
     deleteModuleBundle,
     restoreModuleBundlesOnBoot,
     startDevWatcher,

@@ -153,37 +153,3 @@ export async function purgeModuleFiles(key, modulesDir) {
   await fs.rm(targetBase, { recursive: true, force: true });
   return true;
 }
-
-/**
- * Hard-deletes all DB records for a module inside a Prisma transaction.
- * Requires module.status !== 'INSTALLED' || module.enabled === false.
- * Deletion order: RunlyField → RunlyModel → Blueprint → RunlyModule.
- */
-export async function purgeModuleFromDb(key, prisma) {
-  return prisma.$transaction(async (tx) => {
-    const module = await tx.runlyModule.findUnique({ where: { key } });
-    if (!module) {
-      throw Object.assign(new Error('MODULE_NOT_FOUND'), { statusCode: 404 });
-    }
-    if (module.status === 'INSTALLED' && module.enabled) {
-      throw Object.assign(new Error('MODULE_MUST_BE_UNINSTALLED'), { statusCode: 409 });
-    }
-
-    const models = await tx.runlyModel.findMany({
-      where: { moduleKey: key },
-      select: { id: true },
-    });
-    const modelIds = models.map(m => m.id);
-    if (modelIds.length > 0) {
-      await tx.runlyField.deleteMany({ where: { modelId: { in: modelIds } } });
-    }
-    await tx.runlyModel.deleteMany({ where: { moduleKey: key } });
-    // Blueprint has no moduleKey column — it relates to RunlyModule by moduleId (uuid).
-    // (Its FK is ON DELETE CASCADE, so runlyModule.delete below would clean these up
-    // on its own; this stays explicit so the deletion order documented above holds.)
-    await tx.blueprint.deleteMany({ where: { moduleId: module.id } });
-    await tx.runlyModule.delete({ where: { key } });
-
-    return { moduleKey: key };
-  });
-}

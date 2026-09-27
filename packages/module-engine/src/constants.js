@@ -19,6 +19,7 @@ export const BLUEPRINT_KINDS = Object.freeze({
   DETAIL:    'DETAIL',
   PAGE:      'PAGE',
   DASHBOARD: 'DASHBOARD',
+  KANBAN:    'KANBAN',
   ACTION:    'ACTION',
   RELATION:  'RELATION',
   CUSTOM:    'CUSTOM',

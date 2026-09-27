@@ -170,6 +170,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "core",
     order: 76,
   },
+  "core.modules.builder": {
+    displayNameEs: "Usar el Module Builder",
+    descriptionEs: "Permite crear y editar modulos visuales (Module Builder): entidades, campos, vistas, navegacion y permisos, sin publicarlos.",
+    groupKey: "core",
+    order: 77,
+  },
   "core.instance.read": {
     displayNameEs: "Ver configuracion de instancia",
     descriptionEs: "Permite consultar la configuracion de la instancia.",

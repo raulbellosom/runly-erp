@@ -49,12 +49,38 @@ test('POST /modules/:key/upload recibe multipart, extrae el ZIP y responde con e
   const permissionCalls = []
   const app = createModulesRouter({
     prisma: {
-      runlyModule: { findUnique: async () => null },
+      runlyModule: {
+        findUnique: async () => null,
+        upsert: async ({ create }) => ({ id: 'module-1', ...create }),
+        update: async () => ({}),
+      },
+      permission: { upsert: async () => ({}) },
+      blueprint: { upsert: async () => ({}) },
+      $transaction: async (callback) => callback({
+        runlyModule: {
+          findUnique: async () => ({ id: 'module-1', key: 'custom.uploadroute' }),
+          upsert: async ({ create }) => ({ id: 'module-1', ...create }),
+          update: async () => ({}),
+        },
+        permission: { upsert: async () => ({}) },
+        blueprint: { upsert: async () => ({}) },
+        moduleDependency: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
+      }),
+      moduleDependency: { findMany: async () => [] },
+      auditLog: { create: async () => ({}) },
     },
     authMiddleware: async (_c, next) => next(),
     requirePermission: (permission) => async (_c, next) => {
       permissionCalls.push(permission)
       await next()
+    },
+    bundlerSvc: {
+      buildBundleFromDirectory: async () => ({ built: false, reason: 'no-components', hash: null }),
+      snapshotPublishedBundle: async () => ({ content: null, hasBundle: false, bundleHash: null }),
+      publishStagedBundle: async () => ({ published: true, hasBundle: false }),
+      restorePublishedBundle: async () => ({ restored: true }),
+      inspectModuleBundle: async () => ({ local: { exists: false }, storage: { exists: false, inspectable: true } }),
+      deleteModuleBundle: async () => ({}),
     },
   })
 
@@ -66,10 +92,10 @@ test('POST /modules/:key/upload recibe multipart, extrae el ZIP y responde con e
   }))
   const body = await response.json()
 
-  assert.equal(response.status, 200)
+  assert.equal(response.status, 200, JSON.stringify(body))
   assert.equal(body.data.moduleKey, 'custom.uploadroute')
   assert.equal(body.data.fileCount, 2)
-  assert.equal(body.data.syncResult.error.code, 'MODULE_NOT_FOUND_AFTER_SYNC')
+  assert.equal(body.data.reconcileResult.syncResult.error.code, 'MODULE_NOT_FOUND_AFTER_SYNC')
   assert.deepEqual(permissionCalls, ['core.modules.upload'])
   await fs.access(path.join(modulesDir, 'custom.uploadroute', 'module.manifest.js'))
 })

@@ -1,5 +1,7 @@
 import { BLUEPRINT_KINDS } from './constants.js'
 import { ModuleEngineError } from './errors.js'
+import { validateDashboardSchema } from './dashboard-schema.js'
+import { validateKanbanSchema } from './kanban-schema.js'
 
 const VALID_KINDS = new Set(Object.values(BLUEPRINT_KINDS))
 const VIEW_DEFAULTS = { version: '0.1.0' }
@@ -61,6 +63,9 @@ function validateKindSchema(kind, schema, errors) {
       errors.push('DETAIL views must declare schema.sections as a non-empty array')
     }
   }
+
+  if (kind === 'DASHBOARD') errors.push(...validateDashboardSchema(schema).errors)
+  if (kind === 'KANBAN') errors.push(...validateKanbanSchema(schema).errors)
 
   if (kind === 'CUSTOM') {
     const component = schema?.component

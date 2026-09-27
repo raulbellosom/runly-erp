@@ -31,6 +31,9 @@ import { createModuleMigrationService } from "../services/module-migration-servi
 import {
   discoverModules,
   getDiscoveryRootInfo,
+  loadModuleManifest,
+  loadModuleModels,
+  loadModuleViews,
 } from "../services/module-discovery-service.js";
 import { listOfficialFallbackManifests, isOfficialCoreModuleKey } from "../services/module-manifests-service.js";
 import {
@@ -38,14 +41,17 @@ import {
   formatDependencyCycle,
   loadManifestDependencies,
 } from "../services/module-dependency-utils.js";
-import { validateManifest } from "@runly/module-engine";
+import { validateDashboardSchema, validateKanbanSchema, validateManifest } from "@runly/module-engine";
 import { del as cacheDel } from "../lib/cache.js";
 import {
   resolveModulesDir,
-  validateAndExtractZip,
-  purgeModuleFiles,
-  purgeModuleFromDb,
 } from "../services/module-upload-service.js";
+import { createModulePackagePurgeService } from "../services/module-package-purge-service.js";
+import { createModulePackageStagingService } from "../services/module-package-staging-service.js";
+import { createModulePackageService } from "../services/module-package-service.js";
+import { createModuleSchemaMigrationService } from "../services/module-schema-migration-service.js";
+import { createModuleDashboardQueryService } from "../services/module-dashboard-query-service.js";
+import { createModuleKanbanQueryService } from "../services/module-kanban-query-service.js";
 
 const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
@@ -580,6 +586,181 @@ export function createModulesRouter({
 
   const metadataSvc = createModuleMetadataService({ prisma });
   const migrationSvc = createModuleMigrationService({ prisma });
+  const schemaMigrationSvc = createModuleSchemaMigrationService({ prisma });
+  const dashboardQuerySvc = createModuleDashboardQueryService({ prisma });
+  const kanbanQuerySvc = createModuleKanbanQueryService({ prisma });
+
+  app.post('/:key/dashboard/query', authMiddleware, async (c) => {
+    try {
+      const moduleKey = c.req.param('key')
+      const body = await c.req.json()
+      const view = await prisma.runlyView.findFirst({
+        where: { moduleKey, key: body?.viewKey, type: 'DASHBOARD', enabled: true },
+        select: { key: true, schema: true },
+      })
+      if (!view) return c.json({ error: 'Dashboard no encontrado.' }, 404)
+      const validation = validateDashboardSchema(view.schema)
+      if (!validation.valid) return c.json({ error: 'Dashboard inválido.', details: validation.errors }, 422)
+      const requested = Array.isArray(body?.widgets) ? new Set(body.widgets) : null
+      const widgets = requested ? view.schema.widgets.filter((widget) => requested.has(widget.key)) : view.schema.widgets
+      if (requested && widgets.length !== requested.size) return c.json({ error: 'Widget desconocido.' }, 422)
+      const slug = moduleKey.split('.').at(-1)
+      const permissions = new Set([
+        ...(view.schema.permissionKey ? [view.schema.permissionKey] : []),
+        ...widgets.map((widget) => widget.permissionKey ?? `${slug}.${widget.source.entity}.read`),
+      ])
+      for (const permission of permissions) {
+        let allowed = false
+        const denial = await requirePermission(permission)(c, async () => { allowed = true })
+        if (!allowed) return denial
+      }
+      const data = await dashboardQuerySvc.executeDashboard({ moduleKey, widgets, companyId: c.get('companyId') })
+      return c.json({ data })
+    } catch (error) {
+      if (error instanceof SyntaxError) return c.json({ error: 'JSON inválido.' }, 400)
+      console.error('[modules.dashboard.query]', error?.message)
+      return c.json({ error: 'No se pudo consultar el dashboard.' }, 500)
+    }
+  })
+
+  app.post('/:key/kanban/query', authMiddleware, async (c) => {
+    try {
+      const moduleKey = c.req.param('key')
+      const body = await c.req.json()
+      const view = await prisma.runlyView.findFirst({
+        where: { moduleKey, key: body?.viewKey, type: 'KANBAN', enabled: true },
+        select: { key: true, schema: true },
+      })
+      if (!view) return c.json({ error: 'Kanban no encontrado.' }, 404)
+      const validation = validateKanbanSchema(view.schema)
+      if (!validation.valid) return c.json({ error: 'Kanban inválido.', details: validation.errors }, 422)
+      const slug = moduleKey.split('.').at(-1)
+      const readPermissionKey = view.schema.permissionKey ?? `${slug}.${view.schema.entity}.read`
+      const updatePermissionKey = `${slug}.${view.schema.entity}.update`
+      let allowed = false
+      const denial = await requirePermission(readPermissionKey)(c, async () => { allowed = true })
+      if (!allowed) return denial
+      const tenant = c.get('tenantContext')
+      const board = await kanbanQuerySvc.queryBoard({ moduleKey, schema: view.schema, companyId: c.get('companyId') })
+      return c.json({ data: {
+        ...board,
+        canUpdate: Boolean(tenant?.isAdmin || tenant?.permissionSet?.has(updatePermissionKey)),
+        readPermissionKey,
+        updatePermissionKey,
+      } })
+    } catch (error) {
+      if (error instanceof SyntaxError) return c.json({ error: 'JSON inválido.' }, 400)
+      console.error('[modules.kanban.query]', error?.message)
+      return c.json({ error: 'No se pudo consultar el Kanban.' }, 500)
+    }
+  })
+  const purgeSvc = bundlerSvc
+    ? createModulePackagePurgeService({ prisma, bundlerSvc, routeLoader, cacheDel })
+    : null;
+  const stagingSvc = createModulePackageStagingService();
+  const packageSvc = bundlerSvc
+    ? createModulePackageService({
+        prisma,
+        stagingService: stagingSvc,
+        bundlerSvc,
+        routeLoader,
+        preflightPackage: async ({ staged, moduleRow }) => {
+          const dependencyResult = await loadManifestDependencies(
+            prisma,
+            staged.manifest.dependencies ?? [],
+          );
+          if (moduleRow?.id) {
+            const requiredDependencyIds = dependencyResult.resolved
+              .filter((dependency) => !dependency.optional)
+              .map((dependency) => dependency.dependencyId);
+            const existingEdges = await prisma.moduleDependency.findMany({
+              where: { optional: false },
+              select: { moduleId: true, dependencyId: true },
+            });
+            const cycle = detectRequiredDependencyCycle({
+              moduleId: moduleRow.id,
+              requiredDependencyIds,
+              existingRequiredEdges: existingEdges,
+            });
+            if (cycle) {
+              throw Object.assign(new Error("DEPENDENCY_CYCLE_DETECTED"), {
+                code: "DEPENDENCY_CYCLE_DETECTED",
+              });
+            }
+          }
+          const schemaMigration = moduleRow?.status === "INSTALLED"
+            ? await schemaMigrationSvc.planModuleSchemaMigration({
+                moduleKey: staged.manifest.key,
+                desiredModels: staged.models,
+                moduleRow,
+              })
+            : {
+                required: false,
+                canAutoApply: true,
+                safety: "SAFE",
+                operations: [],
+                drift: [],
+                warnings: [],
+              };
+          return {
+            declared: dependencyResult.declared,
+            missingRequired: dependencyResult.missingRequired,
+            missingOptional: dependencyResult.missingOptional,
+            installationDependenciesSatisfied: dependencyResult.missingRequired.length === 0,
+            schemaMigration,
+          };
+        },
+        applySchemaMigration: async ({ plan, actorId }) =>
+          schemaMigrationSvc.applyModuleSchemaMigration({ plan, actorId }),
+        reconcilePublishedPackage: async ({ key, staged, moduleRow, publicationPlan, actorId }) => {
+          await svc.syncModules({ manifests: [staged.manifest], actorId });
+          // syncModuleMetadata only upserts RunlyModel/RunlyField/RunlyView/
+          // Blueprint rows — never physical DB schema — so gating it on
+          // `!publicationPlan.schemaChangesDetected` had no ordering reason
+          // (APPLY_SCHEMA_MIGRATION already ran by this point) and silently
+          // dropped metadata for any upload that changed both schema and
+          // metadata at once (e.g. a new field's RunlyField row). Found via
+          // Module Builder golden-path QA; fixed here too since this same
+          // wiring backs the plain ZIP-upload path.
+          if (moduleRow?.status === "INSTALLED") {
+            await metadataSvc.syncModuleMetadata({
+              manifest: staged.manifest,
+              models: staged.models,
+              views: staged.views,
+            });
+          }
+          const syncResult = await syncDiscoveredModuleDependencies({
+            prisma,
+            moduleKey: key,
+            dependencies: staged.manifest.dependencies ?? [],
+          });
+          if (syncResult.error?.code === "DEPENDENCY_CYCLE_DETECTED") {
+            throw Object.assign(new Error(syncResult.error.message), {
+              code: syncResult.error.code,
+            });
+          }
+          return { syncResult };
+        },
+        reconcileRestoredPackage: async ({ key, packageDir, actorId }) => {
+          const loaded = await loadModuleManifest({
+            manifestPath: path.join(packageDir, "module.manifest.js"),
+            source: "custom",
+          });
+          if (loaded.status !== "VALID" || loaded.manifest?.key !== key) {
+            throw new Error("RESTORED_MANIFEST_INVALID");
+          }
+          const models = await loadModuleModels({ moduleDir: packageDir, manifest: loaded.manifest });
+          const views = await loadModuleViews({ moduleDir: packageDir, manifest: loaded.manifest });
+          await svc.syncModules({ manifests: [loaded.manifest], actorId });
+          await metadataSvc.syncModuleMetadata({ manifest: loaded.manifest, models, views });
+          await syncDiscoveredModuleDependencies({
+            prisma,
+            moduleKey: key,
+            dependencies: loaded.manifest.dependencies ?? [],
+          });
+        },
+      })
+    : null;
 
   async function applyManifestMigrationsForRecord({ record }) {
     const moduleKey = record?.manifest?.key ?? null;
@@ -2228,6 +2409,9 @@ export function createModulesRouter({
     requirePermission("core.modules.upload"),
     async (c) => {
       const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+      if (!packageSvc) {
+        return c.json({ error: "MODULE_PACKAGE_PUBLISH_UNAVAILABLE" }, 503);
+      }
 
       const modulesDir = await resolveModulesDir();
       if (!modulesDir || !existsSync(modulesDir)) {
@@ -2246,57 +2430,70 @@ export function createModulesRouter({
       const buffer = Buffer.from(await file.arrayBuffer());
 
       try {
-        const { fileCount } = await validateAndExtractZip(key, buffer, modulesDir);
-
-        // Trigger a dependency sync for the uploaded module so it appears in the catalog
-        const discoveryRootInfo = await getDiscoveryRootInfo();
-        const discoveredAll = await discoverModules({
-          rootDir: discoveryRootInfo.projectRoot,
+        const result = await packageSvc.publishZip({
+          key,
+          fileBuffer: buffer,
+          modulesDir,
+          actorId: c.get("userContext")?.profile?.id ?? null,
         });
-        const uploadedRecord = discoveredAll.find((r) => r?.key === key);
-        const syncResult = await syncDiscoveredModuleDependencies({
-          prisma,
+        return c.json({ data: {
           moduleKey: key,
-          dependencies: uploadedRecord?.manifest?.dependencies ?? [],
-        });
-
-        return c.json({ data: { moduleKey: key, fileCount, syncResult } });
+          fileCount: result.inspection.files,
+          ...result,
+        } });
       } catch (err) {
         return c.json(
-          { error: err.message, details: err.details ?? null },
+          {
+            error: err.code ?? err.message,
+            stage: err.stage ?? err.details?.stage ?? null,
+            details: err.details ?? null,
+          },
           err.statusCode ?? 500,
         );
       }
     },
   );
 
-  // DELETE /modules/:key/purge — hard-delete filesystem files + all DB records for a module
+  // DELETE /modules/:key/purge — verified hard purge of every owned module resource
+  app.post(
+    "/:key/purge/dry-run",
+    authMiddleware,
+    requirePermission("core.modules.purge"),
+    async (c) => {
+      if (!purgeSvc) return c.json({ error: "MODULE_PURGE_UNAVAILABLE" }, 503);
+      const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+      try {
+        return c.json({ data: await purgeSvc.dryRunHardPurge({ key }) });
+      } catch (err) {
+        return c.json(
+          { error: err.message, details: err.details ?? null },
+          err.statusCode ?? err.status ?? 500,
+        );
+      }
+    },
+  );
+
   app.delete(
     "/:key/purge",
     authMiddleware,
     requirePermission("core.modules.purge"),
     async (c) => {
+      if (!purgeSvc) return c.json({ error: "MODULE_PURGE_UNAVAILABLE" }, 503);
       const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
-      const modulesDir = await resolveModulesDir();
-
       try {
-        await purgeModuleFromDb(key, prisma);
-
-        let fsDeleted = false;
-        if (modulesDir) {
-          fsDeleted = await purgeModuleFiles(key, modulesDir);
-          if (!fsDeleted) {
-            console.warn(
-              `[module-purge] Directory not found on filesystem for ${key}`,
-            );
-          }
-        }
-
-        await cacheDel("modules:list").catch(() => {});
-
-        return c.json({ data: { moduleKey: key, deleted: true, fsDeleted } });
+        const body = await c.req.json().catch(() => ({}));
+        const actorId = c.get("userContext")?.profile?.id ?? null;
+        const data = await purgeSvc.hardPurgeModule({
+          key,
+          actorId,
+          confirmation: body?.confirmation ?? null,
+        });
+        return c.json({ data });
       } catch (err) {
-        return c.json({ error: err.message }, err.statusCode ?? 500);
+        return c.json(
+          { error: err.message, details: err.details ?? null },
+          err.statusCode ?? err.status ?? 500,
+        );
       }
     },
   );

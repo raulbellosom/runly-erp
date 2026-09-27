@@ -180,6 +180,11 @@ export function resolveScreen(screenMap, requestedModuleKey, subPath, blueprintS
     if (subPath === "/chat/templates") return screenMap["runly.chat:/chat/templates"] ?? null;
     return null;
   }
+  if (moduleKey === "runly.core") {
+    if (subPath === "/module-builder") return screenMap["runly.core:/module-builder"] ?? null;
+    if (subPath.startsWith("/module-builder/")) return screenMap["runly.core:/module-builder/:id"] ?? null;
+    return null;
+  }
   if (moduleKey === "runly.notes") {
     if (subPath === "/" || subPath === "/notes") return screenMap["runly.notes:/notes"] ?? null;
     if (subPath === "/notes/recent") return screenMap["runly.notes:/notes/recent"] ?? null;

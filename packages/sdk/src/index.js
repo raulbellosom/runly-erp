@@ -4,6 +4,7 @@ import { createDocumentsDomain } from "./domains/documents.js";
 import { createChatDomain } from "./domains/chat.js";
 import { createCallsDomain } from "./domains/calls.js";
 import { createSettingsDomain } from "./domains/settings.js";
+import { createBuilderDomain } from "./domains/builder.js";
 export { createCompanyFetch } from "./company-fetch.js";
 
 export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
@@ -98,6 +99,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
 
   return {
     settings: createSettingsDomain({ request, withAuthHeaders }),
+    builder: createBuilderDomain({ request, requestBlob, withAuthHeaders }),
     support: {
       reportBug: (data, token) =>
         request("/support/report-bug", {
@@ -260,6 +262,31 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       list: (token) => request("/modules", { headers: withAuthHeaders(token) }),
       getAvailable: (token) =>
         request("/modules/available", { headers: withAuthHeaders(token) }),
+      queryDashboard: (key, payload, token) =>
+        request(`/modules/${encodeURIComponent(key)}/dashboard/query`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(payload),
+          onlineOnly: true,
+        }),
+      queryKanban: (key, payload, token) =>
+        request(`/modules/${encodeURIComponent(key)}/kanban/query`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(payload),
+          onlineOnly: true,
+        }),
+      updateKanbanRecord: (apiPath, id, patch, token) => {
+        if (!/^\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)+$/.test(apiPath) || apiPath.includes('..')) {
+          throw new Error('INVALID_MODULE_API_PATH')
+        }
+        return request(`${apiPath}/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(patch),
+          onlineOnly: true,
+        })
+      },
       install: (manifest, token) =>
         request("/modules/install", {
           method: "POST",
@@ -359,9 +386,15 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           // Do NOT set Content-Type — fetch sets the multipart boundary automatically
           body: formData,
         }),
-      purgeModule: (key, token) =>
+      purgeModule: (key, token, confirmation = "ACEPTO") =>
         request(`/modules/${encodeURIComponent(key)}/purge`, {
           method: "DELETE",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify({ confirmation }),
+        }),
+      purgeModuleDryRun: (key, token) =>
+        request(`/modules/${encodeURIComponent(key)}/purge/dry-run`, {
+          method: "POST",
           headers: withAuthHeaders(token),
         }),
     },
@@ -1217,6 +1250,10 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       // Products
       listProducts: (token, options = {}) =>
         request(`/catalog/products${toQueryString(options)}`, {
+          headers: withAuthHeaders(token),
+        }),
+      getProductStats: (token) =>
+        request("/catalog/products/stats", {
           headers: withAuthHeaders(token),
         }),
       getProduct: (id, token) =>

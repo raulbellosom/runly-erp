@@ -31,6 +31,12 @@ const SCREEN_MAP = {
   "runly.core:/settings/webpush": lazy(
     () => import("../modules/runly.core/screens/WebPushSettingsScreen.jsx"),
   ),
+  "runly.core:/module-builder": lazy(
+    () => import("../modules/runly.core/screens/ModuleBuilder.jsx"),
+  ),
+  "runly.core:/module-builder/:id": lazy(
+    () => import("../modules/runly.core/screens/ModuleBuilderEditor.jsx"),
+  ),
   "runly.company:/": lazy(
     () => import("../modules/runly.company/screens/CompanyOverview.jsx"),
   ),

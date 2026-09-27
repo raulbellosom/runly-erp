@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "key": "custom.fleetdashboard",
+  "name": "Flota con dashboard",
+  "version": "1.0.0",
+  "description": "Ejemplo de dashboard declarativo RME3.",
+  "icon": "Truck",
+  "color": "#2563EB",
+  "pwa": { "shortName": "Flota", "startPath": "/dashboard" },
+  "entities": [{
+    "key": "vehicle",
+    "label": "Vehículo",
+    "pluralLabel": "Vehículos",
+    "fields": [
+      { "key": "plate", "type": "text", "label": "Placa", "required": true },
+      { "key": "brand", "type": "text", "label": "Marca" },
+      { "key": "status", "type": "select", "label": "Estado", "options": ["ACTIVE", "MAINTENANCE"] },
+      { "key": "cost", "type": "decimal", "label": "Costo" }
+    ]
+  }],
+  "views": [{
+    "key": "fleetdashboard.dashboard",
+    "kind": "DASHBOARD",
+    "title": "Resumen de flota",
+    "description": "Indicadores operativos de vehículos",
+    "layout": { "columns": 12, "gap": "md" },
+    "widgets": [
+      { "key": "totalVehicles", "type": "stat", "label": "Vehículos", "layout": { "w": 3, "h": 2 }, "source": { "entity": "vehicle", "aggregate": "count" } },
+      { "key": "vehiclesByStatus", "type": "chart", "chart": "bar", "title": "Vehículos por estado", "layout": { "w": 6, "h": 4 }, "source": { "entity": "vehicle", "groupBy": "status", "aggregate": "count" } },
+      { "key": "averageCost", "type": "stat", "label": "Costo promedio", "format": "currency", "layout": { "w": 3, "h": 2 }, "source": { "entity": "vehicle", "aggregate": "avg", "aggregateField": "cost" } },
+      { "key": "latestVehicles", "type": "list", "title": "Últimos vehículos", "layout": { "w": 6, "h": 4 }, "source": { "entity": "vehicle", "orderBy": { "field": "created_at", "direction": "desc" }, "limit": 5 }, "display": { "titleField": "plate", "subtitleField": "brand" } }
+    ]
+  }],
+  "navigation": [{
+    "label": "Dashboard",
+    "icon": "Truck",
+    "path": "/app/m/custom.fleetdashboard/dashboard",
+    "page": "fleetdashboard.dashboard",
+    "permission": "fleetdashboard.vehicle.read"
+  }]
+}

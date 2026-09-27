@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@runly/core": "workspace:^",
+    "@runly/module-compiler": "workspace:*",
     "@runly/module-engine": "workspace:*",
     "@runly/validators": "workspace:*",
     "@hono/node-server": "^1.19.17",

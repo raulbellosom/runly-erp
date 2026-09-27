@@ -646,6 +646,103 @@ POST /modules/custom.deliveries/reset
 { "confirmation": "ACEPTO" }
 ```
 
+### Hard purge (delete the package completely)
+
+Hard purge is separate from uninstall. It removes the custom module's owned
+tables, metadata, migrations, permissions and grants, company activations,
+dependency rows, dynamic routes, local and Storage bundles, package directory,
+and module caches. Historical `AuditLog` rows are preserved.
+
+Inspect the exact resource inventory first:
+
+```json
+POST /modules/custom.deliveries/purge/dry-run
+```
+
+Then confirm the irreversible operation explicitly:
+
+```json
+DELETE /modules/custom.deliveries/purge
+{ "confirmation": "ACEPTO" }
+```
+
+The endpoint reports success only after post-purge verification finds no live
+owned resources. It rejects core/official modules, installed dependents, unsafe
+module keys, and any `ownedTables` entry that is not both a non-core table and a
+`RunlyModel.tableName` belonging to the same module.
+
+### Atomic ZIP package publishing
+
+`POST /modules/:key/upload` keeps its multipart `file` contract, but extraction
+never targets the active package. The publication flow is:
+
+```text
+uploaded ZIP
+  -> RUNLY_MODULES_DIR/.staging/<operationId>/package
+  -> inspect + validate + dependency/model preflight
+  -> compile a temporary bundle
+  -> READY_TO_PUBLISH
+  -> current -> .backups/<operationId>/<moduleKey>
+  -> staged -> current
+  -> publish bundle + reconcile metadata/runtime
+  -> remove backup and staging
+```
+
+`.staging`, `.backups` and `.locks` are hidden from discovery. Because staging
+and backup live below the same `RUNLY_MODULES_DIR` as the canonical package,
+the package swaps use same-filesystem `rename`. An atomic lock directory per
+module key serializes publishers across API processes sharing that volume.
+
+A published package is not necessarily installed. Upload does not install or
+enable an `UNINSTALLED` module, and an update preserves enabled/disabled state.
+Only a previously enabled installed module is unloaded and reloaded.
+
+Model differences on an installed module are reported as
+`requiresSchemaMigration: true`; upload does not apply schema evolution. If a
+post-swap bundle, metadata or runtime step fails, Runly attempts to restore the
+previous package, bundle and runtime. Structured errors report the failed
+stage, restoration status, cleanup status and any rollback error.
+
+### Additive schema evolution
+
+For an update of an installed module, upload now compares three schemas before
+the package swap:
+
+```text
+RunlyModel.schema (previous applied definition)
+  + information_schema / pg_catalog (actual PostgreSQL schema)
+  + staged model definition (desired schema)
+  -> MigrationPlan
+```
+
+The automatic subset is intentionally backward-compatible:
+
+- a new model produces `CREATE_TABLE`;
+- a nullable field, or a field with a safe literal default, produces
+  `ADD_COLUMN`;
+- a required field without a default is accepted only when the table is empty;
+- a new non-unique index produces `ADD_INDEX`.
+
+For example, adding `mileage: { type: 'number' }` produces:
+
+```sql
+ALTER TABLE "fleet_vehicle"
+ADD COLUMN IF NOT EXISTS "mileage" INTEGER;
+```
+
+Removing or renaming fields, changing types/nullability, removing tables or
+indexes, and creating unique indexes are reported as destructive or unsupported
+and block publication before the filesystem swap. Renames are represented as a
+drop plus an addition; they are never inferred from similar names.
+
+Unexpected differences between `RunlyModel.schema` and PostgreSQL produce
+`SCHEMA_DRIFT_DETECTED`. Extra unknown columns are retained and reported as
+warnings, while missing managed columns or incompatible types/defaults block the
+migration. DDL, verification and the deterministic `ModuleMigration` entry run
+inside one database transaction. If runtime activation later fails, the package
+can roll back safely because every automatically applied database change is
+additive and compatible with the previous package.
+
 ---
 
 ## Versioning
@@ -675,3 +772,29 @@ POST /modules/custom.deliveries/reset
 **Cleanup handler failed, module stuck**
 - The Prisma transaction rolled back. Module status unchanged.
 - Check the API error for the specific exception. Fix the handler, redeploy, retry.
+# Compiler declarativo compartido
+
+Para generación automatizada, el scaffolder CLI es un adapter de
+`@runly/module-compiler`. Una `ModuleDefinition` v1 JSON-compatible se valida,
+normaliza y compila de forma pura a los mismos artifacts RME3 que un módulo
+escrito manualmente. Consulta
+[`docs/ai-context/rme3-module-compiler.md`](ai-context/rme3-module-compiler.md)
+para el contrato, API, defaults y modo no interactivo.
+
+### Dashboard declarativo
+
+Una vista `DASHBOARD` renderiza indicadores sin `ModuleDashboard.jsx`. Declara
+widgets `stat`, `chart` o `list` y fuentes sobre modelos owned por el mismo
+módulo. El runtime consulta todos los widgets mediante un endpoint batch,
+revalida la definición persistida, exige permisos `read`, aplica compañía y
+soft-delete, y aísla errores por widget. SQL, joins y fuentes cross-module no
+están permitidos. Los dashboards `CUSTOM` siguen siendo compatibles.
+
+### Kanban declarativo
+
+Una vista `KANBAN` agrupa una entity owned por un campo `select` o `boolean` y
+define los campos visibles de sus tarjetas. La consulta se resuelve desde el
+blueprint persistido, con tenant, soft-delete y permiso `read`; mover una
+tarjeta usa el `PATCH` existente y exige `update`. Las columnas vacías y “Sin
+asignar” permanecen visibles; valores legacy aparecen en columnas de solo
+salida. Véase `examples/module-definitions/declarative-kanban.json`.

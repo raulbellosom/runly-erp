@@ -1,0 +1,216 @@
+import { createHash } from 'node:crypto'
+import { Prisma } from '@prisma/client'
+import {
+  compileMigrationPlan,
+  diffModelSchemas,
+  hashNormalizedSchema,
+  normalizeModelSchema,
+} from '@runly/module-engine'
+
+const IDENTIFIER_RE = /^[a-z][a-z0-9_]*$/
+const CORE_TABLE_NAMES = new Set(
+  (Prisma.dmmf?.datamodel?.models ?? []).flatMap((model) => [model.name, model.dbName].filter(Boolean)),
+)
+
+function safeIdentifier(value, label) {
+  if (!IDENTIFIER_RE.test(value ?? '')) throw Object.assign(new Error(`Invalid ${label}: ${value}`), { code: 'AME_UNSAFE_IDENTIFIER' })
+  return value
+}
+
+function normalizeDatabaseType(row) {
+  const type = String(row.data_type ?? '').toLowerCase()
+  if (type === 'character varying') return `VARCHAR(${row.character_maximum_length})`
+  if (type === 'timestamp with time zone') return 'TIMESTAMPTZ'
+  if (type === 'array' && row.udt_name === '_text') return 'TEXT[]'
+  if (type === 'numeric') {
+    return row.numeric_precision && row.numeric_scale !== null
+      ? `NUMERIC(${row.numeric_precision},${row.numeric_scale})`
+      : 'NUMERIC'
+  }
+  return ({ integer: 'INTEGER', text: 'TEXT', boolean: 'BOOLEAN', date: 'DATE', uuid: 'UUID', jsonb: 'JSONB' })[type]
+    ?? String(row.udt_name ?? row.data_type).toUpperCase()
+}
+
+function defaultsMatch(expected, actual) {
+  if (expected === actual) return true
+  const normalize = (value) => String(value ?? '')
+    .replaceAll('::character varying', '')
+    .replaceAll('::text', '')
+    .replace(/^'(.*)'$/, '$1')
+    .toLowerCase()
+  return normalize(expected) === normalize(actual)
+}
+
+export class ModuleSchemaMigrationError extends Error {
+  constructor(message, { code = message, statusCode = 409, details = null } = {}) {
+    super(message)
+    this.name = 'ModuleSchemaMigrationError'
+    this.code = code
+    this.statusCode = statusCode
+    this.details = details
+  }
+}
+
+export function createModuleSchemaMigrationService({ prisma }) {
+  async function inspectTableSchema(tableName, db = prisma) {
+    const table = safeIdentifier(tableName, 'table name')
+    // ::text — @prisma/adapter-pg (the driver adapter this service runs
+    // under) can't deserialize the raw `regclass` OID type and throws P2010
+    // ("Failed to deserialize column of type 'regclass'"), which made every
+    // schema-diff preflight for an already-installed module fail outright.
+    // Found during golden-path QA on the very first additive Builder
+    // update. NULL::text (table doesn't exist) is still falsy below.
+    const tableRows = await db.$queryRawUnsafe(
+      `SELECT to_regclass('public.' || $1)::text AS relation`,
+      table,
+    )
+    if (!tableRows?.[0]?.relation) return { table, exists: false, rowCount: 0, columns: [], indexes: [] }
+    const columns = await db.$queryRawUnsafe(
+      `SELECT column_name, data_type, udt_name, is_nullable, column_default,
+              character_maximum_length, numeric_precision, numeric_scale
+         FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = $1
+        ORDER BY ordinal_position`,
+      table,
+    )
+    const indexes = await db.$queryRawUnsafe(
+      `SELECT indexname, indexdef
+         FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = $1
+        ORDER BY indexname`,
+      table,
+    )
+    const countRows = await db.$queryRawUnsafe(`SELECT COUNT(*)::bigint AS count FROM "${table}"`)
+    return {
+      table,
+      exists: true,
+      rowCount: Number(countRows?.[0]?.count ?? 0),
+      columns: columns.map((row) => ({
+        name: row.column_name,
+        sqlType: normalizeDatabaseType(row),
+        nullable: row.is_nullable === 'YES',
+        default: row.column_default ?? null,
+      })),
+      indexes: indexes.map((row) => {
+        const fieldList = String(row.indexdef).match(/\(([^)]+)\)\s*$/)?.[1] ?? ''
+        const fields = fieldList.split(',').map((field) => field.trim().replaceAll('"', '')).filter((field) => IDENTIFIER_RE.test(field))
+        return { name: row.indexname, fields, unique: /CREATE UNIQUE INDEX/i.test(row.indexdef) }
+      }),
+    }
+  }
+
+  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null }) {
+    const persistedRows = moduleRow?.status === 'INSTALLED'
+      ? await prisma.runlyModel.findMany({ where: { moduleKey }, select: { name: true, tableName: true, schema: true } })
+      : []
+    const previousByTable = new Map(persistedRows.map((row) => [row.tableName, row]))
+    const desired = desiredModels.map((model) => ({ model, schema: normalizeModelSchema(model) }))
+    const operations = []
+    const drift = []
+    const warnings = []
+    const models = []
+
+    for (const entry of desired) {
+      if (CORE_TABLE_NAMES.has(entry.schema.table)) {
+        throw new ModuleSchemaMigrationError('CORE_TABLE_OWNERSHIP_FORBIDDEN', {
+          details: { table: entry.schema.table },
+        })
+      }
+      const previousRow = previousByTable.get(entry.schema.table)
+      const previous = previousRow?.schema ? normalizeModelSchema(previousRow.schema) : null
+      const actual = await inspectTableSchema(entry.schema.table)
+      const diff = diffModelSchemas({
+        previous,
+        desired: entry.schema,
+        actual,
+        rowCount: actual.rowCount,
+        modelDefinition: entry.model,
+      })
+      operations.push(...diff.operations)
+      drift.push(...diff.drift)
+      warnings.push(...diff.warnings)
+      models.push({
+        model: entry.schema.model,
+        table: entry.schema.table,
+        previousSchemaHash: previous ? hashNormalizedSchema(previous) : null,
+        nextSchemaHash: hashNormalizedSchema(entry.schema),
+        desiredSchema: entry.schema,
+      })
+      previousByTable.delete(entry.schema.table)
+    }
+    for (const removed of previousByTable.values()) {
+      operations.push({ type: 'DROP_TABLE', table: removed.tableName, model: removed.name, safety: 'DESTRUCTIVE' })
+    }
+    const required = operations.length > 0
+    const canAutoApply = drift.length === 0 && operations.every((operation) => ['SAFE', 'CONDITIONAL'].includes(operation.safety))
+    const core = { moduleKey, models, operations, drift, warnings }
+    const planHash = createHash('sha256').update(JSON.stringify(core)).digest('hex')
+    return {
+      ...core,
+      required,
+      canAutoApply,
+      safety: drift.length ? 'DRIFT' : operations.some((operation) => operation.safety === 'DESTRUCTIVE')
+        ? 'DESTRUCTIVE'
+        : operations.some((operation) => operation.safety === 'UNSUPPORTED') ? 'UNSUPPORTED'
+          : operations.some((operation) => operation.safety === 'CONDITIONAL') ? 'CONDITIONAL' : 'SAFE',
+      planHash,
+      filename: `schema__${planHash.slice(0, 24)}.sql`,
+      sql: canAutoApply ? compileMigrationPlan({ operations }) : [],
+      baselineCreated: !required && warnings.some((warning) => warning.type === 'BASELINE_COLUMN'),
+    }
+  }
+
+  async function applyModuleSchemaMigration({ plan, actorId = null }) {
+    if (plan.drift.length) throw new ModuleSchemaMigrationError('SCHEMA_DRIFT_DETECTED', { details: plan })
+    if (!plan.required) return { applied: false, reason: 'no_changes', plan }
+    if (!plan.canAutoApply) throw new ModuleSchemaMigrationError('SCHEMA_MIGRATION_UNSUPPORTED', { details: plan })
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.moduleMigration.findUnique({
+        where: { moduleKey_filename: { moduleKey: plan.moduleKey, filename: plan.filename } },
+      })
+      if (existing) return { applied: false, reason: 'already_applied', migration: existing, plan }
+      for (const statement of plan.sql) await tx.$executeRawUnsafe(statement)
+      for (const model of plan.models) {
+        const expected = model.desiredSchema
+        const actual = await inspectTableSchema(model.table, tx)
+        if (!actual.exists) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table } })
+        const actualByName = new Map(actual.columns.map((column) => [column.name, column]))
+        const mismatch = expected.columns.find((column) => {
+          const found = actualByName.get(column.name)
+          return !found
+            || found.sqlType !== column.sqlType
+            || found.nullable !== column.nullable
+            || !defaultsMatch(column.default, found.default)
+        })
+        if (mismatch) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, column: mismatch.name } })
+        const actualIndexes = new Map(actual.indexes.map((index) => [index.name, index]))
+        const missingIndex = expected.indexes.find((index) => {
+          const found = actualIndexes.get(index.name)
+          return !found || found.unique !== index.unique || JSON.stringify(found.fields) !== JSON.stringify(index.fields)
+        })
+        if (missingIndex) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, index: missingIndex.name } })
+      }
+      const checksum = createHash('sha256').update(plan.sql.join('\n')).digest('hex')
+      const migration = await tx.moduleMigration.create({
+        data: { moduleKey: plan.moduleKey, filename: plan.filename, checksum },
+      })
+      if (tx.auditLog?.create) {
+        await tx.auditLog.create({
+          data: {
+            actorId,
+            moduleKey: plan.moduleKey,
+            entityType: 'ModuleMigration',
+            entityId: migration.id,
+            action: 'core.module.schema.migrate',
+            before: null,
+            after: JSON.stringify({ planHash: plan.planHash, safety: plan.safety, operations: plan.operations }),
+            metadata: null,
+          },
+        })
+      }
+      return { applied: true, migration, plan }
+    })
+  }
+
+  return { inspectTableSchema, planModuleSchemaMigration, applyModuleSchemaMigration }
+}

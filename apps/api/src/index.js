@@ -48,6 +48,7 @@ import { createInventoryNotificationService } from "./services/inventory-notific
 import { createCommentsService, CommentsServiceError } from "./services/comments-service.js";
 import { createInventoryRouter } from "./routes/inventory/index.js";
 import { createModulesRouter } from "./routes/modules.js";
+import { createBuilderRouter } from "./routes/builder-routes.js";
 import {
   createPublicWebsiteRouter,
   createPublicCatalogRouter,
@@ -1997,8 +1998,8 @@ app.get("/public", (c) => {
       { method: "DELETE", path: "/public/storefront/files/:id",         auth: "storefront", description: "Delete an owned file" },
       // Catalog
       { method: "GET",  path: "/public/catalog/categories",             auth: "none",       description: "Published product categories" },
-      { method: "GET",  path: "/public/catalog/products",               auth: "none",       description: "Published products list (supports ?q, ?category, ?limit)" },
-      { method: "GET",  path: "/public/catalog/products/:slug",         auth: "none",       description: "Single product detail by slug" },
+      { method: "GET",  path: "/public/catalog/products",               auth: "none",       description: "Published products list (supports ?search, ?categorySlug, ?limit, ?offset)" },
+      { method: "GET",  path: "/public/catalog/products/:slug",         auth: "none",       description: "Single product detail, by slug or by id" },
       // Website / CMS
       { method: "GET",  path: "/public/website/resolve",                auth: "none",       description: "Resolve a website by domain or slug" },
       { method: "GET",  path: "/public/website/blog",                   auth: "none",       description: "Published blog posts" },
@@ -2189,6 +2190,7 @@ function mountWithAuth(baseApp, router) {
 }
 
 mountWithAuth(app, createCompanyRouter({ prisma, supabaseAdmin, requirePermission, cacheDel }));
+mountWithAuth(app, createBuilderRouter({ prisma, requirePermission, bundlerSvc: bundlerService, routeLoader, cacheDel }));
 mountWithAuth(app, createContactsRouter({ prisma, requirePermission }));
 mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }));
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));

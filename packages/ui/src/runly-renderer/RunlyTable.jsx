@@ -950,7 +950,7 @@ export function RunlyTable({
   const renderListView = () => {
     const primaryCol = visibleColumns[0] ?? null;
     const statusCol =
-      visibleColumns.find((c) => /^(status|estado)$/i.test(c.field)) ?? null;
+      visibleColumns.find((c) => /^(status|estado|published)$/i.test(c.field)) ?? null;
     const colorCol = visibleColumns.find((c) => c.type === "color") ?? null;
     const imageCol = visibleColumns.find((c) => c.type === "image") ?? null;
     const detailCols = visibleColumns.filter(

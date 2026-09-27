@@ -73,6 +73,7 @@ describe('module-bundler-service', () => {
         storage: {
           listBuckets: async () => ({ data: [{ name: 'module-bundles' }] }),
           from: () => ({
+            list: async () => ({ data: [{ name: 'custom.test.js' }], error: null }),
             upload: async () => ({ error: null }),
             download: async () => ({ data: null, error: new Error('not found') }),
             remove: async () => ({ error: null }),
@@ -153,6 +154,29 @@ describe('module-bundler-service', () => {
       const result = await svc.buildModuleBundle('custom.nonexistent')
       assert.equal(result.built, false)
       assert.equal(result.reason, 'module-not-found')
+    })
+
+    it('inspects the persisted Storage bundle and treats a missing local file as clean', async () => {
+      const { createModuleBundlerService } = await import('../module-bundler-service.js')
+      const svc = createModuleBundlerService({ prisma: mockPrisma, supabaseAdmin: mockSupabase })
+      const result = await svc.inspectModuleBundle('custom.test')
+      assert.equal(result.local.exists, false)
+      assert.equal(result.storage.exists, true)
+      assert.equal(result.storage.inspectable, true)
+    })
+
+    it('surfaces Storage deletion failures in strict purge mode', async () => {
+      const { createModuleBundlerService } = await import('../module-bundler-service.js')
+      const failingStorage = {
+        storage: {
+          from: () => ({ remove: async () => ({ error: new Error('storage unavailable') }) }),
+        },
+      }
+      const svc = createModuleBundlerService({ prisma: mockPrisma, supabaseAdmin: failingStorage })
+      await assert.rejects(
+        svc.deleteModuleBundle('custom.test', { strict: true, updateMetadata: false }),
+        /storage unavailable/,
+      )
     })
   })
 })

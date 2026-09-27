@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "key": "custom.workboard",
+  "name": "Tablero de trabajo",
+  "version": "1.0.0",
+  "description": "Ejemplo de Kanban declarativo",
+  "icon": "LayoutDashboard",
+  "color": "#2563EB",
+  "pwa": { "shortName": "Tablero", "startPath": "/tasks-kanban" },
+  "entities": [{
+    "key": "task", "label": "Tarea", "pluralLabel": "Tareas",
+    "fields": [
+      { "key": "title", "type": "text", "label": "Título", "required": true },
+      { "key": "description", "type": "textarea", "label": "Descripción" },
+      { "key": "priority", "type": "select", "label": "Prioridad", "options": ["Baja", "Media", "Alta"] },
+      { "key": "status", "type": "select", "label": "Estado", "options": [{ "value": "BACKLOG", "label": "Pendiente" }, { "value": "IN_PROGRESS", "label": "En curso" }, { "value": "DONE", "label": "Terminado" }] }
+    ]
+  }],
+  "views": [{
+    "key": "workboard.tasks.kanban", "kind": "KANBAN", "title": "Flujo de tareas", "entity": "task", "groupBy": "status",
+    "card": { "titleField": "title", "descriptionField": "description", "badgeField": "priority" },
+    "orderBy": { "field": "created_at", "direction": "desc" }, "limit": 200
+  }],
+  "navigation": [{ "label": "Tablero", "icon": "LayoutDashboard", "path": "/app/m/custom.workboard/tasks-kanban", "page": "workboard.tasks.kanban", "permission": "workboard.task.read" }]
+}

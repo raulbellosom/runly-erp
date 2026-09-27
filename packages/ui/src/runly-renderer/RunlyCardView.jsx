@@ -65,7 +65,7 @@ export function RunlyCardView({
   onDelete,
 }) {
   const primaryColumn = columns[0] ?? null;
-  const statusColumn = columns.find((c) => /^(status|estado)$/i.test(c.field)) ?? null;
+  const statusColumn = columns.find((c) => /^(status|estado|published)$/i.test(c.field)) ?? null;
   const colorColumn = columns.find((c) => c.type === "color") ?? null;
   const imageColumn = columns.find((c) => c.type === "image") ?? null;
   const secondaryColumns = columns.filter(

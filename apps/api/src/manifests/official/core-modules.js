@@ -22,7 +22,7 @@ export const runlyCoreMap = createModuleManifest({
   name: "Runly Core",
   description:
     "Nucleo del sistema: modulos, permisos, bitacora y configuracion de instancia.",
-  version: "0.2.2",
+  version: "0.2.3",
   kind: MODULE_KINDS.CORE,
   core: true,
   uninstallable: false,
@@ -38,6 +38,13 @@ export const runlyCoreMap = createModuleManifest({
       icon: "Puzzle",
       layout: "main",
       permissionKey: "core.modules.read",
+    },
+    {
+      label: "Constructor de modulos",
+      path: "/module-builder",
+      icon: "Hammer",
+      layout: "main",
+      permissionKey: "core.modules.builder",
     },
     {
       label: "Configuracion",
@@ -68,6 +75,7 @@ export const runlyCoreMap = createModuleManifest({
     { key: "core.modules.delete", name: "Uninstall Core Modules" },
     { key: "core.modules.upload", name: "Upload Custom Module ZIP" },
     { key: "core.modules.purge", name: "Purge Custom Module from Server" },
+    { key: "core.modules.builder", name: "Use Module Builder" },
     { key: "core.instance.read", name: "Read Core Instance" },
     { key: "core.instance.create", name: "Create Core Instance Config" },
     { key: "core.instance.update", name: "Update Core Instance Config" },

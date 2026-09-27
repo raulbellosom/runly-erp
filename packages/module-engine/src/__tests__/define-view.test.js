@@ -196,3 +196,42 @@ test('validateView rejects CUSTOM with /p/ path but missing schema.public: true'
   assert.equal(result.valid, false)
   assert.ok(result.errors.some((e) => e.includes('/p/')))
 })
+
+test('validateView accepts a declarative DASHBOARD', () => {
+  const result = validateView({ key: 'fleet.dashboard', kind: 'DASHBOARD', schema: {
+    title: 'Flota', path: '/app/m/custom.fleet/dashboard',
+    widgets: [{ key: 'totalVehicles', type: 'stat', title: 'Vehículos', source: { entity: 'vehicle', aggregate: 'count' } }],
+  } })
+  assert.deepEqual(result, { valid: true, errors: [] })
+})
+
+test('validateView rejects unsafe DASHBOARD widgets', () => {
+  const result = validateView({ key: 'fleet.dashboard', kind: 'DASHBOARD', schema: {
+    title: 'Flota', path: '/app/m/custom.fleet/dashboard',
+    widgets: [
+      { key: 'same', type: 'sql', title: 'Unsafe', source: { entity: 'vehicle', aggregate: 'count' } },
+      { key: 'same', type: 'list', title: 'Too much', source: { entity: 'vehicle', limit: 1000, filters: [{ field: 'company_id', operator: 'eq', value: 'other' }] } },
+    ],
+  } })
+  assert.equal(result.valid, false)
+  assert.ok(result.errors.some((error) => error.includes('unsupported')))
+  assert.ok(result.errors.some((error) => error.includes('unique')))
+  assert.ok(result.errors.some((error) => error.includes('company_id')))
+})
+
+test('validateView accepts a safe declarative KANBAN', () => {
+  const result = validateView({ key: 'fleet.kanban', kind: 'KANBAN', schema: {
+    title: 'Operación', path: '/app/m/custom.fleet/vehicles-kanban', entity: 'vehicle', groupBy: 'status',
+    apiPath: '/fleet/vehicles', card: { titleField: 'plate', subtitleField: 'brand' },
+  } })
+  assert.deepEqual(result, { valid: true, errors: [] })
+})
+
+test('validateView rejects unsafe KANBAN data controls', () => {
+  const result = validateView({ key: 'fleet.kanban', kind: 'KANBAN', schema: {
+    title: 'Unsafe', path: '/app/m/custom.fleet/kanban', entity: 'vehicle', groupBy: 'status',
+    card: { titleField: 'plate' }, sql: 'select * from anything', companyId: 'foreign',
+  } })
+  assert.equal(result.valid, false)
+  assert.ok(result.errors.some((error) => error.includes('forbidden')))
+})

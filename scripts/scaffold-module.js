@@ -13,7 +13,9 @@ const REPO_ROOT = resolve(__dirname, '..')
 const SCAFFOLD_OUTPUT = resolve(__dirname, 'scaffold-output')
 
 async function main() {
-  const configPath = process.argv[2]
+  const args = process.argv.slice(2)
+  const definitionFlag = args.indexOf('--definition')
+  const configPath = definitionFlag >= 0 ? args[definitionFlag + 1] : args[0]
   let config
 
   if (configPath) {

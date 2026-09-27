@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { Package, Plus } from "lucide-react";
 import {
   RunlyCrudView,
+  RunlyDashboard,
+  RunlyKanban,
   Button,
   Card,
   CardHeader,
@@ -620,6 +622,23 @@ export function BlueprintCrudScreen() {
 
   const isCustomView = customBlueprint !== null
 
+  const dashboardBlueprint = useMemo(() => {
+    const normalizedPathname = normalizePath(location.pathname)
+    return moduleRows.find((row) => getBlueprintKind(row) === 'DASHBOARD' && normalizePath(row?.schema?.path) === normalizedPathname) ?? null
+  }, [moduleRows, location.pathname])
+
+  const kanbanBlueprint = useMemo(() => {
+    const normalizedPathname = normalizePath(location.pathname)
+    return moduleRows.find((row) => getBlueprintKind(row) === 'KANBAN' && normalizePath(row?.schema?.path) === normalizedPathname) ?? null
+  }, [moduleRows, location.pathname])
+
+  const kanbanDetailPath = useMemo(() => {
+    if (!kanbanBlueprint) return null
+    const table = moduleRows.find((row) => getBlueprintKind(row) === 'TABLE' && row?.schema?.entity === kanbanBlueprint.schema?.entity)
+    const page = table && moduleRows.find((row) => getBlueprintKind(row) === 'PAGE' && (row?.schema?.view === table.key || row?.schema?.page?.view === table.key))
+    return getPagePath(page)
+  }, [kanbanBlueprint, moduleRows])
+
   const routeInfo = useMemo(
     () =>
       resolveRouteInfo({
@@ -924,6 +943,23 @@ export function BlueprintCrudScreen() {
         />
       </div>
     )
+  }
+
+  if (dashboardBlueprint) {
+    return <RunlyDashboard blueprint={dashboardBlueprint} moduleKey={moduleKey} companyId={activeCompanyId} queryDashboard={async (payload) => {
+      const response = await runly.modules.queryDashboard(moduleKey, payload, token)
+      return response?.data ?? {}
+    }} />
+  }
+
+  if (kanbanBlueprint) {
+    return <RunlyKanban blueprint={kanbanBlueprint} moduleKey={moduleKey} companyId={activeCompanyId} queryKanban={async (payload) => {
+      const response = await runly.modules.queryKanban(moduleKey, payload, token)
+      return response?.data ?? {}
+    }} updateRecord={async (apiPath, id, patch) => {
+      const response = await runly.modules.updateKanbanRecord(apiPath, id, patch, token)
+      return response?.data
+    }} onCardClick={kanbanDetailPath ? (id) => navigate(`${kanbanDetailPath}/${id}`) : undefined} />
   }
 
   if (groupedTabs?.shouldRedirect && groupedTabs.defaultPath) {

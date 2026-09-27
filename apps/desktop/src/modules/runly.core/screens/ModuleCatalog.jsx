@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Upload,
   Package,
+  Hammer,
 } from "lucide-react";
 import {
   ModuleIcon,
@@ -78,6 +79,7 @@ export default function ModuleCatalog() {
   const canUninstallModules = hasPermission("core.modules.delete");
   const canUploadModules = hasPermission("core.modules.upload");
   const canPurgeModules = hasPermission("core.modules.purge");
+  const canUseModuleBuilder = hasPermission("core.modules.builder");
 
   const modulesQuery = useQuery({
     queryKey: ["modules", token],
@@ -448,6 +450,15 @@ export default function ModuleCatalog() {
           description="Gestiona el ciclo de vida de los módulos de tu instancia Runly."
           actions={
             <div className="flex flex-wrap items-center gap-2">
+              {canUseModuleBuilder && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/app/m/runly.core/module-builder")}
+                >
+                  <Hammer className="h-4 w-4" />
+                  Crear módulo
+                </Button>
+              )}
               {canUploadModules && (
                 <Button
                   variant="outline"

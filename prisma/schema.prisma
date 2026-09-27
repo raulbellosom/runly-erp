@@ -225,6 +225,69 @@ model ModuleDependency {
   @@map("module_dependency")
 }
 
+// Module Builder (No-Code Module Builder MVP). A project's `definition` is
+// the draft ModuleDefinition JSON consumed by @runly/module-compiler; it is
+// never itself an installed module. Ownership is company-scoped (the
+// creating company owns/edits the draft) but the compiled artifact is always
+// an instance-wide RunlyModule, activated per company via CompanyModule —
+// same split as every other RME3 module. No FK to RunlyModule: a purge can
+// delete/recreate that row across install cycles, and moduleKey (unique
+// here) is enough to look it up. See
+// docs/superpowers/specs/2026-09-27-rme3-no-code-module-builder-architecture.md §21.
+enum ModuleBuilderProjectStatus {
+  DRAFT
+  VALIDATED
+  PUBLISHED
+
+  @@map("module_builder_project_status")
+}
+
+model ModuleBuilderProject {
+  id String @id @default(uuid(7)) @db.Uuid
+  companyId String @db.Uuid @map("company_id")
+  moduleKey String @unique @map("module_key")
+  name String
+  description String?
+  status ModuleBuilderProjectStatus @default(DRAFT)
+  schemaVersion Int @default(1) @map("schema_version")
+  definition Json
+  publishedDefinition Json? @map("published_definition")
+  publishedPackageHash String? @map("published_package_hash")
+  publishedVersion String? @map("published_version")
+  detachedAt DateTime? @map("detached_at")
+  createdById String? @db.Uuid @map("created_by")
+  updatedById String? @db.Uuid @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  publishedAt DateTime? @map("published_at")
+
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy UserProfile? @relation("ModuleBuilderProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  revisions ModuleBuilderRevision[]
+
+  @@index([companyId, status])
+  @@map("module_builder_project")
+}
+
+model ModuleBuilderRevision {
+  id String @id @default(uuid(7)) @db.Uuid
+  projectId String @db.Uuid @map("project_id")
+  revisionNumber Int @map("revision_number")
+  definition Json
+  definitionHash String @map("definition_hash")
+  published Boolean @default(false)
+  packageHash String? @map("package_hash")
+  createdById String? @db.Uuid @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project   ModuleBuilderProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy UserProfile?         @relation("ModuleBuilderRevisionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, revisionNumber])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("module_builder_revision")
+}
+
 model Blueprint {
   id String @id @default(uuid(7)) @db.Uuid
   key         String @unique
@@ -344,6 +407,7 @@ model Company {
   companyModules CompanyModule[]
   brandingConfig BrandingConfig?
   permissionGrants UserPermissionGrant[]
+  moduleBuilderProjects ModuleBuilderProject[]
 
   hrEmployees    HrEmployee[]
   hrDepartments  HrDepartment[]
@@ -397,6 +461,9 @@ model UserProfile {
   hrEmployees HrEmployee[]
   tablePreferences UserTablePreference[]
   preferences  UserPreference[]
+
+  createdModuleBuilderProjects  ModuleBuilderProject[]  @relation("ModuleBuilderProjectCreator")
+  createdModuleBuilderRevisions ModuleBuilderRevision[] @relation("ModuleBuilderRevisionCreator")
 
   googleCalendarConnection GoogleCalendarConnection?
   calendarOwner          CalendarCalendar[]       @relation("CalendarOwner")

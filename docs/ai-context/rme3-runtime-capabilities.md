@@ -227,6 +227,18 @@ renders as a plain stack of `label / value` sections (unchanged behaviour).
   `relationCard.contactActions: [{ type: 'call', field }]` add an avatar
   (initials fallback) and `tel:` buttons.
 
+### DASHBOARD — declarative analytics screen
+
+Use `DASHBOARD` for no-code KPI, chart and recent-record surfaces. Its schema
+declares `path`, title, a 12-column layout and widgets. Supported widget types
+are `stat`, `chart` (`bar`, `line`, `pie`, `donut`) and `list`. Sources may use
+`count`, `sum`, `avg`, `min`, `max`, one `groupBy`, safe filters and bounded
+lists. Sources are restricted to models owned by the same module; the server
+enforces entity read permission, company scope and soft-delete automatically.
+
+See `examples/module-definitions/declarative-dashboard.json`. Do not place SQL,
+Recharts props or functions in the schema.
+
 ### CUSTOM — full custom React screen
 
 Use CUSTOM when TABLE/FORM/DETAIL renderers are insufficient. Requires a component registered via the dynamic bundle. No SCREEN_MAP entry needed.
@@ -500,6 +512,8 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `RunlyDetail` | Renders DETAIL kind blueprints |
 | `RunlyCrudView` | Combined list + form + detail view |
 | `RunlyCardView` | Card grid alternative to RunlyTable |
+| `RunlyDashboard` | Declarative DASHBOARD renderer |
+| `RunlyKanban` | Declarative KANBAN renderer with pointer, touch and keyboard drag/drop; read-only ACL fallback |
 | `BulkActionBar` | Multi-select action toolbar |
 | `CostsSummaryPanel` | Costs summary panel |
 | `normalizeSpanishLabel` | Label normalization helper |

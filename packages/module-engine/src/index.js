@@ -15,6 +15,13 @@ export { defineModel,
 export { FIELD_TYPES }                   from './constants.js'
 export { defineView,
          validateView }                  from './define-view.js'
+export { validateDashboardSchema, DASHBOARD_WIDGET_TYPES, DASHBOARD_CHART_TYPES,
+         DASHBOARD_AGGREGATES, DASHBOARD_FILTER_OPERATORS, DASHBOARD_MAX_WIDGETS,
+         DASHBOARD_DEFAULT_LIST_LIMIT, DASHBOARD_MAX_LIST_LIMIT } from './dashboard-schema.js'
+export { DATA_VIEW_FILTER_OPERATORS, DATA_VIEW_MAX_FILTER_VALUES,
+         validateDataViewFilters, validateDataViewOrder } from './data-view-schema.js'
+export { validateKanbanSchema, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS,
+         KANBAN_DEFAULT_LIMIT, KANBAN_MAX_LIMIT } from './kanban-schema.js'
 export { definePage,
          validatePage }                  from './define-page.js'
 export { loadHelpBlueprints }             from './load-help-blueprints.js'
@@ -24,6 +31,10 @@ export { ComponentRegistry }            from './component-registry.js'
 export { generateCreateTableSql,
          assertSafeMigrationSql }        from './sql-generator.js'
 export { createChecksum }               from './checksum.js'
+export { normalizeModelSchema,
+         hashNormalizedSchema,
+         diffModelSchemas,
+         compileMigrationPlan }         from './schema-diff.js'
 
 // Additional constants re-exported for module authors
 export { MODULE_KINDS, BLUEPRINT_KINDS,

@@ -51,8 +51,8 @@ describe('e2e scaffold smoke test', () => {
   test('writes the expected number of files', () => {
     // 1 manifest + 1 service-helpers + 1 api/index + 1 validators/index
     // + per entity: 1 model + 4 views + 1 routes + 1 service + 1 validators = 8
-    // total = 4 + 8 = 12 files for 1 entity
-    assert.equal(result.written.length, 12)
+    // total = source definition + 4 shared + 8 entity files = 13
+    assert.equal(result.written.length, 13)
   })
 
   test('module.manifest.js exists', () => {
@@ -97,6 +97,7 @@ describe('e2e scaffold smoke test', () => {
 
   test('all generated files pass node --check (syntax valid)', () => {
     for (const relPath of result.written) {
+      if (relPath.endsWith('.json')) continue
       const absPath = resolve(result.outDir, relPath)
       try {
         execFileSync(process.execPath, ['--check', absPath], { stdio: 'pipe' })
