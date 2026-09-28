@@ -5,6 +5,34 @@ import { runly } from '../lib/runly'
 import { useAuth } from '../auth/AuthProvider'
 import { getApiUrl } from '../lib/runtimeConfig.js'
 
+// Module-scope so remounts and StrictMode double effects share one load per
+// bundle version instead of importing and registering it again.
+const bundleLoads = new Map()
+
+function loadBundle(key, bundleVersion) {
+  const cacheKey = `${key}@${bundleVersion ?? ''}`
+  if (bundleVersion != null && bundleLoads.has(cacheKey)) return bundleLoads.get(cacheKey)
+  const bundleUrl = new URL(`${getApiUrl()}/modules/${key}/bundle.js`)
+  bundleUrl.searchParams.set('web_origin', window.location.origin)
+  // Bust stale browser module cache entries after runtime rewriting changes.
+  bundleUrl.searchParams.set('v', String(bundleVersion ?? Date.now()))
+  const promise = (async () => {
+    try {
+      const mod = await import(/* @vite-ignore */ bundleUrl.toString())
+      if (typeof mod.register === 'function') {
+        await mod.register(componentRegistry)
+      }
+      return { key, loaded: true }
+    } catch (err) {
+      bundleLoads.delete(cacheKey)
+      console.error(`[ModuleBundleLoader] failed to load bundle for ${key}:`, err.message)
+      return { key, loaded: false }
+    }
+  })()
+  if (bundleVersion != null) bundleLoads.set(cacheKey, promise)
+  return promise
+}
+
 async function loadModuleBundles(blueprints) {
   const seen = new Set()
   const modulesWithBundles = []
@@ -25,26 +53,9 @@ async function loadModuleBundles(blueprints) {
     }
   }
 
-  const results = await Promise.all(
-    modulesWithBundles.map(async ({ key, bundleVersion }) => {
-      const bundleUrl = new URL(`${getApiUrl()}/modules/${key}/bundle.js`)
-      bundleUrl.searchParams.set('web_origin', window.location.origin)
-      // Bust stale browser module cache entries after runtime rewriting changes.
-      bundleUrl.searchParams.set('v', String(bundleVersion ?? Date.now()))
-      try {
-        const mod = await import(/* @vite-ignore */ bundleUrl.toString())
-        if (typeof mod.register === 'function') {
-          await mod.register(componentRegistry)
-        }
-        return { key, loaded: true }
-      } catch (err) {
-        console.error(`[ModuleBundleLoader] failed to load bundle for ${key}:`, err.message)
-        return { key, loaded: false }
-      }
-    })
+  return Promise.all(
+    modulesWithBundles.map(({ key, bundleVersion }) => loadBundle(key, bundleVersion))
   )
-
-  return results
 }
 
 export function ModuleBundleLoader({ children }) {

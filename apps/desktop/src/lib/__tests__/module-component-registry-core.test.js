@@ -70,6 +70,20 @@ test("component registry warns and replaces duplicate keys", () => {
   );
 });
 
+test("component registry ignores re-registration of the same component", () => {
+  const warnings = [];
+  const registry = createModuleComponentRegistry({
+    warn: (msg) => warnings.push(msg),
+  });
+  const ComponentA = () => null;
+
+  registry.register("custom.dispatch:DispatchKiosk", ComponentA);
+  registry.register("custom.dispatch:DispatchKiosk", ComponentA);
+
+  assert.equal(registry.resolve("custom.dispatch:DispatchKiosk"), ComponentA);
+  assert.deepEqual(warnings, []);
+});
+
 test("component registry notifies subscribers when state changes", () => {
   const registry = createModuleComponentRegistry();
   let calls = 0;

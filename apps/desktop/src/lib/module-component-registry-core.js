@@ -39,6 +39,9 @@ export function createModuleComponentRegistry(options = {}) {
         );
         return;
       }
+      // Re-registering the same component (bundle re-imported from the ESM
+      // cache on remount/StrictMode) is a no-op, not a conflict.
+      if (store.get(normalizedKey) === component) return;
       if (store.has(normalizedKey)) {
         warn(
           `Duplicate registration for "${normalizedKey}". Replacing previous component.`,
