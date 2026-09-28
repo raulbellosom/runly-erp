@@ -1,7 +1,7 @@
 # Plan — runly.contacts Contact 360 Redesign
 
 Date: 2026-09-27
-Status: Proposed
+Status: In Progress
 Spec: docs/superpowers/specs/2026-09-27-contacts-360-redesign-design.md
 Agent mode: implementation in the current working directory (no worktree), one commit per stage.
 

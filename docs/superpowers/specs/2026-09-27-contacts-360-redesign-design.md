@@ -1,7 +1,7 @@
 # runly.contacts — Contact 360 Redesign (Detail Page, Full-Page Form, Extended Data)
 
 Date: 2026-09-27
-Status: Proposed
+Status: In Progress
 Author: Claude (agent)
 Spec file: docs/superpowers/specs/2026-09-27-contacts-360-redesign-design.md
 Plan file: docs/superpowers/plans/2026-09-27-contacts-360-redesign-plan.md
