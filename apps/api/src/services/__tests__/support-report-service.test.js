@@ -54,6 +54,28 @@ describe("createSupportReportService.sendBugReport", () => {
     assert.equal(sendMail.mock.calls[0].arguments[0].to, "support@runly.mx");
   });
 
+  it("includes both the screenshot and user attachments, and lists filenames in the email", async (t) => {
+    const sendMail = t.mock.fn(async () => ({}));
+    t.mock.method(nodemailer, "createTransport", () => ({ sendMail }));
+
+    const svc = createSupportReportService({ prisma: prismaWith(), env: PLATFORM_ENV });
+    await svc.sendBugReport({
+      userId: "u1",
+      payload: {
+        screenshot: "data:image/png;base64,AAAA",
+        attachments: [
+          { filename: "log.txt", mimeType: "text/plain", dataUrl: "data:text/plain;base64,QkJC" },
+        ],
+      },
+    });
+
+    const sent = sendMail.mock.calls[0].arguments[0];
+    assert.equal(sent.attachments.length, 2);
+    assert.deepEqual(sent.attachments[0], { filename: "captura.png", content: "AAAA", encoding: "base64" });
+    assert.deepEqual(sent.attachments[1], { filename: "log.txt", content: "QkJC", encoding: "base64" });
+    assert.ok(sent.text.includes("Adjuntos: log.txt"));
+  });
+
   it("blocks a second report from the same user within the rate-limit window", async (t) => {
     t.mock.method(nodemailer, "createTransport", () => ({ sendMail: async () => ({}) }));
 

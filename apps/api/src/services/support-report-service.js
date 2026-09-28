@@ -31,6 +31,21 @@ function screenshotAttachment(dataUrl) {
   };
 }
 
+// Generic counterpart for user-picked attachments (BugReportDialog.jsx) —
+// unlike the screenshot, these keep the user's own filename and can be any
+// of the MIME types packages/validators/src/support.js's
+// ALLOWED_ATTACHMENT_MIME_TYPES allows, not just PNG/JPEG. Trusts that the
+// caller already ran bugReportSchema (the only production call site,
+// support-routes.js, always does) — MIME allowlist, dataUrl/mimeType
+// consistency, size caps, and filename control-character rejection are all
+// enforced there, not re-checked here.
+function userAttachment({ filename, dataUrl } = {}) {
+  if (!filename) return null;
+  const match = /^data:[^;]+;base64,(.+)$/.exec(dataUrl ?? "");
+  if (!match) return null;
+  return { filename, content: match[1], encoding: "base64" };
+}
+
 export function createSupportReportService({ prisma, env = process.env }) {
   async function checkRateLimit(userId) {
     const row = await prisma.instanceConfig.findUnique({ where: { key: rateLimitKey(userId) } });
@@ -84,6 +99,8 @@ export function createSupportReportService({ prisma, env = process.env }) {
 
     await checkRateLimit(userId);
 
+    const userAttachments = (payload.attachments ?? []).map(userAttachment).filter(Boolean);
+
     const { subject, html, text } = buildBugReportEmail({
       errorMessage: payload.errorMessage,
       description: payload.description,
@@ -94,11 +111,12 @@ export function createSupportReportService({ prisma, env = process.env }) {
         ["Empresa", companyName],
         ["Módulo / ruta", payload.context],
         ["URL", payload.url],
+        ["Adjuntos", userAttachments.length ? userAttachments.map((a) => a.filename).join(", ") : null],
       ],
       env,
     });
 
-    const attachment = screenshotAttachment(payload.screenshot);
+    const attachments = [screenshotAttachment(payload.screenshot), ...userAttachments].filter(Boolean);
 
     try {
       await sendViaAvailableSmtp({
@@ -108,7 +126,7 @@ export function createSupportReportService({ prisma, env = process.env }) {
         html,
         text,
         fromName: "Runly ERP - Reporte de bug",
-        attachments: attachment ? [attachment] : undefined,
+        attachments: attachments.length ? attachments : undefined,
       });
     } catch (err) {
       throw new SupportReportError(
