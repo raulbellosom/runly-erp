@@ -49,7 +49,7 @@ const DEFAULT_VISIBLE = new Set(
 const BULK_COLUMNS = [
   { field: 'assetTag',       label: 'Tag' },
   { field: 'name',           label: 'Nombre' },
-  { field: 'categoryName',   label: 'Categoria' },
+  { field: 'categoryName',   label: 'Tipo' },
   { field: 'brandName',      label: 'Marca' },
   { field: 'status',         label: 'Estado', type: 'select', options: ITEM_STATUSES.map(s => ({ value: s.value, label: s.label })) },
   { field: 'locationName',   label: 'Ubicacion' },
@@ -408,7 +408,7 @@ export function InventoryGroupedView({
             onValueChange={v => setCategoryIdFilter(v === ALL ? '' : v)}
           >
             <SelectTrigger className="w-36 h-9">
-              <SelectValue placeholder="Categoria" />
+              <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Todas las categorias</SelectItem>

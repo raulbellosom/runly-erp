@@ -37,6 +37,7 @@ export function useCreateInventoryCategory() {
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'categories'] })
+      qc.invalidateQueries({ queryKey: ['inventory', 'models'] })
     },
   })
 }
@@ -50,6 +51,7 @@ export function useUpdateInventoryCategory() {
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'categories'] })
+      qc.invalidateQueries({ queryKey: ['inventory', 'models'] })
     },
   })
 }
@@ -63,6 +65,7 @@ export function useDeleteInventoryCategory() {
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'categories'] })
+      qc.invalidateQueries({ queryKey: ['inventory', 'models'] })
     },
   })
 }
@@ -98,6 +101,7 @@ export function useCreateInventoryBrand() {
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'brands'] })
+      qc.invalidateQueries({ queryKey: ['inventory', 'models'] })
     },
   })
 }
@@ -111,6 +115,7 @@ export function useUpdateInventoryBrand() {
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'brands'] })
+      qc.invalidateQueries({ queryKey: ['inventory', 'models'] })
     },
   })
 }
@@ -124,6 +129,7 @@ export function useDeleteInventoryBrand() {
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'brands'] })
+      qc.invalidateQueries({ queryKey: ['inventory', 'models'] })
     },
   })
 }
@@ -204,7 +210,7 @@ export function useReorderInventoryLocations() {
 export function useInventoryCustomFields(categoryId) {
   const token = useToken()
   return useQuery({
-    queryKey: ['inventory', 'custom-fields', categoryId ?? 'all'],
+    queryKey: ['inventory', 'custom-fields', categoryId ?? 'global'],
     queryFn: () => runly.inventory.listCustomFields({ categoryId }, token),
     enabled: Boolean(token),
     staleTime: 5 * 60 * 1000,

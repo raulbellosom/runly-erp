@@ -12,7 +12,7 @@ import { inventoryFormComponents } from './InventoryItemClassification.jsx'
 import { useInventoryBrands, useInventoryCategories, useCreateInventoryBrand, useCreateInventoryCategory } from '../hooks/useInventoryCatalogs.js'
 import { collectSuggestions, confirmationKey, identifiersFor, intakeRequest } from '../lib/intake.js'
 
-const LABELS = { name: 'Nombre', itemType: 'Tipo', brandName: 'Marca', categoryName: 'Categoría', model: 'Modelo', partNumber: 'Número de parte', serialNumber: 'Número de serie', productCode: 'Código de producto', description: 'Descripción visible' }
+const LABELS = { name: 'Nombre', brandName: 'Marca', categoryName: 'Tipo', model: 'Modelo', partNumber: 'Número de parte', serialNumber: 'Número de serie', productCode: 'Código de producto', description: 'Descripción visible' }
 const ATTACHMENTS = INVENTORY_ITEM_FORM.schema.sections.find(s => s.type === 'attachments').attachments
 const INITIAL_UNIT = { id: 'unit-0', serialNumber: '', assetTag: '', photoIds: [] }
 const FLOW_STEPS = [
@@ -158,7 +158,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
       const combined = allPhotos.map(p => analyzed.find(a => a.id === p.id) ?? p)
       const proposed = collectSuggestions(combined)
       const patch = {}
-      for (const field of ['name', 'itemType', 'model', 'partNumber']) {
+      for (const field of ['name', 'model', 'partNumber']) {
         const options = proposed[field] ?? []
         if (!values[field] && options.length === 1 && !options[0].uncertain) patch[field] = options[0].value
       }
@@ -176,7 +176,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
         setUnits(current => current.map(unit => !unit.serialNumber ? { ...unit, serialNumber: suggestion.value, confirmation: null } : unit))
       }
       const failures = analyzed.filter(photo => photo.result.error).length
-      const fields = Object.keys(patch).map(field => ({ brandId: 'Marca', categoryId: 'Categoría', ...LABELS })[field]).join(', ')
+      const fields = Object.keys(patch).map(field => ({ brandId: 'Marca', categoryId: 'Tipo', ...LABELS })[field]).join(', ')
       const summary = `${analyzed.length - failures} de ${analyzed.length} fotos leídas.${fields ? ` Campos completados: ${fields}.` : ' No se completaron campos comunes automáticamente.'} Revisa el texto, las propuestas y la serie de cada equipo.`
       setAnalysisSummary(summary)
       if (failures === analyzed.length) toast.error('No se pudieron leer las fotos. Consulta el motivo debajo de cada imagen.')

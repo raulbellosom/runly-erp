@@ -1,7 +1,3 @@
-import { ITEM_TYPES } from '../lib/inventory-constants.js'
-
-const ITEM_TYPE_OPTIONS = ITEM_TYPES.map((t) => ({ value: t.value, label: t.label }))
-
 export const INVENTORY_ITEM_DETAIL = {
   key: 'inventory.item.detail',
   kind: 'DETAIL',
@@ -12,13 +8,13 @@ export const INVENTORY_ITEM_DETAIL = {
     layout: 'two-column',
     hero: {
       titleField: 'name',
-      subtitleFields: ['itemType', 'model'],
+      subtitleFields: ['categoryName', 'model'],
       statusField: 'status',
       imageDocsPath: '/inventory/items/:id/files',
       fallbackIcon: 'Package',
       metaChips: [
         { field: 'assetTag', label: 'Etiqueta', icon: 'Hash' },
-        { field: 'categoryName', label: 'Categoría', icon: 'Layers' },
+        { field: 'categoryName', label: 'Tipo', icon: 'Layers' },
         { field: 'brandName', label: 'Marca', icon: 'Tag' },
       ],
     },
@@ -36,8 +32,7 @@ export const INVENTORY_ITEM_DETAIL = {
         columns: 2,
         fields: [
           { field: 'assetTag', label: 'Etiqueta de activo', icon: 'Hash' },
-          { field: 'itemType', label: 'Tipo', icon: 'Layers', type: 'select', options: ITEM_TYPE_OPTIONS },
-          { field: 'categoryName', label: 'Categoría', icon: 'Layers' },
+          { field: 'categoryName', label: 'Tipo', icon: 'Layers' },
           { field: 'brandName', label: 'Marca', icon: 'Tag' },
           { field: 'model', label: 'Modelo', icon: 'Package' },
           { field: 'serialNumber', label: 'Número de serie', icon: 'Hash' },

@@ -20,7 +20,7 @@ export const ITEM_TYPES = [
 ]
 
 export const GROUP_BY_OPTIONS = [
-  { value: 'category',  label: 'Categoria' },
+  { value: 'category',  label: 'Tipo' },
   { value: 'brand',     label: 'Marca' },
   { value: 'status',    label: 'Estado' },
   { value: 'location',  label: 'Ubicacion' },

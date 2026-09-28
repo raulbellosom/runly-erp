@@ -1,54 +1,60 @@
 import { CreatableComboboxField } from '@runly/ui'
 import { toast } from 'sonner'
-import { useInventoryBrands, useCreateInventoryBrand } from '../hooks/useInventoryCatalogs.js'
-import { useInventoryTypes, useCreateInventoryType } from '../hooks/useInventoryReusableCatalogs.js'
+import {
+  useInventoryBrands, useCreateInventoryBrand, useInventoryCategories, useCreateInventoryCategory,
+} from '../hooks/useInventoryCatalogs.js'
+
+const rowsOf = (data) => (data?.data ?? data ?? []).filter((row) => row.enabled !== false)
 
 export function useBrandRows() {
-  const { data } = useInventoryBrands()
-  return (data?.data ?? data ?? []).filter((brand) => brand.enabled !== false)
+  return rowsOf(useInventoryBrands().data)
 }
 
-export function findBrandId(brands, { brandId, brandName } = {}) {
-  if (brandId && brands.some((brand) => brand.id === brandId)) return brandId
-  const key = brandName?.trim().toLocaleLowerCase('es')
-  return key ? (brands.find((brand) => brand.name.trim().toLocaleLowerCase('es') === key)?.id ?? null) : null
+export function useTypeRows() {
+  return rowsOf(useInventoryCategories().data)
 }
 
-// Tipo: base types + company types; "+ Crear «X»" adds it to the catalog.
+// Subtypes read "Laptop › Gamer" so the hierarchy is visible in a flat list.
+export function typeOptions(types) {
+  const byId = new Map(types.map((type) => [type.id, type]))
+  return types.map((type) => ({
+    value: type.id,
+    label: type.parentId && byId.has(type.parentId) ? `${byId.get(type.parentId).name} › ${type.name}` : type.name,
+  }))
+}
+
 export function InventoryTypePicker({ value, onChange, error, required, label = 'Tipo' }) {
-  const { data } = useInventoryTypes()
-  const createType = useCreateInventoryType()
-  const options = (data ?? []).map((row) => ({ value: row.value, label: row.name }))
-  if (value && !options.some((option) => option.value === value)) options.unshift({ value, label: value })
+  const types = useTypeRows()
+  const createType = useCreateInventoryCategory()
   async function handleCreate(name) {
     try {
-      const row = await createType.mutateAsync({ name })
-      onChange(row.value)
-      toast.success(`Tipo «${row.name}» disponible`)
-    } catch (err) { toast.error(err.message) }
+      const res = await createType.mutateAsync({ name })
+      const row = res?.data ?? res
+      if (row?.id) onChange(row.id)
+      toast.success(`Tipo «${name}» creado`)
+    } catch (err) { toast.error(err?.message || 'No se pudo crear el tipo.') }
   }
   return (
-    <CreatableComboboxField label={label} required={required} error={error} value={value ?? ''} options={options}
+    <CreatableComboboxField label={label} required={required} error={error} value={value ?? ''} options={typeOptions(types)}
       onChange={onChange} onCreate={handleCreate} isCreating={createType.isPending}
       placeholder="Buscar o crear..." searchPlaceholder="Buscar tipo..." />
   )
 }
 
-// Marca: InvBrand rows by id; "+ Crear «X»" creates the brand right away.
 export function InventoryBrandPicker({ value, onChange, error, required, label = 'Marca' }) {
   const brands = useBrandRows()
   const createBrand = useCreateInventoryBrand()
-  const options = brands.map((brand) => ({ value: brand.id, label: brand.name }))
   async function handleCreate(name) {
     try {
       const res = await createBrand.mutateAsync({ name })
       const row = res?.data ?? res
       if (row?.id) onChange(row.id)
       toast.success(`Marca «${name}» creada`)
-    } catch (err) { toast.error(err.message || 'No se pudo crear la marca.') }
+    } catch (err) { toast.error(err?.message || 'No se pudo crear la marca.') }
   }
   return (
-    <CreatableComboboxField label={label} required={required} error={error} value={value ?? ''} options={options}
+    <CreatableComboboxField label={label} required={required} error={error} value={value ?? ''}
+      options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
       onChange={onChange} onCreate={handleCreate} isCreating={createBrand.isPending}
       placeholder="Buscar o crear..." searchPlaceholder="Buscar marca..." />
   )

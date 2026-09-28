@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Badge, Button, Checkbox, cn } from '@runly/ui'
-import { Check, X, ClipboardList, Boxes, Tag, LayoutGrid, MapPin, Package, Layers, ListPlus } from 'lucide-react'
+import { Check, X, ClipboardList, Boxes, Tag, LayoutGrid, MapPin, Package, ListPlus } from 'lucide-react'
 import { ITEM_STATUSES, ITEM_TYPES } from '../lib/inventory-constants.js'
 
-const KIND_ICONS = { item: Boxes, brand: Tag, category: LayoutGrid, location: MapPin, model: Package, type: Layers, customField: ListPlus }
-const KINDS = { item: 'Equipo', brand: 'Marca', category: 'Categoría', location: 'Ubicación', model: 'Modelo', type: 'Tipo', customField: 'Campo personalizado' }
-const LABELS = { name: 'Nombre', description: 'Descripción', itemType: 'Tipo', model: 'Modelo', brandName: 'Marca', categoryName: 'Categoría', locationName: 'Ubicación', serialNumber: 'Serie', assetTag: 'Etiqueta', partNumber: 'Número de parte', status: 'Estado', purchaseDate: 'Fecha de compra', purchasePrice: 'Precio de compra', vendorName: 'Proveedor', invoiceNumber: 'Factura', warrantyExpiry: 'Fin de garantía', warrantyNotes: 'Garantía', notes: 'Notas', licenseKey: 'Clave de licencia', licenseExpiry: 'Vencimiento de licencia', licenseSeats: 'Puestos de licencia', fieldKey: 'Clave', fieldType: 'Tipo de campo', label: 'Etiqueta', options: 'Opciones', required: 'Obligatorio', customValues: 'Campos personalizados' }
+const KIND_ICONS = { item: Boxes, brand: Tag, category: LayoutGrid, location: MapPin, model: Package, customField: ListPlus }
+const KINDS = { item: 'Equipo', brand: 'Marca', category: 'Tipo', location: 'Ubicación', model: 'Modelo', customField: 'Campo personalizado' }
+const LABELS = { name: 'Nombre', description: 'Descripción', typeName: 'Tipo', year: 'Año', model: 'Modelo', brandName: 'Marca', categoryName: 'Tipo', locationName: 'Ubicación', serialNumber: 'Serie', assetTag: 'Etiqueta', partNumber: 'Número de parte', status: 'Estado', purchaseDate: 'Fecha de compra', purchasePrice: 'Precio de compra', vendorName: 'Proveedor', invoiceNumber: 'Factura', warrantyExpiry: 'Fin de garantía', warrantyNotes: 'Garantía', notes: 'Notas', licenseKey: 'Clave de licencia', licenseExpiry: 'Vencimiento de licencia', licenseSeats: 'Puestos de licencia', fieldKey: 'Clave', fieldType: 'Tipo de campo', label: 'Etiqueta', options: 'Opciones', required: 'Obligatorio', customValues: 'Campos personalizados' }
 const STATUS = { pending: 'Por confirmar', executed: 'Guardado', cancelled: 'Cancelado', superseded: 'Reemplazado' }
 const FIELD_TYPES = { text: 'Texto', textarea: 'Texto largo', number: 'Número', date: 'Fecha', boolean: 'Sí/No', select: 'Lista de opciones', url: 'URL', email: 'Correo electrónico' }
 function display(value, key) {

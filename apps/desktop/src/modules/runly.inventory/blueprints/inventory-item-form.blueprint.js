@@ -1,7 +1,6 @@
-import { ITEM_STATUSES, ITEM_TYPES } from '../lib/inventory-constants.js'
+import { ITEM_STATUSES } from '../lib/inventory-constants.js'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label }))
-const ITEM_TYPE_OPTIONS = ITEM_TYPES.map((t) => ({ value: t.value, label: t.label }))
 
 export const INVENTORY_ITEM_FORM = {
   key: 'inventory.item.form',
@@ -21,7 +20,6 @@ export const INVENTORY_ITEM_FORM = {
       imageDocsPath: '/inventory/items/:id/files',
       fallbackIcon: 'Package',
       rows: [
-        { field: 'itemType', label: 'Tipo' },
         { field: 'status', label: 'Estado' },
         { field: 'serialNumber', label: 'Serie' },
       ],
@@ -36,24 +34,6 @@ export const INVENTORY_ITEM_FORM = {
           { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar' },
           { field: 'serialNumber', label: 'Número de serie', type: 'text' },
           { field: 'partNumber', label: 'Número de parte', type: 'text' },
-          {
-            field: 'categoryId',
-            label: 'Categoría',
-            type: 'relation',
-            relation: {
-              apiPath: '/inventory/categories',
-              labelField: 'name',
-              preload: true,
-              clearable: true,
-              create: {
-                enabled: true,
-                mode: 'quick',
-                apiPath: '/inventory/categories',
-                label: 'Crear categoría',
-                permissionKey: 'inventory.catalog.manage',
-              },
-            },
-          },
         ],
       },
       {
@@ -66,8 +46,9 @@ export const INVENTORY_ITEM_FORM = {
         icon: 'Boxes',
         collapsible: true,
         fields: [
-          { field: 'model', label: 'Modelo', type: 'text' },
-          { field: 'itemType', label: 'Tipo', type: 'select', options: ITEM_TYPE_OPTIONS },
+          { field: 'modelId', label: 'Modelo', type: 'relation' },
+          { field: 'model', label: 'Nombre del modelo', type: 'text' },
+          { field: 'categoryId', label: 'Tipo', type: 'relation' },
           { field: 'brandId', label: 'Marca', type: 'relation' },
         ],
       },

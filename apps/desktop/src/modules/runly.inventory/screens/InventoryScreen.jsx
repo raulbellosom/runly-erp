@@ -67,7 +67,7 @@ export default function InventoryScreen() {
         },
         { field: 'assetTag',       label: 'Tag',         sortable: true  },
         { field: 'name',           label: 'Nombre',      sortable: true,  link: true },
-        { field: 'categoryName',   label: 'Categoria',   sortable: false },
+        { field: 'categoryName',   label: 'Tipo',   sortable: false },
         { field: 'brandName',      label: 'Marca',       sortable: false },
         {
           field: 'status', label: 'Estado', sortable: true, type: 'select',
@@ -83,7 +83,7 @@ export default function InventoryScreen() {
       ],
       filters: [
         { key: 'status',     label: 'Estado',    type: 'select', options: STATUS_OPTIONS },
-        { key: 'categoryId', label: 'Categoria', type: 'select', options: categoryOptions },
+        { key: 'categoryId', label: 'Tipo', type: 'select', options: categoryOptions },
         { key: 'brandId',    label: 'Marca',     type: 'select', options: brandOptions },
         { key: 'locationId', label: 'Ubicacion', type: 'select', options: locationOptions },
       ],
