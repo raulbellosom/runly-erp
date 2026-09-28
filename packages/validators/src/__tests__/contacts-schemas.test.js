@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   contactUpsertSchema,
+  contactFormSchema,
   rfcPersonType,
   catalogForPersonType,
   REGIMEN_FISCAL,
@@ -26,7 +27,7 @@ describe('contacts fiscal validation', () => {
     const ok = contactUpsertSchema.safeParse({ ...base, taxId: ' mcn990618ab2 ' })
     assert.equal(ok.success, true)
     assert.equal(ok.data.taxId, 'MCN990618AB2')
-    const bad = contactUpsertSchema.safeParse({ ...base, taxId: 'MCN99061-INVALID' })
+    const bad = contactFormSchema.safeParse({ ...base, taxId: 'MCN99061-INVALID' })
     assert.equal(bad.success, false)
   })
 

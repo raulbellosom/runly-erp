@@ -11,7 +11,7 @@ export const CONTACT_ADDRESS_KINDS = ["fiscal", "shipping", "other"];
 const optionalText = (max) =>
   z.string().trim().max(max).optional().nullable().or(z.literal(""));
 
-const uuidOptional = z.string().uuid().optional();
+const uuidOptional = z.string().uuid().optional().nullable();
 
 const REGIMEN_CODES = new Set(REGIMEN_FISCAL.map((entry) => entry.code));
 const USO_CFDI_CODES = new Set(USO_CFDI.map((entry) => entry.code));
@@ -56,12 +56,16 @@ export const contactPersonSchema = z.object({
   notes: optionalText(500),
 });
 
-const rfcField = z
+// Server side accepts any tax id (foreign ids, legacy callers); the form
+// schema below enforces the Mexican RFC format.
+const taxIdField = z
   .string()
+  .max(20)
   .optional()
   .nullable()
-  .transform((value) => (value == null ? value : normalizeRfc(value)))
-  .refine((value) => !value || RFC_REGEX.test(value), { message: "RFC no válido." });
+  .transform((value) => (value == null ? value : normalizeRfc(value)));
+
+const rfcField = taxIdField.refine((value) => !value || RFC_REGEX.test(value), { message: "RFC no válido." });
 
 export const contactUpsertSchema = z.object({
   type: z.enum(CONTACT_TYPES),
@@ -69,7 +73,7 @@ export const contactUpsertSchema = z.object({
   legalName: optionalText(200),
   email: z.string().trim().email().optional().nullable().or(z.literal("")),
   phone: optionalText(40),
-  taxId: rfcField,
+  taxId: taxIdField,
   notesMarkdown: optionalText(5000),
   metadata: z.record(z.string(), z.any()).optional(),
   website: z.string().trim().url("URL no válida.").optional().nullable().or(z.literal("")),
@@ -98,3 +102,6 @@ export const contactUpsertSchema = z.object({
   addresses: z.array(contactAddressSchema).max(10).optional(),
   persons: z.array(contactPersonSchema).max(30).optional(),
 });
+
+// Stricter variant used by the contact form: RFC must match the SAT format.
+export const contactFormSchema = contactUpsertSchema.extend({ taxId: rfcField });
