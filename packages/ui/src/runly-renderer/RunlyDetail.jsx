@@ -47,6 +47,7 @@ import {
   initialsFromName,
 } from "./runly-detail-hero.jsx";
 import { resolveSchemaTabs, tabOfSection } from "./schema-tabs.js";
+import { isElementVisible, matchesVisibilityRule, visibleSections as filterVisibleSections } from "./visibility-rules.js";
 import { SchemaTabBar } from "./SchemaTabBar.jsx";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { cn } from "../lib/utils.js";
@@ -143,21 +144,7 @@ const ICON_ALIAS_MAP = {
   usercheck: UserCheck,
 };
 
-function matchesFieldRule(rule, record) {
-  if (!rule || typeof rule !== "object") return true;
-  const fieldName = String(rule.field ?? "").trim();
-  if (!fieldName) return true;
-  const value = record?.[fieldName];
-  if (Object.prototype.hasOwnProperty.call(rule, "equals"))
-    return value === rule.equals;
-  if (Object.prototype.hasOwnProperty.call(rule, "notEquals"))
-    return value !== rule.notEquals;
-  if (Array.isArray(rule.in)) return rule.in.includes(value);
-  if (Array.isArray(rule.notIn)) return !rule.notIn.includes(value);
-  if (Object.prototype.hasOwnProperty.call(rule, "truthy"))
-    return Boolean(value) === Boolean(rule.truthy);
-  return true;
-}
+const matchesFieldRule = matchesVisibilityRule;
 
 function normalizeField(fieldLike) {
   if (!fieldLike || typeof fieldLike !== "object") return null;
@@ -439,10 +426,11 @@ function normalizeSections(schema, fieldMap) {
     })
     .map((section, i) => {
       if (!section) return null;
-      const withTab =
-        typeof rawSections[i]?.tab === "string"
-          ? { ...section, tab: rawSections[i].tab }
-          : section;
+      const withTab = {
+        ...section,
+        ...(typeof rawSections[i]?.tab === "string" ? { tab: rawSections[i].tab } : {}),
+        ...(rawSections[i]?.visibleWhen ? { visibleWhen: rawSections[i].visibleWhen } : {}),
+      };
       return withCollapseConfig(withTab, rawSections[i]);
     })
     .filter(Boolean);
@@ -1012,13 +1000,17 @@ export function RunlyDetail({
     () => (data && typeof data === "object" ? resolveKpis(schema, data) : []),
     [schema, data],
   );
-  const tabs = useMemo(() => resolveSchemaTabs(schema), [schema]);
+  const allTabs = useMemo(() => resolveSchemaTabs(schema), [schema]);
+  const tabs = useMemo(
+    () => allTabs.filter((tab) => isElementVisible(tab, data ?? {})),
+    [allTabs, data],
+  );
   const [activeTab, setActiveTab] = useState(null);
   const currentTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : (tabs[0]?.key ?? null);
-  const visibleSections = useMemo(
-    () => (tabs.length ? sections.filter((section) => tabOfSection(section, tabs) === currentTab) : sections),
-    [sections, tabs, currentTab],
-  );
+  const visibleSections = useMemo(() => {
+    const shown = filterVisibleSections(sections, allTabs, data ?? {}, tabOfSection);
+    return allTabs.length ? shown.filter((section) => tabOfSection(section, allTabs) === currentTab) : shown;
+  }, [sections, allTabs, data, currentTab]);
   const { twoColumn, main: mainSections, aside: asideSections, full: fullSections } = useMemo(
     () => splitSectionsByColumn(visibleSections, schema?.layout),
     [visibleSections, schema?.layout],

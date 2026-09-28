@@ -192,6 +192,21 @@ export default defineView({
   keeps every tab mounted and jumps to the first tab holding a validation
   error. Sections stay flat so field extraction and the page-mode heuristic
   keep working.
+- `visibleWhen` (`{ field, equals | notEquals | in | notIn | truthy }`) works on
+  fields, sections and `schema.tabs[]` entries, evaluated against live form
+  values (RunlyForm) or the record (RunlyDetail) through the shared
+  `runly-renderer/visibility-rules.js`. Fields of hidden tabs/sections are not
+  validated nor sent (stored values stay). Builder modules with required
+  fields inside conditional elements get a generated
+  `api/<entity>-visibility.js` so the API requires them only while visible.
+- Builder same-module relations (`targetEntity`) get integrity from the
+  generated API (`api/<entity>-relations.js`): targets must exist, be enabled
+  and share the company (400 otherwise); disabling a referenced record follows
+  each relation's `onDisable` (`restrict` -> 409 with the count, `setNull`,
+  `cascade` through the child's own service) inside one transaction. List/get
+  return `<field>__label` (the target's `labelField`), lists accept
+  `?<relationField>=<uuid>`, and a layout section `{ type: 'related', source:
+  { entity, field } }` renders as a detail-only `relation-list`.
 - `schema.formMode: 'page' | 'sheet' | 'auto'` forces full page vs side sheet.
 - A `file` form field with `filesPath` (plus `accept: 'image' | 'document' |
   'any'`, `camera`, `maxSizeMB`, `signedUrlPath`) renders `FileAssetField`: it

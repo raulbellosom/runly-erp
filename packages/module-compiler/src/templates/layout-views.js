@@ -1,5 +1,6 @@
-import { moduleSlug, permKey } from './helpers.js'
+import { moduleSlug, permKey, toKebab } from './helpers.js'
 import { resolveEntityLayout } from '../layout.js'
+import { isSameModuleRelation, resolveLabelField } from '../relations.js'
 
 const FORM_TYPES = { textarea: 'textarea', number: 'number', decimal: 'decimal', boolean: 'boolean', select: 'select', multiselect: 'multiselect', date: 'date', datetime: 'datetime', email: 'email', phone: 'phone', relation: 'relation', file: 'file', json: 'json', markdown: 'markdown', color: 'color', richtext: 'richtext' }
 const DETAIL_TYPES = { boolean: 'boolean', date: 'date', datetime: 'datetime', decimal: 'currency', number: 'number', color: 'color', markdown: 'markdown', richtext: 'richtext', file: 'file-asset' }
@@ -41,19 +42,28 @@ export function fileFieldProps(config, entity, field) {
   return { accept: field.accept ?? 'any', camera: Boolean(field.camera), maxSizeMB: field.maxSizeMB ?? 10, filesPath, signedUrlPath }
 }
 
+// Display field of a relation's target (explicit labelField, else the
+// target's first text field; 'name' when the target is unknown).
+export function relationLabelField(config, field) {
+  const target = (config.entities ?? []).find((item) => item.name === field.targetEntity || item.key === field.targetEntity)
+  return resolveLabelField(target, field.labelField) ?? field.labelField ?? 'name'
+}
+
 export function formFieldSpec(config, entity, field) {
   const spec = { field: field.name, label: field.label || field.name, type: mapFormFieldType(field.type) }
   if (field.required) spec.required = true
   if (field.type === 'select' && Array.isArray(field.options)) spec.options = field.options
   if (field.type === 'relation') {
     const target = field.relatedModel ? `${field.relatedModel.split('.').pop()}s` : `${field.name}s`
-    spec.relation = { apiPath: `/${moduleSlug(config.key)}/${target}`, labelField: 'name', clearable: true }
+    spec.relation = { apiPath: `/${moduleSlug(config.key)}/${target}`, labelField: isSameModuleRelation(field) ? relationLabelField(config, field) : 'name', clearable: true }
   }
   if (field.type === 'file') Object.assign(spec, fileFieldProps(config, entity, field))
   return spec
 }
 
 export function detailFieldSpec(config, entity, field) {
+  // Same-module relations show the target's label (list/get return <field>__label).
+  if (isSameModuleRelation(field)) return { field: `${field.name}__label`, label: field.label || field.name }
   const spec = { field: field.name, label: field.label || field.name }
   const type = getDetailTypeHint(field.type)
   if (type) spec.type = type
@@ -84,24 +94,70 @@ function attachmentsConfig(config, entity) {
   }
 }
 
-function layoutSections(config, entity, layout, fieldSpec, { attachmentsColumn } = {}) {
+const NON_DISPLAY_TYPES = new Set(['relation', 'file', 'json', 'multiselect', 'markdown', 'richtext'])
+
+// Detail "related records" section -> RunlyDetail relation-list over the
+// child entity's list endpoint filtered by the relation field.
+function relatedSectionSpec(config, section) {
+  const slug = moduleSlug(config.key)
+  const child = (config.entities ?? []).find((item) => item.name === section.source.entity)
+  const titleField = resolveLabelField(child) ?? 'id'
+  const subtitleFields = (child?.fields ?? [])
+    .filter((field) => field.name !== titleField && field.name !== section.source.field && !NON_DISPLAY_TYPES.has(field.type))
+    .slice(0, 2)
+  return {
+    type: 'relation-list',
+    relationList: {
+      apiPath: `/${slug}/${section.source.entity}s?${section.source.field}=:id&pageSize=50`,
+      titleField,
+      subtitleFields: subtitleFields.map((field) => field.name),
+      subtitleLabels: subtitleFields.map((field) => field.label || field.name),
+      hrefTemplate: `/app/m/${config.key}/${slug}-${toKebab(section.source.entity)}s/:id`,
+      emptyMessage: `No hay ${String(child?.labelPlural ?? child?.label ?? 'registros').toLowerCase()} relacionados.`,
+    },
+  }
+}
+
+function layoutSections(config, entity, layout, fieldSpec, { attachmentsColumn, related = false } = {}) {
   const fieldsByName = new Map(entity.fields.map((field) => [field.name, field]))
   const multiTab = layout.tabs.length > 1
-  return layout.tabs.flatMap((tab) => tab.sections.map((section) => {
-    const base = { id: section.key, label: section.label, ...(multiTab ? { tab: tab.key } : {}) }
+  return layout.tabs.flatMap((tab) => tab.sections.flatMap((section) => {
+    if (section.type === 'related' && !related) return []
+    const base = {
+      id: section.key,
+      label: section.label,
+      ...(multiTab ? { tab: tab.key } : {}),
+      ...(section.visibleWhen ? { visibleWhen: section.visibleWhen } : {}),
+    }
+    if (section.type === 'related') return [{ ...base, ...relatedSectionSpec(config, section) }]
     if (section.type === 'attachments') {
       return { ...base, type: 'attachments', placement: section.placement ?? 'embedded', ...(attachmentsColumn ? { column: attachmentsColumn } : {}), attachments: attachmentsConfig(config, entity) }
     }
     return {
       ...base,
       columns: section.columns ?? 2,
-      fields: (section.fields ?? []).map((name) => fieldSpec(config, entity, fieldsByName.get(name))),
+      fields: (section.fields ?? []).map((name) => {
+        const spec = fieldSpec(config, entity, fieldsByName.get(name))
+        const rule = section.fieldRules?.[name]
+        return rule ? { ...spec, visibleWhen: rule } : spec
+      }),
     }
   }))
 }
 
-function tabsList(layout) {
-  return layout.tabs.length > 1 ? layout.tabs.map((tab) => ({ key: tab.key, label: tab.label })) : undefined
+// Tabs that still have at least one emitted section (the form drops
+// detail-only related sections), when 2+ remain.
+function tabsList(layout, sections) {
+  if (layout.tabs.length < 2) return undefined
+  const tabs = layout.tabs
+    .filter((tab) => sections.some((section) => section.tab === tab.key))
+    .map((tab) => ({ key: tab.key, label: tab.label, ...(tab.visibleWhen ? { visibleWhen: tab.visibleWhen } : {}) }))
+  return tabs.length > 1 ? tabs : undefined
+}
+
+function withTabs(layout, sections) {
+  const tabs = tabsList(layout, sections)
+  return tabs ? { tabs, sections } : { sections }
 }
 
 function emitView(key, kind, schema) {
@@ -134,8 +190,7 @@ export function buildLayoutFormSchema(config, entity) {
     component: 'RunlyForm',
     apiPath: entityApiPath(config, entity),
     ...(layout.mode && layout.mode !== 'auto' ? { formMode: layout.mode } : {}),
-    ...(tabsList(layout) ? { tabs: tabsList(layout) } : {}),
-    sections: layoutSections(config, entity, layout, formFieldSpec),
+    ...withTabs(layout, layoutSections(config, entity, layout, formFieldSpec)),
     submitLabel: `Guardar ${entity.label.toLowerCase()}`,
     cancelLabel: 'Cancelar',
   }
@@ -147,7 +202,7 @@ export function generateLayoutFormView(config, entity) {
 }
 
 export function buildLayoutDetailSchema(config, entity) {
-  const layout = resolveEntityLayout(entity)
+  const layout = resolveEntityLayout(entity, 'detail')
   if (!layout) return null
   const slug = moduleSlug(config.key)
   const detail = layout.detail ?? {}
@@ -164,8 +219,7 @@ export function buildLayoutDetailSchema(config, entity) {
     ...(hero ? { hero } : {}),
     ...(detail.kpis?.length ? { kpis: detail.kpis.map((kpi) => ({ field: kpi.field, label: kpi.label })) } : {}),
     ...(detail.twoColumn ? { layout: 'two-column' } : {}),
-    ...(tabsList(layout) ? { tabs: tabsList(layout) } : {}),
-    sections: layoutSections(config, entity, layout, detailFieldSpec, { attachmentsColumn: detail.twoColumn ? 'aside' : undefined }),
+    ...withTabs(layout, layoutSections(config, entity, layout, detailFieldSpec, { attachmentsColumn: detail.twoColumn ? 'aside' : undefined, related: true })),
     actions: [
       { label: 'Editar', permission: permKey(slug, entity.name, 'update') },
       { label: 'Desactivar', permission: permKey(slug, entity.name, 'delete') },

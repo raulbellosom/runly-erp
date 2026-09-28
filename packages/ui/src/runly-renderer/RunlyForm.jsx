@@ -37,6 +37,7 @@ import { normalizeField, normalizeSections } from "./runly-form-schema.js";
 import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
 import { fetchFirstImageAssetId, fetchSignedUrl } from "./runly-detail-hero.jsx";
 import { firstTabWithError, resolveSchemaTabs, tabOfSection, tabsWithErrors } from "./schema-tabs.js";
+import { isElementVisible, matchesVisibilityRule, visibleSections } from "./visibility-rules.js";
 import { SchemaTabBar } from "./SchemaTabBar.jsx";
 import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
@@ -55,28 +56,7 @@ import {
 
 const MAIN_SECTION_TYPES = new Set(["fields", "parts", "attachments", "custom-fields", "component"]);
 
-function matchesFieldRule(rule, formValues) {
-  if (!rule || typeof rule !== "object") return true;
-  const fieldName = String(rule.field ?? "").trim();
-  if (!fieldName) return true;
-  const value = formValues?.[fieldName];
-  if (Object.prototype.hasOwnProperty.call(rule, "equals")) {
-    return value === rule.equals;
-  }
-  if (Object.prototype.hasOwnProperty.call(rule, "notEquals")) {
-    return value !== rule.notEquals;
-  }
-  if (Array.isArray(rule.in)) {
-    return rule.in.includes(value);
-  }
-  if (Array.isArray(rule.notIn)) {
-    return !rule.notIn.includes(value);
-  }
-  if (Object.prototype.hasOwnProperty.call(rule, "truthy")) {
-    return Boolean(value) === Boolean(rule.truthy);
-  }
-  return true;
-}
+const matchesFieldRule = matchesVisibilityRule;
 
 function isFieldVisible(field, formValues) {
   if (!field) return false;
@@ -161,9 +141,6 @@ export function RunlyForm({
     () => normalizeSections(schema, fieldMap),
     [fieldMap, schema],
   );
-  const formTabs = useMemo(() => resolveSchemaTabs(schema), [schema]);
-  const [activeTab, setActiveTab] = useState(null);
-  const currentTab = formTabs.some((tab) => tab.key === activeTab) ? activeTab : (formTabs[0]?.key ?? null);
   const formStructureToken = useMemo(() => {
     const fieldNames = [...fieldMap.keys()].sort().join("|");
     const sectionKeys = sections
@@ -179,6 +156,27 @@ export function RunlyForm({
   const [formValues, setFormValues] = useState(() =>
     buildInitialValues(fieldMap, initialData),
   );
+  // Tabs and sections can depend on live values (visibleWhen). Fields of a
+  // hidden tab/section are neither validated nor sent, so stored values stay.
+  const allFormTabs = useMemo(() => resolveSchemaTabs(schema), [schema]);
+  const formTabs = useMemo(
+    () => allFormTabs.filter((tab) => isElementVisible(tab, formValues)),
+    [allFormTabs, formValues],
+  );
+  const shownSections = useMemo(
+    () => visibleSections(sections, allFormTabs, formValues, tabOfSection),
+    [sections, allFormTabs, formValues],
+  );
+  const hiddenFieldNames = useMemo(() => {
+    const shown = new Set(shownSections.flatMap((section) => section.fields ?? []));
+    return new Set(
+      sections
+        .flatMap((section) => section.fields ?? [])
+        .filter((name) => !shown.has(name)),
+    );
+  }, [sections, shownSections]);
+  const [activeTab, setActiveTab] = useState(null);
+  const currentTab = formTabs.some((tab) => tab.key === activeTab) ? activeTab : (formTabs[0]?.key ?? null);
   const [reportParts, setReportParts] = useState(() =>
     normalizeReportParts(initialData?.parts),
   );
@@ -350,7 +348,7 @@ export function RunlyForm({
 
   const validate = () => {
     const nextErrors = {};
-    for (const section of sections) {
+    for (const section of shownSections) {
       if (section.type === "parts") {
         const minItems = Number(section.minItems ?? 0);
         if (minItems > 0 && reportParts.length < minItems) {
@@ -381,7 +379,7 @@ export function RunlyForm({
       }
     }
     setFieldErrors(nextErrors);
-    const errorTab = firstTabWithError(sections, formTabs, nextErrors);
+    const errorTab = firstTabWithError(shownSections, allFormTabs, nextErrors);
     if (errorTab) setActiveTab(errorTab);
     return Object.keys(nextErrors).length === 0;
   };
@@ -399,6 +397,7 @@ export function RunlyForm({
     for (const [name, field] of fieldMap.entries()) {
       if (field.readonly) continue;
       if (!isFieldVisible(field, formValues)) continue;
+      if (hiddenFieldNames.has(name)) continue;
       const casted = castValueByType(formValues[name], field.type);
       if (field.type === "boolean") {
         payload[name] = Boolean(casted);
@@ -765,11 +764,11 @@ export function RunlyForm({
     }
   };
 
-  const mainSections = sections.filter(
+  const mainSections = shownSections.filter(
     (section) =>
       MAIN_SECTION_TYPES.has(section.type) && section.placement !== "aside",
   );
-  const asideSections = sections.filter(
+  const asideSections = shownSections.filter(
     (section) =>
       section.type === "attachments" && section.placement === "aside",
   );
@@ -1048,8 +1047,8 @@ export function RunlyForm({
         activeKey={currentTab}
         onChange={setActiveTab}
         errorKeys={tabsWithErrors(
-          sections,
-          formTabs,
+          shownSections,
+          allFormTabs,
           Object.fromEntries(Object.entries(fieldErrors).filter(([, message]) => Boolean(message))),
         )}
       />
@@ -1071,8 +1070,8 @@ export function RunlyForm({
         <div className="space-y-3 order-last xl:order-none">
           {/* Every tab stays mounted (only hidden) so no typed value is lost. */}
           {mainSections.map((section) =>
-            formTabs.length ? (
-              <div key={section.id} hidden={tabOfSection(section, formTabs) !== currentTab}>
+            allFormTabs.length ? (
+              <div key={section.id} hidden={tabOfSection(section, allFormTabs) !== currentTab}>
                 {renderSection(section)}
               </div>
             ) : (

@@ -2,6 +2,7 @@ import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, RESERVED_NAM
 import { moduleSlug, permKey, toKebab } from './templates/helpers.js'
 import { isRecordsViewKind, normalizeRecordsView, validateRecordsView } from './records-views.js'
 import { validateEntityLayout, validateFileFieldOptions } from './layout.js'
+import { validateRelations } from './relations.js'
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/
 const MODULE_KEY = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/
@@ -88,7 +89,7 @@ export function validateModuleDefinition(definition) {
       if (field.default !== undefined && !['string', 'number', 'boolean'].includes(typeof field.default)) errors.push(diagnostic(`${fieldPath}.default`, 'UNSAFE_DEFAULT', 'Defaults must be string, number or boolean literals.'))
       validateFileFieldOptions(field, fieldPath, errors)
     }
-    validateEntityLayout(entity, base, errors, warnings)
+    validateEntityLayout(entity, base, errors, warnings, definition.entities)
   })
   definition.entities.forEach((entity, entityIndex) => {
     for (const [fieldIndex, field] of (entity.fields ?? []).entries()) {
@@ -97,6 +98,7 @@ export function validateModuleDefinition(definition) {
       }
     }
   })
+  validateRelations(definition.entities, errors)
   const viewKeys = new Set()
   for (const [viewIndex, view] of (definition.views ?? []).entries()) {
     if (viewKeys.has(view.key)) errors.push(diagnostic(`views[${viewIndex}].key`, 'DUPLICATE_VIEW_KEY', `Duplicate view key "${view.key}".`))

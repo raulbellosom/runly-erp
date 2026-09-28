@@ -1,5 +1,6 @@
 import { moduleSlug, permKey, toKebab } from './helpers.js'
-import { entityFilePaths, fileFieldProps, generateLayoutDetailView, generateLayoutFormView, getDetailTypeHint, mapFormFieldType } from './layout-views.js'
+import { entityFilePaths, fileFieldProps, generateLayoutDetailView, generateLayoutFormView, getDetailTypeHint, mapFormFieldType, relationLabelField } from './layout-views.js'
+import { isSameModuleRelation } from '../relations.js'
 
 export function generateTableView(config, entity) {
   const slug = moduleSlug(config.key)
@@ -10,6 +11,7 @@ export function generateTableView(config, entity) {
   const columns = entity.fields
     .slice(0, 5)
     .map((f) => {
+      if (isSameModuleRelation(f)) return `      { field: '${f.name}__label', label: '${f.label || f.name}', sortable: false },`
       if (f.type === 'file' && f.accept === 'image') {
         return `      { field: '${f.name}', label: '${f.label || f.name}', type: 'image-asset', signedUrlPath: '${entityFilePaths(config, entity).signedUrlPath}' },`
       }
@@ -70,7 +72,7 @@ export function generateFormView(config, entity) {
         lines.push(`        options: [${opts}]`)
       }
       if (f.type === 'relation') {
-        lines.push(`        relation: { apiPath: '/${slug}/${f.relatedModel ? f.relatedModel.split('.').pop() + 's' : f.name + 's'}', labelField: 'name', clearable: true }`)
+        lines.push(`        relation: { apiPath: '/${slug}/${f.relatedModel ? f.relatedModel.split('.').pop() + 's' : f.name + 's'}', labelField: '${isSameModuleRelation(f) ? relationLabelField(config, f) : 'name'}', clearable: true }`)
       }
       if (f.type === 'file') {
         for (const [prop, value] of Object.entries(fileFieldProps(config, entity, f))) lines.push(`        ${prop}: ${JSON.stringify(value)}`)
@@ -115,6 +117,7 @@ export function generateDetailView(config, entity) {
     .map((f) => {
       const typeHint = getDetailTypeHint(f.type)
       const base = `      { field: '${f.name}', label: '${f.label || f.name}'`
+      if (isSameModuleRelation(f)) return `      { field: '${f.name}__label', label: '${f.label || f.name}' },`
       if (f.type === 'file') return base + `, type: 'file-asset', accept: '${f.accept ?? 'any'}', signedUrlPath: '${entityFilePaths(config, entity).signedUrlPath}' },`
       return typeHint ? base + `, type: '${typeHint}' },` : base + ' },'
     })

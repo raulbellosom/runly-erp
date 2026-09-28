@@ -1,8 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  addSection, addTab, createDefaultLayout, placeField, pruneLayout, removeTab, unplacedFields, uniqueLayoutKey,
+  addSection, addTab, createDefaultLayout, disableDetailTree, enableDetailTree, hasDetailTree, placeField, pruneLayout,
+  removeTab, ruleSummary, setFieldRule, setSectionRule, treeOf, unplacedFields, uniqueLayoutKey, withTree,
 } from "../layoutHelpers.js";
+
+test("rules: set, move with field, summary, prune", () => {
+  let layout = addTab(createDefaultLayout(entity), "Extra");
+  const [first, second] = [layout.tabs[0].sections[0].key, layout.tabs[1].sections[0].key];
+  layout = setFieldRule(layout, first, "foto", { field: "estado", equals: "A" });
+  layout = setSectionRule(layout, second, { field: "estado", truthy: true });
+  assert.deepEqual(layout.tabs[0].sections[0].fieldRules, { foto: { field: "estado", equals: "A" } });
+  layout = placeField(layout, "foto", second);
+  assert.equal(layout.tabs[0].sections[0].fieldRules, undefined);
+  const fields = new Map([["estado", { key: "estado", label: "Estado", type: "select", options: [{ value: "A", label: "Activo" }] }]]);
+  assert.equal(ruleSummary({ field: "estado", equals: "A" }, fields), "Estado = Activo");
+  assert.equal(ruleSummary({ field: "estado", truthy: false }, fields), "Estado está vacío");
+  const pruned = pruneLayout(layout, ["nombre", "foto", "monto"]);
+  assert.equal(pruned.tabs[1].sections[0].visibleWhen, undefined);
+});
+
+test("independent detail tree starts as a copy and is edited separately", () => {
+  let layout = enableDetailTree(createDefaultLayout(entity));
+  assert.ok(hasDetailTree(layout));
+  const detail = treeOf(layout, "detail");
+  layout = withTree(layout, "detail", addTab(detail, "Resumen"));
+  assert.equal(layout.detail.tabs.length, 2);
+  assert.equal(layout.tabs.length, 1);
+  layout = disableDetailTree(layout);
+  assert.equal(hasDetailTree(layout), false);
+});
 
 const entity = { key: "orden", label: "Orden", fields: [{ key: "nombre" }, { key: "foto" }, { key: "monto" }] };
 
@@ -43,4 +70,16 @@ test("pruneLayout drops deleted fields from sections, hero and kpis", () => {
   assert.equal(pruned.detail.hero.imageField, undefined);
   assert.deepEqual(pruned.detail.kpis, [{ field: "monto", label: "M" }]);
   assert.equal(pruneLayout(layout, ["monto"]).detail.hero, undefined);
+});
+
+test("related sources list relations pointing to the entity", async () => {
+  const { relatedSources, addSection: add } = await import("../layoutHelpers.js");
+  const definition = { entities: [
+    { key: "cliente", label: "Cliente", fields: [{ key: "nombre", type: "text" }] },
+    { key: "pedido", label: "Pedido", pluralLabel: "Pedidos", fields: [{ key: "cliente", label: "Cliente", type: "relation", targetEntity: "cliente" }] },
+  ] };
+  const sources = relatedSources(definition, "cliente");
+  assert.deepEqual(sources.map((item) => item.source), [{ entity: "pedido", field: "cliente" }]);
+  const layout = add(createDefaultLayout(entity), "general", { label: "Pedidos", type: "related", source: sources[0].source });
+  assert.deepEqual(layout.tabs[0].sections.at(-1), { key: "pedidos", label: "Pedidos", type: "related", source: { entity: "pedido", field: "cliente" } });
 });

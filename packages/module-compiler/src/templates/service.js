@@ -1,4 +1,6 @@
 import { toPascal, moduleSlug } from './helpers.js'
+import { isSameModuleRelation } from '../relations.js'
+import { hasInboundRules, hasRelationsModule, outboundRelations, relationLabelSql } from './relations.js'
 
 function toPascalSimple(str) {
   return str.split('_').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('')
@@ -15,15 +17,24 @@ export function generateService(config, entity) {
   const firstTextField = entity.fields.find((f) => ['text', 'email', 'phone'].includes(f.type))
   const selectFields = entity.fields.filter((f) => f.type === 'select')
   const allFields = entity.fields.map((f) => f.name)
+  const rel = {
+    module: hasRelationsModule(config, entity),
+    outbound: outboundRelations(config, entity).length > 0,
+    inbound: hasInboundRules(config, entity),
+    sql: relationLabelSql(config, entity),
+    filterFields: entity.fields.filter(isSameModuleRelation),
+  }
 
   const importLine = `import { ${errorClass}, toScopedCompanyUuid, normalizeRecordId, normalizePagination, normalizeSearch, normalizeOptionalString, toCount, firstRow, withDbErrorMapping, isUniqueViolation } from './service-helpers.js'`
   const moduleKeyLine = `const MODULE_KEY = '${config.key}'`
+    + (rel.filterFields.length ? '\nconst UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i' : '')
+  const relationsImport = rel.module ? `\nimport { assertRelationTargets, beforeDisable } from './${entity.name}-relations.js'` : ''
 
-  const listFn = buildListFn(pascal, table, entity, companyScoped, softDelete, firstTextField, selectFields)
-  const getByIdFn = buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorClass)
-  const createFn = buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields)
-  const updateFn = buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields)
-  const setEnabledFn = softDelete ? buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity) : null
+  const listFn = buildListFn(pascal, table, entity, companyScoped, softDelete, firstTextField, selectFields, rel)
+  const getByIdFn = buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorClass, rel)
+  const createFn = buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel)
+  const updateFn = buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields, rel)
+  const setEnabledFn = softDelete ? buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel) : null
 
   const returnedMethods = [`list${pascal}s`, `get${pascal}ById`, `create${pascal}`, `update${pascal}`]
   if (softDelete) returnedMethods.push(`set${pascal}Enabled`)
@@ -32,7 +43,7 @@ export function generateService(config, entity) {
     .map((fn) => indent(fn, 2))
     .join('\n\n')
 
-  return `${importLine}
+  return `${importLine}${relationsImport}
 
 ${moduleKeyLine}
 
@@ -44,9 +55,9 @@ ${fnBodies}
 `
 }
 
-function buildListFn(pascal, table, entity, companyScoped, softDelete, firstTextField, selectFields) {
+function buildListFn(pascal, table, entity, companyScoped, softDelete, firstTextField, selectFields, rel) {
   const searchParam = firstTextField ? ', search' : ''
-  const filterParams = selectFields.map((f) => `, ${f.name}`).join('')
+  const filterParams = [...selectFields, ...rel.filterFields].map((f) => `, ${f.name}`).join('')
   const safeCompany = companyScoped ? `  const safeCompanyId = toScopedCompanyUuid(companyId)\n` : ''
   const enabledFilter = softDelete ? '\n      AND t.enabled = true' : ''
   const companyFilter = companyScoped ? '\n      WHERE t.company_id = ${safeCompanyId}' : '\n      WHERE 1=1'
@@ -56,6 +67,9 @@ function buildListFn(pascal, table, entity, companyScoped, softDelete, firstText
   const fieldFilters = selectFields
     .map((f) => '\n      AND (${' + f.name + 'Filter}::text IS NULL OR t.' + f.name + ' = ${' + f.name + 'Filter})')
     .join('')
+    + rel.filterFields
+      .map((f) => '\n      AND (${' + f.name + 'Filter}::uuid IS NULL OR t.' + f.name + ' = ${' + f.name + 'Filter}::uuid)')
+      .join('')
 
   const lines = []
   lines.push(`async function list${pascal}s({ companyId, page, pageSize${searchParam}${filterParams} }) {`)
@@ -68,9 +82,12 @@ function buildListFn(pascal, table, entity, companyScoped, softDelete, firstText
   for (const sf of selectFields) {
     lines.push(`  const ${sf.name}Filter = normalizeOptionalString(${sf.name}) ?? null`)
   }
+  for (const rf of rel.filterFields) {
+    lines.push(`  const ${rf.name}Filter = UUID_PATTERN.test(String(${rf.name} ?? '')) ? String(${rf.name}) : null`)
+  }
   lines.push('  const [rows, totalRows] = await withDbErrorMapping(async () => {')
   lines.push('    const data = await prisma.$queryRaw`')
-  lines.push('      SELECT t.* FROM ' + table + ' t' + companyFilter + enabledFilter + searchFilter + fieldFilters)
+  lines.push('      SELECT t.*' + rel.sql.select + ' FROM ' + table + ' t' + rel.sql.joins + companyFilter + enabledFilter + searchFilter + fieldFilters)
   lines.push('      ORDER BY t.created_at DESC')
   lines.push('      LIMIT ${pagination.pageSize} OFFSET ${pagination.offset}')
   lines.push('    `')
@@ -84,7 +101,7 @@ function buildListFn(pascal, table, entity, companyScoped, softDelete, firstText
   return lines.join('\n')
 }
 
-function buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorClass) {
+function buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorClass, rel) {
   const companyFilter = companyScoped ? ' AND t.company_id = ${safeCompanyId}' : ''
   const enabledFilter = softDelete ? ' AND t.enabled = true' : ''
   const notFoundMsg = escSingle(entity.label) + ' no encontrado.'
@@ -94,7 +111,7 @@ function buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorC
   lines.push(`  const safeId = normalizeRecordId(id, '${notFoundMsg}')`)
   lines.push('  const row = await withDbErrorMapping(async () => {')
   lines.push('    const rows = await prisma.$queryRaw`')
-  lines.push('      SELECT t.* FROM ' + table + ' t WHERE t.id = ${safeId}' + companyFilter + enabledFilter + ' LIMIT 1')
+  lines.push('      SELECT t.*' + rel.sql.select + ' FROM ' + table + ' t' + rel.sql.joins + ' WHERE t.id = ${safeId}' + companyFilter + enabledFilter + ' LIMIT 1')
   lines.push('    `')
   lines.push('    return firstRow(rows)')
   lines.push('  })')
@@ -104,7 +121,7 @@ function buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorC
   return lines.join('\n')
 }
 
-function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields) {
+function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel) {
   const cols = companyScoped ? ['company_id', ...allFields] : allFields
   const vals = companyScoped
     ? ['${safeCompanyId}', ...allFields.map((f) => buildFieldValue(entity, f))]
@@ -113,6 +130,7 @@ function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFiel
   const lines = []
   lines.push(`async function create${pascal}({ companyId, data, actorId }) {`)
   if (companyScoped) lines.push('  const safeCompanyId = toScopedCompanyUuid(companyId)')
+  if (rel.outbound) lines.push(`  await assertRelationTargets(prisma, { companyId: ${companyScoped ? 'safeCompanyId' : 'companyId'}, data })`)
   lines.push('  try {')
   lines.push('    const row = await withDbErrorMapping(async () => {')
   lines.push('      const rows = await prisma.$queryRaw`')
@@ -132,7 +150,7 @@ function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFiel
   return lines.join('\n')
 }
 
-function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields) {
+function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields, rel) {
   const companyWhere = companyScoped ? ' AND company_id = ${safeCompanyId}' : ''
   const enabledWhere = softDelete ? ' AND enabled = true' : ''
   const notFoundMsg = escSingle(entity.label) + ' no encontrado.'
@@ -151,6 +169,7 @@ function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorCl
   lines.push(`  if (!${hasVars.join(' && !')}) throw new ${errorClass}('No hay campos validos para actualizar.', 400)`)
   const companyArg = companyScoped ? 'safeCompanyId' : 'null'
   lines.push(`  const before = await get${pascal}ById({ companyId: ${companyArg}, id: safeId })`)
+  if (rel.outbound) lines.push(`  await assertRelationTargets(prisma, { companyId: ${companyScoped ? 'safeCompanyId' : 'companyId'}, data })`)
   lines.push('  try {')
   lines.push('    const updated = await withDbErrorMapping(async () => {')
   lines.push('      const rows = await prisma.$queryRaw`')
@@ -174,13 +193,22 @@ function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorCl
   return lines.join('\n')
 }
 
-function buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity) {
+function buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel) {
   const companyWhere = companyScoped ? ' AND company_id = ${safeCompanyId}' : ''
   const entityType = toPascalSimple(entity.name)
   const lines = []
-  lines.push(`async function set${pascal}Enabled({ companyId, id, enabled, actorId }) {`)
+  lines.push(`async function set${pascal}Enabled({ companyId, id, enabled, actorId${rel.inbound ? ', inTransaction = false' : ''} }) {`)
   if (companyScoped) lines.push('  const safeCompanyId = toScopedCompanyUuid(companyId)')
   lines.push('  const safeId = normalizeRecordId(id, \'Registro no encontrado.\')')
+  if (rel.inbound) {
+    // Disabling applies the inbound relation rules atomically: the first call
+    // opens a transaction and re-enters with the transaction client and
+    // inTransaction: true, which runs the rules and the update.
+    lines.push('  if (!enabled && !inTransaction) {')
+    lines.push(`    return prisma.$transaction((tx) => create${pascal}Service({ prisma: tx }).set${pascal}Enabled({ companyId, id, enabled, actorId, inTransaction: true }))`)
+    lines.push('  }')
+    lines.push(`  if (!enabled) await beforeDisable(prisma, { companyId: ${companyScoped ? 'safeCompanyId' : 'companyId'}, id: safeId, actorId })`)
+  }
   lines.push(`  const before = await get${pascal}ById({ companyId: ${companyScoped ? 'safeCompanyId' : 'null'}, id: safeId })`)
   lines.push('  const updated = await withDbErrorMapping(async () => {')
   lines.push('    const rows = await prisma.$queryRaw`')

@@ -34,6 +34,10 @@ export function PreviewLayoutBody({ layout, fieldsByKey, renderField }) {
           <h4 className="text-sm font-semibold">{section.label}</h4>
           {section.type === "attachments" ? (
             <AttachmentsPlaceholder label={section.label} />
+          ) : section.type === "related" ? (
+            <div className="rounded-xl border border-dashed border-[hsl(var(--border))] px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">
+              Lista de {section.label.toLowerCase()} de este registro (solo en el detalle).
+            </div>
           ) : (
             <div className={GRID[section.columns ?? 2] ?? GRID[2]}>
               {(section.fields ?? []).map((key) => fieldsByKey.get(key)).filter(Boolean).map((field) => (

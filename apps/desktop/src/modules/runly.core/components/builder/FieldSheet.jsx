@@ -100,6 +100,7 @@ function FileOptionsEditor({ field, onPatch, readOnly }) {
     <div className="space-y-4 rounded-xl border border-[hsl(var(--border))] p-3">
       <SelectField
         label="Tipo de archivo"
+        hint="Elige Imagen si será una foto: permite usar la cámara y mostrarla en el encabezado del detalle."
         options={FILE_ACCEPT_OPTIONS}
         value={accept}
         disabled={readOnly}
@@ -120,6 +121,44 @@ function FileOptionsEditor({ field, onPatch, readOnly }) {
         value={String(field.maxSizeMB ?? 10)}
         disabled={readOnly}
         onValueChange={(value) => onPatch({ maxSizeMB: Number(value) })}
+      />
+    </div>
+  );
+}
+
+const RELATION_LABEL_TYPES = new Set(["text", "email", "phone", "select", "number", "decimal", "date", "datetime"]);
+const ON_DISABLE_OPTIONS = [
+  { value: "restrict", label: "Bloquear (no se puede desactivar mientras se use)" },
+  { value: "setNull", label: "Dejar vacío en estos registros" },
+  { value: "cascade", label: "Desactivar también estos registros" },
+];
+
+function RelationOptionsEditor({ field, definition, onPatch, readOnly }) {
+  const target = (definition?.entities ?? []).find((entity) => entity.key === field.targetEntity);
+  if (!target) return null;
+  const labelOptions = (target.fields ?? [])
+    .filter((item) => RELATION_LABEL_TYPES.has(item.type))
+    .map((item) => ({ value: item.key, label: item.label }));
+  const defaultLabel = (target.fields ?? []).find((item) => ["text", "email", "phone"].includes(item.type));
+  const onDisableOptions = ON_DISABLE_OPTIONS.map((option) => (option.value === "setNull" && field.required
+    ? { ...option, label: `${option.label} (no disponible: el campo es requerido)`, disabled: true }
+    : option));
+  return (
+    <div className="space-y-4 rounded-xl border border-[hsl(var(--border))] p-3">
+      <SelectField
+        label="Campo a mostrar"
+        hint={defaultLabel ? `Por defecto: ${defaultLabel.label}` : "La entidad relacionada no tiene campos de texto."}
+        options={labelOptions}
+        value={field.labelField ?? defaultLabel?.key ?? ""}
+        disabled={readOnly || !labelOptions.length}
+        onValueChange={(value) => onPatch({ labelField: value })}
+      />
+      <SelectField
+        label={`Al desactivar un(a) ${target.label.toLowerCase()} usado(a) aquí`}
+        options={onDisableOptions}
+        value={field.onDisable ?? "restrict"}
+        disabled={readOnly}
+        onValueChange={(value) => onPatch({ onDisable: value })}
       />
     </div>
   );
@@ -146,7 +185,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
 
   function handleTypeChange(type) {
     const next = { type, options: ["select", "multiselect"].includes(type) ? (draft.options ?? []) : undefined };
-    if (type !== "relation") next.targetEntity = undefined;
+    if (type !== "relation") Object.assign(next, { targetEntity: undefined, labelField: undefined, onDisable: undefined });
     if (type !== "file") Object.assign(next, { accept: undefined, camera: undefined, maxSizeMB: undefined });
     patch(next);
   }
@@ -205,7 +244,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
             description="El registro no se puede guardar sin este valor."
             checked={Boolean(draft.required)}
             disabled={readOnly}
-            onChange={(checked) => patch({ required: checked })}
+            onChange={(checked) => patch(checked && draft.onDisable === "setNull" ? { required: checked, onDisable: "restrict" } : { required: checked })}
           />
           {isSelect && <SelectOptionsEditor field={draft} onChange={setDraft} readOnly={readOnly} />}
           {draft.type === "relation" && (
@@ -216,8 +255,11 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
               value={draft.targetEntity ?? ""}
               disabled={readOnly}
               placeholder={relationTargets.length ? "Selecciona una entidad" : "Crea otra entidad primero"}
-              onValueChange={(value) => patch({ targetEntity: value })}
+              onValueChange={(value) => patch({ targetEntity: value, labelField: undefined })}
             />
+          )}
+          {draft.type === "relation" && draft.targetEntity && (
+            <RelationOptionsEditor field={draft} definition={definition} onPatch={patch} readOnly={readOnly} />
           )}
           {draft.type === "file" && <FileOptionsEditor field={draft} onPatch={patch} readOnly={readOnly} />}
         </div>

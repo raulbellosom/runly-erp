@@ -67,3 +67,15 @@ test("signedUrl requires an owned asset and an active company", async () => {
   await assert.rejects(files.signedUrl(ctx(), { fileId: "nope", entityType: "taller.orden" }), { status: 404 });
   await assert.rejects(files.signedUrl(ctx({ companyId: null }), { fileId: "f1", entityType: "taller.orden" }), { status: 403 });
 });
+
+test("file-field uploads are tagged and excluded from the attachments list", async () => {
+  const assets = [{ id: "a1", metadata: { sourceEntityId: "r1" } }, { id: "a2", metadata: { sourceEntityId: "r1", field: "foto" } }];
+  const prisma = { fileAsset: { findMany: async () => assets } };
+  const uploads = [];
+  const filesService = { upload: async (args) => { uploads.push(args); return { id: "x" }; } };
+  const files = createModuleFilesCapability({ prisma, filesService, supabaseAdmin: null })("custom.taller");
+  const list = await files.list(ctx(), { entityType: "taller.orden", sourceEntityId: "r1" });
+  assert.deepEqual(list.map((asset) => asset.id), ["a1"]);
+  await files.upload(ctx(), { file: {}, entityType: "taller.orden", field: "foto" });
+  assert.deepEqual(uploads[0].fields.metadata, { field: "foto" });
+});

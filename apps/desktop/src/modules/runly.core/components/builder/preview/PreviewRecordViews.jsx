@@ -140,7 +140,7 @@ export function FormPreview({ entity, rows }) {
 export function DetailPreview({ entity, rows }) {
   const fields = entity?.fields ?? [];
   const row = rows[0] ?? {};
-  const layout = resolveLayoutForPreview(entity);
+  const layout = resolveLayoutForPreview(entity, "detail");
   const fieldsByKey = new Map(fields.map((field) => [field.key, field]));
   const highlight = fields.filter((f) => f.type === "select" || f.type === "boolean").slice(0, 3);
   return (

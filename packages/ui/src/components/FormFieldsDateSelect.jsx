@@ -457,6 +457,7 @@ export const SelectField = forwardRef(function SelectField(
                     <SelectPrimitive.Item
                       key={val}
                       value={val}
+                      disabled={typeof opt === "object" && Boolean(opt?.disabled)}
                       className={cn(
                         "relative flex w-full cursor-default select-none items-center",
                         "rounded-md py-2 pl-8 pr-3 text-sm outline-none",

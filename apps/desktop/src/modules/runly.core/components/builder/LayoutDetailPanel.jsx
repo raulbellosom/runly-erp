@@ -20,14 +20,18 @@ function fromOption(value) {
   return value === NONE ? undefined : value;
 }
 
-export function LayoutDetailPanel({ layout, entity, readOnly, onChange }) {
+export function LayoutDetailPanel({ layout, entity, readOnly, onChange, onPatchField }) {
   const fields = entity.fields ?? [];
   const detail = layout.detail ?? {};
   const hero = detail.hero ?? {};
   const kpis = detail.kpis ?? [];
   const textFields = fields.filter((field) => !["file", "relation", "json", "boolean"].includes(field.type));
   const selectFields = fields.filter((field) => field.type === "select");
-  const imageFields = fields.filter((field) => field.type === "file" && field.accept === "image");
+  // Every file field is offered; a non-image one can be converted in place
+  // (the detail header needs an image, see compiler LAYOUT_HERO_IMAGE_NOT_IMAGE).
+  const fileFields = fields.filter((field) => field.type === "file");
+  const heroImage = fileFields.find((field) => field.key === hero.imageField);
+  const heroImageNotImage = heroImage && heroImage.accept !== "image";
   const kpiFields = fields.filter((field) => KPI_TYPES.has(field.type));
 
   function patchHero(patch) {
@@ -60,14 +64,31 @@ export function LayoutDetailPanel({ layout, entity, readOnly, onChange }) {
           <>
             <SelectField label="Subtítulo" options={options(textFields.filter((field) => field.key !== hero.titleField), "Ninguno")} value={hero.subtitleFields?.[0] ?? NONE} disabled={readOnly} onValueChange={(value) => patchHero({ subtitleFields: fromOption(value) ? [value] : undefined })} />
             <SelectField label="Estado" hint="Campo de selección que se muestra como etiqueta." options={options(selectFields, "Ninguno")} value={hero.statusField ?? NONE} disabled={readOnly} onValueChange={(value) => patchHero({ statusField: fromOption(value) })} />
-            <SelectField
-              label="Imagen"
-              hint={imageFields.length ? undefined : "Crea un campo Archivo de tipo Imagen para usarlo aquí."}
-              options={options(imageFields, "Ninguna")}
-              value={hero.imageField ?? NONE}
-              disabled={readOnly || !imageFields.length}
-              onValueChange={(value) => patchHero({ imageField: fromOption(value) })}
-            />
+            {fileFields.length ? (
+              <SelectField
+                label="Foto o imagen"
+                options={options(fileFields, "Ninguna")}
+                value={hero.imageField ?? NONE}
+                disabled={readOnly}
+                onValueChange={(value) => patchHero({ imageField: fromOption(value) })}
+              />
+            ) : (
+              <p className="rounded-lg bg-[hsl(var(--muted))]/60 px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                Para mostrar una foto en el encabezado, primero crea un campo de tipo <strong>Archivo</strong> con "Tipo de archivo: Imagen".
+              </p>
+            )}
+            {heroImageNotImage && (
+              <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+                <p>
+                  "{heroImage.label}" acepta cualquier tipo de archivo. Para mostrarlo como foto debe aceptar solo imágenes.
+                </p>
+                {!readOnly && onPatchField && (
+                  <Button size="sm" variant="outline" onClick={() => onPatchField(heroImage.key, { accept: "image" })}>
+                    Convertir "{heroImage.label}" en campo de imagen
+                  </Button>
+                )}
+              </div>
+            )}
           </>
         )}
       </section>

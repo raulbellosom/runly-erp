@@ -1634,4 +1634,22 @@ Spec: `docs/superpowers/specs/2026-09-27-rme3-builder-layout-media-design.md` ·
 
 Deviations from the spec: record association uses `metadata.sourceEntityId` (FileAsset.entityId holds the companyId, as with HR documents); removing an attachment disables the asset; `maxSizeMB` is 1-10 (server upload cap); tabs are emitted as flat `sections[].tab` + `tabs[]`; file fields get upload props even without a layout (fixes the previous non-uploading dropzone).
 - [x] Follow-up (2026-09-28): generated upload route enforces each field's `maxSizeMB` (413) and `accept: image` (400) server-side (`FileAssetField` sends `field`); the "Diseño" preview renders the production `RunlyForm`/`RunlyDetail` with the exact compiler schema (`@runly/module-compiler/layout-views` subpath export); attachments section placement (form body vs aside) selectable in the designer. Verified: 2026-09-28 (module-compiler 28/28 incl. an in-process Hono request test of the generated route, renderer + builder tests 44/44, `pnpm build:web`, `pnpm lint`)
-- Deferred (tracked for a future spec): relation fields with integrity constraints/locks (top priority), related-record tabs in the detail, separate form/detail layouts, conditional section visibility.
+- Deferred (tracked for a future spec): relation fields with integrity constraints/locks (top priority), related-record tabs in the detail.
+
+## RME3 Module Builder — conditional visibility + independent detail layout (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-conditional-layout-design.md` · Plan: `docs/superpowers/plans/2026-09-28-rme3-builder-conditional-layout-plan.md`
+
+- [x] Compiler: rule validation (`LAYOUT_RULE_*`), `layout.detail.tabs`, `visibleWhen` emission, conditional required fields optional in validators + generated `<entity>-visibility.js` checks on create/update. Verified: 2026-09-28 (compiler + renderer + builder tests 81/81, api services + module-engine 729/730 — the one failure, inventory-chat.test.js, is flaky and passed 6/6 on rerun; `pnpm build:web`, `pnpm lint`)
+- [x] UI: shared `visibility-rules.js`; RunlyForm/RunlyDetail hide tabs/sections by rule; hidden fields skipped by validation/payload. Verified: 2026-09-28 (compiler + renderer + builder tests 81/81, api services + module-engine 729/730 — the one failure, inventory-chat.test.js, is flaky and passed 6/6 on rerun; `pnpm build:web`, `pnpm lint`)
+- [x] Builder: condition dialog on tabs/sections/fields with badges, "Detalle con diseño propio", detail test values in the real preview. Verified: 2026-09-28 (compiler + renderer + builder tests 81/81, api services + module-engine 729/730 — the one failure, inventory-chat.test.js, is flaky and passed 6/6 on rerun; `pnpm build:web`, `pnpm lint`)
+
+## RME3 Module Builder — relation integrity + related-record sections (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-relations-integrity-design.md` · Plan: `docs/superpowers/plans/2026-09-28-rme3-builder-relations-integrity-plan.md`
+
+- [x] Compiler: `labelField`/`onDisable` contract + diagnostics (incl. cascade cycles), related layout sections. Verified: 2026-09-28 (`relations.test.js` 4/4, module-compiler 37/37)
+- [x] Generated API: `<entity>-relations.js` (target existence/enabled/company check; restrict 409 / setNull / cascade inside one transaction via `inTransaction`), `__label` joins, relation list filters. Verified: 2026-09-28 (generated services imported and executed in-process against a fake DB; all generated files pass `node --check`)
+- [x] Views + Builder: relation labels in table/detail/picker, detail-only `relation-list`, FieldSheet "Campo a mostrar" / "Al desactivar", "Agregar registros relacionados" in the designer. Verified: 2026-09-28 (tests 86/86, `pnpm build:web`, `pnpm lint`; api services + module-engine 729/730 with the known flaky inventory-chat test)
+- [ ] Manual end-to-end in a running instance (publish a module with Cliente/Pedido, try disabling a used Cliente).
+- Out of scope: DB-level foreign keys (engine only allows additive migrations), cross-module relations, re-enable cascade, creating children from the related section.

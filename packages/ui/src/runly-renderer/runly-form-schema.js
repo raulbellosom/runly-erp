@@ -260,10 +260,14 @@ export function normalizeSections(schema, fieldMap) {
     });
   // Keep the tab a section belongs to (see schema-tabs.js).
   return normalized
-    .map((section, index) =>
-      section && typeof rawSections[index]?.tab === "string"
-        ? { ...section, tab: rawSections[index].tab }
-        : section,
-    )
+    .map((section, index) => {
+      if (!section) return section;
+      const raw = rawSections[index];
+      return {
+        ...section,
+        ...(typeof raw?.tab === "string" ? { tab: raw.tab } : {}),
+        ...(raw?.visibleWhen ? { visibleWhen: raw.visibleWhen } : {}),
+      };
+    })
     .filter(Boolean);
 }

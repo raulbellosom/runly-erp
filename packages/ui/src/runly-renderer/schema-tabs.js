@@ -6,7 +6,11 @@
 export function resolveSchemaTabs(schema) {
   const tabs = (Array.isArray(schema?.tabs) ? schema.tabs : [])
     .filter((tab) => tab && typeof tab.key === "string" && tab.key.trim())
-    .map((tab) => ({ key: tab.key.trim(), label: String(tab.label ?? tab.key).trim() || tab.key }));
+    .map((tab) => ({
+      key: tab.key.trim(),
+      label: String(tab.label ?? tab.key).trim() || tab.key,
+      ...(tab.visibleWhen ? { visibleWhen: tab.visibleWhen } : {}),
+    }));
   return tabs.length > 1 ? tabs : [];
 }
 

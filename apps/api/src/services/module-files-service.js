@@ -41,17 +41,25 @@ export function createModuleFilesCapability({ prisma, filesService, supabaseAdmi
     }
 
     return {
-      async upload(c, { file, entityType, sourceEntityId = null }) {
+      // `field` tags uploads that belong to a file field, so the record's
+      // attachments list (list()) does not show them a second time.
+      async upload(c, { file, entityType, sourceEntityId = null, field = null }) {
         return filesService.upload({
           authUserId: c.get("authUserId"),
           activeContext: tenantActiveContext(c),
           file,
-          fields: { moduleKey, entityType, entityId: sourceEntityId ?? undefined },
+          fields: {
+            moduleKey,
+            entityType,
+            entityId: sourceEntityId ?? undefined,
+            ...(field ? { metadata: { field } } : {}),
+          },
         });
       },
 
+      // Attachments only: files uploaded through a file field are excluded.
       async list(c, { entityType, sourceEntityId }) {
-        return prisma.fileAsset.findMany({
+        const assets = await prisma.fileAsset.findMany({
           where: {
             moduleKey,
             entityType,
@@ -61,6 +69,7 @@ export function createModuleFilesCapability({ prisma, filesService, supabaseAdmi
           },
           orderBy: { createdAt: "asc" },
         });
+        return assets.filter((asset) => !asset.metadata?.field);
       },
 
       async link(c, { fileId, entityType, sourceEntityId }) {

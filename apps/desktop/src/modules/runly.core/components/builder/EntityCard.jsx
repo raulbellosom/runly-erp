@@ -176,9 +176,11 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
         open={designOpen}
         onOpenChange={setDesignOpen}
         moduleKey={definition.key}
+        entities={definition.entities ?? []}
         entity={entity}
         readOnly={readOnly}
         onSave={(layout) => patchEntity({ layout })}
+        onPatchField={(fieldKey, patch) => onChange((d) => updateField(d, entity.key, fieldKey, patch))}
       />
 
       <ConfirmDialog

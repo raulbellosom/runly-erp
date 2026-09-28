@@ -8,6 +8,8 @@ import { generateServiceHelpers } from './templates/service-helpers.js'
 import { generateService } from './templates/service.js'
 import { generateRoutes } from './templates/routes.js'
 import { generateFileRoutes } from './templates/file-routes.js'
+import { generateVisibilityModule, hasConditionalRequired } from './templates/visibility.js'
+import { generateRelationsModule, hasRelationsModule } from './templates/relations.js'
 import { hasFileSupport } from './templates/layout-views.js'
 import { generateEntityValidators } from './templates/validators.js'
 import { generateApiIndex } from './templates/api-index.js'
@@ -54,6 +56,8 @@ export function compileModule(rawDefinition) {
     add(`views/${entity.name}.page.js`, generatePageView(config, entity))
     add(`api/${entity.name}-routes.js`, generateRoutes(config, entity))
     if (hasFileSupport(entity)) add(`api/${entity.name}-file-routes.js`, generateFileRoutes(config, entity))
+    if (hasConditionalRequired(entity)) add(`api/${entity.name}-visibility.js`, generateVisibilityModule(entity))
+    if (hasRelationsModule(config, entity)) add(`api/${entity.name}-relations.js`, generateRelationsModule(config, entity))
     add(`api/${entity.name}-service.js`, generateService(config, entity))
     add(`validators/${entity.name}.validators.js`, generateEntityValidators(entity))
   }

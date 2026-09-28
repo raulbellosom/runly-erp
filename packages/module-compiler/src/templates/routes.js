@@ -1,5 +1,7 @@
 import { toPascal, moduleSlug, permKey } from './helpers.js'
 import { hasFileSupport } from './layout-views.js'
+import { hasConditionalRequired } from './visibility.js'
+import { isSameModuleRelation } from '../relations.js'
 
 export function generateRoutes(config, entity) {
   const slug = moduleSlug(config.key)
@@ -9,8 +11,13 @@ export function generateRoutes(config, entity) {
   const softDelete = entity.softDelete !== false
   const companyScoped = entity.companyScoped !== false
   const withFiles = hasFileSupport(entity)
+  const withVisibility = hasConditionalRequired(entity)
+  const missingCheck = (values) => withVisibility
+    ? `      const missing = findMissingConditionalRequired(${values})\n      if (missing) return c.json({ error: \`El campo \${missing.label} es requerido.\` }, 400)\n`
+    : ''
 
-  const selectFields = entity.fields.filter((f) => f.type === 'select')
+  // List filters: select values and same-module relation ids (?cliente=<uuid>).
+  const selectFields = entity.fields.filter((f) => f.type === 'select' || isSameModuleRelation(f))
   const filterQueryParams = selectFields.map((f) => '    const ' + f.name + ' = c.req.query(\'' + f.name + '\')').join('\n')
   const filterServiceParams = selectFields.map((f) => ' ' + f.name + ': ' + f.name + ',').join('')
 
@@ -23,6 +30,7 @@ import { create${pascal}Schema, update${pascal}Schema } from '../validators/inde
 import { create${pascal}Service } from './${entity.name}-service.js'
 import { ${errorClass} } from './service-helpers.js'
 ${withFiles ? `import { create${pascal}FileRouter, link${pascal}FileFields } from './${entity.name}-file-routes.js'
+` : ''}${withVisibility ? `import { findMissingConditionalRequired } from './${entity.name}-visibility.js'
 ` : ''}
 const enabledSchema = z.object({ enabled: z.boolean() })
 
@@ -84,7 +92,7 @@ ${filterQueryParams ? filterQueryParams + '\n' : ''}      const result = await s
       const body = await c.req.json()
       const parsed = create${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
-      const created = await service.create${pascal}({ companyId, data: parsed.data, actorId })
+${missingCheck('parsed.data')}      const created = await service.create${pascal}({ companyId, data: parsed.data, actorId })
 ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
 ` : ''}      return c.json({ data: created }, 201)
     } catch (err) {
@@ -99,7 +107,8 @@ ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
       const body = await c.req.json()
       const parsed = update${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
-      const updated = await service.update${pascal}({ companyId, id: c.req.param('id'), data: parsed.data, actorId })
+${withVisibility ? `      const existing = await service.get${pascal}ById({ companyId, id: c.req.param('id') })
+` : ''}${missingCheck('{ ...existing, ...parsed.data }')}      const updated = await service.update${pascal}({ companyId, id: c.req.param('id'), data: parsed.data, actorId })
 ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, updated)
 ` : ''}      return c.json({ data: updated })
     } catch (err) {

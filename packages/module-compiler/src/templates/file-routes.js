@@ -77,7 +77,7 @@ export function create${pascal}FileRouter({ requirePermission, moduleContext }) 
       const invalid = checkUpload(c, body.file, fieldName)
       if (invalid) return invalid
       const sourceEntityId = typeof body.entityId === 'string' && body.entityId.trim() ? body.entityId.trim() : null
-      const asset = await files.upload(c, { file: body.file, entityType: FILE_ENTITY_TYPE, sourceEntityId })
+      const asset = await files.upload(c, { file: body.file, entityType: FILE_ENTITY_TYPE, sourceEntityId, field: fieldName })
       return c.json({ data: asset }, 201)
     } catch (err) {
       return fileError(c, err, 'No se pudo subir el archivo.')
