@@ -88,14 +88,11 @@ export function createSupportReportService({ prisma, env = process.env }) {
   }
 
   async function sendBugReport({ userId, userName, userEmail, companyId, companyName, payload }) {
-    const supportEmail = env.RUNLY_SUPPORT_EMAIL;
-    if (!supportEmail) {
-      throw new SupportReportError(
-        "Reporte de bugs no disponible en esta instancia.",
-        503,
-        "not_configured",
-      );
-    }
+    // RUNLY_SUPPORT_EMAIL lets a self-hosted instance redirect bug reports to
+    // its own inbox; when unset, reports fall back to Runly's own support
+    // address rather than disabling the feature — every deployment should be
+    // able to report a bug out of the box.
+    const supportEmail = env.RUNLY_SUPPORT_EMAIL || "hola@runly.mx";
 
     await checkRateLimit(userId);
 

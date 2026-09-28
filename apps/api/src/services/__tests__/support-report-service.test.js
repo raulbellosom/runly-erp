@@ -28,14 +28,15 @@ const PLATFORM_ENV = {
 };
 
 describe("createSupportReportService.sendBugReport", () => {
-  it("rejects with 503 when RUNLY_SUPPORT_EMAIL is not set", async () => {
-    const svc = createSupportReportService({ prisma: prismaWith(), env: {} });
-    await assert.rejects(svc.sendBugReport({ userId: "u1", payload: {} }), (err) => {
-      assert.ok(err instanceof SupportReportError);
-      assert.equal(err.status, 503);
-      assert.equal(err.reason, "not_configured");
-      return true;
-    });
+  it("falls back to hola@runly.mx when RUNLY_SUPPORT_EMAIL is not set", async (t) => {
+    const sendMail = t.mock.fn(async () => ({}));
+    t.mock.method(nodemailer, "createTransport", () => ({ sendMail }));
+
+    const { RUNLY_SUPPORT_EMAIL, ...envWithoutSupportEmail } = PLATFORM_ENV;
+    const svc = createSupportReportService({ prisma: prismaWith(), env: envWithoutSupportEmail });
+    await svc.sendBugReport({ userId: "u1", payload: {} });
+
+    assert.equal(sendMail.mock.calls[0].arguments[0].to, "hola@runly.mx");
   });
 
   it("sends via platform SMTP to the support address and records the rate-limit timestamp", async (t) => {
