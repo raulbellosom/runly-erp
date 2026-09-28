@@ -6,7 +6,7 @@ const date = z.iso.date().nullable().optional();
 export const inventoryCommonSchema = z.object({
   name: z.string().trim().min(1, 'Escribe el nombre del equipo.').max(255),
   description: text(2000),
-  itemType: z.string().min(1).max(50).nullable().optional(),
+  modelId: ref,
   categoryId: ref, brandId: ref, locationId: ref,
   model: text(255), partNumber: text(255),
   status: z.enum(['available', 'assigned', 'maintenance', 'retired', 'lost', 'stolen', 'disposed']).default('available'),
@@ -28,7 +28,7 @@ export const intakeSchema = z.object({
 export const observationSchema = z.object({
   rawText: z.string().max(8000).default(''),
   observations: z.array(z.object({
-    field: z.enum(['name', 'itemType', 'categoryName', 'brandName', 'model', 'partNumber', 'serialNumber', 'productCode', 'description']),
+    field: z.enum(['name', 'categoryName', 'brandName', 'model', 'partNumber', 'serialNumber', 'productCode', 'description']),
     value: z.string().max(2000).nullable(),
     status: z.enum(['observed', 'uncertain', 'unreadable']),
   })).max(100),

@@ -20,7 +20,7 @@ const turnSchema = z.object({ content: z.string().trim().min(1).max(2000), conte
 const queryArgsSchema = z.object({ filters: inventoryFiltersSchema.default({}), scope: z.enum(['context', 'company']).default('context') }).strict();
 const filterParameters = {
   type: 'object', additionalProperties: false,
-  properties: Object.fromEntries(['search', 'categoryId', 'brandId', 'locationId', 'status', 'model', 'itemType', 'createdFrom', 'createdTo'].map(k => [k, { type: 'string' }]).concat([['missingSerial', { type: 'boolean' }]])),
+  properties: Object.fromEntries(['search', 'categoryId', 'brandId', 'locationId', 'status', 'model', 'modelId', 'createdFrom', 'createdTo'].map(k => [k, { type: 'string' }]).concat([['missingSerial', { type: 'boolean' }]])),
 };
 const toolParameters = { type: 'object', additionalProperties: false, properties: { filters: filterParameters, scope: { type: 'string', enum: ['context', 'company'] } } };
 const TOOLS = [
@@ -91,19 +91,19 @@ export function createInventoryAssistantService({ prisma, env = process.env, mir
         const [total, missingSerial, groups] = await Promise.all([
           prisma.invItem.count({ where }),
           prisma.invItem.count({ where: { AND: [where, { OR: [{ serialNumber: null }, { serialNumber: '' }] }] } }),
-          prisma.invItem.groupBy({ by: ['brandId', 'model', 'itemType', 'categoryId'], where, _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 40 }),
+          prisma.invItem.groupBy({ by: ['brandId', 'model', 'categoryId'], where, _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 40 }),
         ]);
         const [brands, categories] = await Promise.all([
           prisma.invBrand.findMany({ where: { companyId, id: { in: [...new Set(groups.map(g => g.brandId).filter(Boolean))] } }, select: { id: true, name: true } }),
           prisma.invCategory.findMany({ where: { companyId, id: { in: [...new Set(groups.map(g => g.categoryId).filter(Boolean))] } }, select: { id: true, name: true } }),
         ]);
         return { total, missingSerial, withSerial: total - missingSerial, groupsLimit: 40, groups: groups.map(g => ({ brandId: g.brandId, brand: brands.find(b => b.id === g.brandId)?.name ?? null,
-          model: g.model, type: g.itemType, categoryId: g.categoryId, category: categories.find(c => c.id === g.categoryId)?.name ?? null, count: g._count.id })) };
+          model: g.model, categoryId: g.categoryId, type: categories.find(c => c.id === g.categoryId)?.name ?? null, count: g._count.id })) };
       }
       const [total, items] = await Promise.all([
         prisma.invItem.count({ where }),
         prisma.invItem.findMany({ where, take: 30, orderBy: { createdAt: 'desc' }, select: {
-          id: true, name: true, assetTag: true, serialNumber: true, partNumber: true, model: true, itemType: true, status: true, createdAt: true,
+          id: true, name: true, assetTag: true, serialNumber: true, partNumber: true, model: true, status: true, createdAt: true,
           description: true, notes: true, purchaseDate: true, warrantyExpiry: true,
           brandId: true, categoryId: true, brand: { select: { name: true } }, category: { select: { name: true } }, location: { select: { name: true } },
           customValues: { take: 20, select: { value: true, field: { select: { label: true } } } },

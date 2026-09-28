@@ -19,7 +19,7 @@ export const inventoryFiltersSchema = z.object({
   search: z.string().max(200).optional(),
   categoryId: z.uuid().optional(), brandId: z.uuid().optional(), locationId: z.uuid().optional(), assignedToId: z.uuid().optional(),
   status: z.enum(['available', 'assigned', 'maintenance', 'retired', 'lost', 'stolen', 'disposed']).optional(),
-  model: z.string().max(255).optional(), itemType: z.string().max(50).optional(),
+  model: z.string().max(255).optional(), modelId: z.uuid().optional(),
   missingSerial: z.boolean().optional(), createdFrom: z.iso.date().optional(), createdTo: z.iso.date().optional(),
 }).strict();
 
@@ -28,7 +28,7 @@ export function buildInventoryWhere(companyId, filters = {}) {
   const where = { companyId, enabled: true };
   const q = String(filters.search ?? '').trim();
   if (q) where.OR = ['name', 'assetTag', 'serialNumber'].map(field => ({ [field]: { contains: q, mode: 'insensitive' } }));
-  for (const field of ['categoryId', 'brandId', 'locationId', 'assignedToId', 'status', 'model', 'itemType']) if (filters[field]) where[field] = filters[field];
+  for (const field of ['categoryId', 'brandId', 'locationId', 'assignedToId', 'status', 'model', 'modelId']) if (filters[field]) where[field] = filters[field];
   if (filters.missingSerial) where.AND = [{ OR: [{ serialNumber: null }, { serialNumber: '' }] }];
   if (filters.createdFrom || filters.createdTo) where.createdAt = {
     ...(filters.createdFrom ? { gte: inventoryDayStart(filters.createdFrom) } : {}),

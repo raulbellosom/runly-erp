@@ -3,7 +3,7 @@ import { createVisionService } from './vision-service.js';
 import { prepareVisionImage } from './vision-image.js';
 import { createInventoryService, InventoryServiceError } from './inventory-service.js';
 import { intakeSchema, observationSchema } from '../routes/inventory/intake-validators.js';
-import { createInventoryReusableCatalog } from './inventory-reusable-catalog.js';
+import { createInventoryModelService } from './inventory-model-service.js';
 
 // The vision model doesn't reliably tag serialNumber under a tight token
 // budget (see vision-service.js's DEFAULT_MAX_TOKENS), but rawText transcription
@@ -123,7 +123,7 @@ export function createInventoryIntakeService({ prisma, env = process.env, vision
   async function validate({ input, companyId, actorId, db = prisma }) {
     assertContext({ companyId, actorId });
     const data = parse(input);
-    await createInventoryReusableCatalog({ prisma: db }).assertType(companyId, data.common.itemType);
+    data.common = await createInventoryModelService({ prisma: db }).applyModelDefaults(data.common, companyId);
     const proofs = data.proofs.map(p => decodeProof(p, { companyId, actorId }));
     const imageIds = new Set(proofs.map(p => p.imageId));
     const seenSerials = new Set();

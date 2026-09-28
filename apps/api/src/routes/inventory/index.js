@@ -8,7 +8,8 @@ import { Hono } from "hono";
 import { createInventoryIntakeRouter } from './intake-routes.js';
 import { createInventoryAssistantRouter } from './assistant-routes.js';
 import { tenantActiveContext } from '../../lib/active-context.js';
-import { createInventoryReusableCatalog, INVENTORY_BASE_TYPES, INVENTORY_BASE_TYPE_LABELS } from '../../services/inventory-reusable-catalog.js';
+import { createInventoryModelsRouter } from './models-routes.js';
+import { createInventoryModelService } from '../../services/inventory-model-service.js';
 
 export function createInventoryRouter({
   prisma,
@@ -24,24 +25,8 @@ export function createInventoryRouter({
   const router = new Hono();
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryAssistantRouter({ prisma, requirePermission }));
-  const reusableCatalog = createInventoryReusableCatalog({ prisma });
-  const typeLabels = INVENTORY_BASE_TYPE_LABELS;
-  for (const [segment, kind] of [['models', 'model'], ['types', 'type']]) {
-    router.get(`/inventory/${segment}`, requirePermission('inventory.catalog.read'), async c => {
-      try {
-        const search = c.req.query('search') ?? '';
-        const rows = await reusableCatalog.list({ companyId: c.get('companyId'), kind, search });
-        const base = kind === 'type' ? INVENTORY_BASE_TYPES.map((value, i) => ({ id: value, value, name: typeLabels[i] })).filter(row => `${row.value} ${row.name}`.toLowerCase().includes(search.toLowerCase())) : [];
-        return c.json({ data: [...base, ...rows.map(row => ({ ...row, value: row.name }))] });
-      } catch (error) { return c.json({ error: 'No se pudo consultar el catálogo.' }, error.status ?? 500); }
-    });
-    router.post(`/inventory/${segment}`, requirePermission('inventory.catalog.manage'), async c => {
-      try {
-        const row = await reusableCatalog.create({ companyId: c.get('companyId'), kind, input: await c.req.json() });
-        return c.json({ data: { ...row, value: row.name } }, 201);
-      } catch (error) { return c.json({ error: error.status ? error.message : 'No se pudo crear el registro.' }, error.status ?? 500); }
-    });
-  }
+  router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
+  const modelDefaults = createInventoryModelService({ prisma });
 
   const isInvErr = (err) => err instanceof InventoryServiceError;
   const isCommentErr = (err) => err instanceof CommentsServiceError || err?.status === 404;
@@ -63,7 +48,7 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const authUserId = c.get("authUserId");
-      const data = await c.req.json();
+      const data = await modelDefaults.applyModelDefaults(await c.req.json(), companyId);
       const item = await inventoryService.createItem(data, companyId, authUserId);
       return c.json({ data: item }, 201);
     } catch (err) {
@@ -100,7 +85,7 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { id } = c.req.param();
-      const data = await c.req.json();
+      const data = await modelDefaults.applyModelDefaults(await c.req.json(), companyId);
       const item = await inventoryService.updateItem(id, data, companyId);
       return c.json({ data: item });
     } catch (err) {
@@ -116,7 +101,7 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { id } = c.req.param();
-      const data = await c.req.json();
+      const data = await modelDefaults.applyModelDefaults(await c.req.json(), companyId);
       const item = await inventoryService.updateItem(id, data, companyId);
       return c.json({ data: item });
     } catch (err) {
