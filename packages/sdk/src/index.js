@@ -386,6 +386,14 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           method: "POST",
           headers: withAuthHeaders(token),
         }),
+      // Review a module ZIP without applying it (validation, structure plan,
+      // React preview bundle). Same multipart body as uploadModuleZip.
+      checkModuleZip: (key, formData, token) =>
+        request(`/modules/${encodeURIComponent(key)}/upload/check`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: formData,
+        }),
       uploadModuleZip: (key, formData, token) =>
         request(`/modules/${encodeURIComponent(key)}/upload`, {
           method: "POST",

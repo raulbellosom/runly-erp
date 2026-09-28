@@ -21,12 +21,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  ConfirmDialog,
   Alert,
   AlertTitle,
   AlertDescription,
 } from "@runly/ui";
-import { ArrowLeft, Code2, Download, Eye, ShieldCheck, Rocket, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Code2, Download, Eye, ShieldCheck, Rocket, MoreHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -38,6 +37,10 @@ import { PermissionsTab } from "../components/builder/PermissionsTab";
 import { DiagnosticsPanel } from "../components/builder/DiagnosticsPanel";
 import { PreviewSheet } from "../components/builder/PreviewSheet";
 import { PublishDialog } from "../components/builder/PublishDialog";
+import { DeveloperModeDialog } from "../components/builder/DeveloperModeDialog";
+import { UploadModuleSheet } from "./UploadModuleSheet";
+import { StatusPill } from "../components/builder/BuilderProjectCard";
+import { PROJECT_STATUS, projectSummary } from "../lib/builderProjectSummary";
 
 const AUTOSAVE_DELAY_MS = 1200;
 
@@ -79,7 +82,13 @@ export default function ModuleBuilderEditor() {
   }, [token]);
 
   const saveMutation = useMutation({
-    mutationFn: (nextDefinition) => runly.builder.updateDefinition(id, { definition: nextDefinition }, token),
+    // Name/description are also kept on the project row so lists and search
+    // never show the creation-time values.
+    mutationFn: (nextDefinition) => runly.builder.updateDefinition(id, {
+      definition: nextDefinition,
+      name: nextDefinition?.name?.trim() || undefined,
+      description: nextDefinition?.description ?? undefined,
+    }, token),
     onMutate: () => setSaveStatus("saving"),
     onSuccess: () => {
       setSaveStatus("saved");
@@ -147,16 +156,63 @@ export default function ModuleBuilderEditor() {
     onError: (error) => toast.error(error.message ?? "No se pudo validar."),
   });
 
-  // "Modo avanzado": the project stops being edited/published visually so a
-  // hand-edited ZIP (custom React views) can never be overwritten.
-  const [confirmDetach, setConfirmDetach] = useState(false);
+  // "Modo desarrollador": the module is extended as code (ZIP with custom
+  // React screens). Converting freezes the project so a Builder publish can
+  // never overwrite hand-written code; uploading a changed ZIP does it too.
+  const [developerOpen, setDeveloperOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [reattachBlocked, setReattachBlocked] = useState(null);
+
+  // Uploads and "Volver al modo visual" change the project on the server
+  // (captured React screens, detached state). Reload the draft from there and
+  // mark it as saved; otherwise the next autosave would overwrite it with the
+  // stale local copy and drop the captured screens.
+  async function reloadDefinitionFromServer() {
+    const fresh = await projectQuery.refetch();
+    const next = fresh.data?.data?.definition;
+    if (next) {
+      lastSavedRef.current = next;
+      setDefinition(next);
+    }
+  }
+
+  const reattachMutation = useMutation({
+    mutationFn: (confirm) => runly.builder.reattachProject(id, { confirm }, token),
+    onSuccess: async (result) => {
+      setReattachBlocked(null);
+      setDeveloperOpen(false);
+      await reloadDefinitionFromServer();
+      const kept = result?.data?.kept?.views ?? 0;
+      toast.success("El módulo volvió al modo visual.", { description: kept ? `Se conservaron ${kept} pantalla(s) React.` : undefined });
+    },
+    onError: (error) => {
+      const lost = error?.details?.details?.lost;
+      if (error?.status === 409 && Array.isArray(lost)) setReattachBlocked({ lost, kept: error.details.details.kept });
+      else toast.error(error?.message ?? "No se pudo volver al modo visual.");
+    },
+  });
+
+  const installedMutation = useMutation({
+    mutationFn: async () => {
+      const blob = await runly.builder.installedPackage(id, token);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${project?.moduleKey ?? "modulo"}-instalado.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error) => toast.error(error.message ?? "No se pudo descargar el respaldo."),
+  });
   const detachMutation = useMutation({
     mutationFn: () => runly.builder.detachProject(id, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["module-builder-project", id] });
-      toast.success("El módulo pasó a modo avanzado. Descarga el ZIP para editar su código.");
+      toast.success("El módulo está en modo desarrollador. Descarga el ZIP para programarlo.");
     },
-    onError: (error) => toast.error(error.message ?? "No se pudo convertir a modo avanzado."),
+    onError: (error) => toast.error(error.message ?? "No se pudo convertir a modo desarrollador."),
   });
 
   const exportMutation = useMutation({
@@ -205,6 +261,8 @@ export default function ModuleBuilderEditor() {
   // Tabs pass either an updater `(current) => next` or an already-computed
   // next definition. Treating every argument as a function crashed the Datos
   // and Vistas tabs ("e is not a function") on their first edit.
+  const summary = projectSummary({ ...project, definition: definition ?? project.definition });
+
   function patchDefinition(next) {
     setDefinition((current) => (typeof next === "function" ? next(current) : next));
   }
@@ -213,23 +271,40 @@ export default function ModuleBuilderEditor() {
     <div className="flex flex-col min-h-full">
       <div className="flex-1 p-4 md:p-6 space-y-4 pb-24">
         <PageHeader
-          eyebrow={project.moduleKey}
-          title={project.name}
-          description={project.status === "PUBLISHED" ? "Módulo publicado — los cambios requieren volver a publicar." : "Borrador"}
+          eyebrow="Constructor de módulos"
+          title={
+            <span className="flex flex-wrap items-center gap-2">
+              {summary.name}
+              <StatusPill status={summary.status} />
+            </span>
+          }
+          description={`v${summary.version} · ${summary.moduleKey} · ${PROJECT_STATUS[summary.status]?.hint ?? ""}${summary.unpublishedChanges ? " · con cambios sin publicar" : ""}`}
           actions={
-            <Button variant="ghost" onClick={() => flushPendingSave().then(() => navigate("/app/m/runly.core/module-builder"))}>
-              <ArrowLeft className="h-4 w-4" />
-              Volver
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {project.detachedAt && (
+                <Button onClick={() => flushPendingSave().then(() => setUpdateOpen(true))}>
+                  <Upload className="h-4 w-4" />
+                  Subir actualización
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setDeveloperOpen(true)}>
+                <Code2 className="h-4 w-4" />
+                Modo desarrollador
+              </Button>
+              <Button variant="ghost" onClick={() => flushPendingSave().then(() => navigate("/app/m/runly.core/module-builder"))}>
+                <ArrowLeft className="h-4 w-4" />
+                Volver
+              </Button>
+            </div>
           }
         />
 
         {project.detachedAt && (
           <Alert>
             <Code2 className="h-4 w-4" />
-            <AlertTitle>Modo avanzado</AlertTitle>
+            <AlertTitle>Modo desarrollador</AlertTitle>
             <AlertDescription>
-              Este módulo se edita como código (por ejemplo, con pantallas React propias), así que el Constructor ya no lo modifica ni lo publica. Usa "Descargar ZIP" para obtener el paquete con su guía de desarrollo y súbelo desde Módulos &gt; Subir módulo.
+              Este módulo se edita como código (por ejemplo, con pantallas React propias), así que el Constructor ya no lo modifica ni lo publica. Abre "Modo desarrollador" para descargar el ZIP con su guía y ver cómo subirlo.
             </AlertDescription>
           </Alert>
         )}
@@ -246,7 +321,20 @@ export default function ModuleBuilderEditor() {
           </TabsList>
 
           <TabsContent value="general">
-            <GeneralTab definition={definition} onChange={patchDefinition} capabilities={capabilities} readOnly={Boolean(project.detachedAt)} />
+            <GeneralTab
+              definition={definition}
+              onChange={patchDefinition}
+              capabilities={capabilities}
+              readOnly={Boolean(project.detachedAt)}
+              editingMode={{
+                published: summary.published,
+                publishedVersion: project.publishedVersion,
+                advanced: Boolean(project.detachedAt),
+                onOpen: () => setDeveloperOpen(true),
+                onDownload: () => flushPendingSave().then(() => exportMutation.mutate()),
+                downloading: exportMutation.isPending,
+              }}
+            />
           </TabsContent>
           <TabsContent value="data">
             <EntitiesTab
@@ -264,7 +352,7 @@ export default function ModuleBuilderEditor() {
             <NavigationTab definition={definition} onChange={patchDefinition} capabilities={capabilities} readOnly={Boolean(project.detachedAt)} />
           </TabsContent>
           <TabsContent value="permissions">
-            <PermissionsTab definition={definition} published={project.status === "PUBLISHED"} />
+            <PermissionsTab definition={definition} published={summary.published} />
           </TabsContent>
         </Tabs>
       </div>
@@ -311,30 +399,44 @@ export default function ModuleBuilderEditor() {
                 <Download />
                 Descargar ZIP
               </DropdownMenuItem>
-              {project.status === "PUBLISHED" && !project.detachedAt && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setConfirmDetach(true)}>
-                    <Code2 />
-                    Convertir a modo avanzado
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setDeveloperOpen(true)}>
+                <Code2 />
+                Modo desarrollador...
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      <ConfirmDialog
-        open={confirmDetach}
-        onOpenChange={setConfirmDetach}
-        title="Convertir a modo avanzado"
-        description="El módulo seguirá funcionando igual, pero ya no podrás editarlo ni publicarlo desde el Constructor: se trabajará como código (ZIP con pantallas React propias y su guía de desarrollo). Este cambio no se puede deshacer. Subir un ZIP modificado de este módulo también lo convierte automáticamente."
-        confirmLabel="Convertir"
-        onConfirm={() => {
-          setConfirmDetach(false);
-          detachMutation.mutate();
+      <DeveloperModeDialog
+        open={developerOpen}
+        onOpenChange={(next) => {
+          setDeveloperOpen(next);
+          if (!next) setReattachBlocked(null);
         }}
+        advanced={Boolean(project.detachedAt)}
+        onDownload={() => flushPendingSave().then(() => exportMutation.mutate())}
+        downloading={exportMutation.isPending}
+        converting={detachMutation.isPending}
+        onConvert={() => flushPendingSave().then(() => detachMutation.mutate(undefined, { onSuccess: () => setDeveloperOpen(false) }))}
+        onUpload={() => {
+          setDeveloperOpen(false);
+          flushPendingSave().then(() => setUpdateOpen(true));
+        }}
+        onReattach={(confirm) => reattachMutation.mutate(confirm)}
+        reattaching={reattachMutation.isPending}
+        reattachBlocked={reattachBlocked}
+        onDownloadInstalled={() => installedMutation.mutate()}
+        downloadingInstalled={installedMutation.isPending}
+      />
+
+      <UploadModuleSheet
+        open={updateOpen}
+        onOpenChange={setUpdateOpen}
+        fixedModuleKey={project.moduleKey}
+        title={`Subir actualización de ${summary.name}`}
+        onSuccess={reloadDefinitionFromServer}
       />
 
       <PreviewSheet open={previewOpen} onOpenChange={setPreviewOpen} projectId={id} token={token} definition={definition} />
@@ -344,6 +446,17 @@ export default function ModuleBuilderEditor() {
         projectId={id}
         token={token}
         moduleKey={project.moduleKey}
+        definition={definition}
+        publishedDefinition={project.publishedDefinition}
+        publishedVersion={project.publishedVersion}
+        // The dialog already saved this version before publishing; marking it
+        // as saved keeps autosave from re-saving (which would flip the project
+        // back to DRAFT right after the publish).
+        onVersionChange={(version) => setDefinition((current) => {
+          const next = { ...current, version };
+          lastSavedRef.current = next;
+          return next;
+        })}
         onPublished={() => {
           queryClient.invalidateQueries({ queryKey: ["module-builder-project", id] });
           queryClient.invalidateQueries({ queryKey: ["modules"] });

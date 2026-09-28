@@ -1,0 +1,23 @@
+---
+title: Desarrollo de módulos en Runly
+summary: Guía para extender con código los módulos creados con el Constructor de módulos — pantallas React, API de los módulos, relaciones, campos y librerías disponibles.
+order: 0
+---
+Runly permite crear módulos sin código con el **Constructor de módulos** y extenderlos con código cuando hace falta: pantallas propias en React, integraciones con otros módulos o lógica de API.
+
+Esta documentación está pensada para personas desarrolladoras **y para asistentes de IA** (Claude, Cursor, Copilot…). Cada página está disponible también como Markdown y el índice completo para IA está en [`/llms.txt`](https://runly.mx/llms.txt) (todo el contenido en un solo archivo: [`/llms-full.txt`](https://runly.mx/llms-full.txt)).
+
+## Páginas
+
+- [**Flujo con ZIP y modos de edición**](/documentacion/desarrolladores/flujo-zip): descargar el paquete, modo visual, modo mixto y modo desarrollador, revisión y vista previa antes de aplicar, volver al modo visual.
+- [**Pantallas React**](/documentacion/desarrolladores/pantallas-react): vistas `CUSTOM`, registro de componentes, props, llamadas a la API y reglas de diseño.
+- [**API de los módulos**](/documentacion/desarrolladores/api-modulos): endpoints que genera el Constructor para cada entidad, formatos de respuesta, filtros, errores y archivos.
+- [**Relaciones**](/documentacion/desarrolladores/relaciones): relaciones entre entidades del módulo y con módulos del sistema (Flotilla, Inventario, Contactos…), integridad y búsqueda.
+- [**Campos**](/documentacion/desarrolladores/campos): tipos de campo, su columna en la base de datos y su valor en la API.
+- [**Librerías disponibles**](/documentacion/desarrolladores/librerias): qué puedes importar en tus componentes, con la versión exacta instalada en Runly.
+
+## Inicio rápido
+
+1. En Runly abre tu módulo en el **Constructor de módulos** y usa **Modo desarrollador > Descargar ZIP con guía**. El ZIP trae `GUIA_DESARROLLO_RUNLY.md` (personalizada para tu módulo) y `AGENTS.md` (instrucciones para asistentes de IA).
+2. Agrega tus pantallas en `components/` y una vista `views/<nombre>.custom.js` (ver *Pantallas React*).
+3. Súbelo con **Subir actualización**: Runly lo valida, muestra los cambios de estructura y una vista previa de tus pantallas antes de aplicar.

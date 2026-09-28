@@ -23,6 +23,9 @@ import {
   hasDuplicateOptionValues,
 } from "../../lib/builderHelpers";
 import { FIELD_TYPE_ICONS } from "../../lib/builderFieldIcons";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../../../auth/AuthProvider";
+import { runly } from "../../../../lib/runly";
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label, icon: FIELD_TYPE_ICONS[value] }));
 const EMPTY_FIELD = { label: "", type: "text", required: false };
@@ -166,6 +169,8 @@ function RelationOptionsEditor({ field, definition, onPatch, readOnly }) {
 
 export function FieldSheet({ open, onOpenChange, field, entity, definition, existedInPublished, readOnly, onSubmit }) {
   const isNew = !field;
+  const { session } = useAuth();
+  const token = session?.access_token;
   const [draft, setDraft] = useState(EMPTY_FIELD);
   const [createMore, setCreateMore] = useState(false);
 
@@ -174,9 +179,33 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
   }, [open, field]);
 
   const isSelect = ["select", "multiselect"].includes(draft.type);
-  const relationTargets = (definition?.entities ?? [])
-    .filter((e) => e.key !== entity?.key)
-    .map((e) => ({ value: e.key, label: e.label }));
+  // Relation targets: entities of this module ("entity:<key>") and system
+  // entities of other modules ("external:<type>", /relation-targets catalog).
+  const catalogQuery = useQuery({
+    queryKey: ["relation-targets", token],
+    queryFn: () => runly.builder.listRelationTargets(token),
+    enabled: open && draft.type === "relation" && Boolean(token),
+    staleTime: 5 * 60 * 1000,
+  });
+  const catalog = catalogQuery.data?.data ?? [];
+  const relationTargets = [
+    ...(definition?.entities ?? [])
+      .filter((e) => e.key !== entity?.key)
+      .map((e) => ({ value: `entity:${e.key}`, label: `Este módulo · ${e.label}` })),
+    ...catalog.map((target) => ({
+      value: `external:${target.type}`,
+      label: `${target.moduleName} · ${target.label}${target.installed ? "" : " (módulo no instalado)"}`,
+      disabled: !target.installed,
+    })),
+  ];
+  const relationValue = draft.targetExternal ? `external:${draft.targetExternal}` : draft.targetEntity ? `entity:${draft.targetEntity}` : "";
+  const externalInfo = draft.targetExternal ? catalog.find((target) => target.type === draft.targetExternal) : null;
+
+  function handleRelationTarget(value) {
+    const [kind, key] = value.split(":");
+    if (kind === "external") patch({ targetExternal: key, targetEntity: undefined, labelField: undefined, onDisable: undefined });
+    else patch({ targetEntity: key, targetExternal: undefined, labelField: undefined });
+  }
   const keyPreview = isNew ? slugify(draft.label) : field.key;
 
   function patch(p) {
@@ -185,7 +214,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
 
   function handleTypeChange(type) {
     const next = { type, options: ["select", "multiselect"].includes(type) ? (draft.options ?? []) : undefined };
-    if (type !== "relation") Object.assign(next, { targetEntity: undefined, labelField: undefined, onDisable: undefined });
+    if (type !== "relation") Object.assign(next, { targetEntity: undefined, targetExternal: undefined, labelField: undefined, onDisable: undefined });
     if (type !== "file") Object.assign(next, { accept: undefined, camera: undefined, maxSizeMB: undefined });
     patch(next);
   }
@@ -249,14 +278,19 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
           {isSelect && <SelectOptionsEditor field={draft} onChange={setDraft} readOnly={readOnly} />}
           {draft.type === "relation" && (
             <SelectField
-              label="Entidad relacionada"
+              label="Relacionar con"
               icon={Database}
               options={relationTargets}
-              value={draft.targetEntity ?? ""}
+              value={relationValue}
               disabled={readOnly}
-              placeholder={relationTargets.length ? "Selecciona una entidad" : "Crea otra entidad primero"}
-              onValueChange={(value) => patch({ targetEntity: value, labelField: undefined })}
+              placeholder={catalogQuery.isLoading ? "Cargando..." : "Selecciona una entidad"}
+              onValueChange={handleRelationTarget}
             />
+          )}
+          {draft.type === "relation" && externalInfo && (
+            <p className="rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
+              Se buscará entre los {externalInfo.pluralLabel.toLowerCase()} de {externalInfo.moduleName}, con enlace a su ficha. Quien use tu módulo necesita permiso para verlos (<code>{externalInfo.permission}</code>), y tu módulo dependerá de {externalInfo.moduleName} para que no se desinstale mientras lo uses.
+            </p>
           )}
           {draft.type === "relation" && draft.targetEntity && (
             <RelationOptionsEditor field={draft} definition={definition} onPatch={patch} readOnly={readOnly} />

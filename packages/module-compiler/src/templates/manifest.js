@@ -25,6 +25,8 @@ export function generateManifest(config) {
     .concat((config.views ?? []).filter((view) => view.kind === 'DASHBOARD').map((view) => `  './${dashboardFileName(view)}',`))
     .concat((config.views ?? []).filter((view) => view.kind === 'KANBAN').map((view) => `  './${kanbanFileName(view)}',`))
     .concat((config.views ?? []).filter((view) => isRecordsViewKind(view.kind)).map((view) => `  './${recordsViewFileName(view)}',`))
+    // Hand-written CUSTOM views kept by the Builder (extensions.js).
+    .concat((config.extensions?.views ?? []).map((view) => `  ${JSON.stringify(`./${view.file}`)},`))
     .join('\n')
 
   const permissions = (config.permissions ?? entities.flatMap((e) => [
@@ -66,6 +68,15 @@ export function generateManifest(config) {
           ].join('\n')]
         : []
     )
+    .concat((config.extensions?.navigation ?? []).map((item) => [
+      `  {`,
+      `    label: ${JSON.stringify(item.label)},`,
+      `    path: ${JSON.stringify(item.path)},`,
+      `    icon: ${JSON.stringify(item.icon ?? config.icon)},`,
+      `    layout: 'main',`,
+      ...(item.permissionKey ? [`    permissionKey: ${JSON.stringify(item.permissionKey)},`] : []),
+      `  },`,
+    ].join('\n')))
     .join('\n')
 
   const ownedModels = entities

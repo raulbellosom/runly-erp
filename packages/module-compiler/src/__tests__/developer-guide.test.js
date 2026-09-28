@@ -18,4 +18,10 @@ test('every package ships a personalized developer guide with real library versi
   assert.match(guide, /`PATCH \/visitas\/visitas\/:id\/enabled`/)
   const react = catalog.libraries.find((library) => library.name === 'react')
   assert.ok(guide.includes(`| \`react\` | ${react.version} |`))
+  assert.match(guide, /### Visita \(`visita`\)/)
+  assert.match(guide, /\| Nombre \| `nombre` \| `text` \|/)
+  assert.match(guide, /runly\.mx\/llms\.txt/)
+  const agents = compiled.files.find((file) => file.path === 'AGENTS.md')?.content
+  assert.match(agents, /custom\.visitas:<Componente>/)
+  assert.match(agents, /runly\.mx\/documentacion\/desarrolladores/)
 })

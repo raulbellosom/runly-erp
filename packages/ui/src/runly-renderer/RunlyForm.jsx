@@ -707,8 +707,16 @@ export function RunlyForm({
           loading: false,
           error: null,
         };
-        const staticOpts =
+        const loadedOpts =
           descriptor.source === "static" ? descriptor.options : rs.options;
+        // The saved value may not be in the first page of options (or come
+        // from another module): show its label from the record's
+        // <field>__label instead of an empty picker.
+        const savedLabel = initialData?.[`${field.name}__label`];
+        const staticOpts =
+          value && savedLabel && !loadedOpts.some((option) => String(option.value) === String(value))
+            ? [{ value: String(value), label: String(savedLabel) }, ...loadedOpts]
+            : loadedOpts;
         const createActionLabel =
           descriptor.create?.label ?? normalizeSpanishLabel("Crear nuevo");
         const canInlineCreate =

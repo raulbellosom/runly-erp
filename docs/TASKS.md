@@ -1661,4 +1661,37 @@ Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-advanced-mode-design.md` �
 - [x] Every compiled package (and so "Descargar ZIP") ships `GUIA_DESARROLLO_RUNLY.md`, personalized per module (CUSTOM view recipe, component props, module API table, libraries with real versions, import rules, Runly design rules). Versions come from `packages/module-compiler/src/runtime-catalog.json` (`node scripts/generate-module-runtime-catalog.mjs`); `module-runtime-catalog.test.js` fails on drift vs installed versions or `BUNDLE_EXTERNALS`. Verified: 2026-09-28 (`developer-guide.test.js`, catalog tests)
 - [x] CUSTOM components receive `apiBaseUrl`; `buildApiHeaders` exported from `@runly/ui`; CUSTOM example in `rme3-runtime-capabilities.md` fixed (full `/app/m/...` path, props instead of localStorage token).
 - [x] "Convertir a modo avanzado" in the Builder editor (existing detach API) + banner; a changed ZIP upload auto-detaches the module's Builder project (`module-builder-detach.js`, response `builderDetached`). Verified: 2026-09-28 (detach tests; api services 752/753 with the known flaky inventory-chat test; `pnpm build:web`, `pnpm lint`)
-- [ ] Manual: download a Builder ZIP, add a CUSTOM React view following the guide, upload it, confirm the view renders and the project shows "Modo avanzado".
+- [ ] Manual: download a Builder ZIP, add a CUSTOM React view following the guide, upload it, confirm the view renders and the project shows "Modo desarrollador".
+
+## Module updates — review, structure plan and React preview before applying (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-module-update-review-design.md`
+
+- [x] `POST /modules/:key/upload/check` (`checkZip`: real staging + publish preflight, preview bundle in `.previews/`, nothing installed) + `GET /modules/:key/preview/:previewId/bundle.js` (UUID, 1 h TTL); Spanish report in `module-update-report.js` with blockers mirroring publishZip. Verified: 2026-09-28 (`module-update-report.test.js`, `checkZip` test in `module-package-service.test.js`, `module-update-check-e2e.test.js`: Builder ZIP + React screen reviewed with the real staging service and esbuild)
+- [x] UI: `ModuleUpdateReview` (report + `CustomViewPreview` in a temporary registry with an error boundary + apply) used by Módulos > Subir módulo and the editor's "Subir actualización"; developer mode renamed from "modo avanzado", no longer requires publishing first; color swatch respects read-only. Verified: 2026-09-28 (`pnpm build:web`, `pnpm lint`)
+- [ ] Manual: upload an extended ZIP from the editor, check the React preview renders with real data, apply, confirm the screen in the module menu.
+
+## RME3 Module Builder — code extensions (mixed mode) + leaving developer mode (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-code-extensions-design.md`
+
+- [x] Compiler: `definition.extensions` (components/**, views/*.custom.js, menu entries) validated, emitted and listed in the manifest; `classifyModulePackage` compares a package with what its embedded `.module-definition.json` generates. Verified: 2026-09-28 (`extensions.test.js` incl. round trip)
+- [x] API: `module-builder-package-sync.js` — uploads that only add React screens keep the Builder and capture them; anything else detaches with reasons; `POST /module-builder/projects/:id/reattach` (409 + lost[] unless confirm) and `GET .../installed-package` backup; upload check report gains `builder`; autosaves without `extensions` keep the stored ones. Verified: 2026-09-28 (`module-builder-package-sync.test.js` on real packages + manifest loader, builder service tests)
+- [x] UI: "Pantallas propias (código)" in Vistas, builder impact in the update review, "Volver al modo visual" with loss list + backup, editor reloads the draft from the server after uploads/reattach. Verified: 2026-09-28 (`codeExtensions.test.js`, `pnpm build:web`, `pnpm lint`)
+- [ ] Manual: download a Builder ZIP, add a React screen, upload (review says "Sigues en modo visual"), publish from the Builder and confirm the screen survives; then change `api/`, upload (developer mode), and go back to visual mode.
+
+## RME3 Module Builder — relations to system modules (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-external-relations-design.md`
+
+- [x] Compiler: `targetExternal` for 9 system entities (contact, hr_employee, vehicle, inventory_item, project, task, calendar_event, ledger_account, file), validation, automatic dependency on the owning module, picker/table/detail emission, generated `assertExternalTargets` + `withExternalLabels`. Verified: 2026-09-28 (`external-relations.test.js` incl. executing the generated module)
+- [x] API: `relation-targets-service.js` (catalog, per-type search with the owning module's rules, batch resolve via the chat resolvers' new `resolveReferences`), `/relation-targets` routes, `moduleContext.relations`. Verified: 2026-09-28 (`relation-targets-service.test.js`, full api services + chat suites)
+- [x] UI: "Relacionar con" (this module + system modules, disabled when not installed), `external-link` detail rendering, saved relation labels in RunlyForm pickers. Verified: 2026-09-28 (`pnpm build:web`, `pnpm lint`)
+- [ ] Manual: custom module with a Vehículo relation — search by plate, save, see "ABC-123 · Nissan" with a link; user without fleet permission sees "No disponible".
+
+## Developer documentation (ZIP guide, AGENTS.md, public docs + llms.txt) (2026-09-28)
+
+- [x] `docs/developers/*.md` (public, Spanish): index, flujo-zip, pantallas-react, api-modulos, relaciones, campos, librerias (generated from `runtime-catalog.json` by `scripts/generate-module-runtime-catalog.mjs`; `module-runtime-catalog.test.js` checks it). Verified: 2026-09-28
+- [x] ZIP: `GUIA_DESARROLLO_RUNLY.md` gains online-doc/llms.txt links, the module's data dictionary (fields, types, relation targets, `__label`/`__url`) and `/relation-targets` usage; new `AGENTS.md` for AI coding assistants (ignored by the Builder package classification). Verified: 2026-09-28 (`developer-guide.test.js`)
+- [x] runly-web: `scripts/sync-help-content.mjs` also syncs `docs/developers`; pages `/documentacion/desarrolladores` (+ per-page `.md`), `/llms.txt`, `/llms-full.txt`; link from `/documentacion/modulos`. Verified: 2026-09-28 (runly-web vitest 20/20, `pnpm build`)
+- Note: `pnpm check:privacy` reports 2 findings in older specs (2026-09-23 ledger UI, 2026-09-26 help tips), unrelated to this work.

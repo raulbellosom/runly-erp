@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { addView, updateView, removeView, CUSTOM_VIEW_KINDS, RECORDS_VIEW_KINDS } from "../../lib/builderHelpers";
 import { RecordsViewEditor, VIEW_KIND_META } from "./RecordsViewEditors";
+import { CodeExtensionsCard } from "./CodeExtensionsCard";
 
 const AGGREGATE_OPTIONS = [
   { value: "count", label: "Conteo", icon: Hash },
@@ -374,6 +375,8 @@ export function ViewsTab({ definition, onChange, capabilities, readOnly }) {
           </div>
         </div>
       </div>
+
+      <CodeExtensionsCard definition={definition} onChange={onChange} readOnly={readOnly} />
 
       {!customViews.length && (
         <EmptyState

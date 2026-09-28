@@ -210,14 +210,25 @@ test('deleteDraft: blocks deleting a published project, but allows deleting a pl
   const prisma = fakePrisma()
   const svc = createModuleBuilderService({ prisma })
   const project = await svc.createProject({ companyId: 'company-1', actorId: 'user-1', name: 'X', moduleKey: 'custom.xfoo', template: 'blank' })
-  prisma._projects.set(project.id, { ...prisma._projects.get(project.id), status: 'PUBLISHED' })
+  // Published and then edited: every save sets status DRAFT, the module is still installed.
+  prisma._projects.set(project.id, { ...prisma._projects.get(project.id), status: 'DRAFT', publishedAt: new Date() })
   await assert.rejects(
     () => svc.deleteDraft({ companyId: 'company-1', projectId: project.id }),
     (error) => error instanceof ModuleBuilderError && error.code === 'BUILDER_PROJECT_PUBLISHED',
   )
-  prisma._projects.set(project.id, { ...prisma._projects.get(project.id), status: 'DRAFT' })
+  prisma._projects.set(project.id, { ...prisma._projects.get(project.id), status: 'DRAFT', publishedAt: null })
   const result = await svc.deleteDraft({ companyId: 'company-1', projectId: project.id })
   assert.equal(result.deleted, true)
+})
+
+test('detachProject: any project can switch to developer mode, and doing it twice is harmless', async () => {
+  const prisma = fakePrisma()
+  const svc = createModuleBuilderService({ prisma })
+  const project = await svc.createProject({ companyId: 'company-1', actorId: 'user-1', name: 'X', moduleKey: 'custom.xdetach', template: 'blank' })
+  const detached = await svc.detachProject({ companyId: 'company-1', actorId: 'user-1', projectId: project.id })
+  assert.ok(detached.detachedAt)
+  const again = await svc.detachProject({ companyId: 'company-1', actorId: 'user-1', projectId: project.id })
+  assert.equal(String(again.detachedAt), String(detached.detachedAt))
 })
 
 // Regression: right after a real publish, publishedDefinition is
@@ -255,4 +266,16 @@ test('getPublishImpact: a never-installed project reports a PUBLISH action with 
   assert.equal(impact.installed, false)
   assert.equal(impact.entityCount, 1)
   assert.equal(impact.nextVersion, '0.1.0')
+})
+
+test('updateDefinition keeps captured React screens when an autosave omits them', async () => {
+  const prisma = fakePrisma()
+  const svc = createModuleBuilderService({ prisma })
+  const project = await svc.createProject({ companyId: 'company-1', actorId: 'user-1', name: 'X', moduleKey: 'custom.xext', template: 'blank' })
+  const extensions = { files: [{ path: 'components/index.js', content: 'x' }], views: [], navigation: [] }
+  prisma._projects.set(project.id, { ...prisma._projects.get(project.id), definition: { ...project.definition, extensions } })
+  const stale = await svc.updateDefinition({ companyId: 'company-1', actorId: 'user-1', projectId: project.id, definition: { ...project.definition, name: 'Nuevo' } })
+  assert.deepEqual(stale.definition.extensions, extensions)
+  const cleared = await svc.updateDefinition({ companyId: 'company-1', actorId: 'user-1', projectId: project.id, definition: { ...project.definition, extensions: { files: [], views: [], navigation: [] } } })
+  assert.deepEqual(cleared.definition.extensions.files, [])
 })

@@ -181,6 +181,27 @@ export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = nu
     }
   })
 
+  app.post('/module-builder/projects/:id/reattach', requirePermission('core.modules.builder'), async (c) => {
+    try {
+      const body = await c.req.json().catch(() => ({}))
+      return c.json({ data: await svc.reattachProject({ companyId: c.get('companyId'), actorId: actor(c), projectId: c.req.param('id'), confirm: body?.confirm === true }) })
+    } catch (error) {
+      return handleBuilderError(c, error, 'No se pudo volver al modo visual.')
+    }
+  })
+
+  app.get('/module-builder/projects/:id/installed-package', requirePermission('core.modules.builder'), async (c) => {
+    try {
+      const { buffer, filename } = await svc.installedPackage({ companyId: c.get('companyId'), projectId: c.req.param('id') })
+      return new Response(buffer, {
+        status: 200,
+        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${filename}"`, 'Content-Length': String(buffer.length) },
+      })
+    } catch (error) {
+      return handleBuilderError(c, error, 'No se pudo descargar el paquete instalado.')
+    }
+  })
+
   app.post('/module-builder/projects/:id/detach', requirePermission('core.modules.builder'), async (c) => {
     try {
       return c.json({ data: await svc.detachProject({ companyId: c.get('companyId'), actorId: actor(c), projectId: c.req.param('id') }) })

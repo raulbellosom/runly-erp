@@ -88,6 +88,8 @@ import {
 import { createModuleBundlerService } from "./services/module-bundler-service.js";
 import { createRouteLoaderService } from "./services/route-loader-service.js";
 import { createModuleFilesCapability } from "./services/module-files-service.js";
+import { createRelationTargetsService } from "./services/relation-targets-service.js";
+import { createRelationTargetsRouter } from "./routes/relation-targets-routes.js";
 import { createDistServeService } from "./services/dist-serve-service.js";
 import { createNotificationDeliveryWorker } from "./services/notification-delivery-worker.js";
 import { createNotificationService } from "./services/notification-service.js";
@@ -707,11 +709,15 @@ function serializeModulesForResponse(modules, context, options = {}) {
     });
 }
 
+// Relations from Builder modules to system entities (Flotilla, Inventario...).
+const relationTargets = createRelationTargetsService({ prisma, supabaseAdmin });
+
 const routeLoader = createRouteLoaderService({
   prisma,
   authMiddleware,
   requirePermission,
   filesCapability: createModuleFilesCapability({ prisma, filesService, supabaseAdmin }),
+  relationsCapability: relationTargets.capability(),
   cache: {
     get: cacheGet,
     set: cacheSet,
@@ -2196,6 +2202,7 @@ mountWithAuth(app, createBuilderRouter({ prisma, requirePermission, bundlerSvc: 
 mountWithAuth(app, createContactsRouter({ prisma, requirePermission, supabaseAdmin, storageBucket: STORAGE_BUCKET_NAME }));
 mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }));
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));
+mountWithAuth(app, createRelationTargetsRouter({ relationTargets, requirePermission, requireAnyPermission }));
 mountWithAuth(app, createIdentityRouter({
   prisma,
   supabaseAdmin,

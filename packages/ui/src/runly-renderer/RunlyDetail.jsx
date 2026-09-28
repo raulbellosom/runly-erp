@@ -163,6 +163,7 @@ function normalizeField(fieldLike) {
     hiddenWhen: fieldLike.hiddenWhen ?? null,
     accept: fieldLike.accept ?? null,
     signedUrlPath: fieldLike.signedUrlPath ?? null,
+    urlField: fieldLike.urlField ?? null,
   };
 }
 
@@ -406,6 +407,7 @@ function normalizeSections(schema, fieldMap) {
             options: fieldDef.field.options ?? existing?.options ?? null,
             accept: fieldDef.field.accept ?? existing?.accept ?? null,
             signedUrlPath: fieldDef.field.signedUrlPath ?? existing?.signedUrlPath ?? null,
+            urlField: fieldDef.field.urlField ?? existing?.urlField ?? null,
           });
         }
         if (!fieldNames.includes(name)) fieldNames.push(name);
@@ -1139,6 +1141,13 @@ export function RunlyDetail({
                         <span className="text-[hsl(var(--muted-foreground))]">
                           —
                         </span>
+                      )
+                    ) : field.type === "external-link" && value ? (
+                      // Record of another module (relation-targets): label + link to its own detail.
+                      data[field.urlField] ? (
+                        <a href={data[field.urlField]} className="text-(--brand-primary) hover:underline">{String(value)}</a>
+                      ) : (
+                        <span>{String(value)}</span>
                       )
                     ) : field.type === "file-asset" ? (
                       <FileAssetValue

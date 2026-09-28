@@ -11,13 +11,6 @@ import {
   EmptyState,
   ErrorState,
   Skeleton,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-  Badge,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -29,19 +22,17 @@ import {
   SelectField,
   ConfirmDialog,
 } from "@runly/ui";
-import { Hammer, Plus, Trash2, ArrowRight } from "lucide-react";
+import { Hammer, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
+import { BuilderProjectCard } from "../components/builder/BuilderProjectCard";
 
 const TEMPLATE_OPTIONS = [
   { value: "blank", label: "Módulo vacío" },
   { value: "simple-crud", label: "CRUD simple (una entidad)" },
   { value: "inventory-lite", label: "Inventario ligero (con Kanban y dashboard)" },
 ];
-
-const STATUS_LABEL = { DRAFT: "Borrador", VALIDATED: "Validado", PUBLISHED: "Publicado" };
-const STATUS_VARIANT = { DRAFT: "secondary", VALIDATED: "outline", PUBLISHED: "default" };
 
 export default function ModuleBuilder() {
   const navigate = useNavigate();
@@ -145,39 +136,14 @@ export default function ModuleBuilder() {
           />
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
-            <Card key={project.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="truncate">{project.name}</CardTitle>
-                  <Badge variant={STATUS_VARIANT[project.status] ?? "secondary"}>
-                    {STATUS_LABEL[project.status] ?? project.status}
-                  </Badge>
-                </div>
-                <CardDescription className="font-mono text-xs">{project.moduleKey}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1 text-sm text-[hsl(var(--muted-foreground))]">
-                {project.description || "Sin descripción."}
-                {project.status === "PUBLISHED" && project.hasUnpublishedChanges && (
-                  <p className="mt-2 text-amber-600 dark:text-amber-400">Hay cambios sin publicar.</p>
-                )}
-              </CardContent>
-              <CardFooter className="flex items-center justify-between gap-2">
-                <Button
-                  variant="ghost"
-                  className="text-red-600 hover:text-red-700"
-                  disabled={project.status === "PUBLISHED"}
-                  onClick={() => setConfirmDelete(project)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button onClick={() => navigate(`/app/m/runly.core/module-builder/${project.id}`)}>
-                  Abrir
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
+            <BuilderProjectCard
+              key={project.id}
+              project={project}
+              onOpen={() => navigate(`/app/m/runly.core/module-builder/${project.id}`)}
+              onDelete={() => setConfirmDelete(project)}
+            />
           ))}
         </div>
       </div>
@@ -231,7 +197,7 @@ export default function ModuleBuilder() {
         open={Boolean(confirmDelete)}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
         title="Eliminar proyecto"
-        description={`Se eliminará el borrador "${confirmDelete?.name}". Esta acción no se puede deshacer.`}
+        description={`Se eliminará el borrador "${confirmDelete?.definition?.name || confirmDelete?.name}". Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
         loading={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate(confirmDelete.id)}

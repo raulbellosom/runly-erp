@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { moduleSlug, permKey, toPascal } from './helpers.js'
+import { externalTarget, isExternalRelation } from '../external-relations.js'
 
 // GUIA_DESARROLLO_RUNLY.md, shipped in every compiled package (and so in the
 // Builder's "Descargar ZIP"). Personalized with the module's key, entities
@@ -35,6 +36,37 @@ function endpointTable(config) {
   return ['| Entidad | Endpoint | Qué hace | Permiso |', '|---|---|---|---|', ...rows].join('\n')
 }
 
+// Public developer docs (runly-web). Markdown versions and llms.txt let AI
+// assistants read the current documentation.
+export const DEVELOPER_DOCS_URL = 'https://runly.mx/documentacion/desarrolladores'
+export const LLMS_TXT_URL = 'https://runly.mx/llms.txt'
+
+function fieldDetail(field) {
+  if (field.type === 'select' || field.type === 'multiselect') return `Valores: ${(field.options ?? []).map((value) => `\`${value}\``).join(', ')}`
+  if (isExternalRelation(field)) {
+    const target = externalTarget(field.targetExternal)
+    return target ? `${target.label} de ${target.moduleName} (\`${field.targetExternal}\`); la API agrega \`${field.name}__label\` y \`${field.name}__url\`` : ''
+  }
+  if (field.type === 'relation') return `Relación con \`${field.targetEntity ?? field.relatedModel}\`; la API agrega \`${field.name}__label\``
+  if (field.type === 'file') return `Archivo (${field.accept ?? 'any'}${field.camera ? ', cámara' : ''}, máx. ${field.maxSizeMB ?? 10} MB); guarda el id del archivo`
+  return ''
+}
+
+function dataDictionary(config) {
+  return config.entities.map((entity) => {
+    const rows = entity.fields.map((field) => `| ${field.label || field.name} | \`${field.name}\` | \`${field.type}\` | ${field.required ? 'Sí' : ''} | ${fieldDetail(field)} |`)
+    return [`### ${entity.label} (\`${entity.name}\`)`, '', '| Campo | Clave | Tipo | Requerido | Detalle |', '|---|---|---|---|---|', ...rows].join('\n')
+  }).join('\n\n')
+}
+
+function externalRelationsNote(config) {
+  const used = [...new Set(config.entities.flatMap((entity) => entity.fields.filter(isExternalRelation).map((field) => field.targetExternal)))]
+  const list = used.length
+    ? `Tu módulo ya se relaciona con: ${used.map((type) => `${externalTarget(type)?.label ?? type} (\`${type}\`)`).join(', ')}.`
+    : 'Tu módulo todavía no tiene relaciones con otros módulos; puedes agregarlas en el Constructor (campo Relación > "Relacionar con").'
+  return list
+}
+
 export function generateDeveloperGuide(config) {
   const slug = moduleSlug(config.key)
   const first = config.entities[0]
@@ -47,7 +79,9 @@ export function generateDeveloperGuide(config) {
 
 Este paquete es tu módulo tal como lo generó el Constructor de módulos de Runly. Puedes extenderlo con **pantallas propias hechas en React** y volver a subirlo desde **Módulos > Subir módulo**.
 
-> **Importante — modo avanzado.** Al subir un ZIP con cambios, el proyecto del Constructor se **desvincula** ("modo avanzado"): ya no se podrá editar ni publicar visualmente, para no borrar tu código. Termina primero todo lo que quieras hacer en el Constructor (entidades, campos, diseño, vistas) y guarda una copia de este ZIP antes de modificarlo.
+> **Modo visual y modo desarrollador.** Si solo **agregas** pantallas React (archivos en \`components/\`, vistas \`views/<nombre>.custom.js\` y sus entradas de menú en el manifiesto), el Constructor las guarda y sigues editando visualmente: se incluyen en cada publicación. Si cambias cualquier otro archivo (por ejemplo \`api/\`, \`models/\` o archivos generados), el proyecto pasa a **modo desarrollador** y el Constructor deja de publicarlo para no borrar tu código; desde el editor puedes volver al modo visual después. No borres \`.module-definition.json\`: con él Runly distingue tus cambios.
+
+**Documentación en línea (siempre actualizada):** ${DEVELOPER_DOCS_URL} — flujo con ZIP, pantallas React, API de los módulos, relaciones, campos y librerías. Para asistentes de IA: ${LLMS_TXT_URL} (índice) y cada página en Markdown (agrega \`.md\` a su URL). Si usas un asistente de código, dale también el archivo \`AGENTS.md\` de este paquete.
 
 ## 1. Estructura del paquete
 
@@ -59,6 +93,8 @@ api/                      API del módulo (Hono)
 validators/               Validaciones (Zod)
 components/               (tú lo creas) Tus componentes React
 .module-definition.json   Definición usada por el Constructor
+GUIA_DESARROLLO_RUNLY.md  Esta guía
+AGENTS.md                 Instrucciones para asistentes de IA
 ${fence}
 
 ## 2. Crear una pantalla React paso a paso
@@ -164,8 +200,29 @@ Usa siempre \`buildApiHeaders(token, companyId)\` de \`@runly/ui\`: sin el encab
 ${endpointTable(config)}
 
 - Las listas responden \`{ data: [...], pagination: { page, pageSize, total } }\`; un registro, \`{ data: {...} }\`; los errores, \`{ error: "mensaje" }\`.
-- Los campos de relación incluyen \`<campo>__label\` con el nombre del registro relacionado, y las listas aceptan \`?<campo>=<id>\` para filtrar.
-- Todas las operaciones respetan los permisos y la empresa activa del usuario.
+- Los campos de relación incluyen \`<campo>__label\` con el nombre del registro relacionado (y \`<campo>__url\` si es de otro módulo); las listas aceptan \`?<campo>=<id>\` para filtrar por relaciones del mismo módulo y \`?<campo>=<VALOR>\` para campos de selección.
+- Todas las operaciones respetan los permisos y la empresa activa del usuario. Errores: 400 datos inválidos o relación no válida, 403 sin permiso, 404 no existe, 409 duplicado o en uso. Referencia completa: ${DEVELOPER_DOCS_URL}/api-modulos
+
+### Datos de tu módulo
+
+${dataDictionary(config)}
+
+### Relaciones con otros módulos
+
+${externalRelationsNote(config)} Desde tus pantallas puedes buscar y resolver registros de Contactos, RR. HH., Flotilla, Inventario, Proyectos, Calendario, Cuentas y Archivos con \`/relation-targets\` (el usuario necesita el permiso de lectura de ese módulo):
+
+${fence}js
+// Buscar: [{ id, title, subtitle }]
+fetch(\`\${apiBaseUrl}/relation-targets/vehicle/search?search=abc\`, { headers: buildApiHeaders(token, companyId) })
+// Resolver ids (máx. 100): [{ id, title, subtitle, url }] solo los visibles
+fetch(\`\${apiBaseUrl}/relation-targets/vehicle/resolve\`, {
+  method: 'POST',
+  headers: buildApiHeaders(token, companyId, { 'Content-Type': 'application/json' }),
+  body: JSON.stringify({ ids }),
+})
+${fence}
+
+Tipos: \`contact\`, \`hr_employee\`, \`vehicle\`, \`inventory_item\`, \`project\`, \`task\`, \`calendar_event\`, \`ledger_account\`, \`file\`. Detalles: ${DEVELOPER_DOCS_URL}/relaciones
 
 ## 5. Librerías disponibles
 
@@ -206,7 +263,7 @@ Para que tu pantalla se vea y se comporte como el resto de Runly:
 
 1. Comprime la carpeta (con \`module.manifest.js\` en la raíz del ZIP).
 2. En Runly: **Módulos > Subir módulo**, escribe \`${config.key}\` y selecciona el ZIP. Necesitas el permiso \`core.modules.upload\`.
-3. Runly valida el paquete, aplica cambios de tablas seguros, compila \`components/\` y recarga el módulo.
+3. Runly valida el paquete, aplica cambios de tablas seguros, compila \`components/\` y recarga el módulo. Si el módulo aún no estaba instalado, después dale **Instalar** en su tarjeta del catálogo de Módulos.
 4. Si algo falla, el módulo anterior queda intacto y el mensaje indica en qué etapa falló.
 
 ## 8. Problemas frecuentes
@@ -216,5 +273,30 @@ Para que tu pantalla se vea y se comporte como el resto de Runly:
 - **La pantalla no aparece**: revisa que la vista esté en \`views\` del manifiesto y que \`path\` sea la URL completa.
 - **Error 400 "company_required"**: falta \`buildApiHeaders(token, companyId)\` en tu \`fetch\`.
 - **Error 403**: el usuario no tiene el permiso de la entidad; asígnalo en Identidad > Roles.
+`
+}
+
+// AGENTS.md: instructions for AI coding assistants working on the package.
+export const AGENTS_FILE_PATH = 'AGENTS.md'
+
+export function generateAgentsFile(config) {
+  const slug = moduleSlug(config.key)
+  return `# Instrucciones para asistentes de IA — ${config.key}
+
+Este paquete es un módulo de Runly generado por el Constructor de módulos. Antes de cambiar nada, lee \`GUIA_DESARROLLO_RUNLY.md\` (personalizada para este módulo) y la documentación actual:
+
+- Índice para IA: ${LLMS_TXT_URL}
+- Documentación de desarrolladores: ${DEVELOPER_DOCS_URL} (cada página también en Markdown agregando \`.md\`)
+
+## Reglas
+
+1. Para mantener el módulo editable en el Constructor, **solo agrega**: archivos en \`components/\` (.js, .jsx, .css, .json, .svg), vistas \`views/<nombre>.custom.js\` de tipo CUSTOM y sus entradas en \`views\` y \`navigation\` de \`module.manifest.js\`. Cambiar cualquier otro archivo pasa el módulo a modo desarrollador.
+2. No edites ni borres \`.module-definition.json\`, \`models/\`, ni los archivos generados de \`api/\`, \`views/\` y \`validators/\` salvo que la persona pida explícitamente trabajar en modo desarrollador.
+3. Componentes en \`.jsx\` (sin TypeScript), runtime JSX automático, hooks con import nombrado (\`import { useState } from 'react'\`, nunca \`React.useState\`). Sin APIs de Node en el navegador.
+4. Registra cada componente en \`components/index.js\` con la clave \`${config.key}:<Componente>\`; la vista CUSTOM usa esa clave en \`schema.component\` y la URL completa \`/app/m/${config.key}/...\` en \`schema.path\`.
+5. Llama a la API con \`fetch(apiBaseUrl + '/${slug}/...', { headers: buildApiHeaders(token, companyId) })\` usando las props del componente (\`token\`, \`companyId\`, \`apiBaseUrl\`). Datos de otros módulos: \`/relation-targets/<tipo>/search\` y \`/resolve\`.
+6. UI con \`@runly/ui\` (PageHeader, SelectField, TextField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton…), nunca \`window.confirm/alert/prompt\` ni controles nativos si existe el componente. Textos en español, sin emojis. Tailwind con tokens del tema (\`hsl(var(--card))\`, \`var(--brand-primary)\`).
+7. Solo usa las librerías listadas en la guía (sección *Librerías disponibles*) con esas versiones.
+8. Sube la versión en \`module.manifest.js\` antes de entregar. La persona sube el ZIP en Runly con "Subir actualización": Runly lo valida y muestra una vista previa antes de aplicar.
 `
 }

@@ -10,7 +10,7 @@ import { generateRoutes } from './templates/routes.js'
 import { generateFileRoutes } from './templates/file-routes.js'
 import { generateVisibilityModule, hasConditionalRequired } from './templates/visibility.js'
 import { generateRelationsModule, hasRelationsModule } from './templates/relations.js'
-import { DEVELOPER_GUIDE_PATH, generateDeveloperGuide } from './templates/developer-guide.js'
+import { AGENTS_FILE_PATH, DEVELOPER_GUIDE_PATH, generateAgentsFile, generateDeveloperGuide } from './templates/developer-guide.js'
 import { hasFileSupport } from './templates/layout-views.js'
 import { generateEntityValidators } from './templates/validators.js'
 import { generateApiIndex } from './templates/api-index.js'
@@ -50,6 +50,7 @@ export function compileModule(rawDefinition) {
   add('api/index.js', generateApiIndex(config))
   add('validators/index.js', generateValidatorsIndex(config))
   add(DEVELOPER_GUIDE_PATH, generateDeveloperGuide(config))
+  add(AGENTS_FILE_PATH, generateAgentsFile(config))
   for (const entity of config.entities) {
     add(`models/${entity.name}.model.js`, generateModel(config, entity))
     add(`views/${entity.name}.table.js`, generateTableView(config, entity))
@@ -68,6 +69,8 @@ export function compileModule(rawDefinition) {
   }
   for (const view of definition.views.filter((item) => item.kind === 'KANBAN')) add(kanbanFileName(view), generateKanbanView(view))
   for (const view of definition.views.filter((item) => isRecordsViewKind(item.kind))) add(recordsViewFileName(view), generateRecordsView(view))
+  // Hand-written React screens kept by the Builder (extensions.js).
+  for (const file of definition.extensions?.files ?? []) add(file.path, file.content)
   if (config.preset === 'crud-custom') {
     add('views/dashboard.custom.js', generateCustomDashboardView(config))
     add('components/index.js', generateComponentsIndex(config))

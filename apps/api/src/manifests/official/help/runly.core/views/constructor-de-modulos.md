@@ -27,10 +27,10 @@ Todo se guarda solo mientras editas (el indicador de abajo a la izquierda muestr
 - **Condiciones**: mostrar pestanas, secciones o campos solo en ciertos casos.
 - **Relaciones e integridad**: que pasa al desactivar un registro que otros usan.
 - **Archivos, fotos y documentos**: campos de archivo, camara y documentos adjuntos.
-- **Vistas adicionales** y **Publicar y actualizar** (incluye el **modo avanzado** para agregar pantallas propias en React descargando el ZIP).
+- **Vistas adicionales** y **Publicar y actualizar** (incluye el **modo desarrollador** para agregar pantallas propias en React descargando el ZIP; boton **Modo desarrollador** arriba del editor).
 
 ### Alcances y limites
 
 - Necesitas el permiso **Use Module Builder** (`core.modules.builder`); pideselo a un administrador si no ves esta pantalla.
 - Los modulos creados aqui conviven con los modulos oficiales; su clave no puede usar los prefijos reservados del sistema (como `runly.`).
-- Las relaciones solo pueden apuntar a entidades del mismo modulo.
+- Las relaciones pueden apuntar a entidades de tu modulo o de modulos del sistema (Flotilla, Inventario, Contactos, RR. HH., Proyectos, Calendario, Cuentas, Archivos).

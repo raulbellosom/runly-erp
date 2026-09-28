@@ -32,6 +32,7 @@ export function SwatchField({
   hint,
   className,
   id,
+  disabled = false,
 }) {
   return (
     <FieldWrapper label={label} labelFor={id} required={required} error={error} hint={hint}>
@@ -45,9 +46,11 @@ export function SwatchField({
               role="radio"
               aria-checked={active}
               aria-label={hex}
+              disabled={disabled}
               onClick={() => onChange(hex)}
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full transition-transform",
+                "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100",
                 "ring-offset-2 ring-offset-[hsl(var(--background))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
                 active ? "scale-110 ring-2 ring-[hsl(var(--foreground))]" : "hover:scale-105",
               )}

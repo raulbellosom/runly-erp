@@ -14,37 +14,93 @@ import {
   DialogDescription,
   DialogFooter,
   Button,
-  Badge,
   Skeleton,
   Alert,
   AlertTitle,
   AlertDescription,
 } from "@runly/ui";
-import { AlertTriangle, Rocket } from "lucide-react";
+import { AlertTriangle, Rocket, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { runly } from "../../../../lib/runly";
+import { compareVersions, versionOptions } from "../../lib/versionSuggestion";
 
-export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey, onPublished }) {
+// Version step: suggests patch / minor / major from what changed since the
+// last publish (lib/versionSuggestion.js) and saves the chosen version into
+// the draft right before publishing.
+function VersionPicker({ plan, publishedVersion, draftVersion, value, onChange }) {
+  if (plan.first) {
+    return (
+      <p className="flex items-center gap-2 text-sm">
+        <Tag className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+        Primera publicación: versión <strong>{draftVersion}</strong>.
+      </p>
+    );
+  }
+  const options = [...plan.options];
+  if (compareVersions(draftVersion, publishedVersion) > 0 && !options.some((option) => option.version === draftVersion)) {
+    options.push({ level: "custom", label: "La que escribiste", help: "Definida en la pestaña General.", version: draftVersion });
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Nueva versión <span className="font-normal text-[hsl(var(--muted-foreground))]">(publicada: v{publishedVersion})</span></p>
+      {plan.changes.reasons.length > 0 && (
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">Desde la última publicación {plan.changes.reasons.join(", ")}.</p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Nueva versión">
+        {options.map((option) => (
+          <button
+            key={option.level}
+            type="button"
+            role="radio"
+            aria-checked={value === option.version}
+            onClick={() => onChange(option.version)}
+            className={`cursor-pointer rounded-xl border p-2.5 text-left transition-colors ${value === option.version ? "border-(--brand-primary) bg-(--brand-primary)/5" : "border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]/50"}`}
+          >
+            <span className="flex items-center justify-between gap-1">
+              <span className="text-sm font-semibold">v{option.version}</span>
+              {option.recommended && <span className="rounded-full bg-emerald-500/10 px-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Recomendada</span>}
+            </span>
+            <span className="block text-xs font-medium">{option.label}</span>
+            <span className="block text-[11px] text-[hsl(var(--muted-foreground))]">{option.help}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey, onPublished, definition, publishedDefinition, publishedVersion, onVersionChange }) {
   const queryClient = useQueryClient();
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [blocked, setBlocked] = useState(null);
   const [result, setResult] = useState(null);
+  const [version, setVersion] = useState(null);
+  const plan = versionOptions({ publishedVersion, publishedDefinition, definition });
 
   useEffect(() => {
-    if (!open) { setImpact(null); setBlocked(null); setResult(null); return; }
+    if (!open) { setImpact(null); setBlocked(null); setResult(null); setVersion(null); return; }
+    const draftVersion = definition?.version;
+    setVersion(publishedVersion && compareVersions(draftVersion, publishedVersion) > 0 ? draftVersion : plan.suggested);
     setLoading(true);
     runly.builder.getPublishImpact(projectId, token)
       .then((res) => setImpact(res.data))
       .catch((err) => toast.error(err.message ?? "No se pudo calcular el impacto."))
       .finally(() => setLoading(false));
+    // The suggestion is computed once per opening, from the draft at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectId, token]);
 
   async function handlePublish() {
     setPublishing(true);
     setBlocked(null);
     try {
+      if (version && version !== definition?.version) {
+        const next = { ...definition, version };
+        await runly.builder.updateDefinition(projectId, { definition: next }, token);
+        onVersionChange?.(version);
+      }
       const res = await runly.builder.publishProject(projectId, token);
       setResult(res.data);
       toast.success(res.data.installed ? "Módulo instalado correctamente." : "Módulo actualizado correctamente.");
@@ -71,7 +127,7 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Publicar {moduleKey}</DialogTitle>
+          <DialogTitle>Publicar {definition?.name || moduleKey}</DialogTitle>
           <DialogDescription>
             {impact?.action === "UPDATE" ? "Se actualizará el módulo ya instalado." : "Se instalará un módulo nuevo en esta instancia."}
           </DialogDescription>
@@ -99,10 +155,13 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
                 <p className="text-lg font-semibold">{impact.permissionCount}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Badge variant={impact.action === "UPDATE" ? "outline" : "default"}>{impact.action}</Badge>
-              <span>{impact.currentVersion ?? "—"} → {impact.nextVersion}</span>
-            </div>
+            <VersionPicker
+              plan={plan}
+              publishedVersion={publishedVersion}
+              draftVersion={definition?.version ?? "0.1.0"}
+              value={version}
+              onChange={setVersion}
+            />
             <p className="text-xs text-[hsl(var(--muted-foreground))]">{impact.schemaNote}</p>
           </div>
         )}
@@ -145,7 +204,7 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
           <Button variant="outline" onClick={() => onOpenChange(false)}>{result ? "Cerrar" : "Cancelar"}</Button>
           {!result && (
             <Button onClick={handlePublish} disabled={publishing || loading}>
-              {publishing ? "Publicando..." : "Publicar"}
+              {publishing ? "Publicando..." : version ? `Publicar v${version}` : "Publicar"}
             </Button>
           )}
         </DialogFooter>

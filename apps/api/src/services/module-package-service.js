@@ -1,7 +1,9 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createChecksum } from '@runly/module-engine'
+import { randomUUID } from 'node:crypto'
 import { computeSourceHash } from './module-bundler-service.js'
+import { buildUpdateReport, invalidPackageReport } from './module-update-report.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { acquireModuleLock as acquireModuleLockWithRecovery, ModulePackageLockBusyError } from './module-package-lock-service.js'
 
@@ -47,6 +49,25 @@ async function renameWithRetry(from, to, { attempts = 5, delayMs = 150 } = {}) {
       }
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
+  }
+}
+
+// Preview bundles built by checkZip live here, one folder per previewId,
+// and are served by GET /modules/:key/preview/:previewId/bundle.js.
+export const PREVIEWS_DIRNAME = '.previews'
+export const PREVIEW_TTL_MS = 60 * 60 * 1000
+
+export function previewBundlePath(modulesDir, key, previewId) {
+  return path.join(modulesDir, PREVIEWS_DIRNAME, key, previewId, `${key}.js`)
+}
+
+async function removeExpiredPreviews(previewsDir, now = Date.now()) {
+  const entries = await fs.readdir(previewsDir, { withFileTypes: true }).catch(() => [])
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const dir = path.join(previewsDir, entry.name)
+    const stat = await fs.stat(dir).catch(() => null)
+    if (stat && now - stat.mtimeMs > PREVIEW_TTL_MS) await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
   }
 }
 
@@ -399,5 +420,47 @@ export function createModulePackageService({
     }
   }
 
-  return { publishZip }
+  // Review an upload without applying it: same staging validation and
+  // preflight as publishZip, plus a throwaway preview bundle of the
+  // package's React components. Never touches the installed package, the
+  // database schema or the published bundle.
+  // `inspect(staged)` lets the caller add its own findings (the Builder
+  // project impact) while the staged copy still exists.
+  async function checkZip({ key, fileBuffer, modulesDir, inspect = null }) {
+    await stagingService.cleanupStaleStaging(modulesDir)
+    const previewsDir = path.join(modulesDir, PREVIEWS_DIRNAME, key)
+    await removeExpiredPreviews(previewsDir)
+    let staged = null
+    try {
+      try {
+        staged = await stagingService.stageZipPackage({ key, fileBuffer, modulesDir })
+      } catch (error) {
+        return invalidPackageReport(error)
+      }
+      const moduleRow = await prisma.runlyModule.findUnique({
+        where: { key },
+        select: { id: true, key: true, status: true, enabled: true, version: true, manifest: true },
+      }).catch(() => null)
+      const currentDir = path.join(modulesDir, key)
+      const currentHash = await exists(currentDir) ? await computeSourceHash(currentDir) : null
+      const preflight = await preflightPackage({ key, staged, moduleRow, publicationPlan: {} })
+      let preview = null
+      if (staged.inspection.hasComponents && bundlerSvc?.buildBundleFromDirectory) {
+        const previewId = randomUUID()
+        try {
+          const built = await bundlerSvc.buildBundleFromDirectory(key, staged.packageDir, { outputDir: path.join(previewsDir, previewId) })
+          if (built.built) preview = { id: previewId }
+        } catch (error) {
+          preview = { error: error?.errors?.[0]?.text ?? error?.message ?? 'error de compilación' }
+        }
+      }
+      const report = buildUpdateReport({ staged, moduleRow, preflight, noChanges: currentHash === staged.packageHash, preview })
+      if (inspect) report.builder = await inspect(staged).catch(() => null)
+      return report
+    } finally {
+      await stagingService.cleanupStage(staged).catch(() => {})
+    }
+  }
+
+  return { publishZip, checkZip }
 }

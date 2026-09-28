@@ -1,11 +1,64 @@
 // Module Builder — General tab: identity (name, description, icon, color,
 // PWA metadata). Module key is immutable once created (module-builder-service
 // re-pins it on every save), shown read-only here.
-import { TextField, TextareaField, SwatchField, IconPickerField, SectionCard } from "@runly/ui";
-import { GitBranch, KeyRound, Package, Smartphone } from "lucide-react";
+import { Button, TextField, TextareaField, SwatchField, IconPickerField, SectionCard } from "@runly/ui";
+import { Code2, Download, GitBranch, KeyRound, MousePointerClick, Package, Smartphone } from "lucide-react";
 import { buildModuleIconOptions } from "../../lib/builderHelpers";
 
-export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
+// Visual (Builder) vs "modo desarrollador" (code via ZIP). Both the card and
+// the button open DeveloperModeDialog, which explains the flow and hosts the
+// download and the optional manual conversion.
+function EditingModeCard({ mode }) {
+  if (!mode) return null;
+  const options = [
+    { key: "visual", icon: MousePointerClick, title: "Visual", text: "Lo editas aquí, sin código: datos, diseño, vistas, menú y permisos.", active: !mode.advanced },
+    { key: "developer", icon: Code2, title: "Desarrollador (código)", text: "Descargas el ZIP, agregas pantallas propias en React siguiendo la guía incluida y lo subes en Módulos.", active: mode.advanced },
+  ];
+  return (
+    <SectionCard title="Modo de edición" className="md:col-span-2">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {options.map((option) => {
+            const clickable = option.key === "developer";
+            const Tag = clickable ? "button" : "div";
+            return (
+              <Tag
+                key={option.key}
+                {...(clickable ? { type: "button", onClick: mode.onOpen } : {})}
+                className={`rounded-xl border p-3 text-left ${option.active ? "border-(--brand-primary) bg-(--brand-primary)/5" : "border-[hsl(var(--border))]"} ${clickable ? "cursor-pointer transition-colors hover:border-(--brand-primary) hover:bg-(--brand-primary)/5" : ""}`}
+              >
+                <div className="flex items-center gap-2">
+                  <option.icon className="h-4 w-4" />
+                  <span className="text-sm font-semibold">{option.title}</span>
+                  {option.active && <span className="ml-auto text-xs font-medium text-(--brand-primary)">Actual</span>}
+                </div>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{option.text}</p>
+                {clickable && <p className="mt-2 text-xs font-medium text-(--brand-primary)">Ver cómo funciona</p>}
+              </Tag>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={mode.onOpen}>
+            <Code2 className="h-4 w-4" />
+            Modo desarrollador
+          </Button>
+          <Button variant="ghost" size="sm" disabled={mode.downloading} onClick={mode.onDownload}>
+            <Download className="h-4 w-4" />
+            {mode.downloading ? "Preparando..." : "Descargar ZIP con guía"}
+          </Button>
+        </div>
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+          {mode.advanced
+            ? "Este módulo ya se edita como código; el Constructor no lo modifica ni lo publica para no borrar tus cambios."
+            : "No necesitas publicar antes. Cuando subas tu ZIP con cambios, el proyecto pasa solo a modo desarrollador."}
+        </p>
+      </div>
+    </SectionCard>
+  );
+}
+
+export function GeneralTab({ definition, onChange, capabilities, readOnly, editingMode }) {
   function set(patch) {
     onChange((current) => ({ ...current, ...patch }));
   }
@@ -40,7 +93,9 @@ export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
             value={definition.version ?? "0.1.0"}
             disabled={readOnly}
             onChange={(e) => set({ version: e.target.value })}
-            hint="Formato semver x.y.z"
+            hint={editingMode?.publishedVersion
+              ? `Publicada: v${editingMode.publishedVersion}. Al publicar, Runly te sugiere la siguiente versión según lo que cambiaste.`
+              : "Formato x.y.z. Al publicar cambios, Runly te sugiere la siguiente versión."}
           />
         </div>
       </SectionCard>
@@ -57,6 +112,7 @@ export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
           <SwatchField
             label="Color"
             value={definition.color}
+            disabled={readOnly}
             onChange={(value) => set({ color: value })}
           />
           <TextField
@@ -70,6 +126,7 @@ export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
           />
         </div>
       </SectionCard>
+      <EditingModeCard mode={editingMode} />
     </div>
   );
 }

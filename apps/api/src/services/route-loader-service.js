@@ -84,7 +84,7 @@ class RouteCollisionError extends Error {
   }
 }
 
-export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null }) {
+export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null, relationsCapability = null }) {
   let moduleRoots = null
   const routerMap = new Map()
   const routeOwnerMap = new Map()
@@ -331,6 +331,8 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
         // Module-bound file storage (upload/list/link/remove/signedUrl), see
         // module-files-service.js. Null when the host did not provide one.
         files: filesCapability ? filesCapability(moduleKey) : null,
+        // Relations to system entities (relation-targets-service.js).
+        relations: relationsCapability,
         cleanup: {
           // Bound to this module's own key so a handler can never be registered
           // under the wrong moduleKey. Docs show a bare `registerModuleHandler`

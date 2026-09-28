@@ -16,3 +16,9 @@ test("every shared bundler external is documented in the catalog", () => {
   assert.deepEqual(externals.filter((name) => !shared.has(name)), []);
   assert.deepEqual([...shared].filter((name) => !BUNDLE_EXTERNALS.includes(name)), []);
 });
+
+test("the public libraries page matches the catalog", async () => {
+  const { renderLibrariesDoc } = await import("../../../../../scripts/generate-module-runtime-catalog.mjs");
+  const doc = readFileSync(new URL("../../../../../docs/developers/librerias.md", import.meta.url), "utf8");
+  assert.equal(doc.replace(/\r\n/g, "\n"), renderLibrariesDoc(catalog));
+});

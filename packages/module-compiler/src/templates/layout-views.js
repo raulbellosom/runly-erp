@@ -1,6 +1,7 @@
 import { moduleSlug, permKey, toKebab } from './helpers.js'
 import { resolveEntityLayout } from '../layout.js'
 import { isSameModuleRelation, resolveLabelField } from '../relations.js'
+import { isExternalRelation } from '../external-relations.js'
 
 const FORM_TYPES = { textarea: 'textarea', number: 'number', decimal: 'decimal', boolean: 'boolean', select: 'select', multiselect: 'multiselect', date: 'date', datetime: 'datetime', email: 'email', phone: 'phone', relation: 'relation', file: 'file', json: 'json', markdown: 'markdown', color: 'color', richtext: 'richtext' }
 const DETAIL_TYPES = { boolean: 'boolean', date: 'date', datetime: 'datetime', decimal: 'currency', number: 'number', color: 'color', markdown: 'markdown', richtext: 'richtext', file: 'file-asset' }
@@ -53,7 +54,11 @@ export function formFieldSpec(config, entity, field) {
   const spec = { field: field.name, label: field.label || field.name, type: mapFormFieldType(field.type) }
   if (field.required) spec.required = true
   if (field.type === 'select' && Array.isArray(field.options)) spec.options = field.options
-  if (field.type === 'relation') {
+  if (isExternalRelation(field)) {
+    // System entity (Flotilla, Inventario...): searched through the API's
+    // relation-targets catalog, which applies the owning module's permissions.
+    spec.relation = { apiPath: `/relation-targets/${field.targetExternal}/search`, labelField: 'title', valueField: 'id', clearable: true }
+  } else if (field.type === 'relation') {
     const target = field.relatedModel ? `${field.relatedModel.split('.').pop()}s` : `${field.name}s`
     spec.relation = { apiPath: `/${moduleSlug(config.key)}/${target}`, labelField: isSameModuleRelation(field) ? relationLabelField(config, field) : 'name', clearable: true }
   }
@@ -64,6 +69,8 @@ export function formFieldSpec(config, entity, field) {
 export function detailFieldSpec(config, entity, field) {
   // Same-module relations show the target's label (list/get return <field>__label).
   if (isSameModuleRelation(field)) return { field: `${field.name}__label`, label: field.label || field.name }
+  // Label and link resolved by the generated routes (withExternalLabels).
+  if (isExternalRelation(field)) return { field: `${field.name}__label`, label: field.label || field.name, type: 'external-link', urlField: `${field.name}__url` }
   const spec = { field: field.name, label: field.label || field.name }
   const type = getDetailTypeHint(field.type)
   if (type) spec.type = type

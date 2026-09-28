@@ -5,6 +5,10 @@ export function createBuilderDomain({ request, requestBlob, withAuthHeaders }) {
   const projectPath = (id) => `/module-builder/projects/${encodeURIComponent(id)}`;
 
   return {
+    // System entities (Flotilla, Inventario...) a relation field can target.
+    listRelationTargets: (token) =>
+      request('/relation-targets', { headers: withAuthHeaders(token) }),
+
     getCapabilities: (token) =>
       request('/module-builder/capabilities', { headers: withAuthHeaders(token) }),
 
@@ -53,6 +57,18 @@ export function createBuilderDomain({ request, requestBlob, withAuthHeaders }) {
 
     listRevisions: (id, token) =>
       request(`${projectPath(id)}/revisions`, { headers: withAuthHeaders(token) }),
+
+    // "Volver al modo visual"; without confirm the API answers 409 with the
+    // code that would be lost (error.details.details.lost).
+    reattachProject: (id, { confirm = false } = {}, token) =>
+      request(`${projectPath(id)}/reattach`, {
+        method: 'POST',
+        headers: withAuthHeaders(token),
+        body: JSON.stringify({ confirm }),
+      }),
+
+    installedPackage: (id, token) =>
+      requestBlob(`${projectPath(id)}/installed-package`, { headers: withAuthHeaders(token) }),
 
     detachProject: (id, token) =>
       request(`${projectPath(id)}/detach`, { method: 'POST', headers: withAuthHeaders(token) }),

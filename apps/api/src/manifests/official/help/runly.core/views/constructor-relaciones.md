@@ -30,8 +30,18 @@ El mensaje dice cuantos registros lo usan. Puedes reasignarlos a otro registro, 
 - **Campo a mostrar**: tablas, detalle y selectores muestran ese dato del registro relacionado (por ejemplo, el nombre del cliente).
 - **Registros relacionados**: en el Diseno de la entidad principal puedes agregar una seccion que liste, en su detalle, los registros que apuntan a ella (los Pedidos del Cliente), cada uno con enlace a su propia ficha.
 
+### Relaciones con otros modulos del sistema
+
+Un campo de relacion tambien puede apuntar a registros de **otros modulos**: Contacto, Colaborador (RR. HH.), Vehiculo (Flotilla), Articulo de inventario, Proyecto, Tarea, Evento de calendario, Cuenta y Archivo. En el campo, **Relacionar con** muestra primero las entidades de tu modulo y despues las de otros modulos (por ejemplo "Flotilla · Vehiculo"); las de modulos no instalados aparecen deshabilitadas.
+
+- El formulario busca en ese modulo (por placa, nombre, etc.) y la tabla y el detalle muestran el registro con su detalle (por ejemplo "ABC-123 · Nissan NP300") y un **enlace** a su ficha original.
+- Al guardar, Runly valida que el registro exista, este activo y sea de tu empresa, con las mismas reglas de ese modulo.
+- Quien use tu modulo necesita permiso para ver esos registros (por ejemplo, ver vehiculos). Si no lo tiene o el registro se desactivo, se muestra "No disponible".
+- Tu modulo pasa a depender de ese modulo, para que no se pueda desinstalar mientras lo uses.
+- Las reglas "Bloquear / Dejar vacio / Desactivar tambien" solo aplican a relaciones dentro de tu modulo: los registros de otros modulos los administra su propio modulo.
+
 ### Limites
 
-- Las relaciones solo apuntan a entidades del mismo modulo.
+- Por ahora tus registros no aparecen dentro de las fichas de los otros modulos (por ejemplo, dentro del vehiculo); se ven desde tu modulo.
 - El Constructor no permite reglas "Desactivar tambien" que formen un ciclo (A desactiva a B y B desactiva a A).
 - Reactivar un registro no reactiva en cascada a los que se desactivaron con el.

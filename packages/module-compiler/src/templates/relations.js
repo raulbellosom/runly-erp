@@ -1,5 +1,6 @@
 import { moduleSlug, toPascal } from './helpers.js'
 import { inboundRelations, isSameModuleRelation, resolveLabelField } from '../relations.js'
+import { isExternalRelation } from '../external-relations.js'
 
 const esc = (value) => String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 
@@ -43,7 +44,7 @@ function inboundFor(config, entity) {
 }
 
 export function hasRelationsModule(config, entity) {
-  return outboundRelations(config, entity).length > 0 || inboundFor(config, entity).length > 0
+  return outboundRelations(config, entity).length > 0 || inboundFor(config, entity).length > 0 || externalRelations(entity).length > 0
 }
 
 export function hasInboundRules(config, entity) {
@@ -117,5 +118,44 @@ ${assertLines.join('\n')}
 export async function beforeDisable(db, { companyId, id, actorId }) {
 ${[...restrictLines, ...setNullLines, ...cascadeLines].join('\n')}
 }
+
+// Relations to system entities, resolved through moduleContext.relations
+// (the owning module's permissions and company scope).
+export const EXTERNAL_RELATIONS = ${JSON.stringify(externalRelations(entity))}
+
+export async function assertExternalTargets(c, moduleContext, data) {
+  const relations = moduleContext?.relations
+  if (!relations) return
+  for (const relation of EXTERNAL_RELATIONS) {
+    const value = data?.[relation.field]
+    if (value === undefined || value === null || value === '') continue
+    const found = await relations.resolve(c, relation.type, [String(value)])
+    if (!found.has(String(value))) throw new ${errorClass}('El registro seleccionado en "' + relation.label + '" no existe, está inactivo o no tienes acceso.', 400)
+  }
+}
+
+// Adds <field>__label ("Título · detalle") and <field>__url to each row.
+export async function withExternalLabels(c, moduleContext, rows) {
+  const relations = moduleContext?.relations
+  if (!relations || !Array.isArray(rows)) return rows
+  for (const relation of EXTERNAL_RELATIONS) {
+    const ids = [...new Set(rows.map((row) => row?.[relation.field]).filter(Boolean).map(String))]
+    if (!ids.length) continue
+    const found = await relations.resolve(c, relation.type, ids).catch(() => new Map())
+    for (const row of rows) {
+      const value = row?.[relation.field]
+      if (!value) continue
+      const hit = found.get(String(value))
+      row[relation.field + '__label'] = hit ? (hit.subtitle ? hit.title + ' · ' + hit.subtitle : hit.title) : 'No disponible (inactivo o sin acceso)'
+      row[relation.field + '__url'] = hit?.url ?? null
+    }
+  }
+  return rows
+}
 `
+}
+
+// Relations to system entities (Flotilla, Inventario, Contactos...).
+export function externalRelations(entity) {
+  return entity.fields.filter(isExternalRelation).map((field) => ({ field: field.name, label: field.label || field.name, type: field.targetExternal }))
 }

@@ -3,6 +3,8 @@ import { moduleSlug, permKey, toKebab } from './templates/helpers.js'
 import { isRecordsViewKind, normalizeRecordsView, validateRecordsView } from './records-views.js'
 import { validateEntityLayout, validateFileFieldOptions } from './layout.js'
 import { validateRelations } from './relations.js'
+import { validateExtensions } from './extensions.js'
+import { externalRelationDependencies, externalTarget } from './external-relations.js'
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/
 const MODULE_KEY = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/
@@ -85,7 +87,11 @@ export function validateModuleDefinition(definition) {
           }
         }
       }
-      if (field.type === 'relation' && !field.targetEntity && !field.targetModel && !field.relatedModel) errors.push(diagnostic(fieldPath, 'MISSING_RELATION_TARGET', 'Relation field requires targetEntity or targetModel.'))
+      if (field.type === 'relation' && !field.targetEntity && !field.targetModel && !field.relatedModel && !field.targetExternal) errors.push(diagnostic(fieldPath, 'MISSING_RELATION_TARGET', 'Relation field requires targetEntity, targetModel or targetExternal.'))
+      if (field.type === 'relation' && field.targetExternal !== undefined) {
+        if (!externalTarget(field.targetExternal)) errors.push(diagnostic(`${fieldPath}.targetExternal`, 'EXTERNAL_RELATION_TARGET_NOT_FOUND', `Unknown system entity "${field.targetExternal}".`))
+        if (field.targetEntity) errors.push(diagnostic(`${fieldPath}.targetExternal`, 'RELATION_TARGET_CONFLICT', 'A relation targets either an entity of this module or a system entity, not both.'))
+      }
       if (field.default !== undefined && !['string', 'number', 'boolean'].includes(typeof field.default)) errors.push(diagnostic(`${fieldPath}.default`, 'UNSAFE_DEFAULT', 'Defaults must be string, number or boolean literals.'))
       validateFileFieldOptions(field, fieldPath, errors)
     }
@@ -120,6 +126,7 @@ export function validateModuleDefinition(definition) {
   const permissionKeys = new Set((definition.permissions ?? definition.entities.flatMap((entity) =>
     ['read', 'create', 'update', 'delete'].map((action) => ({ key: permKey(moduleSlug(definition.key), entity.key ?? entity.name, action) }))
   )).map((permission) => permission.key))
+  validateExtensions(definition, permissionKeys, errors)
   for (const [permissionIndex, permission] of (definition.permissions ?? []).entries()) {
     const slug = definition.key?.split('.').pop()
     if (!permission.key?.startsWith(`${slug}.`)) errors.push(diagnostic(`permissions[${permissionIndex}].key`, 'PERMISSION_NAMESPACE_ESCAPE', 'Permission must stay inside the module slug namespace.'))
@@ -144,6 +151,16 @@ export function validateModuleDefinition(definition) {
   return { valid: errors.length === 0, errors, warnings }
 }
 
+// Relations to system entities make the owning module a dependency, so it
+// cannot be uninstalled while this module uses it.
+function withExternalDependencies(dependencies, entities) {
+  const next = [...dependencies]
+  for (const key of externalRelationDependencies(entities)) {
+    if (!next.some((dependency) => dependency.key === key)) next.push({ key })
+  }
+  return next
+}
+
 export function normalizeModuleDefinition(input) {
   const definition = {
     schemaVersion: input.schemaVersion ?? 1,
@@ -155,7 +172,7 @@ export function normalizeModuleDefinition(input) {
     color: input.color,
     pwa: { shortName: input.pwa?.shortName, startPath: input.pwa?.startPath },
     preset: input.preset || 'crud',
-    dependencies: input.dependencies ?? [{ key: 'runly.core' }],
+    dependencies: withExternalDependencies(input.dependencies ?? [{ key: 'runly.core' }], input.entities),
     entities: (input.entities ?? []).map((entity) => ({
       id: entity.id ?? entity.key ?? entity.name,
       key: entity.key ?? entity.name,
@@ -203,6 +220,7 @@ export function normalizeModuleDefinition(input) {
     .filter((view) => !generatedViewKeys.has(view.key))
     .map((view) => view.kind === 'DASHBOARD' ? normalizeDashboardView(view, definition) : view.kind === 'KANBAN' ? normalizeKanbanView(view, definition) : isRecordsViewKind(view.kind) ? normalizeRecordsView(view, definition) : view)
   definition.views = [...generatedViews, ...customViews]
+  if (input.extensions) definition.extensions = input.extensions
   definition.navigation = input.navigation ?? definition.entities.map((entity) => ({
     label: entity.pluralLabel,
     icon: definition.icon,

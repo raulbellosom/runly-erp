@@ -1,6 +1,7 @@
 import { toPascal, moduleSlug, permKey } from './helpers.js'
 import { hasFileSupport } from './layout-views.js'
 import { hasConditionalRequired } from './visibility.js'
+import { externalRelations } from './relations.js'
 import { isSameModuleRelation } from '../relations.js'
 
 export function generateRoutes(config, entity) {
@@ -12,6 +13,8 @@ export function generateRoutes(config, entity) {
   const companyScoped = entity.companyScoped !== false
   const withFiles = hasFileSupport(entity)
   const withVisibility = hasConditionalRequired(entity)
+  const withExternal = externalRelations(entity).length > 0
+  const externalAssert = withExternal ? '      await assertExternalTargets(c, moduleContext, parsed.data)\n' : ''
   const missingCheck = (values) => withVisibility
     ? `      const missing = findMissingConditionalRequired(${values})\n      if (missing) return c.json({ error: \`El campo \${missing.label} es requerido.\` }, 400)\n`
     : ''
@@ -31,6 +34,7 @@ import { create${pascal}Service } from './${entity.name}-service.js'
 import { ${errorClass} } from './service-helpers.js'
 ${withFiles ? `import { create${pascal}FileRouter, link${pascal}FileFields } from './${entity.name}-file-routes.js'
 ` : ''}${withVisibility ? `import { findMissingConditionalRequired } from './${entity.name}-visibility.js'
+` : ''}${withExternal ? `import { assertExternalTargets, withExternalLabels } from './${entity.name}-relations.js'
 ` : ''}
 const enabledSchema = z.object({ enabled: z.boolean() })
 
@@ -69,7 +73,8 @@ ${withFiles ? `  app.route('', create${pascal}FileRouter({ requirePermission, mo
     try {
       const companyId = getCompanyIdFromContext(c)
 ${filterQueryParams ? filterQueryParams + '\n' : ''}      const result = await service.list${pascal}s({ companyId, ${listParams.join(', ')} })
-      return c.json(result)
+${withExternal ? `      await withExternalLabels(c, moduleContext, result.data)
+` : ''}      return c.json(result)
     } catch (err) {
       return handleRouteError(c, err, { fallbackError: 'No se pudieron listar los registros.', route: '${base}', moduleKey, operation: 'list${pascal}s' })
     }
@@ -79,7 +84,8 @@ ${filterQueryParams ? filterQueryParams + '\n' : ''}      const result = await s
     try {
       const companyId = getCompanyIdFromContext(c)
       const row = await service.get${pascal}ById({ companyId, id: c.req.param('id') })
-      return c.json({ data: row })
+${withExternal ? `      await withExternalLabels(c, moduleContext, [row])
+` : ''}      return c.json({ data: row })
     } catch (err) {
       return handleRouteError(c, err, { fallbackError: 'No se pudo obtener el registro.', route: '${base}/:id', moduleKey, operation: 'get${pascal}ById' })
     }
@@ -92,7 +98,7 @@ ${filterQueryParams ? filterQueryParams + '\n' : ''}      const result = await s
       const body = await c.req.json()
       const parsed = create${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
-${missingCheck('parsed.data')}      const created = await service.create${pascal}({ companyId, data: parsed.data, actorId })
+${missingCheck('parsed.data')}${externalAssert}      const created = await service.create${pascal}({ companyId, data: parsed.data, actorId })
 ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
 ` : ''}      return c.json({ data: created }, 201)
     } catch (err) {
@@ -108,7 +114,7 @@ ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
       const parsed = update${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
 ${withVisibility ? `      const existing = await service.get${pascal}ById({ companyId, id: c.req.param('id') })
-` : ''}${missingCheck('{ ...existing, ...parsed.data }')}      const updated = await service.update${pascal}({ companyId, id: c.req.param('id'), data: parsed.data, actorId })
+` : ''}${missingCheck('{ ...existing, ...parsed.data }')}${externalAssert}      const updated = await service.update${pascal}({ companyId, id: c.req.param('id'), data: parsed.data, actorId })
 ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, updated)
 ` : ''}      return c.json({ data: updated })
     } catch (err) {

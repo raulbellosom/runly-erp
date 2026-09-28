@@ -48,12 +48,12 @@ import {
 } from "../services/module-upload-service.js";
 import { createModulePackagePurgeService } from "../services/module-package-purge-service.js";
 import { createModulePackageStagingService } from "../services/module-package-staging-service.js";
-import { createModulePackageService } from "../services/module-package-service.js";
+import { createModulePackageService, PREVIEW_TTL_MS, previewBundlePath } from "../services/module-package-service.js";
 import { createModuleSchemaMigrationService } from "../services/module-schema-migration-service.js";
 import { createModuleDashboardQueryService } from "../services/module-dashboard-query-service.js";
 import { createModuleKanbanQueryService } from "../services/module-kanban-query-service.js";
 import { registerRecordsViewRoutes } from "./module-records-view-routes.js";
-import { detachBuilderProjectAfterUpload } from "../services/module-builder-detach.js";
+import { createBuilderPackageSync } from "../services/module-builder-package-sync.js";
 
 const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
@@ -2406,6 +2406,59 @@ export function createModulesRouter({
     return c.body(content);
   });
 
+  // POST /modules/:key/upload/check — review a ZIP without applying it:
+  // validation, structure plan vs the installed module and a preview bundle
+  // of its React components (module-package-service.js#checkZip).
+  app.post(
+    "/:key/upload/check",
+    authMiddleware,
+    requirePermission("core.modules.upload"),
+    async (c) => {
+      const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+      if (!packageSvc?.checkZip) return c.json({ error: "MODULE_PACKAGE_PUBLISH_UNAVAILABLE" }, 503);
+      const modulesDir = await resolveModulesDir();
+      if (!modulesDir || !existsSync(modulesDir)) return c.json({ error: "MODULES_DIR_NOT_CONFIGURED" }, 503);
+      const body = await c.req.parseBody();
+      const file = body.file;
+      if (!file || typeof file.arrayBuffer !== "function") return c.json({ error: 'Campo "file" requerido' }, 422);
+      if (!file.name?.toLowerCase().endsWith(".zip")) return c.json({ error: "El archivo debe ser un ZIP" }, 422);
+      try {
+        const builderSync = createBuilderPackageSync({ prisma });
+        const report = await packageSvc.checkZip({
+          key,
+          fileBuffer: Buffer.from(await file.arrayBuffer()),
+          modulesDir,
+          inspect: (staged) => builderSync.evaluateUpload({ moduleKey: key, dir: staged.packageDir, manifest: staged.manifest }),
+        });
+        return c.json({ data: { moduleKey: key, ...report } });
+      } catch (err) {
+        return c.json({ error: err.code ?? err.message ?? "No se pudo revisar el paquete." }, err.statusCode ?? 500);
+      }
+    },
+  );
+
+  // GET /modules/:key/preview/:previewId/bundle.js — preview bundle built by
+  // /upload/check. No auth header is possible with import(); the previewId
+  // is a random UUID and previews expire after PREVIEW_TTL_MS.
+  app.get("/:key/preview/:previewId/bundle.js", async (c) => {
+    const key = c.req.param("key");
+    const previewId = c.req.param("previewId");
+    if (!/^[\w.-]+$/.test(key) || !/^[0-9a-f-]{36}$/i.test(previewId)) return c.json({ error: "Vista previa no encontrada." }, 404);
+    const modulesDir = await resolveModulesDir();
+    if (!modulesDir) return c.json({ error: "Vista previa no encontrada." }, 404);
+    const bundlePath = previewBundlePath(modulesDir, key, previewId);
+    try {
+      const stat = await fs.stat(bundlePath);
+      if (Date.now() - stat.mtimeMs > PREVIEW_TTL_MS) return c.json({ error: "La vista previa expiró; vuelve a revisar el ZIP." }, 410);
+      const content = await fs.readFile(bundlePath, "utf8");
+      c.header("Content-Type", "application/javascript");
+      c.header("Cache-Control", "no-store");
+      return c.body(content);
+    } catch {
+      return c.json({ error: "Vista previa no encontrada." }, 404);
+    }
+  });
+
   // POST /modules/:key/upload — extract a custom module ZIP to ATLAS_MODULES_DIR
   app.post(
     "/:key/upload",
@@ -2441,14 +2494,17 @@ export function createModulesRouter({
           modulesDir,
           actorId,
         });
-        // Hand-edited code must never be overwritten by a Builder publish.
-        const builderDetached = await detachBuilderProjectAfterUpload(prisma, { moduleKey: key, outcome: result.outcome, actorId })
-          .catch(() => false);
+        // Builder projects keep React-screen-only changes and switch to
+        // developer mode for anything else, so a Builder publish never
+        // overwrites hand-written code (module-builder-package-sync.js).
+        const builder = await createBuilderPackageSync({ prisma })
+          .afterUpload({ moduleKey: key, dir: path.join(modulesDir, key), outcome: result.outcome, actorId })
+          .catch(() => ({}));
         return c.json({ data: {
           moduleKey: key,
           fileCount: result.inspection.files,
           ...result,
-          builderDetached,
+          ...builder,
         } });
       } catch (err) {
         return c.json(

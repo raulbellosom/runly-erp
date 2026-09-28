@@ -151,5 +151,16 @@ export function createChatEntityReferencesService({ prisma, contactsService, fil
     return resolved.filter(Boolean);
   }
 
-  return { resolveEntityRefs };
+  // Batch variant for relation fields of Builder modules (relation-targets
+  // service): same per-type permission, company scope and shape, no 5-ref cap.
+  async function resolveReferences({ authUserId, companyId, refs, limit = 100 }) {
+    if (!companyId || !refs?.length) return [];
+    const profile = await prisma.userProfile.findUnique({ where: { authUserId }, select: { id: true } });
+    if (!profile) return [];
+    const ctx = { companyId, profileId: profile.id };
+    const resolved = await Promise.all(refs.slice(0, limit).map((ref) => resolveOne(authUserId, ctx, ref)));
+    return resolved.filter(Boolean);
+  }
+
+  return { resolveEntityRefs, resolveReferences };
 }

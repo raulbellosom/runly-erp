@@ -21,6 +21,7 @@ import { createModulePackageWiring } from './module-package-wiring-service.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { buildDefinitionFromTemplate, BUILDER_TEMPLATE_KEYS } from './module-builder-templates.js'
 import { buildPreview } from './module-builder-preview-service.js'
+import { createBuilderPackageSync } from './module-builder-package-sync.js'
 
 export class ModuleBuilderError extends Error {
   constructor(message, { code, statusCode = 400, details = null } = {}) {
@@ -82,6 +83,14 @@ function suggestModuleKey(name) {
 // entity added but not yet labeled) falls back to the safe answer: assume
 // unpublished changes, since an invalid draft can't be meaningfully diffed
 // against the last published one anyway.
+// `status` only describes the draft (every save sets DRAFT, even for an
+// installed module), so "is this module installed?" must come from
+// publishedAt — otherwise editing a published module unlocks deleting its
+// project and blocks converting it to advanced mode.
+function wasPublished(project) {
+  return Boolean(project.publishedAt)
+}
+
 function hasUnpublishedChanges(project) {
   if (!project.publishedDefinition) return true
   try {
@@ -114,6 +123,7 @@ function serializeProject(project) {
 
 export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoader = null, cacheDel = () => {} }) {
   const wiring = createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cacheDel })
+  const packageSync = createBuilderPackageSync({ prisma })
 
   async function requireProject({ companyId, projectId }) {
     // A malformed :id path param (not a UUID) used to reach Prisma's
@@ -177,9 +187,15 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
   async function updateDefinition({ companyId, actorId, projectId, definition, name, description }) {
     const project = await requireProject({ companyId, projectId })
     if (project.status === 'PUBLISHED' && project.detachedAt) {
-      throw new ModuleBuilderError('Este proyecto fue desconectado del Builder (modo avanzado) y ya no admite edición visual.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
+      throw new ModuleBuilderError('Este proyecto está en modo desarrollador (se edita como código) y ya no admite edición visual.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
     }
     const nextDefinition = { ...(definition ?? project.definition), key: project.moduleKey }
+    // React screens captured from an uploaded ZIP live in `extensions`. An
+    // editor that loaded the draft before the capture autosaves without the
+    // key: keep the stored ones. Removing them sends an explicit value.
+    if (definition && !Object.prototype.hasOwnProperty.call(definition, 'extensions') && project.definition?.extensions) {
+      nextDefinition.extensions = project.definition.extensions
+    }
     const updated = await prisma.moduleBuilderProject.update({
       where: { id: project.id },
       data: {
@@ -267,7 +283,7 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
   async function publishProject({ companyId, actorId, projectId }) {
     const project = await requireProject({ companyId, projectId })
     if (project.detachedAt) {
-      throw new ModuleBuilderError('Este proyecto fue desconectado del Builder y ya no puede publicarse desde aquí.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
+      throw new ModuleBuilderError('Este proyecto está en modo desarrollador: instala su código desde Módulos > Subir módulo.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
     }
     const compiled = compileDefinition(project.definition)
     const modulesDir = await resolveModulesDir()
@@ -353,9 +369,10 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
 
   async function detachProject({ companyId, actorId, projectId }) {
     const project = await requireProject({ companyId, projectId })
-    if (project.status !== 'PUBLISHED') {
-      throw new ModuleBuilderError('Solo un proyecto publicado puede convertirse a modo avanzado.', { code: 'BUILDER_PROJECT_NOT_PUBLISHED', statusCode: 409 })
-    }
+    // Any project can switch to developer mode, published or not: the code
+    // is then installed through Módulos > Subir módulo (which also detaches
+    // automatically, see module-builder-package-sync.js).
+    if (project.detachedAt) return serializeProject(project)
     const updated = await prisma.moduleBuilderProject.update({
       where: { id: project.id },
       data: { detachedAt: new Date(), updatedById: actorId },
@@ -363,9 +380,32 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     return serializeProject(updated)
   }
 
+  // "Volver al modo visual": keeps the installed React screens the Builder can
+  // carry (extensions) and, without confirm, refuses when anything else
+  // would be lost on the next publish (409 + lost[]).
+  async function reattachProject({ companyId, actorId, projectId, confirm = false }) {
+    const project = await requireProject({ companyId, projectId })
+    if (!project.detachedAt) return { reattached: true, lost: [], project: serializeProject(project) }
+    const result = await packageSync.reattach({ project, modulesDir: await resolveModulesDir(), confirm, actorId })
+    if (!result.reattached) {
+      throw new ModuleBuilderError('Volver al modo visual descartaría cambios de código que el Constructor no puede conservar.', {
+        code: 'BUILDER_REATTACH_LOSES_CODE', statusCode: 409, details: { lost: result.lost, kept: result.kept },
+      })
+    }
+    return { reattached: true, lost: result.lost ?? [], kept: result.kept ?? null, project: serializeProject(result.project) }
+  }
+
+  async function installedPackage({ companyId, projectId }) {
+    const project = await requireProject({ companyId, projectId })
+    const modulesDir = await resolveModulesDir()
+    const buffer = modulesDir ? await packageSync.installedPackageZip({ moduleKey: project.moduleKey, modulesDir }) : null
+    if (!buffer) throw new ModuleBuilderError('El módulo no tiene un paquete instalado.', { code: 'BUILDER_NO_INSTALLED_PACKAGE', statusCode: 404 })
+    return { buffer, filename: `${project.moduleKey}-instalado.zip` }
+  }
+
   async function deleteDraft({ companyId, projectId }) {
     const project = await requireProject({ companyId, projectId })
-    if (project.status === 'PUBLISHED') {
+    if (wasPublished(project)) {
       throw new ModuleBuilderError('Un proyecto publicado no puede eliminarse; desinstala el módulo primero desde el catálogo.', { code: 'BUILDER_PROJECT_PUBLISHED', statusCode: 409 })
     }
     await prisma.moduleBuilderProject.delete({ where: { id: project.id } })
@@ -385,6 +425,8 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     publishProject,
     listRevisions,
     detachProject,
+    reattachProject,
+    installedPackage,
     deleteDraft,
     templates: BUILDER_TEMPLATE_KEYS,
   }

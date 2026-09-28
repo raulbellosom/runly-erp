@@ -238,3 +238,22 @@ test('preserves disabled lifecycle and serializes publication by module key', as
   await first
   assert.deepEqual(ctx.routeCalls, [])
 })
+
+test('checkZip reviews a package without publishing it and always removes the staging copy', async (t) => {
+  const ctx = await fixture(t, {
+    preflight: async () => ({ schemaMigration: { canAutoApply: true, operations: [{ type: 'ADD_COLUMN', table: 'atomic_item', column: { name: 'nota' }, safety: 'SAFE' }], drift: [] } }),
+  })
+  let builtInto = null
+  ctx.bundlerSvc.buildBundleFromDirectory = async (_key, _dir, { outputDir }) => { builtInto = outputDir; return { built: true } }
+  const staging = await fs.readdir(path.join(ctx.root, '.staging')).catch(() => [])
+  const report = await ctx.service.checkZip({ key: ctx.key, fileBuffer: Buffer.from('zip'), modulesDir: ctx.root })
+  assert.equal(report.blocked, false)
+  assert.deepEqual(report.changes, ['Se agregará la columna nota en atomic_item.'])
+  assert.equal(report.currentVersion, '1.0.0')
+  assert.equal(report.nextVersion, '2.0.0')
+  assert.equal(builtInto, null, 'no components -> no preview bundle')
+  assert.equal(await fs.readFile(path.join(ctx.current, 'version.txt'), 'utf8'), 'v1', 'installed package untouched')
+  assert.equal(ctx.state.bundle, 'old', 'published bundle untouched')
+  assert.deepEqual(await fs.readdir(path.join(ctx.root, '.staging')).catch(() => []), staging)
+  assert.equal(ctx.auditCalls.length, 0)
+})

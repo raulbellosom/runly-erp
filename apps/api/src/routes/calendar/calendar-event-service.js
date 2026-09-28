@@ -407,6 +407,7 @@ export function createCalendarEventService({ prisma }) {
   }
 
   return {
+    getAccessibleCalendarIds,
     listEvents,
     getEvent,
     createEvent,
