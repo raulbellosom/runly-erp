@@ -47,7 +47,10 @@ function fieldDetail(field) {
     const target = externalTarget(field.targetExternal)
     return target ? `${target.label} de ${target.moduleName} (\`${field.targetExternal}\`); la API agrega \`${field.name}__label\` y \`${field.name}__url\`` : ''
   }
-  if (field.type === 'relation') return `Relación con \`${field.targetEntity ?? field.relatedModel}\`; la API agrega \`${field.name}__label\``
+  if (field.type === 'relation') {
+    const rule = { restrict: 'bloquea desactivar el relacionado mientras se use', setNull: 'se vacía si se desactiva el relacionado', cascade: 'se desactiva junto con el relacionado' }[field.onDisable ?? 'restrict']
+    return `Relación con la entidad \`${field.targetEntity ?? field.relatedModel}\` de este módulo${field.labelField ? ` (muestra \`${field.labelField}\`)` : ''}; ${rule}; la API agrega \`${field.name}__label\` y acepta \`?${field.name}=<id>\``
+  }
   if (field.type === 'file') return `Archivo (${field.accept ?? 'any'}${field.camera ? ', cámara' : ''}, máx. ${field.maxSizeMB ?? 10} MB); guarda el id del archivo`
   return ''
 }
@@ -55,7 +58,9 @@ function fieldDetail(field) {
 function dataDictionary(config) {
   return config.entities.map((entity) => {
     const rows = entity.fields.map((field) => `| ${field.label || field.name} | \`${field.name}\` | \`${field.type}\` | ${field.required ? 'Sí' : ''} | ${fieldDetail(field)} |`)
-    return [`### ${entity.label} (\`${entity.name}\`)`, '', '| Campo | Clave | Tipo | Requerido | Detalle |', '|---|---|---|---|---|', ...rows].join('\n')
+    const slug = moduleSlug(config.key)
+    const header = `Tabla \`${slug}_${entity.name}\` · API \`/${slug}/${entity.name}s\` · permisos \`${slug}.${entity.name}.read|create|update|delete\` · columnas de sistema: \`id\`, \`company_id\`, \`enabled\`, \`created_at\`, \`updated_at\``
+    return [`### ${entity.label} (\`${entity.name}\`)`, '', header, '', '| Campo | Clave | Tipo | Requerido | Detalle |', '|---|---|---|---|---|', ...rows].join('\n')
   }).join('\n\n')
 }
 
