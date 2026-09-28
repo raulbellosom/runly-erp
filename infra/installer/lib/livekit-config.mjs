@@ -237,6 +237,13 @@ export function renderEgressConfig({ apiKey, apiSecret, isLinux, httpPort, redis
     `ws_url: ${wsUrl}`,
     "redis:",
     `  address: ${redisAddress}`,
+    // Recording a call runs one room-composite egress (headless Chrome) plus
+    // one track egress per participant for speaker-attributed transcripts.
+    // Track egress is an audio passthrough (no transcoding), so its admission
+    // cost is kept low; otherwise a small host rejects the per-participant
+    // captures once the composite has reserved most of the CPU budget.
+    "cpu_cost:",
+    "  track_cpu_cost: 0.25",
     "",
   ].join("\n");
 }

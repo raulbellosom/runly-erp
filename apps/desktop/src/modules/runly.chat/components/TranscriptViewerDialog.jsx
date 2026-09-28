@@ -1,9 +1,9 @@
 import { useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-  Button, Skeleton, ErrorState, ConfirmDialog,
+  Button, Skeleton, ErrorState, ConfirmDialog, AssistantWordmark,
 } from "@runly/ui";
-import { Copy, Download, RefreshCw } from "lucide-react";
+import { Copy, Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useTranscript, useRetryTranscript, useRegenerateTranscript } from "../hooks/useConversationTranscripts";
 import { copyTranscriptToClipboard, downloadTranscriptPdf } from "../lib/transcriptExport";
@@ -16,10 +16,8 @@ function formatTimestamp(ms) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// Segments only ever carry speakerLabel/speakerUserId/speakerGuestId once V2
-// (captura por pista, docs/TRANSCRIPTION_SPEC.md §0.2) ships — V1 (audio
-// mezclado) never sets them, so every segment renders without a speaker
-// prefix today. This component already supports both without changes.
+// speakerLabel is only set for PER_TRACK transcripts (captura por pista,
+// docs/TRANSCRIPTION_SPEC.md §0.2); MIXED segments render without a prefix.
 function SegmentRow({ segment }) {
   return (
     <div className="flex gap-3 py-1.5 text-sm">
@@ -73,7 +71,7 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] max-w-lg overflow-hidden">
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Transcripción</DialogTitle>
           <DialogDescription>
@@ -122,6 +120,12 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
 
         {transcript?.status === "READY" && (
           <>
+            {transcript.sourceKind === "MIXED" && (
+              <p className="rounded-lg bg-[hsl(var(--muted)/0.5)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                Esta transcripción se generó del audio mezclado de la grabación y no identifica quién habló.
+                Las grabaciones nuevas capturan el micrófono de cada participante por separado para lograrlo.
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2 border-b border-[hsl(var(--border))] pb-3">
               <Button variant="outline" size="sm" onClick={handleCopy}>
                 <Copy className="h-3.5 w-3.5" />
@@ -140,11 +144,37 @@ export function TranscriptViewerDialog({ transcriptId, open, onOpenChange, conve
                 <RefreshCw className="h-3.5 w-3.5" />
                 Generar de nuevo
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setAnalysisOpen(true)}>
-                Analizar con MirAI
+            </div>
+            <div
+              className="flex items-center gap-3 rounded-xl border p-3"
+              style={{
+                borderColor: "color-mix(in srgb, var(--brand-primary) 35%, transparent)",
+                backgroundColor: "color-mix(in srgb, var(--brand-primary) 8%, transparent)",
+              }}
+            >
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: "var(--brand-primary)", color: "var(--brand-primary-foreground)" }}
+              >
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Analizar con <AssistantWordmark /></p>
+                <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                  Resumen, acuerdos y acciones propuestas a partir de la llamada.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="shrink-0"
+                style={{ backgroundColor: "var(--brand-primary)", color: "var(--brand-primary-foreground)" }}
+                onClick={() => setAnalysisOpen(true)}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Analizar
               </Button>
             </div>
-            <div className="max-h-[55vh] overflow-y-auto divide-y divide-[hsl(var(--border))]">
+            <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[hsl(var(--border))]">
               {transcript.segments?.length
                 ? transcript.segments.map((segment) => <SegmentRow key={segment.id} segment={segment} />)
                 : <p className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">Sin contenido reconocible.</p>}

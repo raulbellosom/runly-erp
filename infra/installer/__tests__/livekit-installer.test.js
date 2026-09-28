@@ -228,6 +228,7 @@ describe("LiveKit installer contract", () => {
     const bridged = renderEgressConfig({ apiKey: "APIabc123", apiSecret: "s3cr3t", isLinux: false });
     assert.match(bridged, /ws_url: ws:\/\/livekit:7880/);
     assert.match(bridged, /address: livekit-redis:6379/);
+    assert.match(bridged, /cpu_cost:\n  track_cpu_cost: 0\.25/);
   });
 
   it("adds the livekit-egress profile only when recording is enabled", () => {

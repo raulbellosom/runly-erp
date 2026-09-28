@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { BugReportDialog, onBugReportRequest } from "@runly/ui";
 import { useAuth } from "../auth/AuthProvider";
 import { runly } from "../lib/runly";
-import { normalizeExportColors } from "../lib/exportColorCompatibility.js";
+
+const MAX_SCREENSHOT_LENGTH = 2_800_000;
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -37,22 +38,25 @@ export function BugReportHost() {
 
     (async () => {
       try {
-        const { default: html2canvas } = await import("html2canvas");
-        // Capture #root rather than body so the bug-report dialog (portaled
-        // into body) never ends up in its own screenshot. Tailwind v4 emits
-        // oklch()/color-mix() colors that html2canvas 1.x cannot parse —
-        // without normalizing them the capture throws and silently drops.
+        // modern-screenshot renders through an SVG foreignObject, so the
+        // browser itself lays the page out — Tailwind v4 colors, responsive
+        // variants and fonts come out exactly as on screen (html2canvas
+        // re-implements CSS and mangled the layout). Capture #root rather
+        // than body so the bug-report dialog (portaled into body) never ends
+        // up in its own screenshot.
+        const { domToJpeg } = await import("modern-screenshot");
         const target = document.getElementById("root") ?? document.body;
-        const canvas = await html2canvas(target, {
-          scale: 0.5,
-          useCORS: true,
-          logging: false,
-          onclone: (clonedDocument) => {
-            const clonedTarget = clonedDocument.getElementById("root") ?? clonedDocument.body;
-            normalizeExportColors(clonedDocument, clonedTarget);
-          },
+        const capture = (scale, quality) => domToJpeg(target, {
+          scale,
+          quality,
+          width: window.innerWidth,
+          height: window.innerHeight,
+          backgroundColor: getComputedStyle(document.body).backgroundColor,
         });
-        setScreenshot(canvas.toDataURL("image/jpeg", 0.7));
+        let dataUrl = await capture(Math.min(window.devicePixelRatio || 1, 2), 0.85);
+        // Stay well under the validator's 3,000,000-char screenshot cap.
+        if (dataUrl.length > MAX_SCREENSHOT_LENGTH) dataUrl = await capture(1, 0.7);
+        if (dataUrl.length <= MAX_SCREENSHOT_LENGTH) setScreenshot(dataUrl);
       } catch {
         // Screenshot is best-effort — the report still sends without it.
       }

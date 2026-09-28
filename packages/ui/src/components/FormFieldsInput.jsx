@@ -8,6 +8,7 @@
 import { useState, useEffect, forwardRef, useId } from "react";
 import { Eye, EyeOff, Check } from "lucide-react";
 import { cn } from "../lib/utils.js";
+import { useOverlayAutoComplete } from "./overlay-surface-context.js";
 import {
   FIELD_ERROR,
   FIELD_NORMAL,
@@ -29,12 +30,14 @@ export const TextField = forwardRef(function TextField(
     id,
     icon,
     className,
+    autoComplete,
     ...props
   },
   ref,
 ) {
   const [localError, setLocalError] = useState("");
   const error = externalError || localError;
+  const resolvedAutoComplete = useOverlayAutoComplete(autoComplete);
 
   function handleBlur(e) {
     if (validate) setLocalError(validate(e.target.value) || "");
@@ -54,6 +57,7 @@ export const TextField = forwardRef(function TextField(
           ref={ref}
           id={id}
           className={fieldCls(error, cn(icon && "pl-9", className))}
+          autoComplete={resolvedAutoComplete}
           onBlur={handleBlur}
           {...props}
         />
@@ -262,12 +266,14 @@ export const TextareaField = forwardRef(function TextareaField(
     onChange,
     className,
     rows = 4,
+    autoComplete,
     ...props
   },
   ref,
 ) {
   const [localError, setLocalError] = useState("");
   const error = externalError || localError;
+  const resolvedAutoComplete = useOverlayAutoComplete(autoComplete);
   const charCount = typeof value === "string" ? value.length : 0;
 
   function handleBlur(e) {
@@ -287,6 +293,7 @@ export const TextareaField = forwardRef(function TextareaField(
         ref={ref}
         id={id}
         rows={rows}
+        autoComplete={resolvedAutoComplete}
         value={value}
         onChange={onChange}
         maxLength={maxLength}

@@ -200,6 +200,29 @@ export function createCallsRouter({
     } catch (error) { return handleError(c, error, "Error al silenciar."); }
   });
 
+  // Recording a call also captures each participant's microphone separately
+  // (V2), so its transcript can say who said what. Transcribing the mixed
+  // recording afterwards (V1) cannot attribute speakers. Best-effort: a
+  // capture failure never fails the recording itself.
+  async function startLinkedTrackCapture(c, { callId, profileId, recordingId }) {
+    const ctx = c.get("userContext");
+    if (!ctx?.isAdmin && !ctx?.permissionSet?.has("chat.calls.transcript.request")) return;
+    try {
+      await transcriptService.requestTrackTranscription({ callId, requestedByUserId: profileId, profileId, recordingId });
+    } catch (error) {
+      if (error?.status === 409) {
+        // A capture was already running (started from the captions button) —
+        // link it to this recording so the gallery shows it.
+        await prisma.callTranscript.updateMany({
+          where: { callId, sourceKind: "PER_TRACK", status: "CAPTURING", recordingId: null },
+          data: { recordingId },
+        }).catch(() => {});
+        return;
+      }
+      console.warn("[runly.calls] No se pudo iniciar la captura por pista con la grabación:", callId, error?.message ?? error);
+    }
+  }
+
   internal.post(
     "/:callId/recording/start",
     requirePermission("chat.calls.record"),
@@ -214,6 +237,7 @@ export function createCallsRouter({
         // proves the caller's role carries the permission somewhere.
         const profileId = c.get("userId");
         const data = await recordingService.startRecording({ callId, startedByUserId: profileId, profileId });
+        await startLinkedTrackCapture(c, { callId, profileId, recordingId: data.id });
         return c.json({ data }, 201);
       } catch (error) { return handleError(c, error, "Error iniciando la grabación."); }
     },
@@ -225,6 +249,11 @@ export function createCallsRouter({
       try {
         const callId = callIdSchema.parse(c.req.param("callId"));
         const data = await recordingService.stopRecording({ callId, profileId: c.get("userId") });
+        if (data?.id) {
+          await Promise.resolve()
+            .then(() => transcriptService.stopTrackTranscription({ callId, profileId: c.get("userId"), recordingId: data.id }))
+            .catch(() => {}); // no linked capture (or already stopping) — nothing to do
+        }
         return c.json({ data });
       } catch (error) { return handleError(c, error, "Error deteniendo la grabación."); }
     },

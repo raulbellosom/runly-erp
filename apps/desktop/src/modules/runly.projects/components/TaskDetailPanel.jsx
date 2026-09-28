@@ -434,53 +434,60 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
             className={`h-0.5 shrink-0 transition-opacity duration-200 bg-primary ${isPending ? "opacity-100 animate-pulse" : "opacity-0"}`}
           />
 
-          <SheetHeader className="pl-6 pr-20 py-4 border-b border-border shrink-0">
+          {/* Two rows: meta (task number + actions) on top, full-width title
+              below. On desktop the right padding clears the Sheet's close
+              button; on mobile that button sits in the drag-handle row above. */}
+          <SheetHeader className="gap-1 border-b border-border px-5 pb-3 pt-1 max-md:bg-background md:pl-6 md:pr-14 md:pt-4">
             <SheetTitle className="sr-only">Detalles de tarea</SheetTitle>
-            <div className="flex items-center gap-2">
-              {isLoading && !task ? (
-                <>
-                  <Skeleton className="h-5 w-10 rounded shrink-0" />
-                  <Skeleton className="h-6 flex-1 rounded" />
-                </>
-              ) : (
-                <>
+            {isLoading && !task ? (
+              <>
+                <Skeleton className="h-5 w-12 rounded" />
+                <Skeleton className="h-6 w-full rounded" />
+              </>
+            ) : (
+              <>
+                <div className="flex min-h-8 items-center gap-2">
                   {task?.taskNumber != null && (
-                    <span className="text-xs text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded">
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                       T-{task.taskNumber}
                     </span>
                   )}
-                  <textarea
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onBlur={handleTitleBlur}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                      }
-                    }}
-                    rows={1}
-                    className="flex-1 text-base font-semibold bg-transparent border-none outline-none focus:ring-0 resize-none leading-snug"
-                    style={{ fieldSizing: "content" }}
-                    placeholder="Nombre de la tarea"
-                  />
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => setDeleteOpen(true)}
-                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    className="ml-auto text-muted-foreground hover:text-destructive"
                     title="Eliminar tarea"
+                    aria-label="Eliminar tarea"
                   >
                     <Trash2 size={16} />
-                  </button>
-                </>
-              )}
-            </div>
+                  </Button>
+                </div>
+                <textarea
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={handleTitleBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  rows={1}
+                  className="w-full max-h-24 resize-none border-none bg-transparent text-lg font-semibold leading-snug outline-none focus:ring-0"
+                  style={{ fieldSizing: "content" }}
+                  placeholder="Nombre de la tarea"
+                />
+              </>
+            )}
           </SheetHeader>
 
-          <div className="flex-1 md:overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {isLoading ? (
               <LoadingState />
             ) : task ? (
-              <div className="flex flex-col gap-4 p-6">
+              <div className="flex flex-col gap-4 p-5 md:p-6">
                 <SelectField
                   label="Estado"
                   value={task.statusId}

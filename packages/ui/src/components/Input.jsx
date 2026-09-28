@@ -1,14 +1,17 @@
 import { forwardRef } from "react";
 import { cn } from "../lib/utils.js";
+import { useOverlayAutoComplete } from "./overlay-surface-context.js";
 
 const Input = forwardRef(function Input(
-  { className, type, error, ...props },
+  { className, type, error, autoComplete, ...props },
   ref,
 ) {
+  const resolvedAutoComplete = useOverlayAutoComplete(autoComplete);
   return (
     <input
       type={type}
       ref={ref}
+      autoComplete={resolvedAutoComplete}
       className={cn(
         "flex h-10 w-full rounded-lg border bg-transparent px-3 py-1 text-base sm:h-9 sm:text-sm shadow-sm transition-colors",
         "placeholder:text-[hsl(var(--muted-foreground))]",

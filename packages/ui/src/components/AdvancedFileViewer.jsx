@@ -390,8 +390,37 @@ export function AdvancedFileViewer({
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     }
 
+    // Long-press -> the viewer's context menu. iOS never fires a native
+    // `contextmenu` event, and Radix's own long-press timer is cancelled by
+    // any pointermove (normal finger jitter), so it rarely fires on phones.
+    // Re-dispatching a synthetic contextmenu at the touch point lets the
+    // ContextMenuTrigger open exactly as it does for a right-click.
+    let longPress = null;
+    function cancelLongPress() {
+      if (longPress) clearTimeout(longPress.timer);
+      longPress = null;
+    }
+    function startLongPress(p) {
+      cancelLongPress();
+      const timer = setTimeout(() => {
+        longPress = null;
+        lastTapRef.current = 0;
+        panRef.current = null;
+        el.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            clientX: p.x,
+            clientY: p.y,
+          }),
+        );
+      }, 500);
+      longPress = { timer, point: p };
+    }
+
     function onTouchStart(e) {
       if (e.touches.length >= 2) {
+        cancelLongPress();
         e.preventDefault();
         const p0 = touchPoint(e.touches[0]);
         const p1 = touchPoint(e.touches[1]);
@@ -411,6 +440,7 @@ export function AdvancedFileViewer({
       } else if (e.touches.length === 1) {
         const p = touchPoint(e.touches[0]);
         panRef.current = { point: p, pan: liveRef.current.pan };
+        startLongPress(p);
         // double-tap -> toggle fit / 2x, anchored at the tap
         const now = Date.now();
         if (now - lastTapRef.current < 280) {
@@ -439,6 +469,10 @@ export function AdvancedFileViewer({
     }
 
     function onTouchMove(e) {
+      if (longPress) {
+        const p = touchPoint(e.touches[0]);
+        if (e.touches.length > 1 || getDistance(p, longPress.point) > 10) cancelLongPress();
+      }
       if (e.touches.length >= 2 && pinchRef.current) {
         e.preventDefault();
         const p0 = touchPoint(e.touches[0]);
@@ -476,6 +510,7 @@ export function AdvancedFileViewer({
     }
 
     function onTouchEnd(e) {
+      cancelLongPress();
       if (e.touches.length === 1) {
         // dropped from a pinch to one finger — reseed pan from here so the
         // transition into a one-finger drag doesn't jump
@@ -495,6 +530,7 @@ export function AdvancedFileViewer({
     el.addEventListener("touchend", onTouchEnd);
     el.addEventListener("touchcancel", onTouchEnd);
     return () => {
+      cancelLongPress();
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
@@ -504,6 +540,10 @@ export function AdvancedFileViewer({
 
   function handlePointerDown(event) {
     if (kind !== "image" || event.pointerType === "touch") return;
+    // Only the primary button pans. Capturing the pointer on a right-click
+    // retargets the following contextmenu event to the container, which
+    // hides the browser's native image menu (copy / save image).
+    if (event.button !== 0) return;
 
     pointersRef.current.set(event.pointerId, {
       x: event.clientX,
@@ -755,7 +795,7 @@ export function AdvancedFileViewer({
         {/* Overlay */}
         <DialogPrimitive.Overlay
           style={{ zIndex }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200"
+          className="fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200"
         />
 
         {/* Viewer panel — fills almost the full viewport */}
@@ -768,7 +808,7 @@ export function AdvancedFileViewer({
           }}
           className={[
             "fixed inset-0 flex flex-col overflow-hidden",
-            "glass-strong",
+            "glass-viewer",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -948,7 +988,7 @@ export function AdvancedFileViewer({
                         h: e.currentTarget.naturalHeight,
                       })
                     }
-                    className="will-change-transform pointer-events-none block"
+                    className="will-change-transform block [-webkit-touch-callout:none]"
                     style={{ ...imageTransformStyle, visibility: naturalSize ? "visible" : "hidden" }}
                   />
                 </div>
@@ -1210,6 +1250,7 @@ export function AdvancedFileViewer({
             </ContextMenuTrigger>
             <ContextMenuContent
               style={{ zIndex: zIndex + 10 }}
+              data-above-viewer=""
               className="w-56"
               onCloseAutoFocus={(e) => e.preventDefault()}
             >

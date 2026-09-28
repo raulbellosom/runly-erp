@@ -206,8 +206,9 @@ def download_track_audio(conn, transcript_id, workdir: Path):
     pistas siguen siendo utiles."""
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
-            "SELECT object_key, speaker_user_id, speaker_guest_id, livekit_identity "
-            "FROM call_transcript_track WHERE transcript_id = %s AND status = 'READY' AND object_key IS NOT NULL",
+            "SELECT object_key, speaker_user_id, speaker_guest_id, livekit_identity, offset_ms "
+            "FROM call_transcript_track WHERE transcript_id = %s AND status = 'READY' AND object_key IS NOT NULL "
+            "ORDER BY offset_ms ASC",
             (transcript_id,),
         )
         tracks = cur.fetchall()
@@ -248,6 +249,7 @@ def download_track_audio(conn, transcript_id, workdir: Path):
             "path": wav_path,
             "speaker_user_id": track["speaker_user_id"],
             "speaker_guest_id": track["speaker_guest_id"],
+            "offset_ms": track["offset_ms"] or 0,
         })
 
     if not result:
@@ -284,29 +286,26 @@ def transcribe(audio_path: Path):
 
 def transcribe_tracks(tracks):
     """V2 (PER_TRACK, spec §2.2): transcribe cada pista por separado y fusiona
-    los segmentos por marca de tiempo absoluta, atribuyendo cada uno a la
-    identidad ya conocida de esa pista — sin ejecutar ningun modelo de
-    diarizacion acustica.
+    los segmentos en la linea de tiempo de la llamada, atribuyendo cada uno a
+    la identidad ya conocida de esa pista — sin diarizacion acustica.
 
-    Simplificacion deliberada: cada pista arranca su propio egress dentro de
-    la MISMA llamada a requestTrackTranscription (el bucle en
-    call-transcript-service.js es sincronico), por lo que sus puntos de
-    inicio quedan lo bastante cerca entre si como para fusionar directamente
-    por start_ms sin un offset de correccion. La correccion fina por
-    CallParticipant.joinedAt/CallGuest.admittedAt que el plan de
-    implementacion menciona como posible refinamiento queda pendiente de
-    validarse contra una llamada real con varios participantes (spec §9
-    riesgo 4) antes de implementarse — no se inventa aqui sin poder medirla."""
+    Cada pista trae offset_ms: cuando empezo su captura respecto al inicio de
+    la transcripcion (quien entra tarde o se reconecta tiene una pista nueva
+    que no arranca en 0). Sin sumarlo, sus segmentos quedarian mezclados con
+    los del inicio de la llamada."""
     all_segments = []
     max_duration_ms = 0
     detected_language = None
     for track in tracks:
         segments, duration_ms, language = transcribe(track["path"])
-        max_duration_ms = max(max_duration_ms, duration_ms)
+        offset_ms = track.get("offset_ms") or 0
+        max_duration_ms = max(max_duration_ms, offset_ms + duration_ms)
         detected_language = detected_language or language
         for seg in segments:
             all_segments.append({
                 **seg,
+                "start_ms": seg["start_ms"] + offset_ms,
+                "end_ms": seg["end_ms"] + offset_ms,
                 "speaker_user_id": track["speaker_user_id"],
                 "speaker_guest_id": track["speaker_guest_id"],
             })

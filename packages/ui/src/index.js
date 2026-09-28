@@ -276,6 +276,12 @@ export { ChatAttachMenu } from "./components/ChatAttachMenu.jsx";
 export { ListLayout } from "./components/ListLayout.jsx";
 export { useAttachmentsController, resolveAttachmentFileType } from "./hooks/useAttachmentsController.js";
 export { useIsMobile } from "./hooks/useIsMobile.js";
+export { useKeyboardInset, useKeyboardViewport } from "./hooks/useKeyboardInset.js";
+export {
+  computeKeyboardInset,
+  isCaretHiddenByKeyboard,
+  computeCaretScrollDelta,
+} from "./lib/keyboardInset.js";
 export { useCoarsePointer, useHasHover } from "./hooks/usePointerCapabilities.js";
 export { useIsolatedScroll } from "./hooks/useIsolatedScroll.js";
 export { useLongPress, createLongPressController } from "./hooks/useLongPress.js";

@@ -514,9 +514,13 @@ describe("createCallTranscriptService.stopTrackTranscription", () => {
   it("stops every active/starting track's egress and marks them PROCESSING", async () => {
     const egress = new FakeTrackEgress();
     let updateManyWhere;
+    let stoppedData;
     const prisma = {
       $queryRaw: async () => memberRows(),
-      callTranscript: { findFirst: async () => ({ id: TRANSCRIPT, conversationId: CONV, status: "CAPTURING" }) },
+      callTranscript: {
+        findFirst: async () => ({ id: TRANSCRIPT, conversationId: CONV, status: "CAPTURING" }),
+        update: async ({ data }) => { stoppedData = data; },
+      },
       callTranscriptTrack: {
         findMany: async () => [
           { id: "track-1", egressId: "egress_1", status: "ACTIVE" },
@@ -530,6 +534,7 @@ describe("createCallTranscriptService.stopTrackTranscription", () => {
     assert.equal(out.id, TRANSCRIPT);
     assert.deepEqual(egress.stopped.sort(), ["egress_1", "egress_2"]);
     assert.deepEqual(updateManyWhere.id.in.sort(), ["track-1", "track-2"]);
+    assert.ok(stoppedData.captureStoppedAt instanceof Date, "an explicit stop closes the capture");
   });
 });
 
@@ -540,7 +545,7 @@ describe("createCallTranscriptService.reconcileActiveTranscriptTracks", () => {
     const prisma = {
       callTranscript: {
         findMany: async () => [{
-          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING",
+          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING", captureStoppedAt: new Date(),
           tracks: [
             { id: "track-1", egressId: "egress_1", status: "ACTIVE", livekitIdentity: USER },
             { id: "track-2", egressId: "egress_2", status: "PROCESSING", livekitIdentity: GUEST_IDENTITY },
@@ -579,7 +584,7 @@ describe("createCallTranscriptService.reconcileActiveTranscriptTracks", () => {
     const prisma = {
       callTranscript: {
         findMany: async () => [{
-          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING",
+          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING", captureStoppedAt: new Date(),
           tracks: [{ id: "track-1", egressId: "egress_1", status: "ACTIVE", livekitIdentity: USER }],
         }],
         update: async ({ data }) => { transcriptUpdateData = data; },
@@ -599,5 +604,69 @@ describe("createCallTranscriptService.reconcileActiveTranscriptTracks", () => {
     });
     await svc.reconcileActiveTranscriptTracks();
     assert.equal(transcriptUpdateData.status, "FAILED");
+  });
+
+  function openCapturePrisma({ tracks, created, onTranscriptUpdate }) {
+    return {
+      callTranscript: {
+        findMany: async () => [{
+          id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "CAPTURING",
+          createdAt: new Date(Date.now() - 60_000), captureStoppedAt: null, tracks,
+        }],
+        update: async ({ data }) => onTranscriptUpdate(data),
+      },
+      callTranscriptTrack: {
+        create: async ({ data }) => { created.push(data); return data; },
+        update: async () => {},
+        findMany: async () => [...tracks, ...created.map((c) => ({ ...c, status: "ACTIVE" }))],
+      },
+      callParticipant: { findMany: async () => [{ livekitIdentity: USER, userId: USER }] },
+      callGuest: { findMany: async () => [{ livekitIdentity: GUEST_IDENTITY, id: GUEST_ID }] },
+    };
+  }
+
+  it("captures a late joiner with its offset from the capture start, without re-capturing existing tracks", async () => {
+    const egress = new FakeTrackEgress();
+    egress.listEgress = async () => [{ status: 1 /* EGRESS_ACTIVE */ }];
+    const created = [];
+    const prisma = openCapturePrisma({
+      tracks: [{ id: "track-1", egressId: "egress_1", status: "ACTIVE", livekitIdentity: USER, trackSid: "TR_USER" }],
+      created,
+      onTranscriptUpdate: () => { throw new Error("must not touch the transcript while capture is open"); },
+    });
+    const svc = createCallTranscriptService({
+      prisma, env: env(), EgressClientImpl: egress,
+      callService: { getLiveCallOrThrow: async () => liveCall },
+      RoomServiceClientImpl: new FakeRoomService([
+        { identity: USER, tracks: [{ sid: "TR_USER", type: TrackType.AUDIO }] },
+        { identity: GUEST_IDENTITY, tracks: [{ sid: "TR_GUEST", type: TrackType.AUDIO }] },
+      ]),
+    });
+    await svc.reconcileActiveTranscriptTracks();
+    assert.equal(egress.started.length, 1);
+    assert.equal(created[0].speakerGuestId, GUEST_ID);
+    assert.equal(created[0].trackSid, "TR_GUEST");
+    assert.ok(created[0].offsetMs >= 59_000, "late joiner's segments must be shifted onto the call timeline");
+  });
+
+  it("re-captures a participant who reconnected with a new track, and does not hand off while capture is open", async () => {
+    const egress = new FakeTrackEgress();
+    egress.listEgress = async () => [];
+    const created = [];
+    const prisma = openCapturePrisma({
+      // Their first track already finished when they dropped.
+      tracks: [{ id: "track-1", egressId: "egress_1", status: "READY", livekitIdentity: USER, trackSid: "TR_OLD" }],
+      created,
+      onTranscriptUpdate: () => { throw new Error("must not promote to PENDING while the call is live and capture open"); },
+    });
+    const svc = createCallTranscriptService({
+      prisma, env: env(), EgressClientImpl: egress,
+      callService: { getLiveCallOrThrow: async () => liveCall },
+      RoomServiceClientImpl: new FakeRoomService([{ identity: USER, tracks: [{ sid: "TR_NEW", type: TrackType.AUDIO }] }]),
+    });
+    await svc.reconcileActiveTranscriptTracks();
+    assert.equal(created.length, 1);
+    assert.equal(created[0].livekitIdentity, USER);
+    assert.equal(created[0].trackSid, "TR_NEW");
   });
 });

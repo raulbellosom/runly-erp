@@ -302,7 +302,11 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
 
     if (!(await pathExists(apiPath))) {
       setModuleRouteStatus(moduleKey, 'MISSING_API', { apiPath })
-      console.warn(`[route-loader] ${moduleKey}: no api/index.js at ${apiPath}, routes not mounted`)
+      // Official modules mount their routes from apps/api directly, so a
+      // missing api/index.js is only worth reporting for installed modules.
+      if (/^(custom|community)\./.test(moduleKey)) {
+        console.warn(`[route-loader] ${moduleKey}: no api/index.js at ${apiPath}, routes not mounted`)
+      }
       return { loaded: false, reason: 'missing_api' }
     }
 

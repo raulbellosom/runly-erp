@@ -246,8 +246,12 @@ export function ChatRecordingsGallery({ conversationId }) {
   const { data: transcriptsData } = useConversationTranscripts(conversationId);
   const transcriptsByRecordingId = useMemo(() => {
     const map = new Map();
+    // Newest first from the API; a speaker-attributed (PER_TRACK) transcript
+    // wins over a mixed-audio one for the same recording.
     for (const t of (transcriptsData?.data ?? transcriptsData ?? [])) {
-      if (t.recordingId) map.set(t.recordingId, t);
+      if (!t.recordingId) continue;
+      const current = map.get(t.recordingId);
+      if (!current || (current.sourceKind !== "PER_TRACK" && t.sourceKind === "PER_TRACK")) map.set(t.recordingId, t);
     }
     return map;
   }, [transcriptsData]);

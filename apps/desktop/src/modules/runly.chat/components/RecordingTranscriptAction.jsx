@@ -57,14 +57,15 @@ export function RecordingTranscriptAction({ recording, transcript, conversationI
     );
   }
 
-  if (["PENDING", "PROCESSING"].includes(transcript.status)) {
+  if (["CAPTURING", "PENDING", "PROCESSING"].includes(transcript.status)) {
+    const label = transcript.status === "CAPTURING" ? "Capturando el audio de cada participante…" : "Transcribiendo…";
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" aria-label="Transcribiendo" />
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" aria-label={label} />
           </TooltipTrigger>
-          <TooltipContent side="top">Transcribiendo…</TooltipContent>
+          <TooltipContent side="top">{label}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );

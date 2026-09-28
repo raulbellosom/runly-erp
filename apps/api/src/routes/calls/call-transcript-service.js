@@ -104,7 +104,14 @@ export function createCallTranscriptService({
   // recordings/transcripts/... (not recordings/...) keeps V2 track audio in
   // its own namespace, never colliding with a CallRecording's HLS segments
   // even though both live in the same bucket.
-  function trackObjectKey(conversationId, callId, livekitIdentity) {
+  // Keyed by transcript + track sid: a participant who reconnects publishes a
+  // new track, and a second capture in the same call must not overwrite the
+  // first one's files.
+  function trackObjectKey(conversationId, callId, transcriptId, livekitIdentity, trackSid) {
+    return `recordings/transcripts/${conversationId}/${callId}/${transcriptId}/track_${livekitIdentity}_${trackSid}.ogg`;
+  }
+  // Rows created before track_sid existed stored no objectKey up front.
+  function legacyTrackObjectKey(conversationId, callId, livekitIdentity) {
     return `recordings/transcripts/${conversationId}/${callId}/track_${livekitIdentity}.ogg`;
   }
   // Same shape as call-recording-service.js's assertMember — the caller must
@@ -201,7 +208,95 @@ export function createCallTranscriptService({
   // llamada ya haya terminado y tenga una CallRecording READY). Analogo a
   // call-recording-service.js's startRecording, pero disparando N trabajos de
   // egress (uno por participante con microfono publicado) en vez de uno solo.
-  async function requestTrackTranscription({ callId, requestedByUserId, profileId }) {
+  // Lists the room's participants that currently publish a microphone track.
+  async function listSpeakers(livekitRoomName) {
+    const participants = await roomServiceClient().listParticipants(livekitRoomName);
+    return (participants ?? [])
+      .map((p) => ({ identity: p.identity, audioTrack: p.tracks?.find((t) => t.type === TrackType.AUDIO) }))
+      .filter((p) => p.audioTrack);
+  }
+
+  // Starts one track egress per microphone track not yet captured for this
+  // transcript and returns how many started. Shared by the initial request
+  // and by the reconcile sweep, which picks up participants who joined,
+  // turned their mic on, or reconnected (a reconnect publishes a new track
+  // sid) after capture began. Each track records its offset from the capture
+  // start so the worker can place its segments on the call's timeline.
+  async function startTrackEgresses({ call, transcript, speakers, existingTracks = [] }) {
+    const capturedSids = new Set(existingTracks.map((t) => t.trackSid).filter(Boolean));
+    // Rows from before track_sid existed: treat their identity as captured
+    // while still active, so an in-flight capture is not duplicated.
+    const legacyActive = new Set(existingTracks
+      .filter((t) => !t.trackSid && TRACK_ACTIVE_STATUSES.includes(t.status))
+      .map((t) => t.livekitIdentity));
+    const pending = speakers.filter((s) => !capturedSids.has(s.audioTrack.sid) && !legacyActive.has(s.identity));
+    if (!pending.length) return 0;
+    const transcriptId = transcript.id;
+    const offsetMs = Math.max(0, now().getTime() - new Date(transcript.createdAt ?? now()).getTime());
+
+    // Resolve each LiveKit identity to a real person (CallParticipant.userId
+    // or CallGuest.id) BEFORE starting any egress — spec §1.2 goal 8, no
+    // segment is ever attributed via voice recognition, only via this known
+    // identity mapping.
+    const identities = pending.map((p) => p.identity);
+    const [callParticipants, callGuests] = await Promise.all([
+      prisma.callParticipant.findMany({ where: { callId: call.id, livekitIdentity: { in: identities } } }),
+      prisma.callGuest.findMany({ where: { callId: call.id, livekitIdentity: { in: identities } } }),
+    ]);
+    const userIdByIdentity = new Map(callParticipants.map((p) => [p.livekitIdentity, p.userId]));
+    const guestIdByIdentity = new Map(callGuests.map((g) => [g.livekitIdentity, g.id]));
+
+    const client = egressClient();
+    const s3 = s3Config(env);
+    let started = 0;
+    for (const speaker of pending) {
+      const speakerUserId = userIdByIdentity.get(speaker.identity) ?? null;
+      const speakerGuestId = guestIdByIdentity.get(speaker.identity) ?? null;
+      if (!speakerUserId && !speakerGuestId) {
+        // A LiveKit identity with no matching CallParticipant/CallGuest row
+        // (e.g. a screen-share pseudo-identity) — skip it rather than
+        // capturing an audio track no one could ever attribute to a person.
+        continue;
+      }
+      const objectKey = trackObjectKey(call.conversationId, call.id, transcriptId, speaker.identity, speaker.audioTrack.sid);
+      try {
+        const info = await client.startTrackEgress(
+          call.livekitRoomName,
+          new DirectFileOutput({
+            filepath: objectKey,
+            output: { case: "s3", value: new S3Upload({ ...s3, bucket: RECORDING_BUCKET, forcePathStyle: true }) },
+          }),
+          speaker.audioTrack.sid,
+        );
+        await prisma.callTranscriptTrack.create({
+          data: {
+            transcriptId,
+            egressId: info.egressId,
+            livekitIdentity: speaker.identity,
+            trackSid: speaker.audioTrack.sid,
+            offsetMs,
+            objectKey,
+            speakerUserId,
+            speakerGuestId,
+            status: "ACTIVE",
+          },
+        });
+        started += 1;
+      } catch (error) {
+        // One participant's egress failing to start must not abort capture
+        // for the rest — their speech may still be picked up as bleed on
+        // another open mic (spec §0.2 accepted edge case), and there is
+        // nothing useful to persist for a track that never got an egressId.
+        console.warn(`${LOG_PREFIX} No se pudo iniciar egress de pista:`, call.id, speaker.identity, error?.message ?? error);
+      }
+    }
+    return started;
+  }
+
+  // recordingId (optional): links the capture to the CallRecording started
+  // alongside it, so the recordings gallery shows this speaker-attributed
+  // transcript for that recording instead of offering the mixed-audio one.
+  async function requestTrackTranscription({ callId, requestedByUserId, profileId, recordingId = null }) {
     if (!callService?.getLiveCallOrThrow) throw new CallTranscriptError("No disponible.", 500);
     const call = await callService.getLiveCallOrThrow(callId); // 409 si la llamada no esta RINGING/ACTIVE
     await assertMember(call.conversationId, profileId);
@@ -217,84 +312,30 @@ export function createCallTranscriptService({
     const companyId = convRows[0]?.company_id;
     if (!companyId) throw new CallTranscriptError("Conversación no encontrada.", 404);
 
-    let participants;
+    let speakers;
     try {
-      participants = await roomServiceClient().listParticipants(call.livekitRoomName);
+      speakers = await listSpeakers(call.livekitRoomName);
     } catch (error) {
       console.warn(`${LOG_PREFIX} No se pudo listar los participantes de la sala:`, callId, error?.message ?? error);
       throw new CallTranscriptError("No se pudo iniciar la captura por pista.", 500);
     }
-    const speakers = (participants ?? [])
-      .map((p) => ({ identity: p.identity, audioTrack: p.tracks?.find((t) => t.type === TrackType.AUDIO) }))
-      .filter((p) => p.audioTrack);
     if (!speakers.length) {
       throw new CallTranscriptError("No hay participantes con micrófono activo en esta llamada.", 422);
     }
-
-    // Resolve each LiveKit identity to a real person (CallParticipant.userId
-    // or CallGuest.id) BEFORE starting any egress — spec §1.2 goal 8, no
-    // segment is ever attributed via voice recognition, only via this known
-    // identity mapping.
-    const identities = speakers.map((p) => p.identity);
-    const [callParticipants, callGuests] = await Promise.all([
-      prisma.callParticipant.findMany({ where: { callId, livekitIdentity: { in: identities } } }),
-      prisma.callGuest.findMany({ where: { callId, livekitIdentity: { in: identities } } }),
-    ]);
-    const userIdByIdentity = new Map(callParticipants.map((p) => [p.livekitIdentity, p.userId]));
-    const guestIdByIdentity = new Map(callGuests.map((g) => [g.livekitIdentity, g.id]));
 
     const record = await prisma.callTranscript.create({
       data: {
         callId,
         conversationId: call.conversationId,
         companyId,
+        recordingId,
         sourceKind: "PER_TRACK",
         status: "CAPTURING",
         requestedByUserId,
       },
     });
 
-    const client = egressClient();
-    const s3 = s3Config(env);
-    let started = 0;
-    for (const speaker of speakers) {
-      const speakerUserId = userIdByIdentity.get(speaker.identity) ?? null;
-      const speakerGuestId = guestIdByIdentity.get(speaker.identity) ?? null;
-      if (!speakerUserId && !speakerGuestId) {
-        // A LiveKit identity with no matching CallParticipant/CallGuest row
-        // (e.g. a screen-share pseudo-identity) — skip it rather than
-        // capturing an audio track no one could ever attribute to a person.
-        console.warn(`${LOG_PREFIX} Identidad de LiveKit sin participante/invitado conocido, se omite:`, callId, speaker.identity);
-        continue;
-      }
-      try {
-        const info = await client.startTrackEgress(
-          call.livekitRoomName,
-          new DirectFileOutput({
-            filepath: trackObjectKey(call.conversationId, callId, speaker.identity),
-            output: { case: "s3", value: new S3Upload({ ...s3, bucket: RECORDING_BUCKET, forcePathStyle: true }) },
-          }),
-          speaker.audioTrack.sid,
-        );
-        await prisma.callTranscriptTrack.create({
-          data: {
-            transcriptId: record.id,
-            egressId: info.egressId,
-            livekitIdentity: speaker.identity,
-            speakerUserId,
-            speakerGuestId,
-            status: "ACTIVE",
-          },
-        });
-        started += 1;
-      } catch (error) {
-        // One participant's egress failing to start must not abort capture
-        // for the rest — their speech may still be picked up as bleed on
-        // another open mic (spec §0.2 accepted edge case), and there is
-        // nothing useful to persist for a track that never got an egressId.
-        console.warn(`${LOG_PREFIX} No se pudo iniciar egress de pista:`, callId, speaker.identity, error?.message ?? error);
-      }
-    }
+    const started = await startTrackEgresses({ call, transcript: record, speakers });
 
     if (!started) {
       await prisma.callTranscript.update({
@@ -324,9 +365,11 @@ export function createCallTranscriptService({
   // manually. Does not itself mark anything READY/FAILED — that only happens
   // once LiveKit actually reports each egress as complete, which this
   // function does not wait for.
-  async function stopTrackTranscription({ callId, profileId }) {
+  // recordingId (optional): only stop the capture linked to that recording —
+  // used when a recording stops, so a capture started on its own is untouched.
+  async function stopTrackTranscription({ callId, profileId, recordingId = undefined }) {
     const transcript = await prisma.callTranscript.findFirst({
-      where: { callId, sourceKind: "PER_TRACK", status: "CAPTURING" },
+      where: { callId, sourceKind: "PER_TRACK", status: "CAPTURING", ...(recordingId ? { recordingId } : {}) },
     });
     if (!transcript) throw new CallTranscriptError("No hay una captura de pistas en curso para esta llamada.", 404);
     await assertMember(transcript.conversationId, profileId);
@@ -348,6 +391,7 @@ export function createCallTranscriptService({
         data: { status: "PROCESSING" },
       });
     }
+    await prisma.callTranscript.update({ where: { id: transcript.id }, data: { captureStoppedAt: now() } });
     return { id: transcript.id, status: transcript.status };
   }
 
@@ -370,10 +414,26 @@ export function createCallTranscriptService({
         // The call ended without anyone explicitly stopping capture (e.g.
         // everyone just hung up) — force-stop any still-active track, same
         // principle as reconcileActiveRecordings' orphan handling.
-        let callStillLive = true;
+        let liveCall = null;
         if (callService?.getLiveCallOrThrow) {
-          try { await callService.getLiveCallOrThrow(transcript.callId); }
-          catch { callStillLive = false; }
+          try { liveCall = await callService.getLiveCallOrThrow(transcript.callId); }
+          catch { liveCall = null; }
+        }
+        const callStillLive = Boolean(liveCall);
+        // Capture still open: pick up anyone who joined, turned their mic on
+        // or reconnected (new track sid) since the last sweep.
+        if (callStillLive && !transcript.captureStoppedAt) {
+          try {
+            const speakers = await listSpeakers(liveCall.livekitRoomName);
+            const added = await startTrackEgresses({ call: liveCall, transcript, speakers, existingTracks: transcript.tracks });
+            if (added) transcript.tracks = await prisma.callTranscriptTrack.findMany({ where: { transcriptId: transcript.id } });
+          } catch (error) {
+            console.warn(`${LOG_PREFIX} No se pudo revisar participantes nuevos (se reintentará):`, transcript.id, error?.message ?? error);
+          }
+        }
+        if (!callStillLive && !transcript.captureStoppedAt) {
+          await prisma.callTranscript.update({ where: { id: transcript.id }, data: { captureStoppedAt: now() } });
+          transcript.captureStoppedAt = now();
         }
         if (!callStillLive) {
           const stillActive = transcript.tracks.filter((t) => ["STARTING", "ACTIVE"].includes(t.status));
@@ -408,7 +468,7 @@ export function createCallTranscriptService({
               where: { id: track.id },
               data: {
                 status: "READY",
-                objectKey: trackObjectKey(transcript.conversationId, transcript.callId, track.livekitIdentity),
+                objectKey: track.objectKey ?? legacyTrackObjectKey(transcript.conversationId, transcript.callId, track.livekitIdentity),
                 durationMs: nsToMs(file?.duration),
                 completedAt: now(),
               },
@@ -424,12 +484,12 @@ export function createCallTranscriptService({
           }
         }
 
-        // Hand off to the Python worker only once EVERY track is terminal —
-        // a transcript with some tracks still ACTIVE/PROCESSING must never
-        // become PENDING, or the worker would transcribe a partial capture.
+        // Hand off to the Python worker only once capture is closed AND every
+        // track is terminal. While capture is open, all tracks can be terminal
+        // just because everyone dropped at once — they may still reconnect.
         const refreshed = await prisma.callTranscriptTrack.findMany({ where: { transcriptId: transcript.id } });
         const allTerminal = refreshed.length > 0 && refreshed.every((t) => t.status === "READY" || t.status === "FAILED");
-        if (allTerminal) {
+        if (allTerminal && transcript.captureStoppedAt) {
           const anyReady = refreshed.some((t) => t.status === "READY");
           await prisma.callTranscript.update({
             where: { id: transcript.id },

@@ -3,9 +3,13 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { useDragToDismiss } from "../hooks/useDragToDismiss.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+import { useKeyboardViewport } from "../hooks/useKeyboardInset.js";
 import {
   BOTTOM_SHEET_SURFACE_CLASS,
+  BOTTOM_SHEET_STICKY_HEADER_CLASS,
   bottomSheetDragStyle,
+  BottomSheetBody,
   BottomSheetHandle,
 } from "./bottom-sheet-shared.jsx";
 import { OverlaySurfaceContext } from "./overlay-surface-context.js";
@@ -47,18 +51,33 @@ const DialogContent = forwardRef(function DialogContent(
 ) {
   const {
     closeRef,
+    surfaceRef,
     dragY,
     dragging,
+    expanded,
+    baseHeight,
     handleDragPointerDown,
     handleDragPointerMove,
     handleDragPointerUp,
   } = useDragToDismiss();
+  const isMobile = useIsMobile();
+  // Only the mobile bottom sheet follows the keyboard; the desktop/tablet
+  // centered modal must keep its own positioning.
+  const keyboard = useKeyboardViewport({
+    enabled: isMobile && mobileVariant !== "center",
+  });
+
+  function setRef(node) {
+    surfaceRef(node);
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  }
 
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        ref={ref}
+        ref={setRef}
         aria-describedby={undefined}
         {...props}
         onInteractOutside={(event) => {
@@ -67,7 +86,7 @@ const DialogContent = forwardRef(function DialogContent(
         }}
         style={mobileVariant === "center"
           ? style
-          : bottomSheetDragStyle({ dragY, dragging, style })}
+          : bottomSheetDragStyle({ dragY, dragging, expanded, baseHeight, style, keyboard })}
         className={cn(
           "fixed z-50 glass-strong shadow-xl focus:outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -80,7 +99,7 @@ const DialogContent = forwardRef(function DialogContent(
                 "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200",
               ]
             : [
-                "inset-x-0 bottom-0 w-full",
+                "inset-x-0 bottom-0 w-full max-md:flex max-md:flex-col",
                 // min-height / padding / handle room all come from
                 // BOTTOM_SHEET_SURFACE_CLASS now (shared with Sheet.jsx).
                 BOTTOM_SHEET_SURFACE_CLASS,
@@ -94,7 +113,7 @@ const DialogContent = forwardRef(function DialogContent(
           "md:-translate-x-1/2 md:-translate-y-1/2",
           "md:w-full md:max-h-[90dvh] md:overflow-y-auto md:overscroll-contain",
           SIZE_CLASSES[size] ?? SIZE_CLASSES.md,
-          "md:rounded-2xl md:p-6",
+          "md:rounded-2xl md:p-6 md:pt-6!",
           "md:data-[state=open]:slide-in-from-top-2",
           "md:data-[state=closed]:slide-out-to-top-2",
           "md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95",
@@ -117,7 +136,13 @@ const DialogContent = forwardRef(function DialogContent(
           </div>
         )}
         <OverlaySurfaceContext.Provider value={true}>
-          {children}
+          {mobileVariant === "center" ? (
+            children
+          ) : (
+            // Only scroll region on mobile; `md:contents` makes it vanish from
+            // layout on desktop so the centered modal behaves as before.
+            <BottomSheetBody className="md:contents">{children}</BottomSheetBody>
+          )}
         </OverlaySurfaceContext.Provider>
         <DialogPrimitive.Close className="absolute right-4 top-4 z-20 rounded-lg p-1 text-[hsl(var(--muted-foreground))] opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/40">
           <X className="h-4 w-4" />
@@ -131,7 +156,11 @@ const DialogContent = forwardRef(function DialogContent(
 const DialogHeader = function DialogHeader({ className, ...props }) {
   return (
     <div
-      className={cn("flex shrink-0 flex-col gap-1.5 text-left mb-4 pr-6", className)}
+      className={cn(
+        "flex shrink-0 flex-col gap-1.5 text-left mb-4 pr-6",
+        BOTTOM_SHEET_STICKY_HEADER_CLASS,
+        className,
+      )}
       {...props}
     />
   );
