@@ -22,7 +22,7 @@ Every new module requires an approved spec and implementation plan before any co
 2. Get spec approved (explicit confirmation — not implied)
 3. Write implementation plan at `docs/superpowers/plans/YYYY-MM-DD-rme3-<moduleKey>.md`
 4. Get plan approved (explicit confirmation — not implied)
-5. Create module folder at `modules/custom/<moduleKey>/`
+5. Create module folder at `modules/custom/<moduleKey>/` (git-ignored instance folder: keep the module's source in its own repository or as a ZIP; see the note in [02_module_system.md](02_module_system.md#module-locations))
 6. Write `module.manifest.js` using `defineRunlyModule`
 7. Declare models in `models/*.model.js` using `defineModel`
 8. Declare views in `views/*.view.js` using `defineView` (TABLE, FORM, DETAIL, CUSTOM kinds)
@@ -329,6 +329,8 @@ Available from Phase 3. In Phase 1–2, register screens manually in `apps/deskt
 `api/index.js` exports a default factory function that returns a Hono router. The Route Loader mounts this automatically in Phase 4. In Phase 1–2, import and mount it manually in `apps/api/src/index.js`.
 
 `requirePermission` and `moduleContext` are not importable — they are injected by the Route Loader as parameters to the factory function (`apps/api/src/services/route-loader-service.js`). There is no resolvable `@runly/api` package to import them from.
+
+`moduleContext` also carries `files`, `relations`, `notifications`, `cleanup` and `ai` (MirAI tool loop + user-initiated internet lookup restricted to the fields declared under the manifest `ai.publicLookup`; see `docs/ai-context/rme3-runtime-capabilities.md`, section "Module AI").
 
 ```js
 // modules/custom/custom.deliveries/api/index.js

@@ -49,8 +49,6 @@
     "check:uuid-policy": "node scripts/enforce-uuid-policy.mjs",
     "check:supabase-schema-ownership": "node scripts/enforce-supabase-schema-ownership-policy.mjs",
     "module:checksums": "node scripts/check-module-manifest-migrations.mjs",
-    "module:checksums:fleet": "node scripts/check-module-manifest-migrations.mjs modules/official/runly.fleet",
-    "module:checksums:write": "node scripts/check-module-manifest-migrations.mjs modules/official/runly.fleet --write",
     "db:advisor-equivalent": "node scripts/check-supabase-advisor-equivalent.mjs",
     "test:isolation": "node --test apps/api/src/services/__tests__/user-isolation.integration.test.js",
     "test:isolation:fresh": "node scripts/verify-user-isolation.mjs"

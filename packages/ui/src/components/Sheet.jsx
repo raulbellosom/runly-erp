@@ -10,6 +10,7 @@ import {
   bottomSheetDragStyle,
   BottomSheetHandle,
 } from "./bottom-sheet-shared.jsx";
+import { OverlaySurfaceContext } from "./overlay-surface-context.js";
 
 const Sheet = SheetPrimitive.Root;
 const SheetTrigger = SheetPrimitive.Trigger;
@@ -137,7 +138,9 @@ const SheetContent = forwardRef(function SheetContent(
           <X className="h-4 w-4" />
           <span className="sr-only">Cerrar</span>
         </SheetPrimitive.Close>
-        {children}
+        <OverlaySurfaceContext.Provider value={true}>
+          {children}
+        </OverlaySurfaceContext.Provider>
       </SheetPrimitive.Content>
     </SheetPortal>
   );

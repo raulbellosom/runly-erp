@@ -18,13 +18,16 @@ function useInstanceStatus() {
 }
 
 export function AppRouteGuard({ mode }) {
-  const { session, loading: authLoading } = useAuth();
+  const { session, loading: authLoading, profileLoading } = useAuth();
   const location = useLocation();
   const { data, isPending, isError, error, refetch } = useInstanceStatus();
   const verifying = isPending || authLoading;
+  // Module screens derive permissions from userProfile; hold them until /me lands.
+  const awaitingProfile = mode === "access" &&Boolean(session) && profileLoading;
   useBootLoader("instance", verifying, "Verificando instancia...");
+  useBootLoader("profile", !verifying && awaitingProfile, "Cargando perfil...");
 
-  if (verifying) {
+  if (verifying || awaitingProfile) {
     return null;
   }
 

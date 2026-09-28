@@ -75,7 +75,7 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
     <div className="space-y-3">
       {views.length > 1 && (
         <Tabs value={view.key} onValueChange={setActive}>
-          <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden scrollbar-none">
             {views.map((item) => <TabsTrigger key={item.key} value={item.key}>{item.title}</TabsTrigger>)}
           </TabsList>
         </Tabs>

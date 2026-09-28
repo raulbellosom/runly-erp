@@ -12,6 +12,7 @@ import { toLocalIso, toLocalMonth } from "@runly/core";
 import { createAiRouter } from "../../services/ai/ai-router.js";
 import { AiClientError } from "../../services/ai/ai-client.js";
 import { isLocalEnabled } from "../../services/ai/ai-providers.js";
+import { createPublicLookup } from "../../services/ai/public-lookup.js";
 import { stripMentionTokens } from "../../lib/mention-utils.js";
 import { ChatServiceError } from "./chat-service-error.js";
 import { TOOL_DEFS, buildToolRunners, CHANNEL_TOOL_DEFS, buildChannelToolRunners } from "./mirai-tools.js";
@@ -39,8 +40,6 @@ const WEB_TIMEOUT_MS = 40_000;
 // A live question is almost always self-contained — keep only a little context.
 const WEB_HISTORY_LIMIT = 4;
 const WEB_MSG_MAX_CHARS = 600;
-const TAVILY_URL = "https://api.tavily.com/search";
-const TAVILY_TIMEOUT_MS = 20_000;
 const LIVE_RATE_MAX = 10;
 const LIVE_RATE_WINDOW_MS = 300_000;
 const ROUTES = ["chat", "general", "live"];
@@ -218,6 +217,9 @@ export function createMiraiService({
   // or Tavily+Groq-phrasing — mirai_web is not local-capable.
   const webProvider = webKillSwitch ? null : (tavilyKey ? "tavily" : (env.CHAT_MIRAI_WEB_MODEL ? "compound" : null));
   const webEnabled = webProvider !== null && Boolean(env.GROQ_API_KEY);
+  // Shared Tavily client + record lookup for module assistants (public-lookup.js).
+  const publicLookup = createPublicLookup({ env, fetchImpl: fetchFn });
+  const tavilySearch = publicLookup.search;
 
   const runners = buildToolRunners({
     prisma, listMessages, chatSearchService, visionService, resolveUserContext,
@@ -458,33 +460,6 @@ export function createMiraiService({
       role: m.sender_type === "assistant" ? "assistant" : "user",
       content: String(m.body || "").slice(0, WEB_MSG_MAX_CHARS),
     }));
-  }
-
-  // Tavily web search (free tier). Returns { answer, results:[{title,url,content}] }.
-  async function tavilySearch(query) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TAVILY_TIMEOUT_MS);
-    try {
-      const res = await fetchFn(TAVILY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: tavilyKey,
-          query: String(query).slice(0, 400),
-          max_results: 5,
-          include_answer: "advanced",
-          search_depth: "basic",
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const d = await res.text().catch(() => "");
-        throw new Error(`Tavily ${res.status}: ${d.slice(0, 160)}`);
-      }
-      return await res.json();
-    } finally {
-      clearTimeout(timer);
-    }
   }
 
   // Resolve a `live` question. Tavily: search, then one gpt-oss call to phrase
@@ -975,7 +950,7 @@ export function createMiraiService({
 
   return {
     answerWithTools,
-    searchPublicModel: tavilyKey && webEnabled ? tavilySearch : null,
+    publicLookup,
     isConfigured,
     isWebEnabled: () => webEnabled,
     getOrCreateMiraiProfile,

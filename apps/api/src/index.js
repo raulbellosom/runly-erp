@@ -88,6 +88,8 @@ import {
 import { createModuleBundlerService } from "./services/module-bundler-service.js";
 import { createRouteLoaderService } from "./services/route-loader-service.js";
 import { createModuleFilesCapability } from "./services/module-files-service.js";
+import { createModuleAiCapability } from "./services/ai/module-ai-capability.js";
+import { createMiraiService } from "./routes/chat/mirai-service.js";
 import { createRelationTargetsService } from "./services/relation-targets-service.js";
 import { createRelationTargetsRouter } from "./routes/relation-targets-routes.js";
 import { createDistServeService } from "./services/dist-serve-service.js";
@@ -718,6 +720,8 @@ const routeLoader = createRouteLoaderService({
   requirePermission,
   filesCapability: createModuleFilesCapability({ prisma, filesService, supabaseAdmin }),
   relationsCapability: relationTargets.capability(),
+  // MirAI tool loop + shared public lookup for RME3 modules (lazy).
+  aiCapability: createModuleAiCapability({ prisma, createMirai: () => createMiraiService({ prisma, env: process.env }) }),
   cache: {
     get: cacheGet,
     set: cacheSet,

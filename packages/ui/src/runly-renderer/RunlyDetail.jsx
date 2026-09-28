@@ -1226,15 +1226,18 @@ export function RunlyDetail({
       )}
 
       {twoColumn ? (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="min-w-0 space-y-6 lg:col-span-2">
+        // The aside column keeps a 300px floor so file lists, thumbnails and
+        // activity feeds never collapse to an unreadable width on narrow
+        // lg viewports (sidebar open); the main column absorbs the squeeze.
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+          <div className="min-w-0 space-y-6">
             {mainSections.map(renderSection)}
           </div>
           <div className="min-w-0 space-y-6">
             {asideSections.map(renderSection)}
           </div>
           {fullSections.length > 0 && (
-            <div className="min-w-0 space-y-6 lg:col-span-3">
+            <div className="min-w-0 space-y-6 lg:col-span-2">
               {fullSections.map(renderSection)}
             </div>
           )}

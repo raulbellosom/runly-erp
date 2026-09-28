@@ -78,8 +78,8 @@ packages/
   sdk/            Runly API client (createRunlyClient factory)
   validators/     Zod schemas shared between API and frontend
 modules/
-  custom/      Custom RME3 modules (e.g. custom.fleet) — self-contained, no core edits needed
-  official/    Reserved for optional curated official distributions
+  custom/      Installed RME3 modules — instance data, git-ignored (Builder output, ZIP uploads); keep module source in its own repo/ZIP
+  official/    Legacy, unused (git-ignored); official manifests live in apps/api/src/manifests/official/
 prisma/
   schema.prisma   Single source of truth for Prisma-managed models (core + legacy feature models)
   seed.js         Seeds core modules, blueprints, permissions

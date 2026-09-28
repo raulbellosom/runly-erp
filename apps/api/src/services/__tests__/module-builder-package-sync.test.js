@@ -97,3 +97,12 @@ test("an untouched package keeps everything; backups include every file", async 
   const zip = await sync.installedPackageZip({ moduleKey: KEY, modulesDir });
   assert.ok(zip.length > 1000);
 });
+
+test("an identical upload still brings a lagging Builder project up to the installed version", async (t) => {
+  const { dir } = await install(t);
+  const project = newProject({ definition: { ...structuredClone(DEFINITION), version: "0.1.0" }, publishedVersion: null });
+  const sync = createBuilderPackageSync({ prisma: fakePrisma(project) });
+  await sync.afterUpload({ moduleKey: KEY, dir, outcome: "NO_CHANGES" });
+  assert.equal(project.publishedVersion, "1.0.0");
+  assert.equal(project.definition.version, "1.0.0");
+});

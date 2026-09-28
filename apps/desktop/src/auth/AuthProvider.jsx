@@ -18,6 +18,14 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  // True once the first /auth/me for the current identity resolved or failed.
+  // Screens gate on permissions from userProfile, so rendering them before this
+  // flashes "Sin acceso" / "no encontrado" until the profile arrives.
+  const [profileSettled, setProfileSettled] = useState(false)
+  // Active company the last settled profile refresh was requested for. The
+  // first /me can run before a company is picked (no permissions), so the
+  // company gate waits until this matches the active company.
+  const [profileCompanyId, setProfileCompanyId] = useState(null)
   const currentIdentityRef = useRef(null)
 
   useEffect(() => {
@@ -32,6 +40,8 @@ export function AuthProvider({ children }) {
       queryClient.cancelQueries()
       queryClient.clear()
       setUserProfile(null)
+      setProfileSettled(false)
+      setProfileCompanyId(null)
       setActiveCompanyId(null)
       useChatFloatStore.setState({ openChats: [], isOpen: false })
       supabase.removeAllChannels().catch(() => {})
@@ -115,6 +125,7 @@ export function AuthProvider({ children }) {
             .then(profile => {
               if (!mounted || currentAuthId !== currentSession?.user?.id || requestedCompanyId !== getActiveCompanyId()) return
               setUserProfile(profile)
+              setProfileSettled(true)
               profileLoadedForAuthUserId = currentSession?.user?.id ?? null
               _sessionVault.update({
                 userProfile: profile,
@@ -124,7 +135,9 @@ export function AuthProvider({ children }) {
             .catch(async (error) => {
               if (shouldForceLogout(error)) {
                 await forceLogout()
+                return
               }
+              if (mounted) setProfileSettled(true)
             })
         } else {
           setUserProfile(null)
@@ -166,12 +179,15 @@ export function AuthProvider({ children }) {
           .then(profile => {
             if (!mounted || currentAuthId !== authUserId || requestedCompanyId !== getActiveCompanyId()) return
             setUserProfile(profile)
+            setProfileSettled(true)
             profileLoadedForAuthUserId = authUserId
           })
           .catch(async (error) => {
             if (shouldForceLogout(error)) {
               await forceLogout()
+              return
             }
+            if (mounted) setProfileSettled(true)
           })
       } else {
         setUserProfile(null)
@@ -208,8 +224,14 @@ export function AuthProvider({ children }) {
       const profile = await runly.auth.me(activeSession.access_token)
       if (currentIdentityRef.current !== activeSession.user?.id || requestedCompanyId !== getActiveCompanyId()) return null
       setUserProfile(profile)
+      setProfileSettled(true)
+      setProfileCompanyId(requestedCompanyId)
       return profile
     } catch {
+      // Settle anyway so ActiveCompanyGate does not wait forever when offline.
+      if (currentIdentityRef.current === activeSession.user?.id && requestedCompanyId === getActiveCompanyId()) {
+        setProfileCompanyId(requestedCompanyId)
+      }
       return null
     }
   }
@@ -219,6 +241,8 @@ export function AuthProvider({ children }) {
       session,
       userProfile,
       loading,
+      profileLoading: Boolean(session) && !userProfile && !profileSettled,
+      profileCompanyId,
       refreshProfile,
       logout: () => supabase.auth.signOut()
     }}>

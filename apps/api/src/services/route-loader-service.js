@@ -84,7 +84,7 @@ class RouteCollisionError extends Error {
   }
 }
 
-export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null, relationsCapability = null }) {
+export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null, relationsCapability = null, aiCapability = null }) {
   let moduleRoots = null
   const routerMap = new Map()
   const routeOwnerMap = new Map()
@@ -333,6 +333,9 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
         files: filesCapability ? filesCapability(moduleKey) : null,
         // Relations to system entities (relation-targets-service.js).
         relations: relationsCapability,
+        // MirAI tool loop + internet lookup limited to the manifest's
+        // `ai.publicLookup` fields (services/ai/module-ai-capability.js).
+        ai: aiCapability ? aiCapability(moduleKey, moduleRow.manifest ?? null) : null,
         cleanup: {
           // Bound to this module's own key so a handler can never be registered
           // under the wrong moduleKey. Docs show a bare `registerModuleHandler`

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AssistantWordmark, Button, Checkbox, ErrorState, ConfirmDialog, Badge, Sheet, SheetContent, SheetHeader, SheetTitle, MarkdownViewer, useCoarsePointer } from '@runly/ui'
-import { Sparkles, Plus, X, Trash2, MessageSquare, FileText, Boxes, ChevronRight } from 'lucide-react'
+import { AssistantWordmark, Button, Checkbox, ErrorState, Badge, Sheet, SheetContent, SheetTitle, MarkdownViewer, ModuleAssistantPanel, useCoarsePointer } from '@runly/ui'
+import { Sparkles, FileText, Boxes, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -45,17 +45,9 @@ function AssistantWorkspace({ children, token, companyId, userId }) {
     setLaunch(current => ({ context, sequence: current.sequence + 1 })); setOpen(true)
   }, [busy])
   const value = useMemo(() => ({ openAssistant, setPageContext, busy }), [openAssistant, setPageContext, busy])
-  const header = onClose => <div className="flex items-center justify-between gap-2 border-b p-3">
-    <span className="flex items-center gap-2">
-      <BotAvatar />
-      <span className="leading-tight"><AssistantWordmark className="block text-sm font-semibold" /><span className="block text-xs text-muted-foreground">Asistente de inventario</span></span>
-    </span>
-    {onClose && <Button size="icon" variant="ghost" aria-label="Cerrar chat" onClick={onClose}><X className="h-4 w-4" /></Button>}
-  </div>
-  const renderPanel = content => coarse ? <Sheet open={open} onOpenChange={setOpen}><SheetContent side="right" className="flex h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-lg"><SheetHeader className="border-b p-4"><SheetTitle className="flex items-center gap-2"><BotAvatar /><span className="leading-tight"><AssistantWordmark className="block" /><span className="block text-xs font-normal text-muted-foreground">Asistente de inventario</span></span></SheetTitle></SheetHeader>{content}</SheetContent></Sheet>
-    : <aside aria-label="Chat de inventario" className={`${open ? 'flex' : 'hidden'} h-full min-h-0 w-[390px] shrink-0 flex-col border-l bg-background`}>
-      {header(() => setOpen(false))}{content}
-    </aside>
+  // ModuleAssistantPanel draws the header (list view / chat view with back).
+  const renderPanel = content => coarse ? <Sheet open={open} onOpenChange={setOpen}><SheetContent side="right" className="flex h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-lg"><SheetTitle className="sr-only">MirAI, asistente de inventario</SheetTitle>{content}</SheetContent></Sheet>
+    : <aside aria-label="Chat de inventario" className={`${open ? 'flex' : 'hidden'} h-full min-h-0 w-[390px] shrink-0 flex-col border-l bg-background`}>{content}</aside>
   return <InventoryAssistantContext.Provider value={value}><div className="flex h-full min-h-0 overflow-hidden">
     <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
     {!open && <Button variant="outline" className="group fixed right-0 top-1/2 z-40 -translate-y-1/2 justify-start gap-0 overflow-hidden rounded-l-full rounded-r-none border-r-0 bg-background/90 px-3 text-muted-foreground shadow-md backdrop-blur transition-all duration-200 hover:gap-2 hover:bg-muted hover:px-4 hover:text-foreground hover:shadow-lg"
@@ -63,23 +55,23 @@ function AssistantWorkspace({ children, token, companyId, userId }) {
       <Sparkles className="h-4 w-4 shrink-0" />
       <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover:max-w-24 group-hover:opacity-100"><AssistantWordmark /></span>
     </Button>}
-    <InventoryChat token={token} companyId={companyId} userId={userId} open={open} launch={launch} currentContext={currentContext} onBusy={setBusy} renderPanel={renderPanel} />
+    <InventoryChat token={token} companyId={companyId} userId={userId} open={open} launch={launch} currentContext={currentContext} onBusy={setBusy} renderPanel={renderPanel} onClose={coarse ? undefined : () => setOpen(false)} coarse={coarse} />
   </div></InventoryAssistantContext.Provider>
 }
 
-function InventoryChat({ token, companyId, userId, open, launch, currentContext, onBusy, renderPanel }) {
+function InventoryChat({ token, companyId, userId, open, launch, currentContext, onBusy, renderPanel, onClose, coarse }) {
   const qc = useQueryClient()
   const key = useMemo(() => ['inventory', 'assistant', companyId, userId], [companyId, userId])
   const [activeId, setActiveId] = useState(null)
   const [draftContext, setDraftContext] = useState(ALL_INVENTORY)
   const [composer, setComposer] = useState(EMPTY_CHAT_DRAFT)
   const [seenLaunch, setSeenLaunch] = useState(launch.sequence)
-  const [remove, setRemove] = useState(null)
+  const [view, setView] = useState('chat')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-  if (seenLaunch !== launch.sequence) { setSeenLaunch(launch.sequence); setActiveId(null); setDraftContext(launch.context); setError('') }
+  if (seenLaunch !== launch.sequence) { setSeenLaunch(launch.sequence); setActiveId(null); setDraftContext(launch.context); setError(''); setView('chat') }
   const request = useCallback((path, options = {}) => intakeRequest({ apiBaseUrl: getApiUrl(), token, companyId, path: `/inventory/ai/threads${path}`, ...options }), [token, companyId])
   const threads = useQuery({ queryKey: [...key, 'threads'], queryFn: ({ signal }) => request('', { signal }), enabled: open && Boolean(token && companyId), retry: false })
   const thread = useQuery({ queryKey: [...key, 'thread', activeId], queryFn: ({ signal }) => request(`/${activeId}`, { signal }), enabled: open && Boolean(activeId), retry: false, staleTime: 0 })
@@ -117,23 +109,22 @@ function InventoryChat({ token, companyId, userId, open, launch, currentContext,
     } catch (err) { if (mounted.current) { setError(err.message); if ([401, 403].includes(err.status)) qc.removeQueries({ queryKey: key }) } }
     finally { if (mounted.current) { setBusy(false); onBusy(false) } }
   }
-  return renderPanel(<>
-    <div className="space-y-2 border-b p-3">
-      <Button variant="outline" size="sm" className="w-full" disabled={busy} onClick={() => { setActiveId(null); setDraftContext(currentContext); setError('') }}><Plus className="h-4 w-4" />Nueva consulta</Button>
-      <nav aria-label="Conversaciones de inventario" className="max-h-32 space-y-1 overflow-y-auto">
-        {(threads.data ?? []).map(item => <div key={item.id} className="flex items-center gap-1"><Button variant={item.id === activeId ? 'secondary' : 'ghost'} size="sm" className="min-w-0 flex-1 justify-start" disabled={busy} aria-current={item.id === activeId ? 'true' : undefined} onClick={() => { setActiveId(item.id); setError(''); void qc.invalidateQueries({ queryKey: [...key, 'thread', item.id] }) }}><MessageSquare className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.title}</span></Button><Button variant="ghost" size="icon" aria-label={`Eliminar ${item.title}`} disabled={busy} onClick={() => setRemove(item)}><Trash2 className="h-3.5 w-3.5" /></Button></div>)}
-      </nav>
-      {threads.isError && <ErrorState title="No se pudo cargar el historial" description={threads.error.message} />}
-      {context && <div className="space-y-2"><Badge variant="outline" className="whitespace-normal">{inventoryScopeLabel(context)}</Badge>{!activeId && context.mode !== 'all' && <label className="flex items-center gap-2 text-xs"><Checkbox checked={context.allowCompanySearch} onCheckedChange={value => setDraftContext(current => ({ ...current, allowCompanySearch: Boolean(value) }))} />Permitir consultar otros equipos</label>}</div>}
-    </div>
+  async function removeThread(item) {
+    try { await request(`/${item.id}`, { method: 'DELETE' }); if (activeId === item.id) setActiveId(null); qc.removeQueries({ queryKey: [...key, 'thread', item.id] }); await qc.invalidateQueries({ queryKey: [...key, 'threads'] }) }
+    catch (err) { setError(err.message) }
+  }
+  const title = activeId ? (threads.data ?? []).find(item => item.id === activeId)?.title ?? 'Conversación' : 'Nueva consulta'
+  const contextChip = context && <div className="space-y-2"><Badge variant="outline" className="whitespace-normal">{inventoryScopeLabel(context)}</Badge>{!activeId && context.mode !== 'all' && <label className="flex items-center gap-2 text-xs"><Checkbox checked={context.allowCompanySearch} onCheckedChange={value => setDraftContext(current => ({ ...current, allowCompanySearch: Boolean(value) }))} />Permitir consultar otros equipos</label>}</div>
+  return renderPanel(<ModuleAssistantPanel view={view} subtitle="Asistente de inventario" listLabel="Conversaciones de inventario" onClose={onClose} headerClassName={coarse ? 'pr-12' : undefined} busy={busy}
+    conversations={threads.data ?? []} conversationsError={threads.isError ? threads.error.message : null} conversationsLoading={threads.isPending} activeId={activeId}
+    onBack={() => { setView('list'); setError('') }}
+    onNew={() => { setActiveId(null); setDraftContext(currentContext); setError(''); setView('chat') }}
+    onSelect={item => { setActiveId(item.id); setError(''); setView('chat'); void qc.invalidateQueries({ queryKey: [...key, 'thread', item.id] }) }}
+    onDelete={removeThread} chatTitle={title} chatContext={contextChip}>
     <ChatMessages messages={thread.isError ? [] : thread.data?.messages ?? []} busy={busy} loading={Boolean(activeId && thread.isPending)} error={error || thread.error?.message} onDecide={decide}
       onPickPrompt={prompt => setComposer(current => ({ ...current, draft: prompt }))} />
     <InventoryChatComposer state={composer} onChange={setComposer} onSend={send} busy={busy} disabled={Boolean(activeId && (!thread.data || thread.isError))} />
-    <ConfirmDialog open={Boolean(remove)} onOpenChange={value => !value && setRemove(null)} title="Eliminar conversación" description="Se eliminarán esta conversación y sus mensajes." confirmLabel="Eliminar" onConfirm={async () => {
-      try { await request(`/${remove.id}`, { method: 'DELETE' }); if (activeId === remove.id) setActiveId(null); qc.removeQueries({ queryKey: [...key, 'thread', remove.id] }); setRemove(null); await qc.invalidateQueries({ queryKey: [...key, 'threads'] }) }
-      catch (err) { setError(err.message); setRemove(null) }
-    }} />
-  </>)
+  </ModuleAssistantPanel>)
 }
 
 function ReferenceCards({ references }) {

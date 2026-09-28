@@ -24,7 +24,7 @@ export function PreviewLayoutBody({ layout, fieldsByKey, renderField }) {
     <div className="space-y-4 p-5">
       {layout.tabs.length > 1 && (
         <Tabs value={current.key} onValueChange={setActive}>
-          <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden scrollbar-none">
             {layout.tabs.map((tab) => <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>)}
           </TabsList>
         </Tabs>

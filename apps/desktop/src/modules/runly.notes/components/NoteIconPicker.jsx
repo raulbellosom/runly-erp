@@ -1,6 +1,5 @@
 import { X } from 'lucide-react'
-import EmojiPicker from 'emoji-picker-react'
-import { useIsDark } from '../hooks/useIsDark.js'
+import { ThemedEmojiPicker } from '@runly/ui'
 
 // Shared Popover content for picking a note icon — a real emoji, matching
 // Notion/Apple Notes convention. Stored as the emoji character itself in
@@ -9,19 +8,12 @@ import { useIsDark } from '../hooks/useIsDark.js'
 // noteIcons.jsx still renders any icon name a note already has, so existing
 // notes aren't affected.
 export function NoteIconPickerContent({ value, onChange }) {
-  const isDark = useIsDark()
-
   return (
     <>
-      <EmojiPicker
+      <ThemedEmojiPicker
         onEmojiClick={emojiData => onChange(emojiData.emoji)}
-        theme={isDark ? 'dark' : 'light'}
-        width={300}
+        width="min(300px, calc(100vw - 1.5rem))"
         height={360}
-        searchPlaceholder="Buscar emoji..."
-        lazyLoadEmojis
-        skinTonesDisabled
-        autoFocusSearch={false}
       />
       {value && (
         <button

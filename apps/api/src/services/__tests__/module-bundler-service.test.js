@@ -200,3 +200,29 @@ describe('module-bundler-service', () => {
     })
   })
 })
+
+// The developer guide promises every "bundled" catalog library (motion,
+// react-hook-form); a module importing one must compile even though its
+// sources live outside any node_modules tree.
+describe('module-bundler-service bundled catalog libraries', () => {
+  it('compiles components that import each bundled library', async () => {
+    const catalogPath = path.resolve(__dirname, '../../../../../packages/module-compiler/src/runtime-catalog.json')
+    const { libraries } = JSON.parse(await fs.readFile(catalogPath, 'utf8'))
+    const bundled = libraries.filter((lib) => lib.category === 'bundled').map((lib) => lib.name)
+    assert.ok(bundled.includes('motion'))
+
+    const moduleDir = await fs.mkdtemp(path.join(os.tmpdir(), 'runly-bundled-libs-'))
+    try {
+      await fs.mkdir(path.join(moduleDir, 'components'))
+      const imports = { motion: "import { motion } from 'motion/react'", 'react-hook-form': "import { useForm } from 'react-hook-form'" }
+      const lines = bundled.map((name) => imports[name] ?? `import * as lib from '${name}'`)
+      await fs.writeFile(path.join(moduleDir, 'components', 'index.js'), `${lines.join('\n')}\nexport default {}\n`)
+      const { createModuleBundlerService } = await import('../module-bundler-service.js')
+      const svc = createModuleBundlerService({ prisma: null, supabaseAdmin: null })
+      const result = await svc.buildBundleFromDirectory('custom.bundled', moduleDir, { outputDir: path.join(moduleDir, '.out') })
+      assert.equal(result.built, true)
+    } finally {
+      await fs.rm(moduleDir, { recursive: true, force: true })
+    }
+  })
+})

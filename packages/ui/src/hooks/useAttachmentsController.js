@@ -685,17 +685,22 @@ export function useAttachmentsController({
   );
 
   const resolveSignedUrl = useCallback(
-    async (fileAssetId, { inlineSignedUrl, inlineSignedUrlExpiresAt } = {}) => {
+    async (fileAssetId, { inlineSignedUrl, inlineSignedUrlExpiresAt, variant } = {}) => {
       if (!fileAssetId) throw new Error("Archivo no disponible");
 
-      if (inlineSignedUrl && inlineSignedUrlExpiresAt) {
+      // Inline signed URLs are always full resolution, so they only satisfy
+      // requests that don't ask for a resized variant.
+      if (!variant && inlineSignedUrl && inlineSignedUrlExpiresAt) {
         const expiresAt = new Date(inlineSignedUrlExpiresAt).getTime();
         if (expiresAt - Date.now() > 60_000) return inlineSignedUrl;
       }
 
       const endpointTemplate =
         config?.signedUrl?.endpointTemplate ?? "/files/:fileId/signed-url";
-      const endpointPath = replacePathTokens(endpointTemplate, { fileId: fileAssetId });
+      const basePath = replacePathTokens(endpointTemplate, { fileId: fileAssetId });
+      const endpointPath = variant
+        ? `${basePath}${basePath.includes("?") ? "&" : "?"}variant=${encodeURIComponent(variant)}`
+        : basePath;
       const response = await fetch(joinUrl(apiBaseUrl, endpointPath), {
         method: "GET",
         headers: buildApiHeaders(token, companyId),

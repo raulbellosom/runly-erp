@@ -155,6 +155,9 @@ importers:
       lucide-react:
         specifier: latest
         version: 1.48.0(react@19.3.0)
+      motion:
+        specifier: ^12.38.0
+        version: 12.38.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       node-cache:
         specifier: ^5.1.2
         version: 5.1.2
@@ -179,6 +182,9 @@ importers:
       react-dom:
         specifier: latest
         version: 19.3.0(react@19.3.0)
+      react-hook-form:
+        specifier: ^7.75.0
+        version: 7.75.0(react@19.3.0)
       rrule:
         specifier: 2.8.1
         version: 2.8.1
@@ -603,6 +609,9 @@ importers:
       date-fns:
         specifier: ^4.3.0
         version: 4.3.0
+      emoji-picker-react:
+        specifier: ^4.19.1
+        version: 4.19.1(react@19.2.5)
       hls.js:
         specifier: ^1.7.3
         version: 1.7.3
@@ -10970,6 +10979,11 @@ snapshots:
       fast-check: 3.23.2
 
   electron-to-chromium@1.5.426: {}
+
+  emoji-picker-react@4.19.1(react@19.2.5):
+    dependencies:
+      flairup: 1.0.0
+      react: 19.2.5
 
   emoji-picker-react@4.19.1(react@19.3.0):
     dependencies:

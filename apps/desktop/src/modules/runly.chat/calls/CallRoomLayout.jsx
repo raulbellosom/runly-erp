@@ -210,7 +210,7 @@ export function CallRoomLayout({ view, actions, chat }) {
       <main className="relative min-h-0 flex-1 overflow-hidden p-2 sm:p-4">
         <RecordingBanner active={recordingActive} />
         {mobileChatOpen ? (
-          <div className="absolute inset-0 flex flex-col bg-[hsl(var(--background))]">
+          <div className="dark absolute inset-0 flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
             {hasScreenShare && (
               <button
                 type="button"
@@ -361,8 +361,10 @@ export function CallRoomLayout({ view, actions, chat }) {
       </footer>
       </div>
 
+      {/* The call room is always dark; `dark` scopes the theme tokens so the
+          chat column matches it even when the app runs in light mode. */}
       {showChatColumn && (
-        <aside className="hidden w-[380px] shrink-0 border-l border-white/10 bg-[hsl(var(--background))] lg:block">
+        <aside className="dark hidden w-[380px] shrink-0 border-l border-white/10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] lg:block">
           {chatPanel}
         </aside>
       )}

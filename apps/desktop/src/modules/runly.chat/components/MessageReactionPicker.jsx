@@ -1,5 +1,4 @@
-import { Popover, PopoverAnchor, PopoverContent, Sheet, SheetContent, SheetHeader, SheetTitle, useCoarsePointer } from "@runly/ui";
-import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
+import { Popover, PopoverAnchor, PopoverContent, Sheet, SheetContent, SheetHeader, SheetTitle, ThemedEmojiPicker, useCoarsePointer } from "@runly/ui";
 
 // The full emoji picker for choosing a reaction outside the quick set. On a
 // coarse pointer (phone) it opens as a bottom Sheet — WhatsApp-style, and the

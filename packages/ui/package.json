@@ -35,6 +35,7 @@
     "clsx": "latest",
     "country-state-city": "^3.2.1",
     "date-fns": "^4.3.0",
+    "emoji-picker-react": "^4.19.1",
     "hls.js": "^1.7.3",
     "lucide-react": "latest",
     "react-hook-form": "^7.75.0",

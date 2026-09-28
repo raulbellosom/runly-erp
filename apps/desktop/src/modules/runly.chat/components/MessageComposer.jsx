@@ -9,13 +9,13 @@ import {
 import {
   Button, MentionTextarea, Popover, PopoverAnchor, PopoverContent,
   Dialog, DialogContent, DialogHeader, DialogTitle, useCoarsePointer,
+  ThemedEmojiPicker,
 } from "@runly/ui";
 import {
   Send, Paperclip, Smile, X, Loader2, AlertCircle, Plus, Link2, Pencil, Check,
 } from "lucide-react";
 import { ComposerFormatToolbar } from "./ComposerFormatting";
 import { toast } from "sonner";
-import { ThemedEmojiPicker } from "./ThemedEmojiPicker";
 import { useChatUpload } from "../hooks/useChatUpload";
 import { useMentionCandidates } from "../hooks/useMentionCandidates";
 import { MIRAI_MENTION_ID } from "../lib/mirai";

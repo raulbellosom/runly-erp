@@ -183,7 +183,7 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
         </section>
       )}
 
-      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-end gap-2 border-t border-[hsl(var(--border))] backdrop-blur-md px-6 py-3">
+      <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 pt-3">
         <Button variant="outline" onClick={onChangeFile} disabled={applying}>Elegir otro archivo</Button>
         <Button onClick={apply} disabled={report.blocked || applying}>
           <Rocket className="h-4 w-4" />

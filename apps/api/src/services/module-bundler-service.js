@@ -38,6 +38,21 @@ export const BUNDLE_EXTERNAL_URL_PATTERNS = ['https://*']
 
 const ESBUILD_EXTERNALS = [...BUNDLE_EXTERNALS, ...BUNDLE_EXTERNAL_URL_PATTERNS]
 
+// "bundled" libraries in @runly/module-compiler's runtime-catalog.json (motion,
+// react-hook-form) are inlined into the module bundle. Module sources live in
+// modules/custom/* (or a staging dir) with no node_modules of their own, so
+// esbuild must resolve them from the API's dependencies.
+const BUNDLE_NODE_PATHS = [path.resolve(__dirname, '..', '..', 'node_modules')]
+
+const ESBUILD_OPTIONS = {
+  bundle: true,
+  format: 'esm',
+  jsx: 'automatic',
+  loader: { '.js': 'jsx', '.jsx': 'jsx' },
+  external: ESBUILD_EXTERNALS,
+  nodePaths: BUNDLE_NODE_PATHS,
+}
+
 export async function computeSourceHash(dir) {
   const entries = await collectFiles(dir)
   const hash = createHash('sha256')
@@ -98,12 +113,8 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
     await fs.mkdir(artifactDir, { recursive: true })
     const artifactPath = path.join(artifactDir, `${key}.js`)
     await esbuild.build({
+      ...ESBUILD_OPTIONS,
       entryPoints: [entryPoint],
-      bundle: true,
-      format: 'esm',
-      jsx: 'automatic',
-      loader: { '.js': 'jsx', '.jsx': 'jsx' },
-      external: ESBUILD_EXTERNALS,
       outfile: artifactPath,
       sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
     })
@@ -218,12 +229,8 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
     const outfile = path.join(BUNDLES_DIR, `${key}.js`)
 
     await esbuild.build({
+      ...ESBUILD_OPTIONS,
       entryPoints: [entryPoint],
-      bundle: true,
-      format: 'esm',
-      jsx: 'automatic',
-      loader: { '.js': 'jsx', '.jsx': 'jsx' },
-      external: ESBUILD_EXTERNALS,
       outfile,
       sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
     })

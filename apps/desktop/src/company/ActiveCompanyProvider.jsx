@@ -132,7 +132,11 @@ export function useActiveCompany() {
 // X-Runly-Company-Id header during the brief window before resolution.
 export function ActiveCompanyGate({ children }) {
   const { isLoading, activeCompanyId } = useActiveCompany()
-  useBootLoader('company', isLoading)
-  if (isLoading) return null
+  const { profileCompanyId } = useAuth()
+  // Screens read permissions from userProfile; wait for the profile refreshed
+  // for this company, otherwise they flash "Sin acceso" with the company-less one.
+  const awaitingProfile = activeCompanyId != null && profileCompanyId !== activeCompanyId
+  useBootLoader('company', isLoading || awaitingProfile)
+  if (isLoading || awaitingProfile) return null
   return <Fragment key={activeCompanyId}>{children}</Fragment>
 }

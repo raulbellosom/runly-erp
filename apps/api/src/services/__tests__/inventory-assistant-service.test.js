@@ -4,14 +4,15 @@ import { createInventoryAssistantService } from '../inventory-assistant-service.
 import { createAiContextSession } from '../ai-context-session.js';
 import { createInventoryAccess } from '../inventory-access.js';
 import { buildInventoryWhere, inventoryDayStart } from '../inventory-query.js';
+import { createPublicLookup } from '../ai/public-lookup.js';
 
 const COMPANY = '01900000-0000-7000-8000-000000000001';
 const ACTOR = '01900000-0000-7000-8000-000000000002';
 const ITEM = '01900000-0000-7000-8000-000000000003';
 const BRAND = '01900000-0000-7000-8000-000000000004';
 const context = { mode: 'all' };
-const row = { id: ITEM, name: 'Laptop', model: 'Model X', assetTag: 'INV-1', serialNumber: 'PRIVATE-SERIAL', brand: { name: 'Maker' } };
-function fixture({ run, authorize = async () => {}, exists = true } = {}) {
+const row = { id: ITEM, name: 'Laptop', model: 'Model X', assetTag: 'INV-1', serialNumber: 'PRIVATE-SERIAL', brand: { name: 'Maker' }, category: { name: 'Laptop' } };
+function fixture({ run, authorize = async () => {}, exists = true, lookup = true } = {}) {
   const queries = [], searches = [], transcripts = [];
   const db = {
     invItem: {
@@ -27,7 +28,7 @@ function fixture({ run, authorize = async () => {}, exists = true } = {}) {
   const service = createInventoryAssistantService({ prisma: db, env: { INVENTORY_AI_SIGNING_SECRET: 'test-secret' }, authorize,
     mirai: {
       answerWithTools: async args => { transcripts.push(args.messages); await run?.(args); return { text: 'Respuesta con datos registrados', model: 'test', calls: 1 }; },
-      searchPublicModel: async query => { searches.push(query); return { results: [{ title: 'Manufacturer', url: 'https://example.com/specs', content: 'Public specifications' }] }; },
+      publicLookup: lookup ? createPublicLookup({ search: async query => { searches.push(query); return { results: [{ title: 'Manufacturer', url: 'https://example.com/specs', content: 'Public specifications' }] }; } }) : null,
     },
   });
   return { service, db, queries, searches, transcripts, ask: (input = {}) => service.turn({ companyId: COMPANY, actorId: ACTOR, input: { content: 'Cuantos equipos hay', context, ...input } }) };
@@ -97,7 +98,7 @@ test('history is authenticated, context-bound, and reauthorizes previously consu
   f.db.invItem.count = async () => 0;
   await assert.rejects(f.ask({ context: { mode: 'item', ids: [ITEM] }, session: first.session }), e => e.status === 409);
 });
-test('public search sends only brand/model, limits calls and marks the external origin', async () => {
+test('public search sends only type/brand/model, limits calls and marks the external origin', async () => {
   const f = fixture({ run: async ({ executeTool }) => {
     const result = await executeTool('inventory_public_model', { id: ITEM });
     assert.equal(result.origin, 'external'); assert.match(result.warning, /no verifican/);
@@ -106,7 +107,16 @@ test('public search sends only brand/model, limits calls and marks the external 
     assert.ok((await executeTool('delete_item', { id: ITEM })).error);
   } });
   await f.ask({ context: { mode: 'item', ids: [ITEM] } });
-  assert.equal(f.searches.length, 2); assert.ok(f.searches.every(q => q === 'Maker Model X especificaciones fabricante'));
+  assert.equal(f.searches.length, 2); assert.ok(f.searches.every(q => q === 'Laptop Maker Model X especificaciones fabricante'));
+  assert.ok(f.searches.every(q => !q.includes('PRIVATE-SERIAL')));
+  assert.match(f.transcripts[0][0].content, /Solo usa la búsqueda pública cuando el usuario pida/);
+});
+test('without internet configured the lookup tool is not offered', async () => {
+  let offered;
+  const f = fixture({ lookup: false, run: async ({ tools }) => { offered = tools.map(t => t.function.name); } });
+  await f.ask({ context: { mode: 'item', ids: [ITEM] } });
+  assert.ok(!offered.includes('inventory_public_model'));
+  assert.match(f.transcripts[0][0].content, /No tienes acceso a internet/);
 });
 test('concurrent turns for the same user/company are bounded', async () => {
   let finish, started;

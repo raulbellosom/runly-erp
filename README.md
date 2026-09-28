@@ -210,7 +210,7 @@ Runly ERP is a module engine. New RME3 modules live in `modules/custom/` and dec
   - `runly.company`
   - `runly.contacts`
   - `runly.hr`
-- Custom modules: `custom.*` or `community.*` in `modules/custom/`
+- Custom modules: `custom.*` or `community.*` in `modules/custom/` (git-ignored instance folder: modules arrive via the Module Builder or ZIP upload; keep each module's source in its own repository or ZIP)
 - Official manifest snapshots: `apps/api/src/manifests/official/`
 
 New modules use `defineRunlyModule` from `@runly/module-engine`.

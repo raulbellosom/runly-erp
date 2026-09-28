@@ -9,6 +9,8 @@ Runly ERP is a module engine. Each ERP capability is modeled as a module that de
 | `modules/custom/<moduleKey>/` | `custom.*`, `community.*` | Partners/community |
 | `apps/api/src/manifests/official/` | `runly.*` | Internal official manifest snapshots (seed/runtime baseline) |
 
+> `modules/custom/` is instance data, not source: the Module Builder, ZIP uploads and installs write into it (plus internal `.staging/`, `.previews/`, `.backups/`, `.locks/` folders), so it is git-ignored except for its `.gitkeep`. Keep a module's source in its own repository or as the ZIP exported from the Builder, and bring it into an instance by uploading the ZIP (or by copying it into `modules/custom/` locally and running `POST /modules/sync`). Never commit a module folder to this repo. `modules/official/` is legacy and unused: official modules ship as manifest snapshots in `apps/api/src/manifests/official/`; module discovery still tolerates the folder but nothing should be placed there.
+
 `packages/maps/` was decommissioned and removed on 2026-05-25.
 
 ## Manifest standard

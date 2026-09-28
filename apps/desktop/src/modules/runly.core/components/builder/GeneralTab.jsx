@@ -39,20 +39,16 @@ function EditingModeCard({ mode }) {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={mode.onOpen}>
-            <Code2 className="h-4 w-4" />
-            Modo desarrollador
-          </Button>
-          <Button variant="ghost" size="sm" disabled={mode.downloading} onClick={mode.onDownload}>
+          <Button variant="outline" size="sm" disabled={mode.downloading} onClick={mode.onDownload}>
             <Download className="h-4 w-4" />
             {mode.downloading ? "Preparando..." : "Descargar ZIP con guía"}
           </Button>
         </div>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">
-          {mode.advanced
-            ? "Este módulo ya se edita como código; el Constructor no lo modifica ni lo publica para no borrar tus cambios."
-            : "No necesitas publicar antes. Cuando subas tu ZIP con cambios, el proyecto pasa solo a modo desarrollador."}
-        </p>
+        {!mode.advanced && (
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">
+            No necesitas publicar antes. Cuando subas tu ZIP con cambios, el proyecto pasa solo a modo desarrollador.
+          </p>
+        )}
       </div>
     </SectionCard>
   );

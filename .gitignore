@@ -39,6 +39,14 @@ build
 coverage
 apps/api/bundles/*.js
 
+# Module folders are instance data, not source: the Module Builder, ZIP uploads
+# and installs write here (plus .staging/.previews/.backups/.locks). Only the
+# empty folders are kept. modules/official is legacy and unused.
+modules/custom/*
+!modules/custom/.gitkeep
+modules/official/*
+!modules/official/.gitkeep
+
 # Tauri native build
 apps/desktop/src-tauri/target
 apps/desktop/src-tauri/tauri.native.generated.json

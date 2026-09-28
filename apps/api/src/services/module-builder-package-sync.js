@@ -38,6 +38,29 @@ function describeForeign(result) {
   return result.foreign.map((item) => `${item.path} (${item.reason})`);
 }
 
+function compareVersions(a, b) {
+  const pa = String(a ?? "0.0.0").split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = String(b ?? "0.0.0").split(".").map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  }
+  return 0;
+}
+
+// The uploaded package's version is what is installed now: record it as the
+// published version and never leave the draft behind it (General tab shows
+// definition.version).
+function versionData(project, version, draft = { ...project.definition }) {
+  if (!version) return {};
+  const data = {};
+  if (project.publishedVersion !== version) data.publishedVersion = version;
+  if (compareVersions(version, draft.version) > 0) {
+    draft.version = version;
+    data.definition = draft;
+  }
+  return data;
+}
+
 function extensionCounts(extensions) {
   return {
     views: extensions?.views?.length ?? 0,
@@ -86,9 +109,9 @@ export function createBuilderPackageSync({ prisma }) {
     return prisma.moduleBuilderProject.update({
       where: { id: project.id },
       data: {
+        ...versionData(project, version, draft),
         definition: draft,
         ...(publishedDefinition ? { publishedDefinition, publishedAt: new Date() } : {}),
-        ...(version ? { publishedVersion: version } : {}),
         ...(reattach ? { detachedAt: null } : {}),
         ...(actorId ? { updatedById: actorId } : {}),
       },
@@ -97,10 +120,18 @@ export function createBuilderPackageSync({ prisma }) {
 
   // After a successful ZIP upload (the package is already installed in dir).
   async function afterUpload({ moduleKey, dir, outcome, actorId = null }) {
-    if (outcome === "NO_CHANGES") return {};
     const project = await projectFor(moduleKey);
-    if (!project || project.detachedAt) return {};
+    if (!project) return {};
     const manifest = await loadPackageManifest(dir);
+    // Developer-mode projects and identical uploads keep their definition,
+    // but the version shown in the Builder must follow the installed package.
+    if (project.detachedAt || outcome === "NO_CHANGES") {
+      const data = versionData(project, manifest?.version);
+      if (Object.keys(data).length) {
+        await prisma.moduleBuilderProject.update({ where: { id: project.id }, data: { ...data, ...(actorId ? { updatedById: actorId } : {}) } });
+      }
+      return {};
+    }
     const result = await classify({ moduleKey, dir, manifest });
     if (result.managed && !result.foreign.length) {
       await captureExtensions(project, result, { version: manifest?.version, actorId });
@@ -108,7 +139,7 @@ export function createBuilderPackageSync({ prisma }) {
     }
     await prisma.moduleBuilderProject.update({
       where: { id: project.id },
-      data: { detachedAt: new Date(), ...(actorId ? { updatedById: actorId } : {}) },
+      data: { ...versionData(project, manifest?.version), detachedAt: new Date(), ...(actorId ? { updatedById: actorId } : {}) },
     });
     return { builderDetached: true, builderReasons: describeForeign(result) };
   }

@@ -3,6 +3,7 @@ export { cn } from "./lib/utils.js";
 
 // Core primitives
 export { AssistantWordmark } from "./components/AssistantWordmark.jsx";
+export { ModuleAssistantPanel } from "./components/ModuleAssistantPanel.jsx";
 export { Button, buttonVariants } from "./components/Button.jsx";
 export {
   Card,
@@ -176,6 +177,7 @@ export {
   DialogTitle,
   DialogDescription,
 } from "./components/Dialog.jsx";
+export { useInsideOverlay } from "./components/overlay-surface-context.js";
 export {
   Sheet,
   SheetPortal,
@@ -227,12 +229,14 @@ export { ImportStepIndicator } from "./components/ImportStepIndicator.jsx";
 export { DetailActionBar } from "./components/DetailActionBar.jsx";
 export { SearchInput } from "./components/SearchInput.jsx";
 export { FilterBar } from "./components/FilterBar.jsx";
+export { ListPager, usePagedList } from "./components/ListPager.jsx";
 export { IconPickerField } from "./components/IconPickerField.jsx";
 export { ICON_CATALOG, resolveLucideIcon } from "./components/icon-catalog.js";
 export { DynamicTable } from "./components/DynamicTable.jsx";
 export { DynamicForm } from "./components/DynamicForm.jsx";
 export { ActionMenu } from "./components/ActionMenu.jsx";
 export { ConfirmDialog } from "./components/ConfirmDialog.jsx";
+export { ThemedEmojiPicker } from "./components/ThemedEmojiPicker.jsx";
 export { BugReportDialog } from "./components/BugReportDialog.jsx";
 export { requestBugReport, onBugReportRequest } from "./lib/bugReportBus.js";
 export { ContactPicker } from "./components/ContactPicker.jsx";

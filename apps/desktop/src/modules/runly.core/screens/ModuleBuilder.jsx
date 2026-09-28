@@ -21,12 +21,21 @@ import {
   TextareaField,
   SelectField,
   ConfirmDialog,
+  SearchInput,
+  FilterBar,
+  ListPager,
+  usePagedList,
 } from "@runly/ui";
-import { Hammer, Plus } from "lucide-react";
+import { Hammer, Plus, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
+import { mergeRuntimeModules } from "../../../lib/runtimeModules";
 import { BuilderProjectCard } from "../components/builder/BuilderProjectCard";
+import { PROJECT_FILTERS, matchesFilters, matchesSearch, projectSummary } from "../lib/builderProjectSummary";
+
+// 12 fills whole rows in both the 2- and 3-column grid.
+const PAGE_SIZE = 12;
 
 const TEMPLATE_OPTIONS = [
   { value: "blank", label: "Módulo vacío" },
@@ -52,6 +61,35 @@ export default function ModuleBuilder() {
     enabled: Boolean(token) && canUse,
   });
   const projects = projectsQuery.data?.data ?? [];
+
+  // Install state per module key — same cache as the Módulos catalog. Optional:
+  // without core.modules.read the cards fall back to the project's publishedAt.
+  const canReadModules = isAdmin || (userProfile?.permissions ?? []).includes("core.modules.read");
+  const modulesQuery = useQuery({
+    queryKey: ["modules", token],
+    queryFn: () => runly.modules.list(token),
+    enabled: Boolean(token) && canUse && canReadModules,
+    staleTime: 60000,
+  });
+  const runtimeByKey = useMemo(
+    () => new Map(mergeRuntimeModules(modulesQuery.data).map((module) => [module.key, module])),
+    [modulesQuery.data],
+  );
+
+  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({});
+  const visibleRows = useMemo(
+    () => projects
+      .map((project) => {
+        const runtimeModule = runtimeByKey.get(project.moduleKey) ?? null;
+        return { project, runtimeModule, summary: projectSummary(project, runtimeModule) };
+      })
+      .filter((row) => matchesFilters(row.summary, filters) && matchesSearch(row.summary, search))
+      .sort((a, b) => String(b.summary.updatedAt ?? "").localeCompare(String(a.summary.updatedAt ?? ""))),
+    [projects, runtimeByKey, filters, search],
+  );
+  const paged = usePagedList(visibleRows, PAGE_SIZE);
+  const hasQuery = Boolean(search.trim()) || Object.values(filters).some(Boolean);
 
   const suggestedKey = useMemo(() => {
     const slug = form.name
@@ -136,16 +174,44 @@ export default function ModuleBuilder() {
           />
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => (
+        {projects.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); paged.setPage(0); }}
+                placeholder="Buscar módulo..."
+                className="w-full sm:w-72"
+              />
+              <FilterBar filters={PROJECT_FILTERS} value={filters} onChange={(next) => { setFilters(next); paged.setPage(0); }} />
+            </div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              {hasQuery ? `${visibleRows.length} de ${projects.length} módulos` : `${projects.length} ${projects.length === 1 ? "módulo" : "módulos"}`}
+            </p>
+          </div>
+        )}
+
+        {projects.length > 0 && visibleRows.length === 0 && (
+          <EmptyState
+            icon={SearchX}
+            title="Ningún módulo coincide"
+            description="Prueba con otra búsqueda o cambia el filtro."
+            action={{ label: "Limpiar filtros", onClick: () => { setSearch(""); setFilters({}); } }}
+          />
+        )}
+
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {paged.pageItems.map(({ project, runtimeModule }) => (
             <BuilderProjectCard
               key={project.id}
               project={project}
-              onOpen={() => navigate(`/app/m/runly.core/module-builder/${project.id}`)}
+              runtimeModule={runtimeModule}
+              href={`/app/m/runly.core/module-builder/${project.id}`}
               onDelete={() => setConfirmDelete(project)}
             />
           ))}
         </div>
+        <ListPager {...paged} />
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

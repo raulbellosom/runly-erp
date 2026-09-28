@@ -98,7 +98,9 @@ After changes: `curl -X POST http://localhost:4010/modules/sync -H "Authorizatio
 
 ## Reference implementation
 
-`modules/custom/custom.fleet/` is the canonical example of a complete RME3 module.
+`scripts/fixtures/rme3-devkit/custom.goldenpath/` is the canonical example of a complete RME3 module.
+
+`modules/custom/` is git-ignored instance data (Builder output, ZIP uploads, installs). Never commit a module folder there; a module's source lives in its own repository or ZIP. `modules/official/` is legacy and unused.
 
 ---
 

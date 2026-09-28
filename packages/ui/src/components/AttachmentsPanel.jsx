@@ -145,6 +145,8 @@ function FileVisual({ item, typeStyle }) {
       <img
         src={item.previewUrl}
         alt={item.fileName ?? "Archivo"}
+        loading="lazy"
+        decoding="async"
         className="h-9 w-9 shrink-0 rounded-lg border border-[hsl(var(--border))] object-cover"
       />
     );
@@ -280,11 +282,13 @@ function ImageGridTile({
   const [imgErr, setImgErr] = useState(false);
   const isVideo = String(mimeType ?? "").startsWith("video/");
   return (
-    <div className="relative group aspect-square rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] hover:border-[hsl(var(--primary)/0.6)] transition-colors">
+    <div className="relative group aspect-square overflow-hidden rounded-lg bg-[hsl(var(--muted)/0.4)]">
       <button
         type="button"
         onClick={onClick}
-        className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+        title={item.fileName ?? undefined}
+        aria-label={`Abrir ${item.fileName ?? "imagen"}`}
+        className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
       >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -299,17 +303,16 @@ function ImageGridTile({
           <img
             src={previewUrl}
             alt={item.fileName}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgErr(true)}
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover transition-opacity group-hover:opacity-90"
           />
         ) : !loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <FileImage className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
           </div>
         ) : null}
-        <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 translate-y-full group-hover:translate-y-0 transition-transform">
-          <p className="text-xs text-white truncate">{item.fileName}</p>
-        </div>
       </button>
 
       {canManageCover && (
@@ -399,7 +402,7 @@ function AssociatedCard({
           {item.fileName ?? "Archivo"}
         </p>
         {metaText && (
-          <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
+          <p className="truncate text-[10px] text-[hsl(var(--muted-foreground))]">
             {metaText}
           </p>
         )}
@@ -475,7 +478,7 @@ function AssociatedFilesList({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))] mb-2">
               Multimedia ({images.length})
             </p>
-            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 md:grid-cols-6">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1.5">
               {images.map((item, index) => {
                 const isVideo = String(item.mimeType ?? "").startsWith("video/");
                 return (
@@ -484,7 +487,7 @@ function AssociatedFilesList({
                     item={item}
                     mimeType={item.mimeType}
                     previewUrl={item.fileAssetId ? (thumbUrlsByAssetId[item.fileAssetId] ?? null) : null}
-                    loading={!isVideo && !thumbUrlsByAssetId[item.fileAssetId] && Boolean(item.fileAssetId)}
+                    loading={!isVideo && Boolean(item.fileAssetId) && !(item.fileAssetId in thumbUrlsByAssetId)}
                     onClick={() => onOpen(item)}
                     canManageCover={canManageCover}
                     isCover={canManageCover && item.id === currentCoverId}
@@ -633,65 +636,51 @@ export function AttachmentsPanel({
           ...item,
           id: item.fileAssetId ?? item.id,
           originalName: item.fileName ?? "Archivo",
-          signedUrl: item.signedUrl ?? preResolved,
-          // AdvancedFileViewer's filmstrip uses thumbnailUrl directly, with no
-          // +/-3-file window limit — the loadThumbs effect above already
-          // resolves every image's thumbnail up front, so reuse it instead of
-          // letting the viewer re-fetch (and only within its own window).
+          // preResolved is the low-res "card" variant: fine for the viewer's
+          // filmstrip, never for the main image, which resolves full size.
+          signedUrl: item.signedUrl ?? null,
           thumbnailUrl: preResolved,
         };
       }),
     [controller.associatedItems, thumbUrlsByAssetId],
   );
 
+  // Thumbnails use the small "card" variant (resized by the storage image
+  // proxy) so the grid loads fast; the full-resolution file is only fetched
+  // when the viewer opens it. Requests run in parallel, once per asset.
+  const requestedThumbIdsRef = useRef(new Set());
   useEffect(() => {
     let cancelled = false;
-    const imageItems = controller.associatedItems.filter((item) =>
-      String(item?.mimeType ?? "").startsWith("image/"),
-    );
-    if (imageItems.length === 0) return () => {};
+    const missingIds = controller.associatedItems
+      .filter((item) => String(item?.mimeType ?? "").startsWith("image/"))
+      .map((item) => item.fileAssetId)
+      .filter((id) => id && !requestedThumbIdsRef.current.has(id));
+    if (missingIds.length === 0) return () => {};
+    for (const id of missingIds) requestedThumbIdsRef.current.add(id);
 
-    async function loadThumbs() {
-      for (const item of imageItems) {
-        const assetId = item.fileAssetId;
-        if (!assetId) continue;
-        if (thumbUrlsByAssetId[assetId]) continue;
-
-        // Use inline signed URL if available and not expiring within 60 s
-        if (item.signedUrl && item.signedUrlExpiresAt) {
-          const expiresAt = new Date(item.signedUrlExpiresAt).getTime();
-          if (expiresAt - Date.now() > 60_000) {
-            if (!cancelled) {
-              setThumbUrlsByAssetId((prev) =>
-                prev[assetId] ? prev : { ...prev, [assetId]: item.signedUrl },
-              );
-            }
-            continue;
-          }
-        }
-
-        // Fallback: fetch signed URL individually (original behavior)
+    Promise.all(
+      missingIds.map(async (assetId) => {
         try {
-          const url = await controller.resolveSignedUrl(assetId);
-          if (cancelled || !url) continue;
-          setThumbUrlsByAssetId((prev) =>
-            prev[assetId] ? prev : { ...prev, [assetId]: url },
-          );
+          const url = await controller.resolveSignedUrl(assetId, { variant: "card" });
+          return [assetId, url];
         } catch {
-          // Ignore thumbnail resolution failures.
+          // Ignore thumbnail resolution failures; the tile shows an icon.
+          return [assetId, null];
         }
+      }),
+    ).then((entries) => {
+      if (cancelled) {
+        for (const id of missingIds) requestedThumbIdsRef.current.delete(id);
+        return;
       }
-    }
+      // Failed lookups are stored as null so the tile stops spinning.
+      setThumbUrlsByAssetId((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    });
 
-    loadThumbs();
     return () => {
       cancelled = true;
     };
-  }, [
-    controller.associatedItems,
-    controller.resolveSignedUrl,
-    thumbUrlsByAssetId,
-  ]);
+  }, [controller.associatedItems, controller.resolveSignedUrl]);
 
   const handleFilesPicked = async (filesLike) => {
     await controller.queueFiles(filesLike, {
@@ -754,12 +743,7 @@ export function AttachmentsPanel({
       (entry) => entry.id === item.id,
     );
     if (index >= 0) setViewerIndex(index);
-    const preloadedUrl = item.fileAssetId
-      ? (thumbUrlsByAssetId[item.fileAssetId] ?? null)
-      : null;
-    await controller.openAssociated(
-      preloadedUrl ? { ...item, signedUrl: preloadedUrl } : item,
-    );
+    await controller.openAssociated(item);
     setOpeningId(null);
   };
 

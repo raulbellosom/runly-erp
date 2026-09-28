@@ -3,6 +3,8 @@
 //          registries, SQL generator, migration safety guard, model checksum.
 
 export { ModuleEngineError }             from './errors.js'
+export { validateAiManifest,
+         isIdentifyingAiField }          from './ai-manifest.js'
 export { defineRunlyModule,
          // Kept for the @atlas/* package-scope compatibility system (vite.config.js):
          // a custom RME3 module authored against the old @atlas/module-engine import

@@ -1,10 +1,9 @@
 // apps/desktop/src/modules/runly.chat/components/ChannelGeneralTab.jsx
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Popover, PopoverTrigger, PopoverContent, ImageViewer, ComboboxField, Label, Textarea, SwitchField } from "@runly/ui";
+import { Button, Popover, PopoverTrigger, PopoverContent, ImageViewer, ComboboxField, Label, Textarea, SwitchField, ThemedEmojiPicker } from "@runly/ui";
 import { Image as ImageIcon, Smile, X, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import EmojiPicker from "emoji-picker-react";
 import EventFormModal from "../../runly.calendar/components/EventFormModal";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -13,7 +12,7 @@ import { useChannelRoles, useUpdateChannelRole } from "../hooks/useChannelRoles"
 import { roleHasPermission, findOwnMember, CHAT_PERMISSIONS } from "../lib/chatPermissions";
 
 // "General" tab of ConversationProfilePanel — avatar-editing UI for a channel/group
-// conversation. Mirrors MessageReactionPicker.jsx's Popover + emoji-picker-react
+// conversation. Mirrors MessageReactionPicker.jsx's Popover + ThemedEmojiPicker
 // pattern for the emoji button (but with a real PopoverTrigger, since the button
 // itself is the trigger here, not opened externally) and CompanyBranding.jsx's
 // uploadLogoMutation for the image button (FormData -> runly.files.upload ->
@@ -226,18 +225,13 @@ export function ChannelGeneralTab({ conversationId, currentUserId }) {
                 </Button>
               </PopoverTrigger>
               <PopoverContent side="bottom" align="start" className="w-auto p-0 overflow-hidden">
-                <EmojiPicker
+                <ThemedEmojiPicker
                   onEmojiClick={(emojiData) => {
                     updateMutation.mutate({ avatarEmoji: emojiData.emoji });
                     setEmojiOpen(false);
                   }}
-                  theme="dark"
-                  width={260}
-                  height={320}
-                  searchPlaceholder="Buscar emoji..."
-                  lazyLoadEmojis
-                  skinTonesDisabled
-                  autoFocusSearch={false}
+                  width="min(300px, calc(100vw - 1.5rem))"
+                  height={340}
                 />
               </PopoverContent>
             </Popover>

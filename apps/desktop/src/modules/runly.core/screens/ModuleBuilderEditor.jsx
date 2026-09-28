@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   Alert,
   AlertTitle,
   AlertDescription,
@@ -398,11 +397,6 @@ export default function ModuleBuilderEditor() {
               <DropdownMenuItem disabled={exportMutation.isPending} onSelect={() => flushPendingSave().then(() => exportMutation.mutate())}>
                 <Download />
                 Descargar ZIP
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setDeveloperOpen(true)}>
-                <Code2 />
-                Modo desarrollador...
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

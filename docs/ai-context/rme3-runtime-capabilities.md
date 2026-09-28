@@ -389,6 +389,42 @@ Cell components used in TABLE blueprints (badge renderers, custom cells) do not 
 
 ---
 
+## Module AI (`moduleContext.ai`)
+
+The Route Loader injects `moduleContext.ai` into every module API factory
+(`null` when the host has no AI). It exposes MirAI's tool loop and a
+privacy-safe internet lookup (Tavily). Search is always user-initiated: the
+assistant only calls the lookup tool when the user asks to search the internet
+or accepts its offer to do so.
+
+Declare which fields describe a record publicly in the manifest (identifying
+fields such as serial, plate, VIN, owner, email, phone or notes are rejected):
+
+```js
+ai: {
+  publicLookup: [
+    { model: 'vehicles', publicFields: ['make', 'model', 'year', 'version'], topics: ['ficha tecnica', 'mantenimiento'] },
+  ],
+},
+```
+
+```js
+export default function createRouter({ prisma, requirePermission, moduleContext }) {
+  const ai = moduleContext.ai
+  // ai.enabled, ai.publicLookupEnabled, ai.promptRule
+  // ai.answerWithTools({ messages, tools, executeTool, actorProfileId })
+  // ai.publicLookup.toolDefinition('vehicles') -> tool def ({ id, topic? }) or null
+  // ai.publicLookup.createTurnBudget()         -> max 2 lookups per turn
+  // ai.publicLookup.run({ model, record, topic, budget, companyId, actorId })
+}
+```
+
+In `executeTool`, resolve the record by `id` with your normal company scope
+(`prisma.$queryRaw`), then call `run`. Only the declared `publicFields` are
+sent; each lookup writes an `AuditLog` row `<moduleKey>.ai.public_lookup`.
+Append `ai.promptRule` to your system prompt whenever you offer the tool.
+The UI side is `ModuleAssistantPanel` from `@runly/ui`.
+
 ## Don’t Guess Imports
 
 These imports are guaranteed and should be used exactly as written:
@@ -512,6 +548,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 |---|---|
 | `PageHeader` | Page title bar with actions slot. The actions slot wraps (`flex-wrap`) — pass a fragment or a `flex flex-wrap` container, never a non-wrapping `flex` div (its buttons clip off the right edge on mobile). |
 | `UnsavedChangesBar` | Sticky "you have unsaved changes" bar. Props: `message`, `saving`, `onDiscard`, `onSave`, `saveLabel`, `savingLabel`, `discardLabel`, `className`. Stacks vertically below `sm` (primary action on top) and clears the mobile bottom nav via `env(safe-area-inset-bottom)`. Use instead of hand-rolling a save/discard footer. |
+| `ModuleAssistantPanel` | ChatGPT-style MirAI panel for a module assistant: full-height conversation list ("Nueva consulta", select, delete with `ConfirmDialog`) and a chat view that replaces the list (back arrow + title + optional `chatContext` chip). Props: `view` (`list`/`chat`), `subtitle`, `conversations` (`[{ id, title, meta? }]`), `conversationsError`, `conversationsLoading`, `activeId`, `onSelect`, `onNew`, `onDelete`, `onBack`, `onClose`, `chatTitle`, `chatContext`, `busy`, `headerClassName` (`pr-12` inside a `Sheet`), `children` (thread + composer). Data fetching stays in the module; header and composer stay fixed. Pair with `moduleContext.ai` (section "Module AI"). |
 | `EmptyState` | Empty list placeholder with icon and message |
 | `ErrorState` | Error display with retry option |
 | `StatCard` | KPI metric card with label, value, trend |
@@ -519,6 +556,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `DetailHero` | Redesigned entity-detail header: a representative image (or a branded fallback panel tinted by an accent colour) + title + subtitle + status pill + meta chips + an actions slot. Presentational only; consumed by `RunlyDetail` when the DETAIL blueprint declares `schema.hero`. |
 | `SearchInput` | Search text field with icon |
 | `FilterBar` | Horizontal filter control bar |
+| `ListPager` + `usePagedList` | Client-side paging for in-memory lists/cards ("1–12 de 40 < 1 / 4 >"); hidden for a single page |
 | `DynamicTable` | Blueprint-driven table renderer |
 | `DynamicForm` | Blueprint-driven form renderer |
 | `ActionMenu` | Row action dropdown button |
@@ -530,6 +568,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `AttachmentsPanel` | File attachments list panel |
 | `DocumentsPanel` | Documents list panel |
 | `ImageViewer` | Image lightbox |
+| `ThemedEmojiPicker` | Emoji picker themed with Runly tokens (native emojis, compact grid of ~9 per row at 300px, no preview). Props: `onEmojiClick(emojiData)` (`emojiData.emoji` is the character), `width`, `height`, `className`, `style`, `dark` (force a theme; defaults to following the app). Scrolls correctly inside a `Popover` opened from a `Dialog`/`Sheet`. Use it instead of importing `emoji-picker-react` directly. |
 | `ImageUploader` | Image crop and upload widget |
 | `ImageSourceSheet` | Camera-vs-gallery picker for touch devices — gate with `useCoarsePointer()`; on a fine-pointer device just open a plain `<input type="file">` directly instead. Props: `open, onOpenChange, onPickFile, accept?`. |
 | `CameraCaptureDialog` | Desktop webcam capture (`getUserMedia`, capture, retake, confirm; stops the stream on close; inline error + file fallback). Props: `open, onOpenChange, onCapture(file), fileName?`. |
