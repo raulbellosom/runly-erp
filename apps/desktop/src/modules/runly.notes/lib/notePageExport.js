@@ -1,4 +1,4 @@
-import { normalizeExportColors } from './exportColorCompatibility.js'
+import { normalizeExportColors } from '../../../lib/exportColorCompatibility.js'
 
 // Client-side export for the public note page's rendered content (the
 // `.note-sheet` DOM node — see NoteSheet.jsx). html2canvas is dynamic-

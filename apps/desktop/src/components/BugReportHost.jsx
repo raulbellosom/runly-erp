@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BugReportDialog, onBugReportRequest } from "@runly/ui";
 import { useAuth } from "../auth/AuthProvider";
 import { runly } from "../lib/runly";
+import { normalizeExportColors } from "../lib/exportColorCompatibility.js";
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -37,10 +38,19 @@ export function BugReportHost() {
     (async () => {
       try {
         const { default: html2canvas } = await import("html2canvas");
-        const canvas = await html2canvas(document.body, {
+        // Capture #root rather than body so the bug-report dialog (portaled
+        // into body) never ends up in its own screenshot. Tailwind v4 emits
+        // oklch()/color-mix() colors that html2canvas 1.x cannot parse —
+        // without normalizing them the capture throws and silently drops.
+        const target = document.getElementById("root") ?? document.body;
+        const canvas = await html2canvas(target, {
           scale: 0.5,
           useCORS: true,
           logging: false,
+          onclone: (clonedDocument) => {
+            const clonedTarget = clonedDocument.getElementById("root") ?? clonedDocument.body;
+            normalizeExportColors(clonedDocument, clonedTarget);
+          },
         });
         setScreenshot(canvas.toDataURL("image/jpeg", 0.7));
       } catch {
