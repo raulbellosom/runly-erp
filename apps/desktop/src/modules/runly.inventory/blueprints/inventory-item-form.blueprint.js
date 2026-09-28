@@ -31,8 +31,8 @@ export const INVENTORY_ITEM_FORM = {
         collapsible: true,
         fields: [
           { field: 'name', label: 'Nombre', type: 'text', required: true, hint: 'Laptop Dell XPS 15' },
-          { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar' },
-          { field: 'serialNumber', label: 'Número de serie', type: 'text' },
+          { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar', hiddenWhen: { field: '__multi', truthy: true } },
+          { field: 'serialNumber', label: 'Número de serie', type: 'text', hiddenWhen: { field: '__multi', truthy: true } },
           { field: 'partNumber', label: 'Número de parte', type: 'text' },
         ],
       },

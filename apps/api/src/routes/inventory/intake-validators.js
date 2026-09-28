@@ -20,6 +20,8 @@ export const intakeSchema = z.object({
   common: inventoryCommonSchema,
   units: z.array(identifiers.extend({
     confirmedIdentifiers: identifiers.optional(),
+    // Optional per-unit name (bulk capture by serial uses "Nombre · serie").
+    name: z.string().trim().min(1).max(255).optional(),
     duplicateAcknowledged: z.boolean().default(false),
     sourceImageIds: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(50).default([]),
   })).min(1).max(200),
