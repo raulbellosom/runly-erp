@@ -975,7 +975,7 @@ export function createModulesRouter({
           type: "core.module.install",
           severity: "success",
           entityType: "RunlyModule",
-          entityId: moduleKey,
+          payload: { moduleKey },
           summary: `${actorName} instaló el módulo ${moduleKey}`,
         });
         return c.json({ data: result, routeLoader: rlStatus }, 201);
@@ -2099,7 +2099,7 @@ export function createModulesRouter({
           type: "core.module.disable",
           severity: "warning",
           entityType: "RunlyModule",
-          entityId: key,
+          payload: { moduleKey: key },
           summary: `${actorName} deshabilitó el módulo ${key}`,
         });
         return c.json({
@@ -2136,7 +2136,7 @@ export function createModulesRouter({
           type: "core.module.enable",
           severity: "info",
           entityType: "RunlyModule",
-          entityId: key,
+          payload: { moduleKey: key },
           summary: `${actorName} habilitó el módulo ${key}`,
         });
         return c.json({ data: result, routeLoader: rlStatus });
@@ -2176,7 +2176,7 @@ export function createModulesRouter({
           type: "core.module.uninstall",
           severity: "critical",
           entityType: "RunlyModule",
-          entityId: key,
+          payload: { moduleKey: key },
           summary: `${actorName} desinstaló el módulo ${key} (preservando datos)`,
         });
         return c.json({
@@ -2263,7 +2263,7 @@ export function createModulesRouter({
           type: "core.module.uninstall",
           severity: "critical",
           entityType: "RunlyModule",
-          entityId: key,
+          payload: { moduleKey: key },
           summary: `${actorName} desinstaló el módulo ${key} (${mode})`,
         });
         return c.json({
@@ -2337,7 +2337,7 @@ export function createModulesRouter({
           type: "core.module.reset",
           severity: "warning",
           entityType: "RunlyModule",
-          entityId: key,
+          payload: { moduleKey: key },
           summary: `${actorName} reinició el módulo ${key}`,
         });
         return c.json({ data: result });
