@@ -124,3 +124,32 @@ describe("SMTP transport encryption", () => {
     });
   }
 });
+
+describe("SMTP inline Runly assets", () => {
+  for (const service of [
+    { name: "platform", create: createSmtpService, prefix: "smtp" },
+    { name: "website", create: createWebsiteSmtpService, prefix: "website.smtp" },
+  ]) {
+    it(`${service.name}: attaches the Runly logo referenced by cid`, async (t) => {
+      const sendMail = t.mock.fn(async () => ({}));
+      t.mock.method(nodemailer, "createTransport", () => ({ sendMail }));
+      const rows = [
+        { key: `${service.prefix}.host`, value: "smtp.example.com" },
+        { key: `${service.prefix}.user`, value: "bot@example.com" },
+      ];
+      const svc = service.create({ prisma: prismaWith(rows) });
+
+      await svc.sendEmail({
+        to: "recipient@example.com",
+        subject: "Runly",
+        html: '<img src="cid:runly-email-logo@runly.mx" alt="Runly ERP">',
+      });
+
+      const message = sendMail.mock.calls[0].arguments[0];
+      assert.equal(message.attachments.length, 1);
+      assert.equal(message.attachments[0].cid, "runly-email-logo@runly.mx");
+      assert.equal(message.attachments[0].contentDisposition, "inline");
+      assert.match(message.attachments[0].path, /runly-logo-horizontal-light\.png$/);
+    });
+  }
+});

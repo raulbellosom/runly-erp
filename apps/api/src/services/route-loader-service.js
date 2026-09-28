@@ -302,6 +302,7 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
 
     if (!(await pathExists(apiPath))) {
       setModuleRouteStatus(moduleKey, 'MISSING_API', { apiPath })
+      console.warn(`[route-loader] ${moduleKey}: no api/index.js at ${apiPath}, routes not mounted`)
       return { loaded: false, reason: 'missing_api' }
     }
 
@@ -489,6 +490,9 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
     })
     if (!moduleRow || moduleRow.status !== 'INSTALLED' || !moduleRow.enabled) {
       setModuleRouteStatus(key, 'UNLOADED', { reason: 'module_not_active' })
+      console.warn(
+        `[route-loader] ${key}: not mounted (status=${moduleRow?.status ?? 'missing'}, enabled=${moduleRow?.enabled ?? false})`
+      )
       return { loaded: false, reason: 'module_not_active' }
     }
 

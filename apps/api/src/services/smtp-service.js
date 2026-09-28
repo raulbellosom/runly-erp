@@ -1,8 +1,27 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import nodemailer from 'nodemailer'
 
 const ALGORITHM = 'aes-256-gcm'
 const SALT = 'atlas-smtp-v1'
+const RUNLY_LOGO_CID = 'runly-email-logo@runly.mx'
+const RUNLY_LOGO_PATH = fileURLToPath(
+  new URL('../../../desktop/public/runly/runly-logo-horizontal-light.png', import.meta.url),
+)
+
+function withRunlyInlineAssets(html, attachments = []) {
+  if (!String(html ?? '').includes(`cid:${RUNLY_LOGO_CID}`)) return attachments
+  if (attachments.some((attachment) => attachment?.cid === RUNLY_LOGO_CID)) return attachments
+  return [
+    ...attachments,
+    {
+      filename: 'runly-logo.png',
+      path: RUNLY_LOGO_PATH,
+      cid: RUNLY_LOGO_CID,
+      contentDisposition: 'inline',
+    },
+  ]
+}
 
 // Raised when a stored SMTP secret cannot be read back — almost always because
 // JWT_SECRET changed since it was saved (the AES key is derived from it), so the
@@ -158,13 +177,14 @@ export function createSmtpService({ prisma, companyId: defaultCompanyId = null, 
     // (ultimately sourced from Company.name, admin-editable text).
     const safeFromName = String(fromName ?? config.fromName).replace(/[\r\n]/g, ' ').trim()
 
+    const resolvedAttachments = withRunlyInlineAssets(html, attachments)
     await transporter.sendMail({
       from:    `"${safeFromName}" <${config.fromEmail}>`,
       to,
       subject,
       html,
       text,
-      ...(attachments?.length ? { attachments } : {}),
+      ...(resolvedAttachments.length ? { attachments: resolvedAttachments } : {}),
     })
   }
 
@@ -230,7 +250,7 @@ export function createWebsiteSmtpService({ prisma, companyId = null }) {
     }
   }
 
-  async function sendEmail({ to, subject, html, text, fromName }) {
+  async function sendEmail({ to, subject, html, text, fromName, attachments }) {
     const config = await getConfig()
     if (!config) throw new Error('SMTP no configurado (website ni plataforma)')
 
@@ -245,12 +265,14 @@ export function createWebsiteSmtpService({ prisma, companyId = null }) {
 
     const safeFromName = String(fromName ?? config.fromName).replace(/[\r\n]/g, ' ').trim()
 
+    const resolvedAttachments = withRunlyInlineAssets(html, attachments)
     await transporter.sendMail({
       from:    `"${safeFromName}" <${config.fromEmail}>`,
       to,
       subject,
       html,
       text,
+      ...(resolvedAttachments.length ? { attachments: resolvedAttachments } : {}),
     })
   }
 

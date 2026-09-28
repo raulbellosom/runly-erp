@@ -66,10 +66,9 @@ function safeHexColor(value, fallback) {
 // always kept in the footer — visible enough to read, but a single plain-text
 // link to our own root domain, not the kind of pattern spam filters flag.
 export function renderRunlyEmailLayout({ kicker, heading, bodyHtml = "", cta = null, footnote, brand = null, env = process.env }) {
-  const apiBaseUrl = resolveApiBaseUrl(env);
-  // Keep this URL versioned by filename. The previous endpoint served the
-  // retired Atlas artwork and can remain cached by email clients for days.
-  const runlyLogoUrl = apiBaseUrl ? `${apiBaseUrl}/brand/runly-email-logo-light.png` : null;
+  // The SMTP service attaches this asset inline. A cid: URL keeps the brand
+  // visible without asking the inbox provider to download a remote image.
+  const runlyLogoUrl = "cid:runly-email-logo@runly.mx";
   const logoUrl = brand?.logoUrl || runlyLogoUrl;
   const logoAlt = brand?.logoUrl ? (brand?.name ?? "Empresa") : "Runly ERP";
   const accentColor = safeHexColor(brand?.primaryColor, CTA_COLOR);

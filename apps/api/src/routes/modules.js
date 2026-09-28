@@ -1890,6 +1890,50 @@ export function createModulesRouter({
     },
   );
 
+  // ── GET /modules/:key/routes ─────────────────────────────────────────────
+  // Diagnostics for "module installed but its endpoints 404": DB state, the
+  // route loader's last result for this key (incl. load errors) and the
+  // routes actually mounted in this API process.
+
+  app.get(
+    "/:key/routes",
+    authMiddleware,
+    requirePermission("core.modules.read"),
+    async (c) => {
+      try {
+        const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+        const mod = await prisma.runlyModule.findUnique({
+          where: { key },
+          select: { key: true, status: true, enabled: true, version: true, lifecycleConfig: true },
+        });
+        if (!mod) return c.json({ error: "Modulo no encontrado." }, 404);
+        const modulesDir = await resolveModulesDir();
+        const apiPath = modulesDir ? path.join(modulesDir, key, "api", "index.js") : null;
+        const loaded = routeLoader?.getLoadedModules?.().find((entry) => entry.moduleKey === key) ?? null;
+        return c.json({
+          data: {
+            module: {
+              key: mod.key,
+              status: mod.status,
+              enabled: mod.enabled,
+              version: mod.version,
+              discovery: mod.lifecycleConfig?.discovery ?? null,
+              persistedRouteLoader: mod.lifecycleConfig?.routeLoader ?? null,
+            },
+            apiFile: { path: apiPath, exists: Boolean(apiPath && existsSync(apiPath)) },
+            routeLoader: routeLoader?.getModuleRouteStatus?.(key) ?? null,
+            mounted: Boolean(loaded),
+            loadedAt: loaded?.loadedAt ?? null,
+            routes: loaded?.routes ?? [],
+          },
+        });
+      } catch (err) {
+        console.error("[modules] GET /:key/routes error:", err);
+        return c.json({ error: "No se pudo leer el estado de rutas del modulo." }, 500);
+      }
+    },
+  );
+
   // ── POST /modules/:key/disable ────────────────────────────────────────────
 
   app.get(

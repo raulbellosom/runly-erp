@@ -36,9 +36,9 @@ describe("renderRunlyEmailLayout", () => {
     assert.match(html, /href="https:\/\/x\.test\/p\/call\/abc\?i=1"/);
     assert.doesNotMatch(html, /<script>/);
   });
-  it("omits the logo img when no api base url resolves", () => {
+  it("embeds the Runly logo by cid even without a public API URL", () => {
     const html = renderRunlyEmailLayout({ heading: "x", env: { NODE_ENV: "production" } });
-    assert.doesNotMatch(html, /runly-email-logo-light/);
+    assert.match(html, /src="cid:runly-email-logo@runly\.mx"/);
   });
   it("uses the current Runly logo and warm brand accent", () => {
     const html = renderRunlyEmailLayout({
@@ -46,9 +46,9 @@ describe("renderRunlyEmailLayout", () => {
       cta: { label: "Abrir", url: "https://app.example.test" },
       env: { RUNLY_API_URL: "https://api.example.test" },
     });
-    assert.match(html, /https:\/\/api\.example\.test\/brand\/runly-email-logo-light\.png/);
+    assert.match(html, /src="cid:runly-email-logo@runly\.mx"/);
     assert.match(html, /background:#FD6016/);
-    assert.doesNotMatch(html, /#2563eb|runly-logo-horizontal\.png/);
+    assert.doesNotMatch(html, /#2563eb|https:\/\/api\.example\.test\/brand/);
   });
   it("always links the footer credit to runly.mx", () => {
     const html = renderRunlyEmailLayout({ heading: "x", env: {} });
