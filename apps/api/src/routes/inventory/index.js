@@ -9,6 +9,7 @@ import { createInventoryIntakeRouter } from './intake-routes.js';
 import { createInventoryAssistantRouter } from './assistant-routes.js';
 import { tenantActiveContext } from '../../lib/active-context.js';
 import { createInventoryModelsRouter } from './models-routes.js';
+import { createInventoryImportRouter } from './import-routes.js';
 import { createInventoryModelService } from '../../services/inventory-model-service.js';
 
 export function createInventoryRouter({
@@ -26,6 +27,7 @@ export function createInventoryRouter({
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryAssistantRouter({ prisma, requirePermission }));
   router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
+  router.route('/', createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError }));
   const modelDefaults = createInventoryModelService({ prisma });
 
   const isInvErr = (err) => err instanceof InventoryServiceError;
