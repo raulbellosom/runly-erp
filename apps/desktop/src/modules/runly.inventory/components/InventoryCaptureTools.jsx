@@ -1,10 +1,15 @@
 import { useEffect } from 'react'
-import { Button, CheckboxField, Popover, PopoverContent, PopoverTrigger, TextareaField, cn } from '@runly/ui'
+import { Button, SwitchField, TextareaField, cn } from '@runly/ui'
 import { Pin, Rows3, Square } from 'lucide-react'
-import { MAX_BULK_SERIALS, PIN_GROUPS, parseSerials, pinnedValues, saveCapture } from '../lib/capture.js'
+import { MAX_BULK_SERIALS, parseSerials, pinnedValues, saveCapture } from '../lib/capture.js'
 
-// Capture toolbar for the new-asset form (RunlyForm renderTools slot):
-// "Un equipo" / "Varios por serie", continuous capture and pinned fields.
+const MODES = [
+  { multi: false, label: 'Un equipo', icon: Square },
+  { multi: true, label: 'Varios por serie', icon: Rows3 },
+]
+
+// Capture bar for the new-asset form (RunlyForm renderTools slot). Pins live on
+// each field (RunlyForm fieldPins); "Fijar campos" only shows/hides them.
 // Pinned values are written to this browser on every change.
 export function InventoryCaptureTools({ values, patchValues, disabled, settings, setSettings, storageKey, serialsText, setSerialsText }) {
   useEffect(() => {
@@ -17,40 +22,64 @@ export function InventoryCaptureTools({ values, patchValues, disabled, settings,
   }, [settings.multi, values.__multi, patchValues])
 
   const update = (patch) => setSettings((prev) => ({ ...prev, ...patch }))
-  const togglePin = (key, on) => update({ pinned: on ? [...settings.pinned, key] : settings.pinned.filter((k) => k !== key) })
   const { serials, repeated } = parseSerials(serialsText)
   const overLimit = serials.length > MAX_BULK_SERIALS
+  const pinnedCount = settings.pinned.length
 
   return (
-    <section className="glass-shell-flat mb-4 space-y-4 rounded-2xl p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-xl border border-[hsl(var(--border))] p-0.5">
-          {[{ multi: false, label: 'Un equipo', icon: Square }, { multi: true, label: 'Varios por serie', icon: Rows3 }].map(({ multi, label, icon: Icon }) => (
-            <Button key={label} type="button" size="sm" disabled={disabled} variant={settings.multi === multi ? 'default' : 'ghost'} onClick={() => update({ multi })}>
-              <Icon className="mr-1.5 h-3.5 w-3.5" />{label}
-            </Button>
-          ))}
+    <section className="glass-shell-flat mb-4 overflow-hidden rounded-2xl">
+      <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div role="radiogroup" aria-label="Modo de captura" className="inline-flex w-full rounded-xl bg-[hsl(var(--muted))]/60 p-1 sm:w-auto">
+          {MODES.map(({ multi, label, icon: Icon }) => {
+            const active = settings.multi === multi
+            return (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                disabled={disabled}
+                onClick={() => update({ multi })}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all sm:flex-none',
+                  active
+                    ? 'bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm'
+                    : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
+                )}
+              >
+                <Icon className="h-4 w-4" />{label}
+              </button>
+            )
+          })}
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button type="button" size="sm" variant="outline" disabled={disabled}>
-              <Pin className={cn('mr-1.5 h-3.5 w-3.5', settings.pinned.length && 'text-[hsl(var(--primary))]')} />
-              Campos fijados{settings.pinned.length ? ` (${settings.pinned.length})` : ''}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-72 space-y-2">
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">Los campos fijados conservan su valor al guardar y al recargar la página (en este navegador).</p>
-            {PIN_GROUPS.map((group) => (
-              <CheckboxField key={group.key} label={group.label} checked={settings.pinned.includes(group.key)}
-                onChange={(e) => togglePin(group.key, e.target.checked)} />
-            ))}
-          </PopoverContent>
-        </Popover>
-        <CheckboxField label="Captura continua: al guardar, empezar otro" checked={settings.continuous} disabled={disabled}
-          onChange={(e) => update({ continuous: e.target.checked })} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            size="sm"
+            variant={settings.pinMode ? 'default' : 'outline'}
+            disabled={disabled}
+            aria-pressed={settings.pinMode}
+            onClick={() => update({ pinMode: !settings.pinMode })}
+          >
+            <Pin className={cn('mr-1.5 h-3.5 w-3.5', pinnedCount > 0 && 'fill-current')} />
+            {settings.pinMode ? 'Listo' : 'Fijar campos'}
+            {pinnedCount > 0 ? (
+              <span className="ml-1.5 rounded-full bg-[hsl(var(--primary))]/15 px-1.5 text-xs tabular-nums">{pinnedCount}</span>
+            ) : null}
+          </Button>
+          <SwitchField label="Captura continua" checked={settings.continuous} disabled={disabled}
+            onChange={(continuous) => update({ continuous: Boolean(continuous) })} />
+        </div>
       </div>
+
+      {settings.pinMode ? (
+        <p className="border-t border-[hsl(var(--border))] bg-[hsl(var(--primary))]/5 px-4 py-2 text-xs text-[hsl(var(--muted-foreground))]">
+          Toca el pin de cada campo para fijarlo. Los campos fijados conservan su valor al guardar y al recargar la página en este navegador.
+        </p>
+      ) : null}
+
       {settings.multi ? (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 border-t border-[hsl(var(--border))] p-4">
           <TextareaField
             label="Números de serie"
             rows={4}
@@ -61,7 +90,7 @@ export function InventoryCaptureTools({ values, patchValues, disabled, settings,
             onChange={(e) => setSerialsText(e.target.value)}
           />
           <p className={cn('text-sm', overLimit ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--muted-foreground))]')}>
-            {serials.length} {serials.length === 1 ? 'serie' : 'series'}
+            <span className="font-medium tabular-nums text-[hsl(var(--foreground))]">{serials.length}</span> {serials.length === 1 ? 'serie' : 'series'}
             {repeated.length ? ` · ${repeated.length} repetida${repeated.length === 1 ? '' : 's'} (se omiten): ${repeated.slice(0, 5).join(', ')}${repeated.length > 5 ? '…' : ''}` : ''}
             {overLimit ? ` · máximo ${MAX_BULK_SERIALS} por captura` : ''}
           </p>

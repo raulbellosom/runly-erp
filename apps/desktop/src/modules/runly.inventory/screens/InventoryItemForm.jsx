@@ -11,7 +11,7 @@ import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryI
 import { INVENTORY_ITEM_FORM } from '../blueprints/inventory-item-form.blueprint.js'
 import { inventoryFormComponents } from '../components/InventoryItemClassification.jsx'
 import { InventoryCaptureTools } from '../components/InventoryCaptureTools.jsx'
-import { MAX_BULK_SERIALS, bulkUnitName, captureStorageKey, loadCapture, parseSerials } from '../lib/capture.js'
+import { MAX_BULK_SERIALS, bulkUnitName, canPinField, captureStorageKey, loadCapture, parseSerials } from '../lib/capture.js'
 import { intakeRequest } from '../lib/intake.js'
 
 const API_BASE = getApiUrl()
@@ -100,6 +100,15 @@ export default function InventoryItemForm() {
           blueprint={blueprint}
           initialData={isEdit ? editItem : createInitial}
           submitRequest={!isEdit && settings.multi ? submitBulk : null}
+          fieldPins={isEdit ? null : {
+            pinned: settings.pinned,
+            visible: settings.pinMode,
+            canPin: canPinField,
+            onToggle: (names, pin) => setSettings((prev) => ({
+              ...prev,
+              pinned: pin ? [...new Set([...prev.pinned, ...names])] : prev.pinned.filter((name) => !names.includes(name)),
+            })),
+          }}
           renderTools={isEdit ? null : (tools) => (
             <InventoryCaptureTools {...tools} settings={settings} setSettings={setSettings} storageKey={storageKey}
               serialsText={serialsText} setSerialsText={setSerialsText} />

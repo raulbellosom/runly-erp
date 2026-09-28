@@ -3,18 +3,11 @@
 
 export const MAX_BULK_SERIALS = 200
 
-// Groups of form fields the user can pin together.
-export const PIN_GROUPS = [
-  { key: 'name', label: 'Nombre', fields: ['name'] },
-  { key: 'classification', label: 'Modelo, tipo y marca', fields: ['modelId', 'model', 'categoryId', 'brandId'] },
-  { key: 'location', label: 'Ubicación', fields: ['locationId'] },
-  { key: 'status', label: 'Estado', fields: ['status'] },
-  { key: 'purchase', label: 'Compra', fields: ['purchaseDate', 'purchasePrice', 'vendorName', 'invoiceNumber'] },
-  { key: 'warranty', label: 'Garantía', fields: ['warrantyExpiry', 'warrantyNotes'] },
-  { key: 'notes', label: 'Notas', fields: ['notes'] },
-]
+// Unique per asset, so pinning them would only produce duplicates.
+export const UNPINNABLE_FIELDS = ['serialNumber', 'assetTag']
+export const canPinField = (name) => !UNPINNABLE_FIELDS.includes(name) && !name.startsWith('__')
 
-export const DEFAULT_CAPTURE = { pinned: [], values: {}, continuous: false, multi: false }
+export const DEFAULT_CAPTURE = { pinned: [], values: {}, continuous: false, multi: false, pinMode: false }
 
 // Serials separated by commas, semicolons, spaces or new lines. Repeats are
 // dropped (first occurrence kept) and reported.
@@ -30,14 +23,12 @@ export function parseSerials(text) {
   return { serials, repeated }
 }
 
+// `pinned` holds field names (RunlyForm fieldPins).
 export function pinnedValues(values, pinned) {
   const out = {}
-  for (const group of PIN_GROUPS) {
-    if (!pinned.includes(group.key)) continue
-    for (const field of group.fields) {
-      const value = values?.[field]
-      if (value !== undefined && value !== null && value !== '') out[field] = value
-    }
+  for (const field of pinned) {
+    const value = values?.[field]
+    if (canPinField(field) && value !== undefined && value !== null && value !== '') out[field] = value
   }
   return out
 }

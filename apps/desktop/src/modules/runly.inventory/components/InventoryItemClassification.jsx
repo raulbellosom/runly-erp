@@ -10,7 +10,7 @@ const NONE = '__none__'
 // RunlyForm "component" section: model, type (categoryId) and brand. Picking a
 // catalog model fills Tipo and Marca; "+ Crear «X»" opens the model dialog,
 // which can itself create types and brands.
-export function InventoryItemClassification({ value, onChange, errors = {}, disabled }) {
+export function InventoryItemClassification({ value, onChange, errors = {}, disabled, renderPin }) {
   const { data: models = [] } = useInventoryModels()
   const [dialog, setDialog] = useState(null)
 
@@ -34,7 +34,8 @@ export function InventoryItemClassification({ value, onChange, errors = {}, disa
 
   return (
     <fieldset disabled={disabled} className="grid gap-4 lg:grid-cols-2">
-      <div className="col-span-full">
+      <div className="relative col-span-full">
+        {renderPin?.(['modelId', 'model'], 'Modelo')}
         <CreatableComboboxField
           label="Modelo"
           value={selected}
@@ -47,8 +48,14 @@ export function InventoryItemClassification({ value, onChange, errors = {}, disa
           searchPlaceholder="Ej. Dell XPS 2023"
         />
       </div>
-      <InventoryTypePicker value={value.categoryId} onChange={(categoryId) => onChange({ categoryId })} error={errors.categoryId} />
-      <InventoryBrandPicker value={value.brandId} onChange={(brandId) => onChange({ brandId })} error={errors.brandId} />
+      <div className="relative">
+        {renderPin?.(['categoryId'], 'Tipo')}
+        <InventoryTypePicker value={value.categoryId} onChange={(categoryId) => onChange({ categoryId })} error={errors.categoryId} />
+      </div>
+      <div className="relative">
+        {renderPin?.(['brandId'], 'Marca')}
+        <InventoryBrandPicker value={value.brandId} onChange={(brandId) => onChange({ brandId })} error={errors.brandId} />
+      </div>
       <InventoryModelDialog
         open={Boolean(dialog)}
         onOpenChange={(open) => { if (!open) setDialog(null) }}

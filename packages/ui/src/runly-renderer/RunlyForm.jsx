@@ -32,6 +32,7 @@ import { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
 import { DynamicFieldsSection, buildCustomFieldsPayload } from "./DynamicFieldsSection.jsx";
 import { normalizeSpanishLabel, normalizeRelationDescriptor } from "./renderer-adapters.js";
 import { cn } from "../lib/utils.js";
+import { useInsideOverlay } from "../components/overlay-surface-context.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { normalizeField, normalizeSections } from "./runly-form-schema.js";
 import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
@@ -39,6 +40,7 @@ import { fetchFirstImageAssetId, fetchSignedUrl } from "./runly-detail-hero.jsx"
 import { firstTabWithError, resolveSchemaTabs, tabOfSection, tabsWithErrors } from "./schema-tabs.js";
 import { isElementVisible, matchesVisibilityRule, visibleSections } from "./visibility-rules.js";
 import { SchemaTabBar } from "./SchemaTabBar.jsx";
+import { FieldPinButton, pinStateFor } from "./FieldPinButton.jsx";
 import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
   CAR_COLORS,
@@ -119,6 +121,8 @@ export function RunlyForm({
   componentRegistry = null,
   renderTools = null,
   submitRequest = null,
+  // Optional per-field pins, see FieldPinButton.jsx for the contract.
+  fieldPins = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -153,6 +157,7 @@ export function RunlyForm({
     [initialData, mode],
   );
 
+  const insideOverlay = useInsideOverlay();
   const [formValues, setFormValues] = useState(() =>
     buildInitialValues(fieldMap, initialData),
   );
@@ -929,6 +934,10 @@ export function RunlyForm({
             token={token}
             companyId={companyId}
             disabled={submitting}
+            renderPin={(names, label) => {
+              const pin = pinStateFor(fieldPins, names);
+              return pin ? <FieldPinButton {...pin} label={label} /> : null;
+            }}
           />
         );
       }
@@ -949,11 +958,13 @@ export function RunlyForm({
             const isFullWidth =
               ["textarea", "markdown"].includes(field.type) ||
               field.fullWidth === true;
+            const pin = pinStateFor(fieldPins, [field.name]);
             return (
               <div
                 key={field.name}
-                className={isFullWidth ? "col-span-full" : ""}
+                className={cn(isFullWidth && "col-span-full", pin && "relative")}
               >
+                {pin ? <FieldPinButton {...pin} label={field.label} /> : null}
                 {renderFieldControl(field)}
               </div>
             );
@@ -1170,7 +1181,12 @@ export function RunlyForm({
       {showFooter && (
         <div
           className={cn(
-            "glass-shell-flat sticky bottom-0 z-10 rounded-xl px-4 py-3 flex items-center justify-between gap-2",
+            "sticky bottom-0 z-10 flex items-center justify-between gap-2",
+            // Inside a Dialog/Sheet the overlay is already the surface:
+            // keep only the buttons, no card behind them.
+            // On a full page it floats over scrolling content, so it gets the
+            // real glass surface (translucent + blur), not the solid card.
+            insideOverlay ? "pt-3" : "glass-strong rounded-xl px-4 py-3",
           )}
         >
           <p className="text-xs text-[hsl(var(--muted-foreground))]">
