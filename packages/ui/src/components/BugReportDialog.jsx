@@ -92,7 +92,8 @@ export function BugReportDialog({
         <DialogHeader>
           <DialogTitle>Reportar bug</DialogTitle>
           <DialogDescription>
-            Se enviará al equipo de Runly junto con detalles técnicos para ayudar a diagnosticarlo.
+            Se enviará por correo al equipo de soporte, incluyendo tu nombre, correo, empresa,
+            la URL actual y, si aplica, la captura de pantalla y los archivos que adjuntes.
           </DialogDescription>
         </DialogHeader>
 
