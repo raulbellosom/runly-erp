@@ -9,8 +9,8 @@ export function CatalogNav({ active, counts, onSelect }) {
         <SelectField label="Catálogo" value={active} onValueChange={onSelect}
           options={CATALOGS.map((c) => ({ value: c.key, label: `${c.label} (${counts[c.key] ?? 0})`, icon: c.icon }))} />
       </div>
-      <nav aria-label="Catálogos" className="hidden md:block">
-        <ul className="glass-shell-flat sticky top-4 space-y-1 rounded-2xl p-2">
+      <nav aria-label="Catálogos" className="hidden md:sticky md:top-4 md:block md:self-start">
+        <ul className="glass-shell-flat space-y-1 rounded-2xl p-2">
           {CATALOGS.map(({ key, label, icon: Icon }) => (
             <li key={key}>
               <button

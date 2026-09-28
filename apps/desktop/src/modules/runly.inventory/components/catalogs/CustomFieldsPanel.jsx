@@ -8,6 +8,8 @@ import {
 import { typeOptions, useTypeRows } from '../InventoryCatalogPickers.jsx'
 import { CatalogPanel } from './CatalogPanel.jsx'
 import { CatalogListRow } from './CatalogListRow.jsx'
+import { CatalogPager, usePagedList } from './CatalogPager.jsx'
+import { ActiveFilterChip, useCatalogUrlFilter } from './CatalogCountLink.jsx'
 import { CatalogEditSheet } from './CatalogEditSheet.jsx'
 
 const FIELD_TYPES = [
@@ -31,6 +33,9 @@ export function CustomFieldsPanel() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   useEffect(() => { setOrder(null) }, [data])
+  const [typeFilter, clearTypeFilter] = useCatalogUrlFilter('typeId')
+  const listed = typeFilter ? rows.filter((row) => row.categoryId === typeFilter) : (order ?? rows)
+  const paged = usePagedList(listed)
 
   function open(row) {
     setEditing(row ?? {})
@@ -57,9 +62,10 @@ export function CustomFieldsPanel() {
         <EmptyState icon={SlidersHorizontal} title="Sin campos" description="Crea campos que se piden al registrar activos de un tipo." action={{ label: 'Nuevo campo', onClick: () => open(null) }} />
       ) : (
         <div className="space-y-1.5">
+          {typeFilter ? <ActiveFilterChip label={`Tipo: ${typeById.get(typeFilter)?.name ?? '...'}`} onClear={clearTypeFilter} /> : null}
           <SortableList
-            items={order ?? rows}
-            onReorder={handleReorder}
+            items={paged.pageItems}
+            onReorder={(next) => { if (!typeFilter) handleReorder(paged.replacePage(next)) }}
             renderItem={(row, { dragHandleProps, isDragging }) => {
               const type = row.categoryId ? typeById.get(row.categoryId) : null
               return (
@@ -77,6 +83,7 @@ export function CustomFieldsPanel() {
               )
             }}
           />
+          <CatalogPager {...paged} />
         </div>
       )}
       <CatalogEditSheet open={Boolean(editing)} onOpenChange={(value) => { if (!value) setEditing(null) }}

@@ -37,8 +37,8 @@ export function createInventoryRouter({
   router.get("/inventory/items", requirePermission("inventory.item.read"), async (c) => {
     try {
       const companyId = c.get("companyId");
-      const { search, categoryId, brandId, locationId, status, assignedToId, page, limit, pageSize, sortBy, sortDir } = c.req.query();
-      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
+      const { search, categoryId, brandId, locationId, status, assignedToId, modelId, page, limit, pageSize, sortBy, sortDir } = c.req.query();
+      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, modelId, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
       return c.json(result);
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);

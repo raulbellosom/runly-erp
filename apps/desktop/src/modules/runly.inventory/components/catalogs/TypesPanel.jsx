@@ -7,6 +7,8 @@ import {
 } from '../../hooks/useInventoryCatalogs.js'
 import { CatalogPanel } from './CatalogPanel.jsx'
 import { CatalogListRow } from './CatalogListRow.jsx'
+import { CatalogPager, usePagedList } from './CatalogPager.jsx'
+import { CATALOGS_PATH, INVENTORY_PATH } from './CatalogCountLink.jsx'
 import { CatalogEditSheet } from './CatalogEditSheet.jsx'
 
 const COLORS = ['#7c3aed', '#2563eb', '#0891b2', '#16a34a', '#ca8a04', '#ea580c', '#dc2626', '#db2777', '#475569']
@@ -30,6 +32,7 @@ export function TypesPanel({ onImport }) {
   const term = search.trim().toLowerCase()
   const items = order ?? rows
   const visible = term ? items.filter((row) => `${row.name} ${row.description ?? ''}`.toLowerCase().includes(term)) : items
+  const paged = usePagedList(visible)
 
   function open(row) {
     setEditing(row ?? {})
@@ -58,7 +61,11 @@ export function TypesPanel({ onImport }) {
       color={row.color ?? COLORS[0]}
       title={row.name}
       subtitle={row.parentId && byId.has(row.parentId) ? `Subtipo de ${byId.get(row.parentId).name}` : (row.description || 'Sin descripción')}
-      badges={[`${row.itemCount ?? 0} activos`, `${row.modelCount ?? 0} modelos`, `${row.customFieldCount ?? 0} campos`]}
+      badges={[
+        { label: `${row.itemCount ?? 0} activos`, to: `${INVENTORY_PATH}?categoryId=${row.id}` },
+        { label: `${row.modelCount ?? 0} modelos`, to: `${CATALOGS_PATH}?tab=models&typeId=${row.id}` },
+        { label: `${row.customFieldCount ?? 0} campos`, to: `${CATALOGS_PATH}?tab=custom-fields&typeId=${row.id}` },
+      ]}
       dragHandleProps={drag.dragHandleProps}
       isDragging={drag.isDragging}
       onEdit={() => open(row)}
@@ -74,11 +81,12 @@ export function TypesPanel({ onImport }) {
       <TextField label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar tipo..." />
       {isLoading ? <LoadingState /> : rows.length === 0 ? (
         <EmptyState icon={Shapes} title="Sin tipos" description="Crea tu primer tipo de activo o importa una lista." action={{ label: 'Nuevo tipo', onClick: () => open(null) }} />
-      ) : term ? (
-        <div className="space-y-1.5">{visible.map((row) => <div key={row.id}>{renderRow(row)}</div>)}</div>
       ) : (
         <div className="space-y-1.5">
-          <SortableList items={visible} onReorder={handleReorder} renderItem={(row, drag) => renderRow(row, drag)} />
+          {term
+            ? paged.pageItems.map((row) => <div key={row.id}>{renderRow(row)}</div>)
+            : <SortableList items={paged.pageItems} onReorder={(next) => handleReorder(paged.replacePage(next))} renderItem={(row, drag) => renderRow(row, drag)} />}
+          <CatalogPager {...paged} />
         </div>
       )}
       <CatalogEditSheet open={Boolean(editing)} onOpenChange={(value) => { if (!value) setEditing(null) }}

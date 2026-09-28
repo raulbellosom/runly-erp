@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Sparkles } from 'lucide-react'
@@ -9,13 +9,22 @@ import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { runly } from '../../../lib/runly.js'
 import { useInventoryCategories, useInventoryBrands, useInventoryLocations } from '../hooks/useInventoryCatalogs.js'
+import { useInventoryModels } from '../hooks/useInventoryModels.js'
 import { ITEM_STATUSES } from '../lib/inventory-constants.js'
 import { useInventoryAssistant } from '../lib/assistant-context.js'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map(s => ({ value: s.value, label: s.label }))
+// Deep links from Catálogos (e.g. ?categoryId=...) open the list pre-filtered.
+const URL_FILTERS = ['status', 'categoryId', 'brandId', 'locationId', 'modelId']
 
 export default function InventoryScreen() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialFilters = useMemo(
+    () => Object.fromEntries(URL_FILTERS.map(key => [key, searchParams.get(key)]).filter(([, value]) => value)),
+    [searchParams],
+  )
+  const filterKey = JSON.stringify(initialFilters)
   const { session } = useAuth()
   const token = session?.access_token
   const { activeCompanyId } = useActiveCompany()
@@ -49,6 +58,10 @@ export default function InventoryScreen() {
     () => (locationsData?.data ?? []).map(l => ({ value: l.id, label: l.name })),
     [locationsData?.data],
   )
+
+  // Only needed to label a ?modelId= deep link; the list has no model filter otherwise.
+  const { data: modelsData } = useInventoryModels()
+  const modelOptions = useMemo(() => (modelsData ?? []).map(m => ({ value: m.id, label: m.name })), [modelsData])
 
   const blueprint = useMemo(() => ({
     key: 'inventory.items.table',
@@ -86,10 +99,11 @@ export default function InventoryScreen() {
         { key: 'categoryId', label: 'Tipo', type: 'select', options: categoryOptions },
         { key: 'brandId',    label: 'Marca',     type: 'select', options: brandOptions },
         { key: 'locationId', label: 'Ubicacion', type: 'select', options: locationOptions },
+        ...(initialFilters.modelId ? [{ key: 'modelId', label: 'Modelo', type: 'select', options: modelOptions }] : []),
       ],
       emptyState: { message: 'No hay activos registrados.' },
     },
-  }), [categoryOptions, brandOptions, locationOptions])
+  }), [categoryOptions, brandOptions, locationOptions, modelOptions, initialFilters.modelId])
 
   const deleteMutation = useMutation({
     mutationFn: id => runly.inventory.deleteItem(id, token),
@@ -121,7 +135,8 @@ export default function InventoryScreen() {
       />
 
       <RunlyTable
-        key={activeCompanyId}
+        key={`${activeCompanyId}:${filterKey}`}
+        initialFilters={initialFilters}
         onContextChange={updateAssistantContext}
         blueprint={blueprint}
         token={token}

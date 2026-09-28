@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useInventoryBrands, useCreateInventoryBrand, useUpdateInventoryBrand, useDeleteInventoryBrand } from '../../hooks/useInventoryCatalogs.js'
 import { CatalogPanel } from './CatalogPanel.jsx'
 import { CatalogRowActions } from './CatalogRowActions.jsx'
+import { CATALOGS_PATH, CatalogCountLink, INVENTORY_PATH } from './CatalogCountLink.jsx'
 import { CatalogEditSheet } from './CatalogEditSheet.jsx'
 
 const EMPTY = { name: '', description: '', website: '' }
@@ -35,8 +36,12 @@ export function BrandsPanel({ onImport }) {
       <span className="flex items-center gap-2 font-medium"><Tag className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />{row.original.name}</span>
     ) },
     { accessorKey: 'website', header: 'Sitio web' },
-    { accessorKey: 'modelCount', header: 'Modelos' },
-    { accessorKey: 'itemCount', header: 'Activos' },
+    { accessorKey: 'modelCount', header: 'Modelos', cell: ({ row }) => (
+      <CatalogCountLink label={`${row.original.modelCount ?? 0} modelos`} to={`${CATALOGS_PATH}?tab=models&brandId=${row.original.id}`} />
+    ) },
+    { accessorKey: 'itemCount', header: 'Activos', cell: ({ row }) => (
+      <CatalogCountLink label={`${row.original.itemCount ?? 0} activos`} to={`${INVENTORY_PATH}?brandId=${row.original.id}`} />
+    ) },
     { id: 'actions', header: '', enableSorting: false, cell: ({ row }) => (
       <CatalogRowActions name={row.original.name} onEdit={() => open(row.original)}
         onDelete={() => remove.mutateAsync(row.original.id).then(() => toast.success('Marca eliminada')).catch((err) => toast.error(err.message))} />

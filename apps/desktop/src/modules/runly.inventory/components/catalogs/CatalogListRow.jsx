@@ -1,6 +1,7 @@
-import { Badge, cn } from '@runly/ui'
+import { cn } from '@runly/ui'
 import { GripVertical } from 'lucide-react'
 import { CatalogRowActions } from './CatalogRowActions.jsx'
+import { CatalogCountLink } from './CatalogCountLink.jsx'
 
 export function CatalogListRow({ icon: Icon, color = '#7c3aed', title, subtitle, badges = [], dragHandleProps, isDragging, onEdit, onDelete }) {
   return (
@@ -18,7 +19,10 @@ export function CatalogListRow({ icon: Icon, color = '#7c3aed', title, subtitle,
         {subtitle ? <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">{subtitle}</p> : null}
       </div>
       <div className="hidden shrink-0 gap-1.5 sm:flex">
-        {badges.map((badge) => <Badge key={badge} variant="outline" className="text-xs">{badge}</Badge>)}
+        {badges.map((badge) => {
+          const { label, to } = typeof badge === 'string' ? { label: badge } : badge
+          return <CatalogCountLink key={label} label={label} to={to} />
+        })}
       </div>
       <CatalogRowActions name={title} onEdit={onEdit} onDelete={onDelete} />
     </div>

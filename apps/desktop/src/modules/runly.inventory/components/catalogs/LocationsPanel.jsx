@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useInventoryLocations, useCreateInventoryLocation, useUpdateInventoryLocation, useDeleteInventoryLocation } from '../../hooks/useInventoryCatalogs.js'
 import { CatalogPanel } from './CatalogPanel.jsx'
 import { CatalogRowActions } from './CatalogRowActions.jsx'
+import { CatalogCountLink, INVENTORY_PATH } from './CatalogCountLink.jsx'
 import { CatalogEditSheet } from './CatalogEditSheet.jsx'
 
 const EMPTY = { name: '', description: '', address: '' }
@@ -35,7 +36,9 @@ export function LocationsPanel({ onImport }) {
       <span className="flex items-center gap-2 font-medium"><MapPin className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />{row.original.name}</span>
     ) },
     { accessorKey: 'address', header: 'Dirección' },
-    { accessorKey: 'itemCount', header: 'Activos' },
+    { accessorKey: 'itemCount', header: 'Activos', cell: ({ row }) => (
+      <CatalogCountLink label={`${row.original.itemCount ?? 0} activos`} to={`${INVENTORY_PATH}?locationId=${row.original.id}`} />
+    ) },
     { id: 'actions', header: '', enableSorting: false, cell: ({ row }) => (
       <CatalogRowActions name={row.original.name} onEdit={() => open(row.original)}
         onDelete={() => remove.mutateAsync(row.original.id).then(() => toast.success('Ubicación eliminada')).catch((err) => toast.error(err.message))} />

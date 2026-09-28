@@ -316,6 +316,8 @@ export function RunlyTable({
   bulkActions = [],
   onExportExcel = null,
   onContextChange = null,
+  // Filter values to start with, e.g. from a deep link (?categoryId=...).
+  initialFilters = null,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -460,7 +462,7 @@ export function RunlyTable({
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [filterValues, setFilterValues] = useState({});
+  const [filterValues, setFilterValues] = useState(() => initialFilters ?? {});
   const [sortBy, setSortBy] = useState("");
   const [sortDir, setSortDir] = useState("asc");
   const [rows, setRows] = useState([]);

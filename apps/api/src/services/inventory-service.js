@@ -49,6 +49,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     locationId,
     status,
     assignedToId,
+    modelId,
     sortBy,
     sortDir,
     page = 1,
@@ -58,7 +59,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     const take = normalizeLimit(limit);
     const skip = (normalizePage(page) - 1) * take;
 
-    const where = buildInventoryWhere(companyId, { search, categoryId, brandId, locationId, status, assignedToId });
+    const where = buildInventoryWhere(companyId, { search, categoryId, brandId, locationId, status, assignedToId, modelId });
 
     const [data, total] = await Promise.all([
       prisma.invItem.findMany({
