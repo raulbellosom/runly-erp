@@ -79,8 +79,14 @@ const SCREEN_MAP = {
   "runly.contacts:/contacts": lazy(
     () => import("../modules/runly.contacts/screens/ContactsScreen.jsx"),
   ),
+  "runly.contacts:/contacts/new": lazy(
+    () => import("../modules/runly.contacts/screens/ContactFormScreen.jsx"),
+  ),
   "runly.contacts:/contacts/:id": lazy(
-    () => import("../modules/runly.contacts/screens/ContactsScreen.jsx"),
+    () => import("../modules/runly.contacts/screens/ContactDetailScreen.jsx"),
+  ),
+  "runly.contacts:/contacts/:id/edit": lazy(
+    () => import("../modules/runly.contacts/screens/ContactFormScreen.jsx"),
   ),
   "runly.files:/": lazy(
     () => import("../modules/runly.files/screens/FilesScreen.jsx"),

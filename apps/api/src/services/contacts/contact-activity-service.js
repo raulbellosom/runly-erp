@@ -4,6 +4,18 @@
 // INSTALLED + enabled and the viewer holds its read permission. A failing
 // provider is logged and skipped so one module never breaks the contact page.
 
+// Attachments uploaded through /files/upload are stored with entityId =
+// companyId and the contact id in metadata.sourceEntityId (files-service).
+function contactFilesWhere({ companyId, contactId }) {
+  return {
+    entityId: companyId,
+    entityType: "Contact",
+    moduleKey: "runly.contacts",
+    enabled: true,
+    metadata: { path: ["sourceEntityId"], equals: contactId },
+  };
+}
+
 const PROVIDERS = [
   {
     key: "growth.leads",
@@ -65,14 +77,14 @@ const PROVIDERS = [
     moduleKey: "runly.files",
     label: "Archivos",
     permission: "files.assets.read",
-    async count(prisma, { contactId }) {
-      return prisma.fileAsset.count({ where: { entityId: contactId, entityType: "contact", enabled: true } });
+    async count(prisma, ctx) {
+      return prisma.fileAsset.count({ where: contactFilesWhere(ctx) });
     },
-    async list(prisma, { contactId, limit }) {
+    async list(prisma, ctx) {
       const rows = await prisma.fileAsset.findMany({
-        where: { entityId: contactId, entityType: "contact", enabled: true },
+        where: contactFilesWhere(ctx),
         orderBy: { createdAt: "desc" },
-        take: limit,
+        take: ctx.limit,
         select: { id: true, originalName: true, mimeType: true, createdAt: true },
       });
       return rows.map((row) => ({
