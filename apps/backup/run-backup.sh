@@ -14,7 +14,42 @@ export AWS_ACCESS_KEY_ID="${BACKUP_S3_ACCESS_KEY_ID:-}"
 export AWS_SECRET_ACCESS_KEY="${BACKUP_S3_SECRET_ACCESS_KEY:-}"
 
 SCRATCH_DIR="$(mktemp -d)"
-trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+# Alerts on failure only (a nightly "all good" email would just be noise).
+# Reuses the same SMTP_*/RUNLY_SUPPORT_EMAIL vars the API already uses for
+# bug reports (docker-compose.yml's env_file already exposes .env.local's
+# vars to this container) — no new configuration needed to get alerts.
+# `set -e` means any failing command (pg_dump, restic, etc.) exits the script
+# immediately with a non-zero code, which this trap always sees.
+send_failure_alert() {
+  local exit_code=$1
+  [ "$exit_code" -eq 0 ] && return 0
+  if [ -z "${SMTP_HOST:-}" ]; then
+    echo "[backup] SMTP_HOST not set — cannot send failure alert" >&2
+    return 0
+  fi
+  local to="${RUNLY_SUPPORT_EMAIL:-hola@runly.mx}"
+  local from="${SMTP_FROM_EMAIL:-${SMTP_USER:-runly-backup@localhost}}"
+  local curl_args=(--fail --silent --show-error
+    --url "smtp://${SMTP_HOST}:${SMTP_PORT:-587}"
+    --mail-from "$from"
+    --mail-rcpt "$to"
+    --upload-file -)
+  [ "${SMTP_TLS:-false}" = "true" ] && curl_args+=(--ssl-reqd)
+  [ -n "${SMTP_USER:-}" ] && curl_args+=(--user "${SMTP_USER}:${SMTP_PASS:-}")
+  if {
+    printf 'Subject: [Runly backup] Fallo en %s\n' "${RUNLY_INSTANCE_ID}"
+    printf 'From: %s\n' "$from"
+    printf 'To: %s\n\n' "$to"
+    printf 'El backup nocturno de la instancia %s fallo (codigo de salida %s).\n' "${RUNLY_INSTANCE_ID}" "$exit_code"
+    printf 'Revisa los logs del contenedor de backup en el VPS (docker logs runly-backup-local o runly-backup-external).\n'
+  } | curl "${curl_args[@]}"; then
+    echo "[backup] failure alert emailed to $to"
+  else
+    echo "[backup] WARNING: could not send failure alert email" >&2
+  fi
+}
+trap 'send_failure_alert $?; rm -rf "$SCRATCH_DIR"' EXIT
 
 echo "[backup] $(date -Iseconds) starting backup run (repo: ${RESTIC_REPOSITORY})"
 

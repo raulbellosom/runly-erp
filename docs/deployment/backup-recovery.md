@@ -122,3 +122,15 @@ docker compose -f docker-compose.yml -f docker-compose.linux.yml \
 
 Exits non-zero if the latest snapshot is older than half the retention
 window, or if `restic check` finds repository corruption.
+
+## 7. Failure alerts
+
+The nightly `run-backup.sh` job emails an alert automatically if the backup
+fails for any reason (a failed `pg_dump`, a failed `restic check`, etc.) —
+no separate monitoring setup needed. It reuses the same `SMTP_*` variables
+already configured for the platform's outgoing mail (`.env.local`/
+`.env.external`), and sends to `RUNLY_SUPPORT_EMAIL` if set, or to
+`hola@runly.mx` (Runly's own support address) otherwise — the same default
+the "Reportar bug" button uses. If `SMTP_HOST` isn't set at all, no alert is
+sent (only logged); `docker logs runly-backup-local` (or `-external`) is
+still the source of truth either way.
