@@ -33,6 +33,7 @@ import { getFileKind, getKindLabel, formatBytes } from "../lib/file-kind";
 import { useHlsPlayback } from "../lib/useHlsPlayback";
 import { FileVisual } from "./FileVisual";
 import { PDFViewer } from "./PDFViewer";
+import { XmlPreview, ZipPreview, isZipFile } from "./FilePreviewPanels";
 
 const HLS_MIME_TYPES = new Set(["application/vnd.apple.mpegurl", "application/x-mpegurl"]);
 
@@ -1008,8 +1009,14 @@ export function AdvancedFileViewer({
               </div>
             )}
 
+            {!loading && signedUrl && kind === "xml" && <XmlPreview key={signedUrl} url={signedUrl} file={file} />}
+            {!loading && signedUrl && kind === "archive" && isZipFile(file) && (
+              <ZipPreview key={signedUrl} url={signedUrl} file={file} />
+            )}
+
             {/* Generic (unsupported) */}
-            {!loading && signedUrl && kind !== "image" && kind !== "pdf" && kind !== "video" && kind !== "audio" && (
+            {!loading && signedUrl && kind !== "image" && kind !== "pdf" && kind !== "video" && kind !== "audio" &&
+              kind !== "xml" && !(kind === "archive" && isZipFile(file)) && (
               <div className="absolute inset-0 flex items-center justify-center p-6">
                 <div className="w-full max-w-xs glass rounded-2xl p-6">
                   <div className="flex items-center gap-4 mb-5">

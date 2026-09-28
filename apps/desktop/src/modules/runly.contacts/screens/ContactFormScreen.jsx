@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AttachmentsPanel,
   Button,
   ErrorState,
   FormCompletionRing,
@@ -13,7 +14,7 @@ import {
   Skeleton,
 } from "@runly/ui";
 import { contactFormSchema } from "@runly/validators";
-import { AlertTriangle, ArrowLeft, AtSign, Eye, Building2, Landmark, MapPin, StickyNote, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, AtSign, Eye, Paperclip, Building2, Landmark, MapPin, StickyNote, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
@@ -26,6 +27,8 @@ import {
   PeopleSection,
 } from "../components/form/ContactFormCollections";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
+import { CONTACT_ATTACHMENTS_CONFIG } from "../lib/attachments";
+import { getApiUrl } from "../../../lib/runtimeConfig.js";
 
 const LIST_PATH = "/app/m/runly.contacts/contacts";
 
@@ -114,10 +117,13 @@ export default function ContactFormScreen() {
   const { activeCompanyId } = useActiveCompany();
   const [scrollRoot, setScrollRoot] = useState(null);
   const [avatarPending, setAvatarPending] = useState(null);
+  const attachmentsController = useRef(null);
 
   const permissions = userProfile?.permissions ?? [];
   const hasPermission = (key) => Boolean(userProfile?.isAdmin || permissions.includes(key));
   const allowed = hasPermission(isEdit ? "contacts.contacts.update" : "contacts.contacts.create");
+  const canReadFiles = hasPermission("files.assets.read");
+  const canCreateFiles = hasPermission("files.assets.create");
 
   const profileQuery = useQuery({
     queryKey: ["contact-profile", contactId, activeCompanyId],
@@ -157,6 +163,11 @@ export default function ContactFormScreen() {
         });
       } else if (avatarPending === "remove") {
         await runly.contacts.removeAvatar(id, token).catch(() => {});
+      }
+      // New contacts stage their files until the record exists.
+      if (!isEdit && attachmentsController.current?.flushPending) {
+        const result = await attachmentsController.current.flushPending(id);
+        if (result?.failed?.length) toast.error("El contacto se guardó, pero algunos archivos no se subieron");
       }
       return id;
     },
@@ -203,6 +214,7 @@ export default function ContactFormScreen() {
     { id: "cf-direcciones", label: "Direcciones", icon: MapPin, badge: values.addresses?.length || null },
     ...(showPeople ? [{ id: "cf-personas", label: "Personas clave", icon: Users, badge: values.persons?.length || null }] : []),
     { id: "cf-notas", label: "Notas", icon: StickyNote },
+    ...(canReadFiles ? [{ id: "cf-archivos", label: "Archivos", icon: Paperclip }] : []),
   ];
 
   return (
@@ -300,6 +312,32 @@ export default function ContactFormScreen() {
                 <NotesSection form={form} />
               </SectionCard>
             </section>
+            {canReadFiles && (
+              <section id="cf-archivos" className="scroll-mt-4">
+                <SectionCard
+                  title={`${showPeople ? 7 : 6}. Archivos`}
+                  description="Constancia fiscal, contratos, CFDI en XML o comprimidos en ZIP/RAR."
+                >
+                  <AttachmentsPanel
+                    apiBaseUrl={getApiUrl()}
+                    token={token}
+                    companyId={activeCompanyId}
+                    recordId={contactId}
+                    config={CONTACT_ATTACHMENTS_CONFIG}
+                    context="form"
+                    readOnly={!canCreateFiles}
+                    showHeading={false}
+                    onControllerReady={(controller) => {
+                      attachmentsController.current = controller;
+                    }}
+                    onChange={() => {
+                      if (contactId) queryClient.invalidateQueries({ queryKey: ["contact-activity", contactId] });
+                    }}
+                    onError={(message) => message && toast.error(message)}
+                  />
+                </SectionCard>
+              </section>
+            )}
           </div>
         </div>
       </div>

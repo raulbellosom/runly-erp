@@ -152,8 +152,8 @@ export function ContactSummaryTab({ contact }) {
       <div className="space-y-5 xl:col-span-2">
         <SectionCard title={<CardTitle icon={Building2}>Datos generales</CardTitle>}>
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-            <CopyableValue label="Tipo" value={TYPE_LABEL[contact.type] ?? contact.type} />
-            <CopyableValue label="Giro" value={contact.industry} />
+            <CopyableValue label="Tipo" value={TYPE_LABEL[contact.type] ?? contact.type} copyable={false} />
+            <CopyableValue label="Giro" value={contact.industry} copyable={false} />
             <CopyableValue
               label="Sitio web"
               value={contact.website}

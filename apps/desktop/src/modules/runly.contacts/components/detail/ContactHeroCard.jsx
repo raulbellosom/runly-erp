@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import {
   Avatar,
   AvatarFallback,
@@ -10,7 +9,6 @@ import {
 } from "@runly/ui";
 import {
   ArrowLeft,
-  Camera,
   Clock,
   FileText,
   IdCard,
@@ -18,8 +16,6 @@ import {
   MessageCircle,
   Pencil,
   Phone,
-  Power,
-  PowerOff,
   Ticket,
   Trash2,
   TrendingUp,
@@ -77,12 +73,8 @@ export function ContactHeroCard({
   canDelete,
   onEdit,
   onBack,
-  onToggleEnabled,
   onDelete,
-  onAvatarSelected,
-  avatarBusy,
 }) {
-  const fileInput = useRef(null);
   const phone = primaryChannel(contact.channels, "phone");
   const email = primaryChannel(contact.channels, "email");
   const colors = TYPE_AVATAR_COLORS[contact.type] ?? TYPE_AVATAR_COLORS.person;
@@ -101,37 +93,13 @@ export function ContactHeroCard({
     <Card className="p-5 md:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left lg:flex-1">
-          <div className="group relative shrink-0">
+          <div className="shrink-0">
             <Avatar className="h-24 w-24 rounded-2xl">
               {contact.avatarUrl && <AvatarImage src={contact.avatarUrl} alt={contact.name} className="object-cover" />}
               <AvatarFallback className={cn("rounded-2xl text-2xl font-semibold", colors.bg, colors.text)}>
                 {initials(contact.name)}
               </AvatarFallback>
             </Avatar>
-            {canUpdate && (
-              <>
-                <button
-                  type="button"
-                  disabled={avatarBusy}
-                  onClick={() => fileInput.current?.click()}
-                  aria-label="Cambiar foto"
-                  className="absolute -bottom-1.5 -right-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--primary))] p-1.5 text-[hsl(var(--primary-foreground))] shadow-md transition-transform hover:scale-105 disabled:opacity-60"
-                >
-                  <Camera className="h-3.5 w-3.5" />
-                </button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) onAvatarSelected?.(file);
-                  }}
-                />
-              </>
-            )}
           </div>
           <div className="min-w-0 space-y-2">
             <h1 className="break-words text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] md:text-3xl">
@@ -167,11 +135,6 @@ export function ContactHeroCard({
             }
             secondary={[
               { label: "Volver a contactos", icon: <ArrowLeft className="h-4 w-4" />, onClick: onBack },
-              canUpdate && {
-                label: contact.enabled ? "Desactivar" : "Activar",
-                icon: contact.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />,
-                onClick: onToggleEnabled,
-              },
               canDelete && {
                 label: "Eliminar",
                 icon: <Trash2 className="h-4 w-4" />,

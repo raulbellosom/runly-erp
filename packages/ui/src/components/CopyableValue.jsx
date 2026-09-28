@@ -3,8 +3,9 @@ import { Check, Copy } from "lucide-react";
 import { cn } from "../lib/utils.js";
 
 // Read-only label/value pair with a copy button revealed on hover/focus.
-// Renders `emptyText` (and no button) when the value is empty.
-export function CopyableValue({ label, value, display, emptyText = "Sin capturar", mono = false, className }) {
+// Renders `emptyText` (and no button) when the value is empty. Pass
+// copyable={false} for descriptive values nobody pastes elsewhere (type, category).
+export function CopyableValue({ label, value, display, emptyText = "Sin capturar", mono = false, copyable = true, className }) {
   const [copied, setCopied] = useState(false);
   const hasValue = value !== null && value !== undefined && String(value).trim() !== "";
 
@@ -35,7 +36,7 @@ export function CopyableValue({ label, value, display, emptyText = "Sin capturar
         >
           {hasValue ? display ?? value : emptyText}
         </span>
-        {hasValue && (
+        {hasValue && copyable && (
           <button
             type="button"
             onClick={copy}

@@ -23,26 +23,11 @@ import { getApiUrl } from "../../../lib/runtimeConfig.js";
 import { ContactHeroCard } from "../components/detail/ContactHeroCard";
 import { ContactPeopleTab, ContactSummaryTab } from "../components/detail/ContactSummaryTab";
 import { ContactActivityTab } from "../components/detail/ContactActivityTab";
+import { CONTACT_ATTACHMENTS_CONFIG } from "../lib/attachments";
 
 const LIST_PATH = "/app/m/runly.contacts/contacts";
 const TABS = ["resumen", "actividad", "personas", "archivos", "historial"];
 
-const ATTACHMENTS_CONFIG = {
-  label: "Archivos",
-  listPath: "/files?moduleKey=runly.contacts&entityType=Contact&sourceEntityId=:id&pageSize=100",
-  removePath: "/files/:docId",
-  upload: { endpoint: "/files/upload", moduleKey: "runly.contacts", entityType: "Contact" },
-  fields: {
-    id: "id",
-    fileAssetId: "id",
-    fileName: "originalName",
-    mimeType: "mimeType",
-    sizeBytes: "sizeBytes",
-    createdAt: "createdAt",
-  },
-  signedUrl: { endpointTemplate: "/files/:fileId/signed-url" },
-  limits: { maxFiles: 30, maxSizeMB: 10, allowMultiple: true },
-};
 
 function useContactId() {
   const { "*": wildcard } = useParams();
@@ -82,7 +67,6 @@ export default function ContactDetailScreen() {
   const canUpdate = hasPermission("contacts.contacts.update");
   const canDelete = hasPermission("contacts.contacts.delete");
   const canReadFiles = hasPermission("files.assets.read");
-  const canCreateFiles = hasPermission("files.assets.create");
 
   const tabParam = searchParams.get("tab");
   const tab = TABS.includes(tabParam) ? tabParam : "resumen";
@@ -100,29 +84,6 @@ export default function ContactDetailScreen() {
     enabled: Boolean(token && contactId && canRead),
   });
   const contact = profileQuery.data?.data ?? null;
-
-  function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["contact-profile", contactId] });
-    queryClient.invalidateQueries({ queryKey: ["contacts"] });
-  }
-
-  const avatarMutation = useMutation({
-    mutationFn: (file) => runly.contacts.uploadAvatar(contactId, file, token),
-    onSuccess: () => {
-      invalidate();
-      toast.success("Foto actualizada");
-    },
-    onError: (err) => toast.error(err?.message || "No se pudo actualizar la foto"),
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: () => runly.contacts.setEnabled(contactId, !contact.enabled, token),
-    onSuccess: () => {
-      invalidate();
-      toast.success(contact.enabled ? "Contacto desactivado" : "Contacto activado");
-    },
-    onError: () => toast.error("No se pudo actualizar el estado del contacto"),
-  });
 
   const deleteMutation = useMutation({
     mutationFn: () => runly.contacts.delete(contactId, token),
@@ -192,10 +153,7 @@ export default function ContactDetailScreen() {
         canDelete={canDelete}
         onEdit={() => navigate(`${LIST_PATH}/${contactId}/edit`)}
         onBack={() => navigate(LIST_PATH)}
-        onToggleEnabled={() => toggleMutation.mutate()}
         onDelete={() => setConfirmDelete(true)}
-        onAvatarSelected={(file) => avatarMutation.mutate(file)}
-        avatarBusy={avatarMutation.isPending}
       />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -234,13 +192,12 @@ export default function ContactDetailScreen() {
               token={token}
               companyId={activeCompanyId}
               recordId={contact.id}
-              config={ATTACHMENTS_CONFIG}
+              config={CONTACT_ATTACHMENTS_CONFIG}
               context="detail"
-              readOnly={!canUpdate || !canCreateFiles}
+              readOnly
               showHeading={false}
               showViewToggle
               defaultViewMode="grid"
-              onChange={() => queryClient.invalidateQueries({ queryKey: ["contact-activity", contactId] })}
               onError={(message) => message && toast.error(message)}
             />
           </TabsContent>

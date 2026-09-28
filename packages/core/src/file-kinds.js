@@ -34,8 +34,13 @@ export const FILE_KINDS = Object.freeze({
   archive: {
     label: 'Comprimido', accent: '#a16207', accentDark: '#d4a017',
     mimePrefixes: [],
-    mimeTypes: ['application/zip', 'application/x-7z-compressed', 'application/x-rar-compressed', 'application/gzip', 'application/x-tar'],
+    mimeTypes: ['application/zip', 'application/x-zip-compressed', 'application/x-7z-compressed', 'application/x-rar-compressed', 'application/vnd.rar', 'application/gzip', 'application/x-tar'],
     extensions: ['zip', '7z', 'rar', 'gz', 'tar'],
+  },
+  // CFDI and other fiscal XML. Before text so text/xml doesn't land on text.
+  xml: {
+    label: 'XML', accent: '#c2410c', accentDark: '#fb923c',
+    mimePrefixes: [], mimeTypes: ['application/xml', 'text/xml'], extensions: ['xml'],
   },
   text: {
     label: 'Texto', accent: '#475569', accentDark: '#94a3b8',
@@ -46,7 +51,7 @@ export const FILE_KINDS = Object.freeze({
 
 // Evaluation priority. csv before sheet/text so a .csv with a spreadsheet or
 // text/plain mime still lands on csv. generic is the fallback, never matched here.
-const KIND_PRIORITY = ['image', 'video', 'audio', 'pdf', 'csv', 'sheet', 'doc', 'presentation', 'archive', 'text'];
+const KIND_PRIORITY = ['image', 'video', 'audio', 'pdf', 'csv', 'sheet', 'doc', 'presentation', 'archive', 'xml', 'text'];
 
 function extensionOf(name = '') {
   const clean = String(name || '').trim().toLowerCase();

@@ -37,7 +37,18 @@ const ALLOWED_EXACT_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  // Fiscal documents (CFDI XML) and the archives they are often bundled in.
+  "application/xml",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
 ]);
+
+// Browsers often report .rar/.7z/.xml as octet-stream or leave the type
+// empty; accept those only when the extension is one of these.
+const EXTENSION_FALLBACK_TYPES = new Set(["xml", "zip", "rar", "7z"]);
 
 const ALLOWED_MIME_PREFIXES = ["image/", "text/"];
 
@@ -126,7 +137,9 @@ function isAllowedSort(sortBy) {
   return ["createdAt", "updatedAt", "sizeBytes", "originalName"].includes(sortBy);
 }
 
-function isAllowedMimeType(mimeType) {
+function isAllowedMimeType(mimeType, fileName = "") {
+  const ext = String(fileName).toLowerCase().split(".").pop();
+  if ((!mimeType || mimeType === "application/octet-stream") && EXTENSION_FALLBACK_TYPES.has(ext)) return true;
   if (!mimeType) return false;
   if (ALLOWED_EXACT_MIME_TYPES.has(mimeType)) return true;
   return ALLOWED_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix));
@@ -336,7 +349,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
         );
       }
 
-      if (!isAllowedMimeType(file.type)) {
+      if (!isAllowedMimeType(file.type, file.name)) {
         throw new FilesServiceError(
           "Tipo de archivo no permitido. Usa imagen, PDF, texto u oficina.",
           400,
@@ -359,7 +372,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
         entityType,
         entityId,
         fileName: file.name,
-        mimeType: file.type,
+        mimeType: file.type || "application/octet-stream",
       });
 
       const targetBucket = visibility === "PUBLIC" ? WEBSITE_BUCKET_NAME : STORAGE_BUCKET_NAME;
@@ -367,7 +380,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
       const { error: uploadError } = await supabaseAdmin.storage
         .from(targetBucket)
         .upload(objectKey, arrayBuffer, {
-          contentType: file.type,
+          contentType: file.type || "application/octet-stream",
           upsert: false,
         });
 
