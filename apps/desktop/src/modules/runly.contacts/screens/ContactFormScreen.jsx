@@ -7,12 +7,13 @@ import {
   Button,
   ErrorState,
   FormCompletionRing,
+  PageHeader,
   SectionCard,
   SectionIndex,
   Skeleton,
 } from "@runly/ui";
 import { contactFormSchema } from "@runly/validators";
-import { AlertTriangle, ArrowLeft, AtSign, Building2, Landmark, MapPin, StickyNote, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, AtSign, Eye, Building2, Landmark, MapPin, StickyNote, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
@@ -210,17 +211,18 @@ export default function ContactFormScreen() {
       className="flex h-full min-h-0 flex-col"
       noValidate
     >
-      <header className="flex shrink-0 items-center gap-3 border-b border-[hsl(var(--border))] px-4 py-3 md:px-6">
-        <Button type="button" variant="ghost" size="icon" onClick={cancel} aria-label="Volver">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">Runly Contacts</p>
-          <h1 className="truncate text-lg font-bold tracking-tight md:text-xl">
-            {isEdit ? `Editar ${contact?.name ?? "contacto"}` : "Nuevo contacto"}
-          </h1>
-        </div>
-      </header>
+      <div className="shrink-0 px-4 pt-4 md:px-6 md:pt-6">
+        <PageHeader
+          eyebrow={isEdit ? "Editar contacto" : "Runly Contacts"}
+          title={isEdit ? contact?.name ?? "Editar contacto" : "Nuevo contacto"}
+          actions={
+            <Button type="button" variant="outline" onClick={cancel}>
+              {isEdit ? <Eye className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+              {isEdit ? "Ver detalle" : "Volver a contactos"}
+            </Button>
+          }
+        />
+      </div>
 
       <div ref={setScrollRoot} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:flex-row md:p-6">

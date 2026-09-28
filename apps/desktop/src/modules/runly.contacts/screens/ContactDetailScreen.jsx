@@ -141,15 +141,7 @@ export default function ContactDetailScreen() {
     setSearchParams(params, { replace: true });
   }
 
-  const header = (
-    <PageHeader
-      eyebrow="Runly Contacts"
-      title="Contacto"
-      compact
-      onBack={() => navigate(LIST_PATH)}
-      backLabel="Contactos"
-    />
-  );
+  const header = <PageHeader eyebrow="Runly Contacts" title="Contacto" />;
 
   if (!canRead) {
     return (
@@ -193,14 +185,13 @@ export default function ContactDetailScreen() {
 
   return (
     <div className="min-h-dvh space-y-5 p-4 md:p-6">
-      {header}
-
       <ContactHeroCard
         contact={contact}
         activity={activityQuery.data?.data}
         canUpdate={canUpdate}
         canDelete={canDelete}
         onEdit={() => navigate(`${LIST_PATH}/${contactId}/edit`)}
+        onBack={() => navigate(LIST_PATH)}
         onToggleEnabled={() => toggleMutation.mutate()}
         onDelete={() => setConfirmDelete(true)}
         onAvatarSelected={(file) => avatarMutation.mutate(file)}

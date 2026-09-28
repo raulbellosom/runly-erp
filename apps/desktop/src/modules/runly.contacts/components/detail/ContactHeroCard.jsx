@@ -4,23 +4,18 @@ import {
   AvatarFallback,
   AvatarImage,
   Badge,
-  Button,
   Card,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DetailActionBar,
   cn,
 } from "@runly/ui";
 import {
+  ArrowLeft,
   Camera,
   Clock,
   FileText,
   IdCard,
   Mail,
   MessageCircle,
-  MoreHorizontal,
   Pencil,
   Phone,
   Power,
@@ -81,6 +76,7 @@ export function ContactHeroCard({
   canUpdate,
   canDelete,
   onEdit,
+  onBack,
   onToggleEnabled,
   onDelete,
   onAvatarSelected,
@@ -151,50 +147,39 @@ export function ContactHeroCard({
                 <Badge key={tag} variant="outline">{tag}</Badge>
               ))}
             </div>
+            {(phone || email || contact.taxId) && (
+              <div className="grid grid-cols-4 gap-2 pt-1 sm:flex sm:flex-wrap">
+                {phone && <QuickAction icon={Phone} label="Llamar" href={telHref(phone.value, phone.countryCode)} />}
+                {phone && <QuickAction icon={MessageCircle} label="WhatsApp" href={whatsappHref(phone.value, phone.countryCode)} />}
+                {email && <QuickAction icon={Mail} label="Correo" href={mailtoHref(email.value)} />}
+                {contact.taxId && <QuickAction icon={IdCard} label="RFC" onClick={copyRfc} />}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 lg:items-end">
-          <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap lg:justify-end">
-            {phone && <QuickAction icon={Phone} label="Llamar" href={telHref(phone.value, phone.countryCode)} />}
-            {phone && <QuickAction icon={MessageCircle} label="WhatsApp" href={whatsappHref(phone.value, phone.countryCode)} />}
-            {email && <QuickAction icon={Mail} label="Correo" href={mailtoHref(email.value)} />}
-            {contact.taxId && <QuickAction icon={IdCard} label="RFC" onClick={copyRfc} />}
-          </div>
-          <div className="flex gap-2">
-            {canUpdate && (
-              <Button onClick={onEdit} className="flex-1 rounded-full sm:flex-none">
-                <Pencil className="mr-2 h-4 w-4" />
-                Editar contacto
-              </Button>
-            )}
-            {(canUpdate || canDelete) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="rounded-full" aria-label="Más acciones">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {canUpdate && (
-                    <DropdownMenuItem onSelect={onToggleEnabled}>
-                      {contact.enabled ? <PowerOff className="mr-2 h-4 w-4" /> : <Power className="mr-2 h-4 w-4" />}
-                      {contact.enabled ? "Desactivar" : "Activar"}
-                    </DropdownMenuItem>
-                  )}
-                  {canDelete && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={onDelete} className="text-[hsl(var(--destructive))]">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+        <div className="flex justify-center lg:justify-end">
+          <DetailActionBar
+            primary={
+              canUpdate
+                ? { label: "Editar", icon: <Pencil className="h-4 w-4" />, onClick: onEdit }
+                : null
+            }
+            secondary={[
+              { label: "Volver a contactos", icon: <ArrowLeft className="h-4 w-4" />, onClick: onBack },
+              canUpdate && {
+                label: contact.enabled ? "Desactivar" : "Activar",
+                icon: contact.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />,
+                onClick: onToggleEnabled,
+              },
+              canDelete && {
+                label: "Eliminar",
+                icon: <Trash2 className="h-4 w-4" />,
+                onClick: onDelete,
+                destructive: true,
+              },
+            ].filter(Boolean)}
+          />
         </div>
       </div>
 
