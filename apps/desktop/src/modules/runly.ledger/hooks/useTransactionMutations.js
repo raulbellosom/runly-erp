@@ -88,6 +88,43 @@ export function useTransactionMutations({ accountId, token, queryKey, canEdit, o
     onError: (error) => { toast.error(error.message) },
   })
 
+  // Drag-and-drop reorder. The cache is reordered optimistically: the loaded
+  // slice keeps its consecutive numbers and opening balance, only the rows
+  // between move, so "#" and "Saldo" update before the server answers.
+  const moveMutation = useMutation({
+    mutationFn: async ({ id, move }) => {
+      const res = await companyFetch(
+        `${API_BASE}/ledger/accounts/${accountId}/transactions/${id}/move`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(move),
+        },
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'No se pudo reordenar el movimiento.')
+      }
+      return res.json()
+    },
+    onMutate: async ({ nextRows }) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData(queryKey)
+      queryClient.setQueryData(queryKey, (old) => {
+        if (!old?.data?.length) return old
+        return { ...old, data: renumberRows(old.data, nextRows) }
+      })
+      return { previousData }
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previousData) queryClient.setQueryData(queryKey, context.previousData)
+      toast.error(error.message)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['ledger-transactions', accountId] })
+    },
+  })
+
   function getDraft(row, rowIdx) {
     const key = row.id ?? `new-${rowIdx}`
     return editingRows[key] ?? row
@@ -122,5 +159,18 @@ export function useTransactionMutations({ accountId, token, queryKey, canEdit, o
     if (draft._isNew) onNewRowSaved?.()
   }
 
-  return { saveMutation, deleteMutation, getDraft, setDraft, clearDraft, saveRow }
+  return { saveMutation, deleteMutation, moveMutation, getDraft, setDraft, clearDraft, saveRow }
+}
+
+const net = (row) => Number(row.deposito ?? 0) - Number(row.retiro ?? 0)
+
+// Reassigns the slice's consecutive numbers and running balance to the new
+// row order, anchored on the balance before the slice's first row.
+export function renumberRows(oldRows, nextRows) {
+  const numbers = oldRows.map((row) => row.consecutive)
+  let balance = oldRows[0].saldo_actual == null ? null : Number(oldRows[0].saldo_actual) - net(oldRows[0])
+  return nextRows.map((row, index) => {
+    if (balance != null) balance += net(row)
+    return { ...row, consecutive: numbers[index], saldo_actual: balance }
+  })
 }

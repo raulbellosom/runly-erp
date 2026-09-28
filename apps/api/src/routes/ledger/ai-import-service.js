@@ -34,7 +34,7 @@ export function createAiImportService({ prisma, env = process.env }) {
       // — selecting it as a plain column throws "column does not exist" here.
       existingTransactions = await prisma.$queryRaw`
         SELECT id, fecha, deposito, retiro, nombre,
-          ROW_NUMBER() OVER (ORDER BY fecha, created_at)::int4 AS consecutive
+          ROW_NUMBER() OVER (ORDER BY position, id)::int4 AS consecutive
         FROM ledger_transaction
         WHERE account_id = ${detected.id}::uuid AND enabled = true
       `

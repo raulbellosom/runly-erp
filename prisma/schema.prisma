@@ -1605,12 +1605,15 @@ model LedgerTransaction {
   deposito   Decimal? @db.Decimal(15, 2)
   retiro     Decimal? @db.Decimal(15, 2)
   enabled    Boolean  @default(true)
+  // Register order; the "#" consecutive is ROW_NUMBER() over this per account.
+  position   Int      @default(autoincrement())
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@index([accountId, enabled])
   @@index([companyId, fecha])
   @@index([accountId, fecha])
+  @@index([accountId, position])
   @@map("ledger_transaction")
 }
 

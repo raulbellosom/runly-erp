@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOfflineStatus } from '@runly/offline'
 import { toast } from 'sonner'
-import { Plus, Wallet, ArrowDownLeft, ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react'
-import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar, DatePickerField, ViewModeSwitch, getStoredViewMode } from '@runly/ui'
+import { Plus, Wallet, ArrowDownLeft, ArrowUpRight, Maximize2, Minimize2, SlidersHorizontal } from 'lucide-react'
+import { Button, ConfirmDialog, ErrorState, SearchInput, FilterBar, DatePickerField, ViewModeSwitch, getStoredViewMode, useIsMobile } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useAccountTransactions, useAccountSummary, useLedgerSQLite } from '../hooks/use-ledger-queries.js'
 import { useTransactionMutations } from '../hooks/useTransactionMutations.js'
@@ -11,6 +11,7 @@ import { EDITABLE_COLS, PAGE_STEP, emptyRow, buildTransactionPayload, toDateValu
 import MobileTransactionList from '../components/MobileTransactionList.jsx'
 import MobileTransactionSheet from '../components/MobileTransactionSheet.jsx'
 import DesktopTransactionTable from '../components/DesktopTransactionTable.jsx'
+import { computeReorder } from '../components/SortableRegister.jsx'
 import { LedgerStatStrip } from '../components/LedgerStatCard.jsx'
 
 function fmtCurrency(amount, currency = 'MXN') {
@@ -50,7 +51,10 @@ export default function SpreadsheetRegister({
   // date pickers portal to <body> and would be invisible outside the
   // fullscreen element.
   const [fullscreen, setFullscreen] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const tableRef = useRef(null)
+  const isMobile = useIsMobile(640)
+  const showCards = isMobile && mobileView !== 'table'
   const mobileTable = mobileView === 'table'
 
   useEffect(() => {
@@ -109,6 +113,10 @@ export default function SpreadsheetRegister({
   const visibleRows = useMemo(() => rows.filter((row) => visibleRowIds.has(row.id)), [rows, visibleRowIds])
   const noFilterMatches = filtersActive && rows.length > 0 && visibleRowIds.size === 0
 
+  const countLabel = rows.length === total
+    ? `${total} movimiento${total !== 1 ? 's' : ''}`
+    : `${rows.length} de ${total}`
+
   const kpis = summaryData?.kpis
   const statItems = kpis
     ? [
@@ -122,14 +130,30 @@ export default function SpreadsheetRegister({
     { key: 'tipo', label: 'Tipo', options: types.map((t) => ({ value: t.id, label: t.code })) },
     { key: 'categoria', label: 'Categoría', options: categories.map((c) => ({ value: c.id, label: c.name })) },
   ].filter((f) => f.options.length > 0)
+  const hasMobileFilters = Boolean(onDateFromChange || onDateToChange || filterBarFilters.length > 0)
+  const activeFilterCount = [dateFrom, dateTo, filterValue.tipo, filterValue.categoria].filter(Boolean).length
 
-  const { saveMutation, deleteMutation, getDraft, setDraft, clearDraft, saveRow } = useTransactionMutations({
+  const { saveMutation, deleteMutation, moveMutation, getDraft, setDraft, clearDraft, saveRow } = useTransactionMutations({
     accountId,
     token,
     queryKey,
     canEdit,
     onNewRowSaved: () => setNewRow(null),
   })
+
+  const dragDisabledReason = !isOnline
+    ? 'Reordenar requiere conexión'
+    : filtersActive
+      ? 'Quita la búsqueda y los filtros para reordenar'
+      : newRow
+        ? 'Guarda la fila nueva antes de reordenar'
+        : null
+
+  function handleReorder(activeId, overId) {
+    const result = computeReorder(rows, activeId, overId)
+    if (!result) return
+    moveMutation.mutate({ id: activeId, move: result.move, nextRows: result.next })
+  }
 
   function focusCell(selector) {
     const el = tableRef.current?.querySelector(selector)
@@ -229,19 +253,34 @@ export default function SpreadsheetRegister({
         </div>
       )}
 
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[hsl(var(--border))] gap-2 flex-wrap">
+      <div className="flex flex-col gap-2 px-3 py-2 border-b border-[hsl(var(--border))] sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0 whitespace-nowrap">
-            {rows.length === total
-              ? `${total} movimiento${total !== 1 ? 's' : ''}`
-              : `${rows.length} de ${total}`}
+          <span className="hidden sm:inline text-xs text-[hsl(var(--muted-foreground))] shrink-0 whitespace-nowrap">
+            {countLabel}
           </span>
           <SearchInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, concepto, referencia..."
-            className="flex-1 max-w-md"
+            className="flex-1 min-w-0 sm:max-w-md"
           />
+          {hasMobileFilters && (
+            <Button
+              variant={mobileFiltersOpen ? 'secondary' : 'outline'}
+              size="sm"
+              className="sm:hidden shrink-0 h-9"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              aria-expanded={mobileFiltersOpen}
+              aria-label="Filtros"
+            >
+              <SlidersHorizontal size={14} />
+              {activeFilterCount > 0 && (
+                <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-(--brand-primary) px-1 text-[10px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+          )}
           {(onDateFromChange || onDateToChange) && (
             <div className="hidden sm:flex items-center gap-2 shrink-0">
               <DatePickerField
@@ -275,28 +314,10 @@ export default function SpreadsheetRegister({
             </div>
           )}
         </div>
-        <>
-          {/* Desktop: inline new row. Mobile: sheet form. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`${mobileTable ? 'inline-flex' : 'hidden sm:inline-flex'} shrink-0`}
-            onClick={() => setNewRow({ ...emptyRow(accountId), numero: String(total + 1) })}
-            disabled={!!newRow || !canEdit}
-          >
-            <Plus size={13} className="mr-1" />
-            Agregar
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`${mobileTable ? 'hidden' : 'sm:hidden'} shrink-0`}
-            onClick={openMobileNew}
-            disabled={!canEdit}
-          >
-            <Plus size={13} className="mr-1" />
-            Agregar
-          </Button>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="sm:hidden text-xs text-[hsl(var(--muted-foreground))] whitespace-nowrap mr-auto">
+            {countLabel}
+          </span>
           <div className="sm:hidden">
             <ViewModeSwitch
               modes={['cards', 'table']}
@@ -315,11 +336,32 @@ export default function SpreadsheetRegister({
           >
             {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </Button>
-        </>
+          {/* Desktop (and mobile table view): inline new row. Mobile cards: sheet form. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`${mobileTable ? 'inline-flex' : 'hidden sm:inline-flex'} shrink-0`}
+            onClick={() => setNewRow({ ...emptyRow(accountId), numero: String(total + 1) })}
+            disabled={!!newRow || !canEdit}
+          >
+            <Plus size={13} className="mr-1" />
+            Agregar
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            className={`${mobileTable ? 'hidden' : 'sm:hidden'} shrink-0`}
+            onClick={openMobileNew}
+            disabled={!canEdit}
+          >
+            <Plus size={13} className="mr-1" />
+            Agregar
+          </Button>
+        </div>
       </div>
 
-      {/* Date filters — mobile only, own row below search/toolbar */}
-      {(onDateFromChange || onDateToChange) && (
+      {/* Date filters — mobile only, collapsible panel below search/toolbar */}
+      {(onDateFromChange || onDateToChange) && mobileFiltersOpen && (
         <div className="sm:hidden flex items-center gap-2 px-3 py-2 border-b border-[hsl(var(--border))]">
           <DatePickerField
             compact
@@ -353,7 +395,7 @@ export default function SpreadsheetRegister({
       )}
 
       {filterBarFilters.length > 0 && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[hsl(var(--border))] flex-wrap">
+        <div className={`${mobileFiltersOpen ? 'flex' : 'hidden sm:flex'} items-center justify-between gap-2 px-3 py-2 border-b border-[hsl(var(--border))] flex-wrap`}>
           <FilterBar filters={filterBarFilters} value={filterValue} onChange={setFilterValue} />
           {noFilterMatches && (
             <span className="text-xs text-[hsl(var(--muted-foreground))]">
@@ -386,14 +428,16 @@ export default function SpreadsheetRegister({
           </div>
         )}
 
+        {showCards ? (
         <MobileTransactionList
           rows={visibleRows}
           canEdit={canEdit}
           onEdit={openMobileEdit}
           onDelete={setDeleteTarget}
-          hidden={mobileTable}
+          onReorder={handleReorder}
+          dragDisabledReason={dragDisabledReason}
         />
-
+        ) : (
         <DesktopTransactionTable
           tableRef={tableRef}
           rows={rows}
@@ -409,8 +453,10 @@ export default function SpreadsheetRegister({
           newRow={newRow}
           setNewRow={setNewRow}
           onDelete={setDeleteTarget}
-          alwaysVisible={mobileTable}
+          onReorder={handleReorder}
+          dragDisabledReason={dragDisabledReason}
         />
+        )}
       </div>
 
       <MobileTransactionSheet

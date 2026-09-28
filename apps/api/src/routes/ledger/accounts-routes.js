@@ -5,6 +5,7 @@ import {
   setAccountGroupSchema,
   createTransactionSchema,
   updateTransactionSchema,
+  moveTransactionSchema,
   enabledSchema,
 } from "./validators.js";
 import { createLedgerService, LedgerServiceError } from "./ledger-service.js";
@@ -319,6 +320,35 @@ export function createAccountsRouter({ prisma, requirePermission }) {
         });
       } catch (err) {
         return handleError(c, err, "No se pudo actualizar el movimiento.");
+      }
+    },
+  );
+
+  app.post(
+    "/ledger/accounts/:id/transactions/:txId/move",
+    requirePermission("ledger.transactions.update"),
+    async (c) => {
+      try {
+        const companyId = getCompanyId(c)
+        const actorId   = getActorId(c)
+        const accountId = c.req.param("id")
+        if (!(await service.canWriteAccount({ companyId, accountId, actorId }))) {
+          return c.json({ error: 'No tienes permisos para reordenar movimientos de esta cuenta.' }, 403)
+        }
+        const parsed = moveTransactionSchema.safeParse(await c.req.json());
+        if (!parsed.success)
+          return c.json({ error: getValidationErrorMessage(parsed.error) }, 400);
+        return c.json({
+          data: await service.moveTransaction({
+            companyId,
+            accountId,
+            transactionId: c.req.param("txId"),
+            beforeId: parsed.data.before_id ?? null,
+            afterId: parsed.data.after_id ?? null,
+          }),
+        });
+      } catch (err) {
+        return handleError(c, err, "No se pudo reordenar el movimiento.");
       }
     },
   );

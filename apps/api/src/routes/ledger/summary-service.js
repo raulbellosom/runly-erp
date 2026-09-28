@@ -52,10 +52,10 @@ export function createSummaryService({ prisma }) {
             ${openingBalance} +
               SUM(COALESCE(deposito,0) - COALESCE(retiro,0))
               OVER (
-                PARTITION BY account_id ORDER BY fecha, created_at
+                PARTITION BY account_id ORDER BY fecha, created_at, id
                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
               ) AS balance,
-            ROW_NUMBER() OVER (PARTITION BY fecha ORDER BY created_at DESC) AS rn
+            ROW_NUMBER() OVER (PARTITION BY fecha ORDER BY created_at DESC, id DESC) AS rn
           FROM ledger_transaction
           WHERE account_id = ${accountId}::uuid
             AND company_id = ${companyId}::uuid

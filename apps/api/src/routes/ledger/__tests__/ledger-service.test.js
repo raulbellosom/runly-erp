@@ -122,3 +122,64 @@ describe('ledger-service — listDisabledTransactions', () => {
     assert.equal(result.pagination.total, 0)
   })
 })
+
+describe('ledger-service — moveTransaction', () => {
+  // In-memory simulation of one account's rows. Positions are sparse on
+  // purpose: they come from a global sequence shared by every account.
+  function simulate(initial, call) {
+    const rows = initial.map(([id, position]) => ({ id, position }))
+    const tx = {
+      $queryRaw: async (strings, ...values) => {
+        const sql = strings.join('?')
+        if (sql.includes('FOR UPDATE')) return [{ id: ACCOUNT_ID }]
+        if (sql.includes('SELECT id, position')) return rows.filter((r) => values.slice(2).includes(r.id)).map((r) => ({ ...r }))
+        if (sql.includes('position - 1')) {
+          const [, p, upper] = values
+          rows.forEach((r) => { if (r.position > p && r.position <= upper) r.position -= 1 })
+          return []
+        }
+        if (sql.includes('position + 1')) {
+          const [, lower, p] = values
+          rows.forEach((r) => { if (r.position >= lower && r.position < p) r.position += 1 })
+          return []
+        }
+        if (sql.includes('SET position =')) {
+          const [newPos, id] = values
+          const row = rows.find((r) => r.id === id)
+          row.position = newPos
+          return [{ ...row }]
+        }
+        throw new Error(`unexpected SQL: ${sql}`)
+      },
+    }
+    const prisma = { $transaction: (fn) => fn(tx) }
+    return call(createLedgerService({ prisma })).then(() => {
+      const positions = rows.map((r) => r.position)
+      assert.equal(new Set(positions).size, positions.length, 'positions stay unique')
+      return rows.slice().sort((a, b) => a.position - b.position).map((r) => r.id)
+    })
+  }
+
+  const initial = [['a', 3], ['b', 10], ['c', 11], ['d', 40], ['e', 41]]
+  const move = (transactionId, opts) => (svc) =>
+    svc.moveTransaction({ companyId: COMPANY_ID, accountId: ACCOUNT_ID, transactionId, ...opts })
+
+  it('moves down, placed after a row', async () => {
+    assert.deepEqual(await simulate(initial, move('a', { afterId: 'd' })), ['b', 'c', 'd', 'a', 'e'])
+  })
+  it('moves down, placed before a row', async () => {
+    assert.deepEqual(await simulate(initial, move('b', { beforeId: 'e' })), ['a', 'c', 'd', 'b', 'e'])
+  })
+  it('moves up, placed after a row', async () => {
+    assert.deepEqual(await simulate(initial, move('e', { afterId: 'a' })), ['a', 'e', 'b', 'c', 'd'])
+  })
+  it('moves up to the very top, placed before the first row', async () => {
+    assert.deepEqual(await simulate(initial, move('d', { beforeId: 'a' })), ['d', 'a', 'b', 'c', 'e'])
+  })
+  it('rejects moving a row relative to itself', async () => {
+    await assert.rejects(
+      createLedgerService({ prisma: {} }).moveTransaction({ companyId: COMPANY_ID, accountId: ACCOUNT_ID, transactionId: 'a', afterId: 'a' }),
+      LedgerServiceError,
+    )
+  })
+})

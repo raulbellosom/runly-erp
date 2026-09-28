@@ -1,18 +1,30 @@
 // apps/desktop/src/modules/runly.ledger/components/MobileTransactionList.jsx
 import { Pencil, Trash2 } from 'lucide-react'
 import { fmtDecimal, toDateValue } from '../lib/spreadsheet-helpers.js'
+import { DragHandle, RegisterDndContext, useSortableRow } from './SortableRegister.jsx'
 
-export default function MobileTransactionList({ rows, canEdit, onEdit, onDelete, hidden = false }) {
-  if (hidden) return null
+export default function MobileTransactionList({ rows, canEdit, onEdit, onDelete, onReorder, dragDisabledReason = null }) {
+  const dragDisabled = !canEdit || Boolean(dragDisabledReason)
   return (
-    <div className="sm:hidden divide-y divide-[hsl(var(--border)/0.5)]">
+    <RegisterDndContext ids={rows.map((row) => row.id)} onReorder={onReorder}>
+    <div className="divide-y divide-[hsl(var(--border)/0.5)]">
       {rows.length === 0 && (
         <div className="px-4 py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">
           Sin movimientos.
         </div>
       )}
       {rows.map((row) => (
-        <div key={row.id} className="px-4 py-3 flex items-start gap-3">
+        <SortableCard key={row.id} id={row.id} dragDisabled={dragDisabled || row._pending}>
+          {(handleProps) => (<>
+          <div className="flex flex-col items-center shrink-0 -ml-2">
+            <DragHandle
+              handleProps={handleProps}
+              disabled={dragDisabled || row._pending}
+              disabledReason={dragDisabledReason ?? 'Sin permisos para reordenar'}
+              label={`Reordenar movimiento ${row.consecutive ?? ''}`}
+            />
+            <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground))]">{row.consecutive}</span>
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium truncate">{row.nombre}</span>
@@ -54,8 +66,23 @@ export default function MobileTransactionList({ rows, canEdit, onEdit, onDelete,
               </button>
             </div>
           )}
-        </div>
+          </>)}
+        </SortableCard>
       ))}
+    </div>
+    </RegisterDndContext>
+  )
+}
+
+function SortableCard({ id, dragDisabled, children }) {
+  const { setNodeRef, style, handleProps, isDragging } = useSortableRow(id, dragDisabled)
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`px-4 py-3 flex items-start gap-3 ${isDragging ? 'bg-[hsl(var(--card))] shadow-lg ring-1 ring-(--brand-primary) rounded-lg' : ''}`}
+    >
+      {children(handleProps)}
     </div>
   )
 }

@@ -296,6 +296,8 @@ export function createLedgerService({ prisma }) {
 
     try {
       // Single query: window functions compute consecutive + running balance,
+      // ordered by the persisted `position` (register order, reorderable by
+      // drag and drop) — never by fecha, so editing a row never moves it.
       // filtered CTE applies date range, COUNT(*) OVER() avoids a second round trip.
       // Account ownership is enforced by the JOIN + company_id filter on the transaction.
       // Category name/color is only exposed when the category is a system one
@@ -310,12 +312,12 @@ export function createLedgerService({ prisma }) {
             c.name   AS category_name,
             c.color  AS category_color,
             ROW_NUMBER() OVER (
-              PARTITION BY t.account_id ORDER BY t.fecha, t.created_at
+              PARTITION BY t.account_id ORDER BY t.position, t.id
             )::int4 AS consecutive,
             a.opening_balance + SUM(COALESCE(t.deposito, 0) - COALESCE(t.retiro, 0))
               OVER (
                 PARTITION BY t.account_id
-                ORDER BY t.fecha, t.created_at
+                ORDER BY t.position, t.id
                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
               ) AS saldo_actual
           FROM ledger_transaction t
@@ -336,14 +338,14 @@ export function createLedgerService({ prisma }) {
           SELECT *, COUNT(*) OVER()::int4 AS _total_count
           FROM filtered
           ORDER BY
-            CASE WHEN ${descFlag}::int = 1 THEN fecha      END DESC,
-            CASE WHEN ${descFlag}::int = 1 THEN created_at  END DESC,
-            CASE WHEN ${descFlag}::int = 0 THEN fecha      END ASC,
-            CASE WHEN ${descFlag}::int = 0 THEN created_at  END ASC
+            CASE WHEN ${descFlag}::int = 1 THEN position END DESC,
+            CASE WHEN ${descFlag}::int = 1 THEN id       END DESC,
+            CASE WHEN ${descFlag}::int = 0 THEN position END ASC,
+            CASE WHEN ${descFlag}::int = 0 THEN id       END ASC
           LIMIT ${pag.pageSize} OFFSET ${pag.offset}
         )
         SELECT * FROM paged
-        ORDER BY fecha, created_at
+        ORDER BY position, id
       `
 
       const total = rows.length > 0 ? (rows[0]._total_count ?? rows.length) : 0
@@ -451,6 +453,63 @@ export function createLedgerService({ prisma }) {
     return row
   }
 
+  // Moves a transaction right before `beforeId` or right after `afterId`
+  // (exactly one) within its account. Positions are unique per account but
+  // sparse (they come from a global sequence), so only the rows strictly
+  // between the old and new slot shift by one. The account row lock
+  // serializes concurrent moves on the same account.
+  async function moveTransaction({ companyId, accountId, transactionId, beforeId = null, afterId = null }) {
+    const targetId = beforeId ?? afterId
+    if (!targetId || targetId === transactionId) {
+      throw new LedgerServiceError('Destino de movimiento inválido.', 400)
+    }
+    return prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw`
+        SELECT id FROM ledger_account
+        WHERE id = ${accountId}::uuid AND company_id = ${companyId}::uuid AND enabled = true
+        FOR UPDATE
+      `
+      if (!firstRow(locked)) throw new LedgerServiceError('Cuenta no encontrada o no disponible.', 404)
+
+      const rows = await tx.$queryRaw`
+        SELECT id, position FROM ledger_transaction
+        WHERE account_id = ${accountId}::uuid
+          AND company_id = ${companyId}::uuid
+          AND id IN (${transactionId}::uuid, ${targetId}::uuid)
+      `
+      const moving = rows.find((r) => r.id === transactionId)
+      const target = rows.find((r) => r.id === targetId)
+      if (!moving || !target) throw new LedgerServiceError('Movimiento no encontrado.', 404)
+
+      const p = Number(moving.position)
+      const t = Number(target.position)
+      let newPos
+      if (p < t) {
+        // Moving down: rows between shift up one slot.
+        const upper = beforeId ? t - 1 : t
+        await tx.$queryRaw`
+          UPDATE ledger_transaction SET position = position - 1, updated_at = NOW()
+          WHERE account_id = ${accountId}::uuid AND position > ${p} AND position <= ${upper}
+        `
+        newPos = upper
+      } else {
+        // Moving up: rows between shift down one slot.
+        const lower = beforeId ? t : t + 1
+        await tx.$queryRaw`
+          UPDATE ledger_transaction SET position = position + 1, updated_at = NOW()
+          WHERE account_id = ${accountId}::uuid AND position >= ${lower} AND position < ${p}
+        `
+        newPos = lower
+      }
+      const updated = await tx.$queryRaw`
+        UPDATE ledger_transaction SET position = ${newPos}, updated_at = NOW()
+        WHERE id = ${transactionId}::uuid
+        RETURNING *
+      `
+      return firstRow(updated)
+    })
+  }
+
   async function setTransactionEnabled({ companyId, accountId, transactionId, enabled }) {
     const rows = await prisma.$queryRaw`
       UPDATE ledger_transaction
@@ -500,6 +559,6 @@ export function createLedgerService({ prisma }) {
 
   return {
     listAccounts, getAccount, getAccountUnchecked, createAccount, canReadAccount, canWriteAccount, updateAccount, setAccountEnabled, setAccountGroup,
-    listTransactions, createTransaction, updateTransaction, setTransactionEnabled, listDisabledTransactions,
+    listTransactions, createTransaction, updateTransaction, moveTransaction, setTransactionEnabled, listDisabledTransactions,
   }
 }

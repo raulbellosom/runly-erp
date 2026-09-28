@@ -1,5 +1,6 @@
 // apps/desktop/src/modules/runly.ledger/components/DesktopTransactionTable.jsx
 import CategoryOptions from './CategoryOptions.jsx'
+import { DragHandle, RegisterDndContext, useSortableRow } from './SortableRegister.jsx'
 import { fmtDecimal, toDateValue } from '../lib/spreadsheet-helpers.js'
 
 const colClass = 'px-2 py-0 h-8 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-[hsl(var(--ring))] rounded w-full'
@@ -15,8 +16,9 @@ const tdClass = 'border-b border-[hsl(var(--border)/0.5)] p-0 align-middle'
 export default function DesktopTransactionTable({
   tableRef, rows, visibleRowIds, types, categories, canEdit,
   getDraft, setDraft, handleKeyDown, handleRowBlur, saveRow,
-  newRow, setNewRow, onDelete, alwaysVisible = false,
+  newRow, setNewRow, onDelete, onReorder, dragDisabledReason = null,
 }) {
+  const dragDisabled = !canEdit || Boolean(dragDisabledReason)
   const totals = rows.reduce(
     (acc, row) => {
       if (!visibleRowIds || visibleRowIds.has(row.id)) {
@@ -30,9 +32,10 @@ export default function DesktopTransactionTable({
   const lastRow = rows[rows.length - 1]
 
   return (
+    <RegisterDndContext ids={rows.map((row) => row.id)} onReorder={onReorder}>
     <table
       ref={tableRef}
-      className={`${alwaysVisible ? 'table' : 'hidden sm:table'} w-full min-w-262.5 border-collapse text-sm`}
+      className="w-full min-w-270 border-collapse text-sm"
       onFocus={(e) => {
         const el = e.target
         if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
@@ -42,6 +45,7 @@ export default function DesktopTransactionTable({
     >
       <thead className="sticky top-0 z-10">
         <tr>
+          <th className={`${thClass} w-8 px-0`} aria-label="Reordenar" />
           <th className={`${thClass} w-10 text-center`}>#</th>
           <th className={`${thClass} w-28`}>Fecha</th>
           <th className={`${thClass} w-32`}>Tipo</th>
@@ -59,7 +63,7 @@ export default function DesktopTransactionTable({
       <tbody>
         {rows.length === 0 && !newRow && (
           <tr>
-            <td colSpan={12} className="px-4 py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">
+            <td colSpan={13} className="px-4 py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">
               Sin movimientos.
             </td>
           </tr>
@@ -68,11 +72,22 @@ export default function DesktopTransactionTable({
           const draft = getDraft(row, rowIdx)
           const hiddenByFilter = visibleRowIds && !visibleRowIds.has(row.id)
           return (
-            <tr
+            <SortableTr
               key={row.id}
+              id={row.id}
+              dragDisabled={dragDisabled || row._pending}
               onBlur={(event) => handleRowBlur(event, row, rowIdx)}
               className={`hover:bg-[hsl(var(--muted)/0.4)] odd:bg-[hsl(var(--muted)/0.12)] transition-colors ${hiddenByFilter ? 'hidden' : ''}`}
             >
+              {(handleProps) => (<>
+              <td className={`${tdClass} px-0.5`}>
+                <DragHandle
+                  handleProps={handleProps}
+                  disabled={dragDisabled || row._pending}
+                  disabledReason={dragDisabledReason ?? 'Sin permisos para reordenar'}
+                  label={`Reordenar movimiento ${row.consecutive ?? rowIdx + 1}`}
+                />
+              </td>
               <td className={`${tdClass} text-center text-xs text-[hsl(var(--muted-foreground))]`}>
                 {row.consecutive}
               </td>
@@ -224,7 +239,8 @@ export default function DesktopTransactionTable({
                   ×
                 </button>
               </td>
-            </tr>
+              </>)}
+            </SortableTr>
           )
         })}
 
@@ -237,6 +253,7 @@ export default function DesktopTransactionTable({
             }}
             className="bg-[hsl(var(--muted)/0.3)]"
           >
+            <td className={tdClass} />
             <td className={`${tdClass} text-center text-xs text-[hsl(var(--muted-foreground))]`}>*</td>
             <td className={tdClass}>
               <input
@@ -359,7 +376,7 @@ export default function DesktopTransactionTable({
       {rows.length > 0 && (
         <tfoot>
           <tr className="bg-[hsl(var(--muted))] font-semibold">
-            <td className={`${tdClass} text-right border-b-0`} colSpan={7}>
+            <td className={`${tdClass} text-right border-b-0`} colSpan={8}>
               Totales
             </td>
             <td className={`${tdClass} text-right border-b-0 text-xs tabular-nums text-success`}>
@@ -377,5 +394,20 @@ export default function DesktopTransactionTable({
         </tfoot>
       )}
     </table>
+    </RegisterDndContext>
+  )
+}
+
+function SortableTr({ id, dragDisabled, className, children, ...props }) {
+  const { setNodeRef, style, handleProps, isDragging } = useSortableRow(id, dragDisabled)
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`${className} ${isDragging ? 'bg-[hsl(var(--card))] shadow-lg ring-1 ring-(--brand-primary)' : ''}`}
+      {...props}
+    >
+      {children(handleProps)}
+    </tr>
   )
 }

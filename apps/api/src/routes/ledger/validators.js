@@ -80,6 +80,14 @@ export const updateTransactionSchema = z.object({
 
 export const enabledSchema = z.object({ enabled: z.boolean() })
 
+// Reorder: place the transaction right before OR right after another one.
+export const moveTransactionSchema = z.object({
+  before_id: z.string().uuid().optional(),
+  after_id: z.string().uuid().optional(),
+}).refine((v) => Boolean(v.before_id) !== Boolean(v.after_id), {
+  message: 'Indica before_id o after_id (solo uno).',
+})
+
 // ── Groups ────────────────────────────────────────────────────────────────────
 
 export const createGroupSchema = z.object({

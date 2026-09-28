@@ -50,6 +50,7 @@ const ENTITY_CONFIG = {
       'enabled',
       'created_at',
       'updated_at',
+      'position',
     ],
     mapRecord(record) {
       return [
@@ -68,6 +69,7 @@ const ENTITY_CONFIG = {
         record.enabled === false ? 0 : 1,
         normalizeTimestamp(record.createdAt ?? record.created_at),
         normalizeTimestamp(record.updatedAt ?? record.updated_at),
+        record.position ?? null,
       ]
     },
   },
@@ -244,6 +246,8 @@ export class LedgerSQLiteStore {
     }
     await this.#safeAlterTable('ALTER TABLE ledger_account ADD COLUMN owner_id TEXT')
     await this.#safeAlterTable('ALTER TABLE ledger_account ADD COLUMN group_id TEXT')
+    // Register order (mirrors the server's ledger_transaction.position).
+    await this.#safeAlterTable('ALTER TABLE ledger_transaction ADD COLUMN position INTEGER')
   }
 
   async upsertBatch(entityType, records = []) {
@@ -378,12 +382,12 @@ export class LedgerSQLiteStore {
           c.name AS category_name,
           c.color AS category_color,
           ROW_NUMBER() OVER (
-            PARTITION BY t.account_id ORDER BY t.fecha, t.created_at, t.id
+            PARTITION BY t.account_id ORDER BY COALESCE(t.position, 0), t.fecha, t.created_at, t.id
           ) AS consecutive,
           COALESCE(a.opening_balance, 0) + SUM(COALESCE(t.deposito, 0) - COALESCE(t.retiro, 0))
             OVER (
               PARTITION BY t.account_id
-              ORDER BY t.fecha, t.created_at, t.id
+              ORDER BY COALESCE(t.position, 0), t.fecha, t.created_at, t.id
               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
             ) AS saldo_actual
         FROM ledger_transaction t
@@ -407,7 +411,7 @@ export class LedgerSQLiteStore {
       )
       SELECT *, COUNT(*) OVER() AS _total_count
       FROM filtered
-      ORDER BY fecha, created_at
+      ORDER BY COALESCE(position, 0), fecha, created_at, id
       LIMIT ? OFFSET ?`,
       params,
     )
