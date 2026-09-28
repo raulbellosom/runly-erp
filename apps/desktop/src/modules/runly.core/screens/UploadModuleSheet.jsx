@@ -174,6 +174,11 @@ export function UploadModuleSheet({ open, onOpenChange, onSuccess }) {
         id: toastId,
         description: `${result?.data?.fileCount ?? "?"} archivos extraídos. Sincronizando catálogo...`,
       });
+      if (result?.data?.builderDetached) {
+        toast.info("Este módulo pasó a modo avanzado", {
+          description: "Venía del Constructor de módulos y el ZIP trae cambios de código: el Constructor ya no lo editará ni publicará, para no sobrescribirlos.",
+        });
+      }
       handleClose(false);
       onSuccess?.();
     } catch (err) {

@@ -20,8 +20,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  ConfirmDialog,
+  Alert,
+  AlertTitle,
+  AlertDescription,
 } from "@runly/ui";
-import { ArrowLeft, Download, Eye, ShieldCheck, Rocket, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Code2, Download, Eye, ShieldCheck, Rocket, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -142,6 +147,18 @@ export default function ModuleBuilderEditor() {
     onError: (error) => toast.error(error.message ?? "No se pudo validar."),
   });
 
+  // "Modo avanzado": the project stops being edited/published visually so a
+  // hand-edited ZIP (custom React views) can never be overwritten.
+  const [confirmDetach, setConfirmDetach] = useState(false);
+  const detachMutation = useMutation({
+    mutationFn: () => runly.builder.detachProject(id, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["module-builder-project", id] });
+      toast.success("El módulo pasó a modo avanzado. Descarga el ZIP para editar su código.");
+    },
+    onError: (error) => toast.error(error.message ?? "No se pudo convertir a modo avanzado."),
+  });
+
   const exportMutation = useMutation({
     mutationFn: async () => {
       const blob = await runly.builder.exportPackage(id, token);
@@ -206,6 +223,16 @@ export default function ModuleBuilderEditor() {
             </Button>
           }
         />
+
+        {project.detachedAt && (
+          <Alert>
+            <Code2 className="h-4 w-4" />
+            <AlertTitle>Modo avanzado</AlertTitle>
+            <AlertDescription>
+              Este módulo se edita como código (por ejemplo, con pantallas React propias), así que el Constructor ya no lo modifica ni lo publica. Usa "Descargar ZIP" para obtener el paquete con su guía de desarrollo y súbelo desde Módulos &gt; Subir módulo.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {diagnostics && !diagnostics.valid && <DiagnosticsPanel diagnostics={diagnostics} />}
 
@@ -284,10 +311,31 @@ export default function ModuleBuilderEditor() {
                 <Download />
                 Descargar ZIP
               </DropdownMenuItem>
+              {project.status === "PUBLISHED" && !project.detachedAt && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setConfirmDetach(true)}>
+                    <Code2 />
+                    Convertir a modo avanzado
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDetach}
+        onOpenChange={setConfirmDetach}
+        title="Convertir a modo avanzado"
+        description="El módulo seguirá funcionando igual, pero ya no podrás editarlo ni publicarlo desde el Constructor: se trabajará como código (ZIP con pantallas React propias y su guía de desarrollo). Este cambio no se puede deshacer. Subir un ZIP modificado de este módulo también lo convierte automáticamente."
+        confirmLabel="Convertir"
+        onConfirm={() => {
+          setConfirmDetach(false);
+          detachMutation.mutate();
+        }}
+      />
 
       <PreviewSheet open={previewOpen} onOpenChange={setPreviewOpen} projectId={id} token={token} definition={definition} />
       <PublishDialog

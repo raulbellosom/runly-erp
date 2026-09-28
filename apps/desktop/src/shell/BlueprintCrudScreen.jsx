@@ -950,6 +950,7 @@ export function BlueprintCrudScreen() {
         <CustomComponent
           token={token}
           companyId={activeCompanyId}
+          apiBaseUrl={API_BASE_URL}
           navigate={navigate}
           moduleKey={moduleKey}
         />

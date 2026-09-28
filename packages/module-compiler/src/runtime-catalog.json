@@ -1,0 +1,88 @@
+{
+  "libraries": [
+    {
+      "name": "react",
+      "version": "19.3.0",
+      "category": "shared",
+      "imports": "useState, useEffect, useMemo, useCallback, useRef, useContext, createContext, forwardRef, memo, Fragment"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.3.0",
+      "category": "shared",
+      "imports": "createPortal, flushSync"
+    },
+    {
+      "name": "@runly/ui",
+      "version": "0.1.0",
+      "category": "shared",
+      "imports": "PageHeader, Card, Button, TextField, SelectField, DatePickerField, RunlyTable, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton, Badge, Tabs, buildApiHeaders ..."
+    },
+    {
+      "name": "@runly/sdk",
+      "version": "0.1.0",
+      "category": "shared",
+      "imports": "createRunlyClient"
+    },
+    {
+      "name": "@runly/validators",
+      "version": "0.1.0",
+      "category": "shared",
+      "imports": "Esquemas Zod compartidos"
+    },
+    {
+      "name": "@tanstack/react-query",
+      "version": "5.104.0",
+      "category": "shared",
+      "imports": "useQuery, useMutation, useQueryClient"
+    },
+    {
+      "name": "react-router-dom",
+      "version": "7.18.3",
+      "category": "shared",
+      "imports": "useNavigate, useParams, useLocation, Link"
+    },
+    {
+      "name": "zustand",
+      "version": "5.0.15",
+      "category": "shared",
+      "imports": "create"
+    },
+    {
+      "name": "sonner",
+      "version": "2.0.7",
+      "category": "shared",
+      "imports": "toast"
+    },
+    {
+      "name": "lucide-react",
+      "version": "1.48.0",
+      "category": "shared",
+      "imports": "Iconos: Plus, Pencil, Trash2, Search, Calendar ..."
+    },
+    {
+      "name": "recharts",
+      "version": "3.8.1",
+      "category": "shared",
+      "imports": "ResponsiveContainer, BarChart, LineChart, PieChart, AreaChart, Tooltip, Legend"
+    },
+    {
+      "name": "react-hook-form",
+      "version": "7.75.0",
+      "category": "bundled",
+      "imports": "useForm, Controller (prefiere los campos de @runly/ui)"
+    },
+    {
+      "name": "motion",
+      "version": "12.38.0",
+      "category": "bundled",
+      "imports": "motion, AnimatePresence (~280 KB, usar con moderacion)"
+    },
+    {
+      "name": "tailwindcss",
+      "version": "4.3.1",
+      "category": "styles",
+      "imports": "Clases utilitarias en className (sin importar nada)"
+    }
+  ]
+}

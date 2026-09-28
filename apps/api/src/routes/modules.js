@@ -53,6 +53,7 @@ import { createModuleSchemaMigrationService } from "../services/module-schema-mi
 import { createModuleDashboardQueryService } from "../services/module-dashboard-query-service.js";
 import { createModuleKanbanQueryService } from "../services/module-kanban-query-service.js";
 import { registerRecordsViewRoutes } from "./module-records-view-routes.js";
+import { detachBuilderProjectAfterUpload } from "../services/module-builder-detach.js";
 
 const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
@@ -2433,16 +2434,21 @@ export function createModulesRouter({
       const buffer = Buffer.from(await file.arrayBuffer());
 
       try {
+        const actorId = c.get("userContext")?.profile?.id ?? null;
         const result = await packageSvc.publishZip({
           key,
           fileBuffer: buffer,
           modulesDir,
-          actorId: c.get("userContext")?.profile?.id ?? null,
+          actorId,
         });
+        // Hand-edited code must never be overwritten by a Builder publish.
+        const builderDetached = await detachBuilderProjectAfterUpload(prisma, { moduleKey: key, outcome: result.outcome, actorId })
+          .catch(() => false);
         return c.json({ data: {
           moduleKey: key,
           fileCount: result.inspection.files,
           ...result,
+          builderDetached,
         } });
       } catch (err) {
         return c.json(

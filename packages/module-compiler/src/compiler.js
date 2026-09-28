@@ -10,6 +10,7 @@ import { generateRoutes } from './templates/routes.js'
 import { generateFileRoutes } from './templates/file-routes.js'
 import { generateVisibilityModule, hasConditionalRequired } from './templates/visibility.js'
 import { generateRelationsModule, hasRelationsModule } from './templates/relations.js'
+import { DEVELOPER_GUIDE_PATH, generateDeveloperGuide } from './templates/developer-guide.js'
 import { hasFileSupport } from './templates/layout-views.js'
 import { generateEntityValidators } from './templates/validators.js'
 import { generateApiIndex } from './templates/api-index.js'
@@ -48,6 +49,7 @@ export function compileModule(rawDefinition) {
   add('api/service-helpers.js', generateServiceHelpers(config))
   add('api/index.js', generateApiIndex(config))
   add('validators/index.js', generateValidatorsIndex(config))
+  add(DEVELOPER_GUIDE_PATH, generateDeveloperGuide(config))
   for (const entity of config.entities) {
     add(`models/${entity.name}.model.js`, generateModel(config, entity))
     add(`views/${entity.name}.table.js`, generateTableView(config, entity))

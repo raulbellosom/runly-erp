@@ -1653,3 +1653,12 @@ Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-relations-integrity-design
 - [x] Views + Builder: relation labels in table/detail/picker, detail-only `relation-list`, FieldSheet "Campo a mostrar" / "Al desactivar", "Agregar registros relacionados" in the designer. Verified: 2026-09-28 (tests 86/86, `pnpm build:web`, `pnpm lint`; api services + module-engine 729/730 with the known flaky inventory-chat test)
 - [ ] Manual end-to-end in a running instance (publish a module with Cliente/Pedido, try disabling a used Cliente).
 - Out of scope: DB-level foreign keys (engine only allows additive migrations), cross-module relations, re-enable cascade, creating children from the related section.
+
+## RME3 Module Builder — advanced mode + developer guide in the ZIP (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-advanced-mode-design.md` · Plan: `docs/superpowers/plans/2026-09-28-rme3-builder-advanced-mode-plan.md`
+
+- [x] Every compiled package (and so "Descargar ZIP") ships `GUIA_DESARROLLO_RUNLY.md`, personalized per module (CUSTOM view recipe, component props, module API table, libraries with real versions, import rules, Runly design rules). Versions come from `packages/module-compiler/src/runtime-catalog.json` (`node scripts/generate-module-runtime-catalog.mjs`); `module-runtime-catalog.test.js` fails on drift vs installed versions or `BUNDLE_EXTERNALS`. Verified: 2026-09-28 (`developer-guide.test.js`, catalog tests)
+- [x] CUSTOM components receive `apiBaseUrl`; `buildApiHeaders` exported from `@runly/ui`; CUSTOM example in `rme3-runtime-capabilities.md` fixed (full `/app/m/...` path, props instead of localStorage token).
+- [x] "Convertir a modo avanzado" in the Builder editor (existing detach API) + banner; a changed ZIP upload auto-detaches the module's Builder project (`module-builder-detach.js`, response `builderDetached`). Verified: 2026-09-28 (detach tests; api services 752/753 with the known flaky inventory-chat test; `pnpm build:web`, `pnpm lint`)
+- [ ] Manual: download a Builder ZIP, add a CUSTOM React view following the guide, upload it, confirm the view renders and the project shows "Modo avanzado".

@@ -27,7 +27,7 @@ Todo se guarda solo mientras editas (el indicador de abajo a la izquierda muestr
 - **Condiciones**: mostrar pestanas, secciones o campos solo en ciertos casos.
 - **Relaciones e integridad**: que pasa al desactivar un registro que otros usan.
 - **Archivos, fotos y documentos**: campos de archivo, camara y documentos adjuntos.
-- **Vistas adicionales** y **Publicar y actualizar**.
+- **Vistas adicionales** y **Publicar y actualizar** (incluye el **modo avanzado** para agregar pantallas propias en React descargando el ZIP).
 
 ### Alcances y limites
 

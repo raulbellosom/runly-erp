@@ -291,7 +291,7 @@ export default defineView({
   kind: 'CUSTOM',
   version: '0.1.0',
   schema: {
-    path: '/mymodule/dashboard',
+    path: '/app/m/custom.mymodule/dashboard', // full URL: matched against location.pathname
     component: 'custom.mymodule:MyDashboard',
     title: 'Dashboard',
   },
@@ -317,25 +317,17 @@ import {
   Button,
   EmptyState,
   Skeleton,
+  buildApiHeaders,
 } from '@runly/ui'
 
-// Helpers
-function useAtlasToken() {
-  // The Atlas token is stored in localStorage by the auth provider.
-  // Key: sb-<project>-auth-token  (Supabase session)
-  // Simplest approach: read from window.__atlas_token if your shell exposes it,
-  // or grab it from localStorage directly.
-  return localStorage.getItem('atlas_token') ?? ''
-}
-
-export default function MyDashboard() {
-  const token = useAtlasToken()
-
+// CUSTOM components receive { token, companyId, apiBaseUrl, navigate, moduleKey }
+// as props from BlueprintCrudScreen — never read tokens from localStorage.
+export default function MyDashboard({ token, companyId, apiBaseUrl }) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['mymodule.dashboard'],
     queryFn: async () => {
-      const res = await fetch('/api/mymodule/summary', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${apiBaseUrl}/mymodule/summary`, {
+        headers: buildApiHeaders(token, companyId),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()
