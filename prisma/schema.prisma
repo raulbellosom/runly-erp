@@ -733,14 +733,90 @@ model Contact {
   taxId String? @map("tax_id")
   notesMarkdown String? @map("notes_markdown")
   metadata    Json?
+  avatarFileId String? @db.Uuid @map("avatar_file_id")
+  website     String?
+  industry    String?
+  tags        String[] @default([])
+  taxRegime String? @map("tax_regime")
+  fiscalPostalCode String? @db.VarChar(5) @map("fiscal_postal_code")
+  cfdiUse String? @map("cfdi_use")
   enabled     Boolean @default(true)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  channels  ContactChannel[]
+  addresses ContactAddress[]
+  persons   ContactPerson[]
 
   @@index([type])
   @@index([name])
   @@index([companyId, enabled])
   @@map("contact")
+}
+
+model ContactChannel {
+  id String @id @default(uuid(7)) @db.Uuid
+  companyId String @db.Uuid @map("company_id")
+  contactId String @db.Uuid @map("contact_id")
+  kind        String
+  label       String @default("other")
+  value       String
+  countryCode String? @map("country_code")
+  isPrimary Boolean @default(false) @map("is_primary")
+  sortOrder Int @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([companyId, kind, value])
+  @@map("contact_channel")
+}
+
+model ContactAddress {
+  id String @id @default(uuid(7)) @db.Uuid
+  companyId String @db.Uuid @map("company_id")
+  contactId String @db.Uuid @map("contact_id")
+  kind        String @default("other")
+  label       String?
+  street      String
+  extNumber String? @map("ext_number")
+  intNumber String? @map("int_number")
+  neighborhood String?
+  postalCode String? @map("postal_code")
+  city        String?
+  state       String?
+  country     String @default("MX")
+  isDefault Boolean @default(false) @map("is_default")
+  sortOrder Int @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_address")
+}
+
+model ContactPerson {
+  id String @id @default(uuid(7)) @db.Uuid
+  companyId String @db.Uuid @map("company_id")
+  contactId String @db.Uuid @map("contact_id")
+  name        String
+  role        String?
+  phone       String?
+  email       String?
+  isPrimary Boolean @default(false) @map("is_primary")
+  sortOrder Int @default(0) @map("sort_order")
+  notes       String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_person")
 }
 
 model HrEmployee {
