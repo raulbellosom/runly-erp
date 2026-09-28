@@ -748,6 +748,31 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/contacts/${encodeURIComponent(id)}`, {
           headers: withAuthHeaders(token),
         }),
+      getProfile: (id, token) =>
+        request(`/contacts/${encodeURIComponent(id)}/profile`, { headers: withAuthHeaders(token) }),
+      getActivity: (id, options = {}, token) =>
+        request(
+          `/contacts/${encodeURIComponent(id)}/activity${toQueryString({ module: options.module, limit: options.limit })}`,
+          { headers: withAuthHeaders(token) },
+        ),
+      findDuplicates: (criteria = {}, token) =>
+        request(`/contacts/duplicates${toQueryString(criteria)}`, { headers: withAuthHeaders(token) }),
+      listTags: (q, token) =>
+        request(`/contacts/tags${toQueryString({ q })}`, { headers: withAuthHeaders(token) }),
+      uploadAvatar: (id, file, token) => {
+        const formData = new FormData();
+        formData.append("avatar", file);
+        return request(`/contacts/${encodeURIComponent(id)}/avatar`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: formData,
+        });
+      },
+      removeAvatar: (id, token) =>
+        request(`/contacts/${encodeURIComponent(id)}/avatar`, {
+          method: "DELETE",
+          headers: withAuthHeaders(token),
+        }),
       update: (id, data, token) =>
         request(`/contacts/${encodeURIComponent(id)}`, {
           method: "PUT",

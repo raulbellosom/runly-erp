@@ -12,10 +12,20 @@ import ExcelJS from "exceljs";
 import { formatLocalDateTime, toLocalIso } from "@runly/core";
 import { createContactsService, ContactsServiceError } from "../services/contacts-service.js";
 import { publishActivityFromContext, getActivityContext } from "../services/activity-publisher.js";
+import { registerContactsProfileRoutes } from "./contacts-profile-routes.js";
 
-export function createContactsRouter({ prisma, requirePermission }) {
+function formatAddress(address) {
+  if (!address) return "";
+  const street = [address.street, address.extNumber, address.intNumber && `Int. ${address.intNumber}`].filter(Boolean).join(" ");
+  return [street, address.neighborhood, address.postalCode && `C.P. ${address.postalCode}`, address.city, address.state]
+    .filter(Boolean)
+    .join(", ");
+}
+
+export function createContactsRouter({ prisma, requirePermission, supabaseAdmin = null, storageBucket }) {
   const app = new Hono();
-  const contactsService = createContactsService({ prisma });
+  const contactsService = createContactsService({ prisma, supabaseAdmin, storageBucket });
+  registerContactsProfileRoutes(app, { prisma, requirePermission, contactsService });
 
   app.get(
     "/contacts",
@@ -39,6 +49,7 @@ export function createContactsRouter({ prisma, requirePermission }) {
           sortBy,
           sortDir,
           enabled,
+          tag: c.req.query("tag") || undefined,
         });
         return c.json({
           data: result.rows,
@@ -104,7 +115,7 @@ export function createContactsRouter({ prisma, requirePermission }) {
       } catch (err) {
         if (err?.name === "ZodError") {
           return c.json(
-            { error: err.errors?.[0]?.message ?? "Datos de contacto invalidos." },
+            { error: (err.issues ?? err.errors)?.[0]?.message ?? "Datos de contacto invalidos." },
             400,
           );
         }
@@ -195,6 +206,13 @@ export function createContactsRouter({ prisma, requirePermission }) {
           { header: "Correo", key: "email", width: 32 },
           { header: "Telefono", key: "phone", width: 18 },
           { header: "RFC / ID fiscal", key: "taxId", width: 20 },
+          { header: "Giro", key: "industry", width: 24 },
+          { header: "Sitio web", key: "website", width: 28 },
+          { header: "Regimen fiscal", key: "taxRegime", width: 14 },
+          { header: "CP fiscal", key: "fiscalPostalCode", width: 10 },
+          { header: "Uso CFDI", key: "cfdiUse", width: 10 },
+          { header: "Etiquetas", key: "tags", width: 30 },
+          { header: "Direccion fiscal", key: "fiscalAddress", width: 48 },
           { header: "Estado", key: "enabled", width: 12 },
           { header: "Creado", key: "createdAt", width: 22 },
         ];
@@ -209,6 +227,13 @@ export function createContactsRouter({ prisma, requirePermission }) {
             email: contact.email ?? "",
             phone: contact.phone ?? "",
             taxId: contact.taxId ?? "",
+            industry: contact.industry ?? "",
+            website: contact.website ?? "",
+            taxRegime: contact.taxRegime ?? "",
+            fiscalPostalCode: contact.fiscalPostalCode ?? "",
+            cfdiUse: contact.cfdiUse ?? "",
+            tags: (contact.tags ?? []).join(", "),
+            fiscalAddress: formatAddress(contact.addresses?.[0]),
             enabled: contact.enabled ? "Activo" : "Inactivo",
             createdAt: contact.createdAt
               ? formatLocalDateTime(contact.createdAt)
@@ -411,7 +436,7 @@ export function createContactsRouter({ prisma, requirePermission }) {
       } catch (err) {
         if (err?.name === "ZodError") {
           return c.json(
-            { error: err.errors?.[0]?.message ?? "Datos de contacto invalidos." },
+            { error: (err.issues ?? err.errors)?.[0]?.message ?? "Datos de contacto invalidos." },
             400,
           );
         }

@@ -2191,7 +2191,7 @@ function mountWithAuth(baseApp, router) {
 
 mountWithAuth(app, createCompanyRouter({ prisma, supabaseAdmin, requirePermission, cacheDel }));
 mountWithAuth(app, createBuilderRouter({ prisma, requirePermission, bundlerSvc: bundlerService, routeLoader, cacheDel }));
-mountWithAuth(app, createContactsRouter({ prisma, requirePermission }));
+mountWithAuth(app, createContactsRouter({ prisma, requirePermission, supabaseAdmin, storageBucket: STORAGE_BUCKET_NAME }));
 mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }));
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));
 mountWithAuth(app, createIdentityRouter({
