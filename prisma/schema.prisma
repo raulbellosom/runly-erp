@@ -417,6 +417,7 @@ model Company {
 
   invCategories   InvCategory[]    @relation("CompanyInvCategories")
   invBrands       InvBrand[]       @relation("CompanyInvBrands")
+  invModels       InvModel[]       @relation("CompanyInvModels")
   invLocations    InvLocation[]    @relation("CompanyInvLocations")
   invItems        InvItem[]        @relation("CompanyInvItems")
   invCustomFields InvCustomField[] @relation("CompanyInvCustomFields")
@@ -3373,6 +3374,7 @@ model InvCategory {
   children     InvCategory[] @relation("InvCategoryChildren")
   items        InvItem[]
   customFields InvCustomField[]
+  models       InvModel[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -3391,6 +3393,7 @@ model InvBrand {
 
   company Company   @relation("CompanyInvBrands", fields: [companyId], references: [id])
   items   InvItem[]
+  models  InvModel[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -3415,6 +3418,33 @@ model InvLocation {
   @@map("inv_location")
 }
 
+model InvModel {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @db.Uuid @map("company_id")
+  name        String   @db.VarChar(255)
+  nameKey     String   @db.VarChar(255) @map("name_key")
+  typeId      String   @db.Uuid @map("type_id")
+  brandId     String   @db.Uuid @map("brand_id")
+  year        Int?
+  description String?  @db.VarChar(2000)
+  sortOrder   Int      @default(0) @map("sort_order")
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company Company     @relation("CompanyInvModels", fields: [companyId], references: [id])
+  type    InvCategory @relation(fields: [typeId], references: [id])
+  brand   InvBrand    @relation(fields: [brandId], references: [id])
+  items   InvItem[]
+
+  // NULL years are distinct in Postgres; inventory-model-service checks that case.
+  @@unique([companyId, brandId, nameKey, year])
+  @@index([companyId])
+  @@index([typeId])
+  @@index([brandId])
+  @@map("inv_model")
+}
+
 model InvItem {
   id            String    @id @default(uuid(7)) @db.Uuid
   companyId     String    @db.Uuid @map("company_id")
@@ -3427,6 +3457,7 @@ model InvItem {
   locationId    String?   @db.Uuid @map("location_id")
   serialNumber  String?   @db.VarChar(255) @map("serial_number")
   model         String?   @db.VarChar(255)
+  modelId       String?   @db.Uuid @map("model_id")
   partNumber    String?   @db.VarChar(255) @map("part_number")
   status        String    @default("available") @db.VarChar(50)
   purchaseDate  DateTime? @db.Date @map("purchase_date")
@@ -3450,7 +3481,8 @@ model InvItem {
   category     InvCategory?   @relation(fields: [categoryId], references: [id])
   brand        InvBrand?      @relation(fields: [brandId], references: [id])
   location     InvLocation?   @relation(fields: [locationId], references: [id])
-  assignedTo   HrEmployee?    @relation("EmployeeAssignedItems", fields: [assignedToId], references: [id], onDelete: SetNull)
+  catalogModel InvModel?      @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  assignedTo  HrEmployee?    @relation("EmployeeAssignedItems", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdBy    UserProfile?   @relation("UserCreatedInvItems", fields: [createdById], references: [id])
   assignments  InvAssignment[]
   customValues InvCustomFieldValue[]
@@ -3460,6 +3492,7 @@ model InvItem {
   @@index([companyId, status])
   @@index([categoryId])
   @@index([assignedToId])
+  @@index([modelId])
   @@map("inv_item")
 }
 
