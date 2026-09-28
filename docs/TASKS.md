@@ -1620,3 +1620,18 @@ Spec: `docs/superpowers/specs/2026-09-27-contacts-360-redesign-design.md`; plan:
 Deviations from the spec: Historial reads the existing `Activity` table (contacts routes already publish `contacts.contact.*` events there), so no new `AuditLog` writes were added; the optional `runly.files` manifest dependency was not added (contacts is a core module); avatar in the list's name cell is deferred (RunlyTable custom cells need the component registry).
 
 Verified: 2026-09-27 (`node --test` on `apps/api/src/services/__tests__` + `packages/validators` → 642 pass / 0 fail; new contacts tests included; service smoke test against the dev DB with a temporary contact — create with collections, primary mirror, replace/clear semantics, legacy phone sync, duplicates, tags, tag+person search, activity summary, cross-company 404 — contact deleted afterwards; real API boot with the new routes answering 401 unauthenticated; `pnpm lint` clean; `vite build` clean).
+
+## RME3 Module Builder — layout designer + media fields (2026-09-27)
+
+Spec: `docs/superpowers/specs/2026-09-27-rme3-builder-layout-media-design.md` · Plan: `docs/superpowers/plans/2026-09-27-rme3-builder-layout-media-plan.md`
+
+- [x] Compiler: `entity.layout` contract (tabs/sections/columns, attachments section, hero, KPIs, mode) + file options (`accept`, `camera`, `maxSizeMB`), unplaced fields go to "Otros datos". Verified: 2026-09-27 (`node --test packages/module-compiler/src/__tests__/*.test.js` 27/27)
+- [x] Compiler: layout-aware FORM/DETAIL emission, image-asset table columns, generated `<entity>-file-routes.js` + file linking on create/update. Verified: 2026-09-27 (same suite; generated routes pass `node --check`)
+- [x] API: `moduleContext.files` (`module-files-service.js`) injected by the route loader, scoped by module/entityType/company/record. Verified: 2026-09-27 (`node --test apps/api/src/services/__tests__/*.test.js` 614/614)
+- [x] UI: tabs in RunlyForm/RunlyDetail (`schema-tabs.js`, `SchemaTabBar`), `FileAssetField`, `CameraCaptureDialog`, `file-asset` detail rendering, module-scoped signed URLs for hero/table images. Verified: 2026-09-27 (renderer tests 36/36, `pnpm build:web`, `pnpm lint`)
+- [x] Builder: "Diseño" sheet per entity (tree, detail panel, preview), file options in FieldSheet, field deletion prunes the layout. Verified: 2026-09-27 (`layoutHelpers` tests, `pnpm build:web`)
+- [ ] Manual end-to-end in a running instance: publish a module with 2 tabs, hero image with camera and an attachments section; create a record uploading a webcam photo and a document.
+
+Deviations from the spec: record association uses `metadata.sourceEntityId` (FileAsset.entityId holds the companyId, as with HR documents); removing an attachment disables the asset; `maxSizeMB` is 1-10 (server upload cap); tabs are emitted as flat `sections[].tab` + `tabs[]`; file fields get upload props even without a layout (fixes the previous non-uploading dropzone).
+- [x] Follow-up (2026-09-28): generated upload route enforces each field's `maxSizeMB` (413) and `accept: image` (400) server-side (`FileAssetField` sends `field`); the "Diseño" preview renders the production `RunlyForm`/`RunlyDetail` with the exact compiler schema (`@runly/module-compiler/layout-views` subpath export); attachments section placement (form body vs aside) selectable in the designer. Verified: 2026-09-28 (module-compiler 28/28 incl. an in-process Hono request test of the generated route, renderer + builder tests 44/44, `pnpm build:web`, `pnpm lint`)
+- Deferred (tracked for a future spec): relation fields with integrity constraints/locks (top priority), related-record tabs in the detail, separate form/detail layouts, conditional section visibility.

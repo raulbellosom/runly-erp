@@ -6,6 +6,7 @@
 // published, so these helpers don't need to be authoritative — just
 // convenient and non-destructive to sibling data.
 import * as LucideIcons from "lucide-react";
+import { pruneLayout } from "./layoutHelpers.js";
 
 // Turns the server's `capabilities.iconNames` (@runly/module-engine's
 // MODULE_ICON_NAMES — the exact list @runly/module-compiler's validator
@@ -136,7 +137,10 @@ export function updateField(definition, entityKey, fieldKey, patch) {
 export function removeField(definition, entityKey, fieldKey) {
   const entity = definition.entities.find((e) => e.key === entityKey);
   if (!entity) return definition;
-  return updateEntity(definition, entityKey, { fields: entity.fields.filter((f) => f.key !== fieldKey) });
+  const fields = entity.fields.filter((f) => f.key !== fieldKey);
+  const patch = { fields };
+  if (entity.layout) patch.layout = pruneLayout(entity.layout, fields.map((f) => f.key));
+  return updateEntity(definition, entityKey, patch);
 }
 
 export function moveField(definition, entityKey, fieldKey, direction) {

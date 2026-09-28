@@ -27,6 +27,7 @@ import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
 import { Button } from "../components/Button.jsx";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/Avatar.jsx";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.jsx";
+import { FileAssetValue } from "../components/FileAssetField.jsx";
 import { MarkdownViewer } from "../components/MarkdownViewer.jsx";
 import { normalizeSpanishLabel } from "./renderer-adapters.js";
 import { resolveColorHex } from "./runly-form-utils.js";
@@ -45,6 +46,8 @@ import {
   fetchUserAvatarSignedUrl,
   initialsFromName,
 } from "./runly-detail-hero.jsx";
+import { resolveSchemaTabs, tabOfSection } from "./schema-tabs.js";
+import { SchemaTabBar } from "./SchemaTabBar.jsx";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { cn } from "../lib/utils.js";
 
@@ -171,6 +174,8 @@ function normalizeField(fieldLike) {
     options: Array.isArray(fieldLike.options) ? fieldLike.options : null,
     visibleWhen: fieldLike.visibleWhen ?? null,
     hiddenWhen: fieldLike.hiddenWhen ?? null,
+    accept: fieldLike.accept ?? null,
+    signedUrlPath: fieldLike.signedUrlPath ?? null,
   };
 }
 
@@ -412,6 +417,8 @@ function normalizeSections(schema, fieldMap) {
             type: fieldDef.field.type ?? existing?.type ?? "text",
             icon: fieldDef.field.icon ?? existing?.icon ?? null,
             options: fieldDef.field.options ?? existing?.options ?? null,
+            accept: fieldDef.field.accept ?? existing?.accept ?? null,
+            signedUrlPath: fieldDef.field.signedUrlPath ?? existing?.signedUrlPath ?? null,
           });
         }
         if (!fieldNames.includes(name)) fieldNames.push(name);
@@ -430,9 +437,14 @@ function normalizeSections(schema, fieldMap) {
         fields: fieldNames,
       };
     })
-    .map((section, i) =>
-      section ? withCollapseConfig(section, rawSections[i]) : null,
-    )
+    .map((section, i) => {
+      if (!section) return null;
+      const withTab =
+        typeof rawSections[i]?.tab === "string"
+          ? { ...section, tab: rawSections[i].tab }
+          : section;
+      return withCollapseConfig(withTab, rawSections[i]);
+    })
     .filter(Boolean);
 }
 
@@ -1000,9 +1012,16 @@ export function RunlyDetail({
     () => (data && typeof data === "object" ? resolveKpis(schema, data) : []),
     [schema, data],
   );
+  const tabs = useMemo(() => resolveSchemaTabs(schema), [schema]);
+  const [activeTab, setActiveTab] = useState(null);
+  const currentTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : (tabs[0]?.key ?? null);
+  const visibleSections = useMemo(
+    () => (tabs.length ? sections.filter((section) => tabOfSection(section, tabs) === currentTab) : sections),
+    [sections, tabs, currentTab],
+  );
   const { twoColumn, main: mainSections, aside: asideSections, full: fullSections } = useMemo(
-    () => splitSectionsByColumn(sections, schema?.layout),
-    [sections, schema?.layout],
+    () => splitSectionsByColumn(visibleSections, schema?.layout),
+    [visibleSections, schema?.layout],
   );
 
   if (!loading && (!data || typeof data !== "object")) {
@@ -1129,6 +1148,15 @@ export function RunlyDetail({
                           —
                         </span>
                       )
+                    ) : field.type === "file-asset" ? (
+                      <FileAssetValue
+                        value={value}
+                        accept={field.accept ?? "any"}
+                        signedUrlPath={field.signedUrlPath}
+                        apiBaseUrl={apiBaseUrl}
+                        token={token}
+                        companyId={companyId}
+                      />
                     ) : (
                       renderValue(field, value, data)
                     )}
@@ -1185,6 +1213,8 @@ export function RunlyDetail({
         )
       )}
 
+      <SchemaTabBar tabs={tabs} activeKey={currentTab} onChange={setActiveTab} />
+
       {sections.length === 0 && (
         <Alert variant="warning">
           <AlertTitle>Detalle sin secciones</AlertTitle>
@@ -1209,7 +1239,7 @@ export function RunlyDetail({
           )}
         </div>
       ) : (
-        <div className="space-y-6">{sections.map(renderSection)}</div>
+        <div className="space-y-6">{visibleSections.map(renderSection)}</div>
       )}
     </div>
   );

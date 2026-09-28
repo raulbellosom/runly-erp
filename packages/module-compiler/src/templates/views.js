@@ -1,4 +1,5 @@
 import { moduleSlug, permKey, toKebab } from './helpers.js'
+import { entityFilePaths, fileFieldProps, generateLayoutDetailView, generateLayoutFormView, getDetailTypeHint, mapFormFieldType } from './layout-views.js'
 
 export function generateTableView(config, entity) {
   const slug = moduleSlug(config.key)
@@ -9,6 +10,9 @@ export function generateTableView(config, entity) {
   const columns = entity.fields
     .slice(0, 5)
     .map((f) => {
+      if (f.type === 'file' && f.accept === 'image') {
+        return `      { field: '${f.name}', label: '${f.label || f.name}', type: 'image-asset', signedUrlPath: '${entityFilePaths(config, entity).signedUrlPath}' },`
+      }
       const typeHint = getColumnTypeHint(f.type)
       const base = `      { field: '${f.name}', label: '${f.label || f.name}', sortable: true`
       return typeHint ? base + `, type: '${typeHint}' },` : base + ' },'
@@ -47,6 +51,8 @@ ${columns}
 }
 
 export function generateFormView(config, entity) {
+  const layoutView = generateLayoutFormView(config, entity)
+  if (layoutView) return layoutView
   const slug = moduleSlug(config.key)
   const apiPath = `/${slug}/${entity.name}s`
   const viewKey = `${slug}.${entity.name}.form`
@@ -65,6 +71,9 @@ export function generateFormView(config, entity) {
       }
       if (f.type === 'relation') {
         lines.push(`        relation: { apiPath: '/${slug}/${f.relatedModel ? f.relatedModel.split('.').pop() + 's' : f.name + 's'}', labelField: 'name', clearable: true }`)
+      }
+      if (f.type === 'file') {
+        for (const [prop, value] of Object.entries(fileFieldProps(config, entity, f))) lines.push(`        ${prop}: ${JSON.stringify(value)}`)
       }
       return '      {\n' + lines.map((l) => '    ' + l + ',').join('\n') + '\n      },'
     })
@@ -96,6 +105,8 @@ ${fields}
 }
 
 export function generateDetailView(config, entity) {
+  const layoutView = generateLayoutDetailView(config, entity)
+  if (layoutView) return layoutView
   const slug = moduleSlug(config.key)
   const apiPath = `/${slug}/${entity.name}s`
   const viewKey = `${slug}.${entity.name}.detail`
@@ -104,6 +115,7 @@ export function generateDetailView(config, entity) {
     .map((f) => {
       const typeHint = getDetailTypeHint(f.type)
       const base = `      { field: '${f.name}', label: '${f.label || f.name}'`
+      if (f.type === 'file') return base + `, type: 'file-asset', accept: '${f.accept ?? 'any'}', signedUrlPath: '${entityFilePaths(config, entity).signedUrlPath}' },`
       return typeHint ? base + `, type: '${typeHint}' },` : base + ' },'
     })
     .join('\n')
@@ -158,14 +170,4 @@ export default definePage({
 function getColumnTypeHint(type) {
   const map = { boolean: 'boolean', date: 'date', datetime: 'datetime', decimal: 'currency', number: 'number', color: 'color' }
   return map[type] || null
-}
-
-function getDetailTypeHint(type) {
-  const map = { boolean: 'boolean', date: 'date', datetime: 'datetime', decimal: 'currency', number: 'number', color: 'color', markdown: 'markdown', richtext: 'richtext' }
-  return map[type] || null
-}
-
-function mapFormFieldType(type) {
-  const map = { textarea: 'textarea', number: 'number', decimal: 'decimal', boolean: 'boolean', select: 'select', multiselect: 'multiselect', date: 'date', datetime: 'datetime', email: 'email', phone: 'phone', relation: 'relation', file: 'file', json: 'json', markdown: 'markdown', color: 'color', richtext: 'richtext' }
-  return map[type] || 'text'
 }

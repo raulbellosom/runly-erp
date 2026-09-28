@@ -264,6 +264,8 @@ export {
 } from "./components/ViewModeSwitch.jsx";
 export { MobileFiltersSheet } from "./components/MobileFiltersSheet.jsx";
 export { ImageSourceSheet } from "./components/ImageSourceSheet.jsx";
+export { CameraCaptureDialog } from "./components/CameraCaptureDialog.jsx";
+export { FileAssetField, FileAssetValue, fetchFileAssetUrl } from "./components/FileAssetField.jsx";
 export { ChatAttachMenu } from "./components/ChatAttachMenu.jsx";
 export { ListLayout } from "./components/ListLayout.jsx";
 export { useAttachmentsController, resolveAttachmentFileType } from "./hooks/useAttachmentsController.js";

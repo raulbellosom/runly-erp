@@ -43,7 +43,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     async (assetId) => {
       if (!assetId) return null;
       try {
-        const res = await fetch(joinUrl(apiBaseUrl, `/files/${encodeURIComponent(assetId)}/signed-url`), {
+        const res = await fetch(joinUrl(apiBaseUrl, String(column?.signedUrlPath ?? "/files/:id/signed-url").replace(":id", encodeURIComponent(assetId))), {
           headers: buildApiHeaders(token, companyId),
         });
         if (!res.ok) return null;
@@ -53,7 +53,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
         return null;
       }
     },
-    [apiBaseUrl, token, companyId],
+    [apiBaseUrl, token, companyId, column?.signedUrlPath],
   );
 
   useEffect(() => {

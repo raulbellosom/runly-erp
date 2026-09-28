@@ -87,6 +87,7 @@ import {
 } from "./services/activity-publisher.js";
 import { createModuleBundlerService } from "./services/module-bundler-service.js";
 import { createRouteLoaderService } from "./services/route-loader-service.js";
+import { createModuleFilesCapability } from "./services/module-files-service.js";
 import { createDistServeService } from "./services/dist-serve-service.js";
 import { createNotificationDeliveryWorker } from "./services/notification-delivery-worker.js";
 import { createNotificationService } from "./services/notification-service.js";
@@ -710,6 +711,7 @@ const routeLoader = createRouteLoaderService({
   prisma,
   authMiddleware,
   requirePermission,
+  filesCapability: createModuleFilesCapability({ prisma, filesService, supabaseAdmin }),
   cache: {
     get: cacheGet,
     set: cacheSet,

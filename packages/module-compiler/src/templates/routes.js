@@ -1,4 +1,5 @@
 import { toPascal, moduleSlug, permKey } from './helpers.js'
+import { hasFileSupport } from './layout-views.js'
 
 export function generateRoutes(config, entity) {
   const slug = moduleSlug(config.key)
@@ -7,6 +8,7 @@ export function generateRoutes(config, entity) {
   const base = `/${slug}/${entity.name}s`
   const softDelete = entity.softDelete !== false
   const companyScoped = entity.companyScoped !== false
+  const withFiles = hasFileSupport(entity)
 
   const selectFields = entity.fields.filter((f) => f.type === 'select')
   const filterQueryParams = selectFields.map((f) => '    const ' + f.name + ' = c.req.query(\'' + f.name + '\')').join('\n')
@@ -20,7 +22,8 @@ import { z } from 'zod'
 import { create${pascal}Schema, update${pascal}Schema } from '../validators/index.js'
 import { create${pascal}Service } from './${entity.name}-service.js'
 import { ${errorClass} } from './service-helpers.js'
-
+${withFiles ? `import { create${pascal}FileRouter, link${pascal}FileFields } from './${entity.name}-file-routes.js'
+` : ''}
 const enabledSchema = z.object({ enabled: z.boolean() })
 
 function getValidationErrorMessage(error) {
@@ -52,7 +55,8 @@ export function create${pascal}Router({ prisma, requirePermission, moduleContext
   const app = new Hono()
   const service = create${pascal}Service({ prisma })
   const moduleKey = moduleContext?.moduleKey ?? '${config.key}'
-
+${withFiles ? `  app.route('', create${pascal}FileRouter({ requirePermission, moduleContext }))
+` : ''}
   app.get('${base}', requirePermission('${permKey(slug, entity.name, 'read')}'), async (c) => {
     try {
       const companyId = getCompanyIdFromContext(c)
@@ -81,7 +85,8 @@ ${filterQueryParams ? filterQueryParams + '\n' : ''}      const result = await s
       const parsed = create${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
       const created = await service.create${pascal}({ companyId, data: parsed.data, actorId })
-      return c.json({ data: created }, 201)
+${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
+` : ''}      return c.json({ data: created }, 201)
     } catch (err) {
       return handleRouteError(c, err, { fallbackError: 'No se pudo crear el registro.', route: '${base}', moduleKey, operation: 'create${pascal}' })
     }
@@ -95,7 +100,8 @@ ${filterQueryParams ? filterQueryParams + '\n' : ''}      const result = await s
       const parsed = update${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
       const updated = await service.update${pascal}({ companyId, id: c.req.param('id'), data: parsed.data, actorId })
-      return c.json({ data: updated })
+${withFiles ? `      await link${pascal}FileFields(c, moduleContext, updated)
+` : ''}      return c.json({ data: updated })
     } catch (err) {
       return handleRouteError(c, err, { fallbackError: 'No se pudo actualizar el registro.', route: '${base}/:id', moduleKey, operation: 'update${pascal}' })
     }

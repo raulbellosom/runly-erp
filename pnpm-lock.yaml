@@ -239,6 +239,9 @@ importers:
       '@runly/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@runly/module-compiler':
+        specifier: workspace:*
+        version: link:../../packages/module-compiler
       '@runly/offline':
         specifier: workspace:*
         version: link:../../packages/offline

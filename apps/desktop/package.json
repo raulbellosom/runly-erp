@@ -39,6 +39,7 @@
     "@runly/core": "workspace:*",
     "@runly/offline": "workspace:*",
     "@runly/sdk": "workspace:*",
+    "@runly/module-compiler": "workspace:*",
     "@runly/ui": "workspace:*",
     "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-query": "latest",

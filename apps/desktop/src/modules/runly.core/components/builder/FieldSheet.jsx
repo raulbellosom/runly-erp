@@ -88,6 +88,43 @@ function SelectOptionsEditor({ field, onChange, readOnly }) {
   );
 }
 
+const FILE_ACCEPT_OPTIONS = [
+  { value: "any", label: "Cualquier archivo" },
+  { value: "image", label: "Imagen" },
+  { value: "document", label: "Documento" },
+];
+
+function FileOptionsEditor({ field, onPatch, readOnly }) {
+  const accept = field.accept ?? "any";
+  return (
+    <div className="space-y-4 rounded-xl border border-[hsl(var(--border))] p-3">
+      <SelectField
+        label="Tipo de archivo"
+        options={FILE_ACCEPT_OPTIONS}
+        value={accept}
+        disabled={readOnly}
+        onValueChange={(value) => onPatch({ accept: value, camera: value === "image" ? field.camera : undefined })}
+      />
+      {accept === "image" && (
+        <SwitchField
+          label="Permitir cámara"
+          description="En celular ofrece tomar la foto; en escritorio abre la webcam."
+          checked={Boolean(field.camera)}
+          disabled={readOnly}
+          onChange={(checked) => onPatch({ camera: checked || undefined })}
+        />
+      )}
+      <SelectField
+        label="Tamaño máximo"
+        options={[1, 2, 5, 10].map((mb) => ({ value: String(mb), label: `${mb} MB` }))}
+        value={String(field.maxSizeMB ?? 10)}
+        disabled={readOnly}
+        onValueChange={(value) => onPatch({ maxSizeMB: Number(value) })}
+      />
+    </div>
+  );
+}
+
 export function FieldSheet({ open, onOpenChange, field, entity, definition, existedInPublished, readOnly, onSubmit }) {
   const isNew = !field;
   const [draft, setDraft] = useState(EMPTY_FIELD);
@@ -110,6 +147,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
   function handleTypeChange(type) {
     const next = { type, options: ["select", "multiselect"].includes(type) ? (draft.options ?? []) : undefined };
     if (type !== "relation") next.targetEntity = undefined;
+    if (type !== "file") Object.assign(next, { accept: undefined, camera: undefined, maxSizeMB: undefined });
     patch(next);
   }
 
@@ -181,6 +219,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
               onValueChange={(value) => patch({ targetEntity: value })}
             />
           )}
+          {draft.type === "file" && <FileOptionsEditor field={draft} onPatch={patch} readOnly={readOnly} />}
         </div>
 
         <div className="shrink-0 border-t border-[hsl(var(--border))] -mx-6 px-6 pt-4 mt-4 flex items-center justify-between gap-3">

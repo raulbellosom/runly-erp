@@ -39,11 +39,13 @@ function extractArrayPayload(payload) {
   return [];
 }
 
-export async function fetchSignedUrl(apiBaseUrl, token, fileAssetId, companyId = null) {
+// `pathTemplate` lets RME3 modules resolve through their own module-scoped
+// route (`/<slug>/<entities>/files/:id/signed-url`) instead of /files.
+export async function fetchSignedUrl(apiBaseUrl, token, fileAssetId, companyId = null, pathTemplate = "/files/:id/signed-url") {
   if (!fileAssetId) return null;
   try {
     const res = await fetch(
-      joinUrl(apiBaseUrl, `/files/${encodeURIComponent(fileAssetId)}/signed-url`),
+      joinUrl(apiBaseUrl, String(pathTemplate).replace(":id", encodeURIComponent(fileAssetId))),
       { headers: buildApiHeaders(token, companyId) },
     );
     if (!res.ok) return null;
@@ -175,7 +177,7 @@ export function HeroContainer({
         }
         return;
       }
-      const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId);
+      const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId, heroModel.signedUrlPath ?? undefined);
       if (!cancelled) {
         setImageUrl(url);
         setOwnAssetId(assetId);
@@ -239,7 +241,7 @@ export function HeroContainer({
           files={[{ id: ownAssetId, fileAssetId: ownAssetId, originalName: heroModel.title || "Imagen", mimeType: "image/*" }]}
           activeIndex={0}
           onIndexChange={() => {}}
-          onResolveSignedUrl={() => fetchSignedUrl(apiBaseUrl, token, ownAssetId, companyId)}
+          onResolveSignedUrl={() => fetchSignedUrl(apiBaseUrl, token, ownAssetId, companyId, heroModel.signedUrlPath ?? undefined)}
         />
       ) : null}
     </Card>

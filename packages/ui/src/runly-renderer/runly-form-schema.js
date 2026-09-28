@@ -23,6 +23,19 @@ export function normalizeField(fieldLike) {
     currency: fieldLike.currency ?? null,
     locale: fieldLike.locale ?? null,
     allowNegative: fieldLike.allowNegative ?? null,
+    file: normalizeFileOptions(fieldLike),
+  };
+}
+
+// RME3 `file` fields that upload through module-scoped routes (FileAssetField).
+function normalizeFileOptions(fieldLike) {
+  if (typeof fieldLike.filesPath !== "string" || !fieldLike.filesPath.trim()) return null;
+  return {
+    accept: fieldLike.accept ?? "any",
+    camera: Boolean(fieldLike.camera),
+    maxSizeMB: Number(fieldLike.maxSizeMB) || 10,
+    filesPath: fieldLike.filesPath.trim(),
+    signedUrlPath: typeof fieldLike.signedUrlPath === "string" ? fieldLike.signedUrlPath : null,
   };
 }
 
@@ -80,7 +93,7 @@ function normalizeSectionType(entry) {
 
 export function normalizeSections(schema, fieldMap) {
   const rawSections = Array.isArray(schema?.sections) ? schema.sections : [];
-  return rawSections
+  const normalized = rawSections
     .map((entry, sectionIndex) => {
       if (!entry || typeof entry !== "object") return null;
       const sectionType = normalizeSectionType(entry);
@@ -220,6 +233,7 @@ export function normalizeSections(schema, fieldMap) {
               fieldDef.field.visibleWhen ?? existing?.visibleWhen ?? null,
             hiddenWhen:
               fieldDef.field.hiddenWhen ?? existing?.hiddenWhen ?? null,
+            file: fieldDef.field.file ?? existing?.file ?? null,
           });
         }
         if (!uniqueFields.includes(name)) uniqueFields.push(name);
@@ -243,6 +257,13 @@ export function normalizeSections(schema, fieldMap) {
         ...toSectionMeta(entry),
         fields: uniqueFields,
       };
-    })
+    });
+  // Keep the tab a section belongs to (see schema-tabs.js).
+  return normalized
+    .map((section, index) =>
+      section && typeof rawSections[index]?.tab === "string"
+        ? { ...section, tab: rawSections[index].tab }
+        : section,
+    )
     .filter(Boolean);
 }

@@ -7,6 +7,8 @@ import { generateComponentsIndex, generateCustomDashboardView, generateModuleDas
 import { generateServiceHelpers } from './templates/service-helpers.js'
 import { generateService } from './templates/service.js'
 import { generateRoutes } from './templates/routes.js'
+import { generateFileRoutes } from './templates/file-routes.js'
+import { hasFileSupport } from './templates/layout-views.js'
 import { generateEntityValidators } from './templates/validators.js'
 import { generateApiIndex } from './templates/api-index.js'
 import { generateValidatorsIndex } from './templates/validators-index.js'
@@ -51,6 +53,7 @@ export function compileModule(rawDefinition) {
     add(`views/${entity.name}.detail.js`, generateDetailView(config, entity))
     add(`views/${entity.name}.page.js`, generatePageView(config, entity))
     add(`api/${entity.name}-routes.js`, generateRoutes(config, entity))
+    if (hasFileSupport(entity)) add(`api/${entity.name}-file-routes.js`, generateFileRoutes(config, entity))
     add(`api/${entity.name}-service.js`, generateService(config, entity))
     add(`validators/${entity.name}.validators.js`, generateEntityValidators(entity))
   }

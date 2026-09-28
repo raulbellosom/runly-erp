@@ -184,6 +184,28 @@ export default defineView({
 })
 ```
 
+#### Tabs and file fields (FORM and DETAIL)
+
+- `schema.tabs: [{ key, label }]` plus `section.tab: '<key>'` groups the flat
+  `sections` list into tabs (RunlyForm and RunlyDetail). Tabs render only with
+  2+ entries; a section without a known `tab` joins the first tab. The form
+  keeps every tab mounted and jumps to the first tab holding a validation
+  error. Sections stay flat so field extraction and the page-mode heuristic
+  keep working.
+- `schema.formMode: 'page' | 'sheet' | 'auto'` forces full page vs side sheet.
+- A `file` form field with `filesPath` (plus `accept: 'image' | 'document' |
+  'any'`, `camera`, `maxSizeMB`, `signedUrlPath`) renders `FileAssetField`: it
+  uploads immediately and stores the FileAsset id. A DETAIL field with
+  `type: 'file-asset'` renders a thumbnail (images) or a "Ver archivo" button.
+- `schema.hero.signedUrlPath` and TABLE `image-asset` columns'
+  `signedUrlPath` (`:id` template) resolve images through a module-scoped
+  route instead of `/files/:id/signed-url`.
+- Builder-made modules get these from `entity.layout` (see
+  `docs/superpowers/specs/2026-09-27-rme3-builder-layout-media-design.md`);
+  entities with a file field or an attachments section also get generated
+  `/<slug>/<entities>/files` routes backed by `moduleContext.files`
+  (`upload`, `list`, `link`, `remove`, `signedUrl`, bound to the module key).
+
 ### DETAIL — read-only entity detail
 
 ```js
@@ -501,6 +523,8 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `ImageViewer` | Image lightbox |
 | `ImageUploader` | Image crop and upload widget |
 | `ImageSourceSheet` | Camera-vs-gallery picker for touch devices — gate with `useCoarsePointer()`; on a fine-pointer device just open a plain `<input type="file">` directly instead. Props: `open, onOpenChange, onPickFile, accept?`. |
+| `CameraCaptureDialog` | Desktop webcam capture (`getUserMedia`, capture, retake, confirm; stops the stream on close; inline error + file fallback). Props: `open, onOpenChange, onCapture(file), fileName?`. |
+| `FileAssetField` / `FileAssetValue` | Uploading file field whose value is a FileAsset id (`filesPath`, `signedUrlPath`, `accept`, `camera`, `maxSizeMB`, `apiBaseUrl`, `token`, `companyId`), and its read-only display. Camera uses `ImageSourceSheet` on touch and `CameraCaptureDialog` on desktop. |
 | `SwatchField` | Pick an accent colour from a small preset palette (`swatches` prop, defaults to `DEFAULT_SWATCHES`). Use instead of a raw `<input type="color">` when only a themeable accent is needed. |
 | `DatePickerField` | Standalone date picker |
 | `PageFooter` | Page footer bar |

@@ -2,7 +2,7 @@
 // type) and DETAIL (read-only record sheet with Editar/Desactivar actions),
 // mirroring what generateFormView/generateDetailView compile to.
 import { Button } from "@runly/ui";
-import { Calendar, ChevronDown, Clock, FileText, Pencil, Power, Search, SquarePen, Upload } from "lucide-react";
+import { Calendar, ChevronDown, Clock, FileText, Pencil, Power, Search, SquarePen } from "lucide-react";
 import {
   FieldValue,
   PreviewCaption,
@@ -12,6 +12,8 @@ import {
   formatPlain,
   recordTitle,
 } from "./previewPrimitives";
+import { FilePreviewControl, PreviewHero, PreviewLayoutBody } from "./PreviewLayout";
+import { resolveLayoutForPreview } from "../../../lib/layoutHelpers";
 
 const INPUT = "flex min-h-11 w-full items-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 text-sm";
 
@@ -54,12 +56,7 @@ function FauxControl({ field, value }) {
     case "color":
       return <div className={INPUT}><FieldValue field={field} value={value} /></div>;
     case "file":
-      return (
-        <div className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[hsl(var(--border))] text-xs text-[hsl(var(--muted-foreground))]">
-          <Upload className="h-4 w-4" />
-          Arrastra un archivo o haz clic para subirlo
-        </div>
-      );
+      return <FilePreviewControl field={field} />;
     case "textarea":
     case "markdown":
     case "richtext":
@@ -74,9 +71,36 @@ function FauxControl({ field, value }) {
   }
 }
 
+function FormFieldPreview({ field, value }) {
+  return (
+    <div className="space-y-1.5">
+      <span className="text-sm font-medium">
+        {field.label}
+        {field.required && <span className="ml-1 text-xs text-red-500">*</span>}
+      </span>
+      <FauxControl field={field} value={value} />
+    </div>
+  );
+}
+
+function DetailFieldPreview({ field, value }) {
+  const Icon = fieldIcon(field.type);
+  return (
+    <div className="space-y-1">
+      <dt className="flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground))]">
+        <Icon className="h-3.5 w-3.5" />
+        {field.label}
+      </dt>
+      <dd className="text-sm min-w-0"><FieldValue field={field} value={value} /></dd>
+    </div>
+  );
+}
+
 export function FormPreview({ entity, rows }) {
   const fields = entity?.fields ?? [];
   const row = rows[0] ?? {};
+  const layout = resolveLayoutForPreview(entity);
+  const fieldsByKey = new Map(fields.map((field) => [field.key, field]));
   const label = (entity?.label ?? "registro").toLowerCase();
   return (
     <div className="space-y-3">
@@ -88,6 +112,9 @@ export function FormPreview({ entity, rows }) {
           <h3 className="font-semibold">Editar {label}</h3>
           <p className="text-xs text-[hsl(var(--muted-foreground))]">Datos de ejemplo precargados</p>
         </div>
+        {layout ? (
+          <PreviewLayoutBody layout={layout} fieldsByKey={fieldsByKey} renderField={(field) => <FormFieldPreview field={field} value={row[field.key]} />} />
+        ) : (
         <div className="grid gap-x-4 gap-y-4 p-5 sm:grid-cols-2">
           {fields.map((field) => (
             <div key={field.key} className={`space-y-1.5 ${WIDE_TYPES.has(field.type) ? "sm:col-span-2" : ""}`}>
@@ -100,6 +127,7 @@ export function FormPreview({ entity, rows }) {
           ))}
           {!fields.length && <p className="text-sm text-[hsl(var(--muted-foreground))] sm:col-span-2">Agrega campos a la entidad para ver el formulario.</p>}
         </div>
+        )}
         <div className="flex justify-end gap-2 border-t border-[hsl(var(--border))] px-5 py-3" aria-hidden="true">
           <Button size="sm" variant="outline" tabIndex={-1} className="pointer-events-none">Cancelar</Button>
           <Button size="sm" tabIndex={-1} className="pointer-events-none bg-(--brand-primary) text-(--brand-primary-foreground)">Guardar {label}</Button>
@@ -112,6 +140,8 @@ export function FormPreview({ entity, rows }) {
 export function DetailPreview({ entity, rows }) {
   const fields = entity?.fields ?? [];
   const row = rows[0] ?? {};
+  const layout = resolveLayoutForPreview(entity);
+  const fieldsByKey = new Map(fields.map((field) => [field.key, field]));
   const highlight = fields.filter((f) => f.type === "select" || f.type === "boolean").slice(0, 3);
   return (
     <div className="space-y-3">
@@ -134,6 +164,12 @@ export function DetailPreview({ entity, rows }) {
             <Button size="sm" variant="ghost" tabIndex={-1} className="pointer-events-none text-red-600"><Power className="h-3.5 w-3.5" />Desactivar</Button>
           </div>
         </div>
+        {layout ? (
+          <>
+            <PreviewHero layout={layout} fieldsByKey={fieldsByKey} row={row} />
+            <PreviewLayoutBody layout={layout} fieldsByKey={fieldsByKey} renderField={(field) => <DetailFieldPreview field={field} value={row[field.key]} />} />
+          </>
+        ) : (
         <dl className="grid gap-px bg-[hsl(var(--border))] sm:grid-cols-2">
           {fields.map((field) => {
             const Icon = fieldIcon(field.type);
@@ -148,6 +184,7 @@ export function DetailPreview({ entity, rows }) {
             );
           })}
         </dl>
+        )}
         <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-[hsl(var(--border))] px-5 py-3 text-xs text-[hsl(var(--muted-foreground))]">
           <span>Creado: {formatPlain({ type: "datetime" }, row.created_at)}</span>
           <span>Actualizado: {formatPlain({ type: "datetime" }, row.updated_at)}</span>

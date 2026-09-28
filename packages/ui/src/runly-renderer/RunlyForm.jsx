@@ -23,6 +23,7 @@ import {
 } from "../components/FormFields.jsx";
 import { MarkdownField } from "../components/MarkdownField.jsx";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.jsx";
+import { FileAssetField } from "../components/FileAssetField.jsx";
 import { DatePickerField } from "../components/DatePickerField.jsx";
 import { FormCompletionRing } from "../components/FormCompletionRing.jsx";
 import { FormPreviewPanel } from "../components/FormPreviewPanel.jsx";
@@ -35,6 +36,8 @@ import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { normalizeField, normalizeSections } from "./runly-form-schema.js";
 import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
 import { fetchFirstImageAssetId, fetchSignedUrl } from "./runly-detail-hero.jsx";
+import { firstTabWithError, resolveSchemaTabs, tabOfSection, tabsWithErrors } from "./schema-tabs.js";
+import { SchemaTabBar } from "./SchemaTabBar.jsx";
 import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
   CAR_COLORS,
@@ -158,6 +161,9 @@ export function RunlyForm({
     () => normalizeSections(schema, fieldMap),
     [fieldMap, schema],
   );
+  const formTabs = useMemo(() => resolveSchemaTabs(schema), [schema]);
+  const [activeTab, setActiveTab] = useState(null);
+  const currentTab = formTabs.some((tab) => tab.key === activeTab) ? activeTab : (formTabs[0]?.key ?? null);
   const formStructureToken = useMemo(() => {
     const fieldNames = [...fieldMap.keys()].sort().join("|");
     const sectionKeys = sections
@@ -375,6 +381,8 @@ export function RunlyForm({
       }
     }
     setFieldErrors(nextErrors);
+    const errorTab = firstTabWithError(sections, formTabs, nextErrors);
+    if (errorTab) setActiveTab(errorTab);
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -396,7 +404,7 @@ export function RunlyForm({
         payload[name] = Boolean(casted);
         continue;
       }
-      if (field.type === "relation") {
+      if (field.type === "relation" || (field.type === "file" && field.file)) {
         payload[name] = casted === "" ? null : casted;
         continue;
       }
@@ -493,6 +501,21 @@ export function RunlyForm({
             {displayValue}
           </div>
         </div>
+      );
+    }
+
+    if (field.type === "file" && field.file) {
+      return (
+        <FileAssetField
+          {...sharedProps}
+          {...field.file}
+          fieldName={field.name}
+          value={value ?? null}
+          onChange={(next) => handleChange(field.name, next)}
+          apiBaseUrl={apiBaseUrl}
+          token={token}
+          companyId={companyId}
+        />
       );
     }
 
@@ -1020,6 +1043,16 @@ export function RunlyForm({
         setFormValues((prev) => ({ ...prev, ...patch }));
         setFieldErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !(key in patch))));
       } })}
+      <SchemaTabBar
+        tabs={formTabs}
+        activeKey={currentTab}
+        onChange={setActiveTab}
+        errorKeys={tabsWithErrors(
+          sections,
+          formTabs,
+          Object.fromEntries(Object.entries(fieldErrors).filter(([, message]) => Boolean(message))),
+        )}
+      />
       {sections.length === 0 && (
         <Alert variant="warning">
           <AlertTitle>Formulario sin secciones</AlertTitle>
@@ -1036,7 +1069,16 @@ export function RunlyForm({
             right below the header instead; xl:order-none restores normal
             (right-column) source order once the two columns sit side by side. */}
         <div className="space-y-3 order-last xl:order-none">
-          {mainSections.map((section) => renderSection(section))}
+          {/* Every tab stays mounted (only hidden) so no typed value is lost. */}
+          {mainSections.map((section) =>
+            formTabs.length ? (
+              <div key={section.id} hidden={tabOfSection(section, formTabs) !== currentTab}>
+                {renderSection(section)}
+              </div>
+            ) : (
+              renderSection(section)
+            ),
+          )}
         </div>
         {hasAsideColumn ? (
           <div className="space-y-3 order-first xl:order-none xl:sticky xl:top-4 xl:self-start">

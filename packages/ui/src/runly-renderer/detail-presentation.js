@@ -96,6 +96,10 @@ export function resolveHeroModel(schema, record, fieldMap = null) {
         ? hero.statusMap
         : null,
     imageAssetId: isEmpty(imageRaw) ? null : String(imageRaw),
+    signedUrlPath:
+      typeof hero.signedUrlPath === "string" && hero.signedUrlPath.trim()
+        ? hero.signedUrlPath.trim()
+        : null,
     imageDocsPath:
       typeof hero.imageDocsPath === "string" && hero.imageDocsPath.trim()
         ? hero.imageDocsPath.trim()

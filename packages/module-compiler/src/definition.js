@@ -1,6 +1,7 @@
 import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, RESERVED_NAMESPACES, isModuleIconName, validateDashboardSchema, validateKanbanSchema } from '@runly/module-engine'
 import { moduleSlug, permKey, toKebab } from './templates/helpers.js'
 import { isRecordsViewKind, normalizeRecordsView, validateRecordsView } from './records-views.js'
+import { validateEntityLayout, validateFileFieldOptions } from './layout.js'
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/
 const MODULE_KEY = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/
@@ -85,7 +86,9 @@ export function validateModuleDefinition(definition) {
       }
       if (field.type === 'relation' && !field.targetEntity && !field.targetModel && !field.relatedModel) errors.push(diagnostic(fieldPath, 'MISSING_RELATION_TARGET', 'Relation field requires targetEntity or targetModel.'))
       if (field.default !== undefined && !['string', 'number', 'boolean'].includes(typeof field.default)) errors.push(diagnostic(`${fieldPath}.default`, 'UNSAFE_DEFAULT', 'Defaults must be string, number or boolean literals.'))
+      validateFileFieldOptions(field, fieldPath, errors)
     }
+    validateEntityLayout(entity, base, errors, warnings)
   })
   definition.entities.forEach((entity, entityIndex) => {
     for (const [fieldIndex, field] of (entity.fields ?? []).entries()) {
@@ -158,6 +161,7 @@ export function normalizeModuleDefinition(input) {
       pluralLabel: entity.pluralLabel ?? entity.labelPlural ?? `${entity.label}s`,
       companyScoped: entity.companyScoped !== false,
       softDelete: entity.softDelete !== false,
+      ...(entity.layout ? { layout: entity.layout } : {}),
       fields: (entity.fields ?? []).map((field) => ({
         ...field,
         key: field.key ?? field.name,

@@ -14,7 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@runly/ui";
-import { ChevronRight, Database, MoreHorizontal, Plus, Rows3, Tag, Tags, Trash2 } from "lucide-react";
+import { ChevronRight, Database, LayoutTemplate, MoreHorizontal, Plus, Rows3, Tag, Tags, Trash2 } from "lucide-react";
 import {
   addField,
   updateEntity,
@@ -24,6 +24,7 @@ import {
 } from "../../lib/builderHelpers";
 import { EntityFieldList } from "./EntityFieldList";
 import { FieldSheet } from "./FieldSheet";
+import { LayoutDesignerSheet } from "./LayoutDesignerSheet";
 
 // addField() only knows key/label/type; the extra attributes the sheet
 // collects (required, options, targetEntity) are applied to the field it
@@ -40,6 +41,7 @@ function addFieldFromDraft(definition, entityKey, draft) {
 export function EntityCard({ entity, definition, onChange, publishedDefinition, readOnly, expanded, onToggle, onDelete }) {
   const [sheet, setSheet] = useState({ open: false, field: null });
   const [confirmDeleteField, setConfirmDeleteField] = useState(null);
+  const [designOpen, setDesignOpen] = useState(false);
   const fields = entity.fields ?? [];
 
   function patchEntity(patch) {
@@ -124,12 +126,20 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
                 <h3 className="text-sm font-semibold">Campos</h3>
                 <span className="text-xs text-[hsl(var(--muted-foreground))]">{fields.length}</span>
               </div>
-              {!readOnly && (
-                <Button size="sm" variant="outline" onClick={() => setSheet({ open: true, field: null })}>
-                  <Plus className="h-3.5 w-3.5" />
-                  Crear campo
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {fields.length > 0 && (
+                  <Button size="sm" variant="ghost" onClick={() => setDesignOpen(true)}>
+                    <LayoutTemplate className="h-3.5 w-3.5" />
+                    Diseño{entity.layout ? " personalizado" : ""}
+                  </Button>
+                )}
+                {!readOnly && (
+                  <Button size="sm" variant="outline" onClick={() => setSheet({ open: true, field: null })}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Crear campo
+                  </Button>
+                )}
+              </div>
             </div>
             {fields.length ? (
               <EntityFieldList
@@ -160,6 +170,15 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
         existedInPublished={Boolean(sheet.field) && fieldExistedInPublished(publishedDefinition, entity.key, sheet.field.key)}
         readOnly={readOnly}
         onSubmit={handleSubmitField}
+      />
+
+      <LayoutDesignerSheet
+        open={designOpen}
+        onOpenChange={setDesignOpen}
+        moduleKey={definition.key}
+        entity={entity}
+        readOnly={readOnly}
+        onSave={(layout) => patchEntity({ layout })}
       />
 
       <ConfirmDialog
