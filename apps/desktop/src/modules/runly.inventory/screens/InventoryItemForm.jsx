@@ -7,12 +7,13 @@ import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryItems.js'
-import { useInventoryFormBlueprint } from '../hooks/useInventoryFormBlueprint.js'
+import { INVENTORY_ITEM_FORM } from '../blueprints/inventory-item-form.blueprint.js'
+import { inventoryFormComponents } from '../components/InventoryItemClassification.jsx'
 
 const API_BASE = getApiUrl()
 
 export default function InventoryItemForm() {
-  const blueprint = useInventoryFormBlueprint()
+  const blueprint = INVENTORY_ITEM_FORM
   const { '*': wildcard } = useParams()
   const id = useMemo(() => {
     const parts = (wildcard ?? '').split('/')
@@ -58,6 +59,7 @@ export default function InventoryItemForm() {
           token={token}
           companyId={activeCompanyId}
           apiBaseUrl={API_BASE}
+          componentRegistry={inventoryFormComponents}
           asideActions={
             isEdit && editItem?.id ? (
               <div className="glass-shell-flat flex flex-col gap-2 rounded-2xl p-3 sm:flex-row sm:items-stretch xl:flex-col">

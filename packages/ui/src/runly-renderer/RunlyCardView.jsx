@@ -102,7 +102,7 @@ export function RunlyCardView({
         return (
           <div
             key={id}
-            className={`glass group flex flex-col rounded-2xl border overflow-hidden transition-all duration-150 hover:bg-[hsl(var(--muted))]/20${
+            className={`surface-card group flex flex-col rounded-2xl border overflow-hidden transition-all duration-150 hover:bg-[hsl(var(--muted))]/20${
               isSelected
                 ? " border-indigo-500/60 bg-indigo-500/5"
                 : " border-[hsl(var(--border))] hover:border-[hsl(var(--border))]/60"

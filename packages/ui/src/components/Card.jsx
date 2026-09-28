@@ -10,19 +10,15 @@ const Card = forwardRef(function Card(
       ref={ref}
       className={cn(
         "rounded-2xl",
-        variant === "default" && "glass",
-        // "shell" = near-opaque glass for structural content containers that
-        // sit directly on the app's plain page background (no colorful
-        // backdrop behind them, unlike auth/setup screens) — plain "glass" is
-        // nearly invisible there, especially in light mode (~68% opaque white
-        // on an already-white page). Same pattern SetupWizard/LoginScreen use
-        // for their main card, just applied to regular module content.
-        variant === "shell" && "glass-shell",
-        // "shell-flat" = same look as "shell" but with no backdrop-filter —
-        // for repeated structural cards (RunlyDetail's hero + section
-        // cards) where blur is cosmetic-only and kept causing rendering
-        // artifacts. See styles.css's .glass-shell-flat.
-        variant === "shell-flat" && "glass-shell-flat",
+        // Structural containers are solid (styles.css .surface-card): glass
+        // read as washed-out on the plain page background. "shell" and
+        // "shell-flat" are kept as aliases for existing call sites. Use
+        // "glass" only for cards that float over a colorful backdrop.
+        (variant === "default" ||
+          variant === "shell" ||
+          variant === "shell-flat") &&
+          "surface-card",
+        variant === "glass" && "glass",
         variant === "solid" &&
           "bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-sm",
         variant === "bordered" &&

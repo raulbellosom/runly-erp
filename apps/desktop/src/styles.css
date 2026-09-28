@@ -117,6 +117,7 @@ html {
      lighter than what's nested inside it against a dark backdrop), so its
      value just reuses --glass-bg-strong unchanged. */
   --glass-bg-shell: rgba(228, 232, 238, 0.96);
+  --surface-card-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
   --topbar-height: 3.5rem;
   /* Exposed as custom properties so JS (MessageActionSheet positioning) can
      read the device safe-area insets without a probe element. */
@@ -190,6 +191,7 @@ html {
   --glass-tint-brand: rgba(253, 96, 22, 0.16);
   --glass-glow-brand: rgba(253, 96, 22, 0.42);
   --glass-bg-shell: var(--glass-bg-strong);
+  --surface-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 
 @layer utilities {
@@ -306,21 +308,21 @@ html {
     --glass-border-subtle: rgba(255, 255, 255, 0.055);
   }
 
-  /* Opaque .glass-shell twin with NO backdrop-filter at all — for RunlyDetail
-     (hero card + one card per section, often 4-6 on a single screen), all
-     sitting directly on the app's own plain dark/light page background, not
-     a colorful backdrop. Blur was purely cosmetic there, but kept producing
-     visible seam/two-tone artifacts that survived every other mitigation
-     tried (layer isolation, translateZ, killing unrelated re-render storms,
-     avoiding fresh-mount transitions) — removing the blur removes the only
-     thing left for the compositor to get wrong. Do NOT use this for
-     login/setup-wizard's main card (glass-shell there sits over an animated
-     gradient backdrop where the blur is the actual point). See the "glassic
-     flicker" bug report. */
+  /* Solid structural container surface — cards, tables, form/detail
+     section cards, stat tiles. These sit on the app's plain page background,
+     where translucent glass read as washed-out/muddy rather than as a layer,
+     so containers are opaque (--card) while floating surfaces (dialogs,
+     sheets, popovers, dropdowns, toasts) and controls (inputs, selects,
+     tabs, buttons) keep the glass treatment. No backdrop-filter: blur here
+     also produced the seam/two-tone artifacts from the "glassic flicker" bug
+     report. `.glass-shell-flat` is kept as an alias for existing call sites.
+     Do NOT use this for login/setup-wizard's main card (.glass-shell there
+     sits over an animated gradient backdrop where the blur is the point). */
+  .surface-card,
   .glass-shell-flat {
-    background: var(--glass-bg-shell);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--surface-card-shadow);
   }
 
   .glass-tinted {

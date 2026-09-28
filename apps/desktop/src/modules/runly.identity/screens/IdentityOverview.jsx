@@ -175,7 +175,7 @@ export default function IdentityOverview() {
               Ver todos
             </button>
           </div>
-          <div className="glass rounded-2xl border border-[hsl(var(--border))] overflow-hidden">
+          <div className="surface-card rounded-2xl overflow-hidden">
             {isLoadingRoles ? (
               <div className="p-4 space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (

@@ -7,7 +7,8 @@ import { RunlyForm, Button, AIUploadDropzone, AIFlowSteps, Input, Textarea, Chec
   Alert, AlertTitle, AlertDescription, ImageSourceSheet, ImageViewer, AttachmentsPanel, ErrorState, ConfirmDialog, useCoarsePointer, cn } from '@runly/ui'
 import { InventoryCaptureTable } from './InventoryCaptureTable.jsx'
 import { INVENTORY_ITEM_FORM } from '../blueprints/inventory-item-form.blueprint.js'
-import { useInventoryFormBlueprint } from '../hooks/useInventoryFormBlueprint.js'
+import { INVENTORY_ITEM_FORM as formBlueprint } from '../blueprints/inventory-item-form.blueprint.js'
+import { inventoryFormComponents } from './InventoryItemClassification.jsx'
 import { useInventoryBrands, useInventoryCategories, useCreateInventoryBrand, useCreateInventoryCategory } from '../hooks/useInventoryCatalogs.js'
 import { collectSuggestions, confirmationKey, identifiersFor, intakeRequest } from '../lib/intake.js'
 
@@ -43,7 +44,6 @@ function SavedPhotos({ item, files, apiBaseUrl, token, companyId, onStatus }) {
 }
 
 export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
-  const formBlueprint = useInventoryFormBlueprint()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const coarse = useCoarsePointer()
@@ -95,7 +95,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
     submitLabel: `Crear ${units.length} ${units.length === 1 ? 'equipo' : 'equipos'}`,
     sections: formBlueprint.schema.sections.filter(s => s.type !== 'attachments').map(s => ({ ...s,
       fields: s.fields?.filter(f => !['assetTag', 'serialNumber'].includes(f.field)) })),
-  } }), [units.length, formBlueprint])
+  } }), [units.length])
 
   const updateUnit = (id, patch) => { setUnits(current => current.map(u => u.id === id ? { ...u, ...patch, confirmation: null, duplicateAcknowledged: false } : u)); setIssues([]) }
   function addSerials(entries) {
@@ -326,7 +326,7 @@ export function InventorySmartForm({ token, companyId, apiBaseUrl, onCancel }) {
   </div>
   return <>
     {pendingSave && <Alert><AlertTitle>Guardado pendiente de confirmar</AlertTitle><AlertDescription>Se perdió la respuesta del servidor. Reintenta para recuperar el mismo lote.</AlertDescription><Button type="button" disabled={retrying} onClick={retrySave}>{retrying ? 'Comprobando…' : 'Recuperar guardado'}</Button></Alert>}
-    <fieldset disabled={pendingSave || analyzing} className="contents"><RunlyForm blueprint={blueprint} initialData={{ status: 'available' }} mode="create" token={token} companyId={companyId} apiBaseUrl={apiBaseUrl} renderTools={renderCapture} submitRequest={submit} onCancel={() => setDiscard(true)} /></fieldset>
+    <fieldset disabled={pendingSave || analyzing} className="contents"><RunlyForm blueprint={blueprint} initialData={{ status: 'available' }} mode="create" token={token} companyId={companyId} apiBaseUrl={apiBaseUrl} componentRegistry={inventoryFormComponents} renderTools={renderCapture} submitRequest={submit} onCancel={() => setDiscard(true)} /></fieldset>
     <ImageViewer key={viewer?.url ?? 'closed'} allowZoom open={Boolean(viewer)} src={viewer?.url} fileName={viewer?.file.name} onClose={() => setViewer(null)} />
     <ConfirmDialog open={discard} onOpenChange={setDiscard} title="Descartar captura" description="Se perderán las fotos y series que aún no guardaste." confirmLabel="Descartar" onConfirm={onCancel} />
     <ConfirmDialog open={Boolean(pendingCatalogCreate)} onOpenChange={value => !value && setPendingCatalogCreate(null)}

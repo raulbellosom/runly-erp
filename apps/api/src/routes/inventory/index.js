@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import { createInventoryIntakeRouter } from './intake-routes.js';
 import { createInventoryAssistantRouter } from './assistant-routes.js';
 import { tenantActiveContext } from '../../lib/active-context.js';
-import { createInventoryReusableCatalog, INVENTORY_BASE_TYPES } from '../../services/inventory-reusable-catalog.js';
+import { createInventoryReusableCatalog, INVENTORY_BASE_TYPES, INVENTORY_BASE_TYPE_LABELS } from '../../services/inventory-reusable-catalog.js';
 
 export function createInventoryRouter({
   prisma,
@@ -25,7 +25,7 @@ export function createInventoryRouter({
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryAssistantRouter({ prisma, requirePermission }));
   const reusableCatalog = createInventoryReusableCatalog({ prisma });
-  const typeLabels = ['Hardware', 'Software', 'Licencia', 'Equipo', 'Mobiliario', 'Vehículo', 'Consumible', 'Otro'];
+  const typeLabels = INVENTORY_BASE_TYPE_LABELS;
   for (const [segment, kind] of [['models', 'model'], ['types', 'type']]) {
     router.get(`/inventory/${segment}`, requirePermission('inventory.catalog.read'), async c => {
       try {

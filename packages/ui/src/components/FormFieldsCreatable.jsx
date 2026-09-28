@@ -16,6 +16,7 @@ import {
   dropdownPanelCls,
   optionCls,
   shouldOfferCreate,
+  optionMatchesSearch,
   useListboxNav,
   triggerKeyDown,
   SearchRow,
@@ -53,7 +54,7 @@ export function CreatableComboboxField({
   const selected = options.find((o) => o.value === value);
 
   const filtered = options
-    .filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+    .filter((o) => optionMatchesSearch(o, search))
     .slice(0, 200);
 
   const trimmed = search.trim();

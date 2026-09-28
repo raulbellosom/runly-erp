@@ -1,8 +1,8 @@
 import { Card } from "./Card.jsx";
 import { cn } from "../lib/utils.js";
 
-// A titled glass card — standardizes the repeated "heading + action + body"
-// container pattern. `variant` passes through to Card ('default' = glass).
+// A titled card — standardizes the repeated "heading + action + body"
+// container pattern. `variant` passes through to Card ('default' = solid).
 export function SectionCard({
   title,
   description,

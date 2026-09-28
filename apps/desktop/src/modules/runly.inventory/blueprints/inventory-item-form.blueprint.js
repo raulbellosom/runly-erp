@@ -34,8 +34,8 @@ export const INVENTORY_ITEM_FORM = {
         fields: [
           { field: 'name', label: 'Nombre', type: 'text', required: true, hint: 'Laptop Dell XPS 15' },
           { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar' },
-          { field: 'itemType', label: 'Tipo', type: 'select', options: ITEM_TYPE_OPTIONS },
           { field: 'serialNumber', label: 'Número de serie', type: 'text' },
+          { field: 'partNumber', label: 'Número de parte', type: 'text' },
           {
             field: 'categoryId',
             label: 'Categoría',
@@ -54,26 +54,21 @@ export const INVENTORY_ITEM_FORM = {
               },
             },
           },
-          {
-            field: 'brandId',
-            label: 'Marca',
-            type: 'relation',
-            relation: {
-              apiPath: '/inventory/brands',
-              labelField: 'name',
-              preload: true,
-              clearable: true,
-              create: {
-                enabled: true,
-                mode: 'quick',
-                apiPath: '/inventory/brands',
-                label: 'Crear marca',
-                permissionKey: 'inventory.catalog.manage',
-              },
-            },
-          },
+        ],
+      },
+      {
+        // Model picker that fills Tipo and Marca — InventoryItemClassification.jsx,
+        // resolved through the componentRegistry the inventory screens pass.
+        id: 'classification',
+        type: 'component',
+        component: 'inventory.item-classification',
+        label: 'Modelo, tipo y marca',
+        icon: 'Boxes',
+        collapsible: true,
+        fields: [
           { field: 'model', label: 'Modelo', type: 'text' },
-          { field: 'partNumber', label: 'Número de parte', type: 'text' },
+          { field: 'itemType', label: 'Tipo', type: 'select', options: ITEM_TYPE_OPTIONS },
+          { field: 'brandId', label: 'Marca', type: 'relation' },
         ],
       },
       {

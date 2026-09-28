@@ -24,6 +24,13 @@ export function optionCls({ active, selected, disabled }) {
   );
 }
 
+// Every search word must appear in the option label or its optional
+// `keywords` string, so "dell 2023" matches "XPS 15 · Dell · 2023".
+export function optionMatchesSearch(option, search) {
+  const haystack = `${option.label ?? ""} ${option.keywords ?? ""}`.toLowerCase();
+  return search.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
 // True when the typed text should offer a "Crear" row: non-empty and not an
 // exact (case-insensitive) match of an existing option label.
 export function shouldOfferCreate(search, options) {

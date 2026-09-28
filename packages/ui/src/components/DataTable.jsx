@@ -102,7 +102,7 @@ export function DataTable({
         </div>
       )}
 
-      <div className="rounded-2xl glass overflow-clip">
+      <div className="rounded-2xl surface-card overflow-clip">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

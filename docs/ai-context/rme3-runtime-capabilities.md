@@ -465,7 +465,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `YearField` | Year-only picker |
 | `SelectField` | Controlled select dropdown |
 | `ComboboxField` | Searchable select with autocomplete; use for read-only option sets |
-| `CreatableComboboxField` | Searchable combobox that shows a "+ Crear «X»" row when the typed term doesn't match any option; calls `onCreate(name)` on select. Use `placeholder="Buscar o crear..."`. Preferred over `SelectField` whenever new entries are possible. |
+| `CreatableComboboxField` | Searchable combobox that shows a "+ Crear «X»" row when the typed term doesn't match any option; calls `onCreate(name)` on select. Search is per word: every typed word must appear in the option `label` or its optional `keywords` string. Use `placeholder="Buscar o crear..."`. Preferred over `SelectField` whenever new entries are possible. |
 | `CheckboxField` | Controlled checkbox |
 | `SwitchField` | Controlled toggle switch |
 | `RadioGroupField` | Controlled radio group |

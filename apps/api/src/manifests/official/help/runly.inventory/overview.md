@@ -7,7 +7,7 @@ Runly Inventario lleva el control de los activos fisicos de tu compania: laptops
 - **Inventario**: la lista completa de activos, con nombre, etiqueta, numero de serie, estado y a quien esta asignado.
 - **Registro con IA**: da de alta un activo tomandole una foto — la IA ayuda a llenar los datos (requiere IA configurada en la instancia).
 - **Asignaciones**: a que colaborador o area se le asigno cada activo, con su historial de asignaciones anteriores.
-- **Catalogos**: categorias y tipos reutilizables para clasificar activos.
+- **Catalogos**: categorias, marcas, ubicaciones, tipos y modelos reutilizables para clasificar activos. Un modelo agrupa tipo, marca, nombre y año, y al elegirlo en un activo completa el tipo y la marca.
 
 ### Alcances y limites
 

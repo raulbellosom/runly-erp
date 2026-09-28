@@ -173,9 +173,20 @@ export function normalizeSections(schema, fieldMap) {
       }
 
       if (sectionType === "component") {
-        const declaredFieldNames = (Array.isArray(entry.fields) ? entry.fields : [])
-          .map((name) => String(name ?? "").trim())
-          .filter(Boolean);
+        // Entries are field names, or field objects when the value needs a
+        // non-text type (e.g. a relation that must be sent as null when cleared).
+        const declaredFieldNames = [];
+        for (const item of Array.isArray(entry.fields) ? entry.fields : []) {
+          if (item && typeof item === "object") {
+            const normalized = normalizeField(item);
+            if (!normalized) continue;
+            if (!fieldMap.has(normalized.name)) fieldMap.set(normalized.name, normalized);
+            declaredFieldNames.push(normalized.name);
+            continue;
+          }
+          const name = String(item ?? "").trim();
+          if (name) declaredFieldNames.push(name);
+        }
         for (const name of declaredFieldNames) {
           if (!fieldMap.has(name)) {
             fieldMap.set(name, {
