@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { Hono } from 'hono'
+import { importModuleFile } from '../lib/module-import-revision.js'
 import { resolveModuleRoots } from './module-root-resolver.js'
 import { publishNotificationFromContext } from './notification-publisher.js'
 import { registerModuleHandler, getModuleHandler } from './module-cleanup-registry.js'
@@ -305,7 +305,9 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
       return { loaded: false, reason: 'missing_api' }
     }
 
-    const moduleNamespace = await import(pathToFileURL(apiPath).href)
+    // Revisioned import: a plain import() of the same path would return the
+    // cached code from before an upload replaced the module.
+    const moduleNamespace = await importModuleFile(apiPath, path.dirname(path.dirname(apiPath)))
     const factory =
       typeof moduleNamespace.default === 'function'
         ? moduleNamespace.default
@@ -407,7 +409,7 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
       return { loaded: false, reason: 'missing_components' }
     }
 
-    const moduleNamespace = await import(pathToFileURL(componentsPath).href)
+    const moduleNamespace = await importModuleFile(componentsPath, path.dirname(path.dirname(componentsPath)))
     const registerFn =
       typeof moduleNamespace.register === 'function'
         ? moduleNamespace.register

@@ -283,3 +283,55 @@ test('route-loader wildcard middleware does not intercept unrelated core routes'
     await fs.rm(projectRoot, { recursive: true, force: true })
   }
 })
+
+test('route-loader reload picks up a replaced module, including its relative imports', async () => {
+  const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-route-loader-'))
+  await fs.writeFile(path.join(projectRoot, 'pnpm-workspace.yaml'), 'packages:\n  - "apps/*"\n', 'utf8')
+  await fs.writeFile(path.join(projectRoot, 'package.json'), '{"name":"tmp","type":"module"}', 'utf8')
+  await fs.mkdir(path.join(projectRoot, 'modules', 'official'), { recursive: true })
+  const apiDir = path.join(projectRoot, 'modules', 'custom', 'custom.survey', 'api')
+  await fs.mkdir(apiDir, { recursive: true })
+  const writeVersion = async (routePath) => {
+    await fs.writeFile(path.join(apiDir, 'routes.js'), `export const ROUTE = '${routePath}'\n`, 'utf8')
+    await fs.writeFile(
+      path.join(apiDir, 'index.js'),
+      `import { ROUTE } from './routes.js'
+export default function createRouter() {
+  return {
+    routes: [{ method: 'GET', path: ROUTE }],
+    router: { match: (m, p) => [m === 'GET' && p === ROUTE ? [{}] : []] },
+    fetch: () => new Response('ok'),
+  }
+}
+`,
+      'utf8'
+    )
+  }
+
+  const prisma = createPrismaMock([
+    { key: 'custom.survey', status: 'INSTALLED', enabled: true, manifest: { key: 'custom.survey' }, lifecycleConfig: {}, core: false },
+  ])
+  const previousRoot = process.env.RUNLY_PROJECT_ROOT
+  process.env.RUNLY_PROJECT_ROOT = projectRoot
+  try {
+    const routeLoader = createRouteLoaderService({
+      prisma,
+      authMiddleware: async (_c, next) => next(),
+      requirePermission: () => async (_c, next) => next(),
+    })
+
+    await writeVersion('/survey/records')
+    await routeLoader.reloadModule('custom.survey')
+    assert.deepEqual(routeLoader.getLoadedModules()[0].routes.map((r) => r.path), ['/survey/records'])
+
+    // An upload rewrites the files with a newer mtime.
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    await writeVersion('/survey/dashboard')
+    await routeLoader.reloadModule('custom.survey')
+    assert.deepEqual(routeLoader.getLoadedModules()[0].routes.map((r) => r.path), ['/survey/dashboard'])
+  } finally {
+    if (typeof previousRoot === 'string') process.env.RUNLY_PROJECT_ROOT = previousRoot
+    else delete process.env.RUNLY_PROJECT_ROOT
+    await fs.rm(projectRoot, { recursive: true, force: true })
+  }
+})
