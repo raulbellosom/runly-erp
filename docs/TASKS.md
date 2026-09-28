@@ -1695,3 +1695,10 @@ Spec: `docs/superpowers/specs/2026-09-28-rme3-builder-external-relations-design.
 - [x] ZIP: `GUIA_DESARROLLO_RUNLY.md` gains online-doc/llms.txt links, the module's data dictionary (fields, types, relation targets, `__label`/`__url`) and `/relation-targets` usage; new `AGENTS.md` for AI coding assistants (ignored by the Builder package classification). Verified: 2026-09-28 (`developer-guide.test.js`)
 - [x] runly-web: `scripts/sync-help-content.mjs` also syncs `docs/developers`; pages `/documentacion/desarrolladores` (+ per-page `.md`), `/llms.txt`, `/llms-full.txt`; link from `/documentacion/modulos`. Verified: 2026-09-28 (runly-web vitest 20/20, `pnpm build`)
 - Note: `pnpm check:privacy` reports 2 findings in older specs (2026-09-23 ledger UI, 2026-09-26 help tips), unrelated to this work.
+
+## runly.inventory — Tipos, modelos y Catálogos (2026-09-28)
+
+Spec: `docs/superpowers/specs/2026-09-28-inventory-types-models-catalogs-design.md`; plan: `docs/superpowers/plans/2026-09-28-inventory-types-models-catalogs.md`.
+
+- [ ] "Tipo" unified onto InvCategory, InvModel (type + brand + year) with item modelId, Catálogos redesign (side list, icons, counts) and fixed-column import for tipos/marcas/modelos/ubicaciones. Automated evidence 2026-09-28: migration `20260928120000_inventory_models_types` applied to dev (`prisma migrate status` up to date); `node --test` inventory/help/router/renderer suites 198/198 pass; `pnpm lint` exit 0; `pnpm build:web` built; API boots (`/health` 200). Pending before `[x]`: authenticated curl smoke test of `/inventory/models`, `/inventory/categories`, import template, and the in-app manual check (plan Task 12 Step 4).
+- [ ] runly.inventory: large catalog/asset import with column mapping (ledger-style) — separate spec

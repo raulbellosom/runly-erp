@@ -33,7 +33,7 @@ export function useCreateInventoryCategory() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data) => runly.inventory.createCategory(data, token),
-    ...loadingMutation('Creando categoria...'),
+    ...loadingMutation('Creando tipo...'),
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'categories'] })
@@ -47,7 +47,7 @@ export function useUpdateInventoryCategory() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, ...data }) => runly.inventory.updateCategory(id, data, token),
-    ...loadingMutation('Guardando categoria...'),
+    ...loadingMutation('Guardando tipo...'),
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'categories'] })
@@ -61,7 +61,7 @@ export function useDeleteInventoryCategory() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id) => runly.inventory.deleteCategory(id, token),
-    ...loadingMutation('Eliminando categoria...'),
+    ...loadingMutation('Eliminando tipo...'),
     onSuccess: (data, vars, ctx) => {
       toast.dismiss(ctx?.toastId)
       qc.invalidateQueries({ queryKey: ['inventory', 'categories'] })
