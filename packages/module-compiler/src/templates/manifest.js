@@ -1,6 +1,8 @@
 import { toPascal, moduleSlug, entityRouteBase, permKey, toKebab } from './helpers.js'
 import { dashboardFileName } from './dashboard.js'
 import { kanbanFileName } from './kanban.js'
+import { recordsViewFileName } from './records-view.js'
+import { isRecordsViewKind } from '../records-views.js'
 
 export function generateManifest(config) {
   const slug = moduleSlug(config.key)
@@ -22,6 +24,7 @@ export function generateManifest(config) {
     .concat(config.preset === 'crud-custom' ? [`  './views/dashboard.custom.js',`] : [])
     .concat((config.views ?? []).filter((view) => view.kind === 'DASHBOARD').map((view) => `  './${dashboardFileName(view)}',`))
     .concat((config.views ?? []).filter((view) => view.kind === 'KANBAN').map((view) => `  './${kanbanFileName(view)}',`))
+    .concat((config.views ?? []).filter((view) => isRecordsViewKind(view.kind)).map((view) => `  './${recordsViewFileName(view)}',`))
     .join('\n')
 
   const permissions = (config.permissions ?? entities.flatMap((e) => [

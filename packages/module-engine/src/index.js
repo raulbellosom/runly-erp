@@ -22,6 +22,9 @@ export { DATA_VIEW_FILTER_OPERATORS, DATA_VIEW_MAX_FILTER_VALUES,
          validateDataViewFilters, validateDataViewOrder } from './data-view-schema.js'
 export { validateKanbanSchema, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS,
          KANBAN_DEFAULT_LIMIT, KANBAN_MAX_LIMIT } from './kanban-schema.js'
+export { validateRecordsViewSchema, RECORDS_VIEW_KINDS, RECORDS_VIEW_DATE_FIELD_TYPES,
+         RECORDS_VIEW_DEFAULT_LIMIT, RECORDS_VIEW_MAX_LIMIT, REPORT_AGGREGATES,
+         REPORT_MAX_MEASURES, REPORT_MAX_GROUPS } from './records-view-schema.js'
 export { definePage,
          validatePage }                  from './define-page.js'
 export { loadHelpBlueprints }             from './load-help-blueprints.js'

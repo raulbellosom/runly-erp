@@ -77,7 +77,8 @@ html {
   --muted: 210 16% 93%;
   --muted-foreground: 215 18% 36%;
   --border: 214 13% 89%;
-  --input: 214 13% 89%;
+  /* Field borders: darker than --border so inputs stay legible on white cards. */
+  --input: 214 14% 78%;
   --ring: 195 98% 56%;
 
   /* Realistic notebook paper effects (runly.notes "Estilo de hoja" +
@@ -167,7 +168,7 @@ html {
   --muted: 222 47% 12%;
   --muted-foreground: 215 16% 55%;
   --border: 222 47% 15%;
-  --input: 222 47% 15%;
+  --input: 222 28% 24%;
   --ring: 195 98% 56%;
 
   --note-paper-line: 213 35% 38%;
@@ -353,7 +354,18 @@ html {
      still reads as "glass" against the already-blurred Card behind it. */
   .glass-subtle {
     background: var(--glass-bg);
-    border: 1px solid var(--glass-border-subtle);
+    border-width: 1px;
+    border-style: solid;
+  }
+
+  /* Default border color at zero specificity: this block is emitted after
+     Tailwind's generated utilities, so a plain `.glass-subtle` color used to
+     override every field's own border-input / border-destructive class and
+     left inputs with a near-invisible rgba(0,0,0,0.04) outline in light mode.
+     Any explicit border color utility now wins; bare .glass-subtle surfaces
+     keep the subtle glass edge. */
+  :where(.glass-subtle) {
+    border-color: var(--glass-border-subtle);
   }
 }
 

@@ -36,7 +36,7 @@ export function DatePickerField({
               "outline-none justify-between gap-2 disabled:cursor-not-allowed disabled:opacity-50",
               error
                 ? "border-destructive focus:ring-destructive/20 focus:border-destructive"
-                : "border-border",
+                : "border-input",
             )
           : fieldCls(
               error,

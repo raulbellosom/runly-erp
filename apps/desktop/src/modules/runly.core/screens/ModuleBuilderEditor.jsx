@@ -16,9 +16,12 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
-  Badge,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from "@runly/ui";
-import { ArrowLeft, Download, Eye, ShieldCheck, Rocket } from "lucide-react";
+import { ArrowLeft, Download, Eye, ShieldCheck, Rocket, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -182,8 +185,11 @@ export default function ModuleBuilderEditor() {
     );
   }
 
-  function patchDefinition(updater) {
-    setDefinition((current) => updater(current));
+  // Tabs pass either an updater `(current) => next` or an already-computed
+  // next definition. Treating every argument as a function crashed the Datos
+  // and Vistas tabs ("e is not a function") on their first edit.
+  function patchDefinition(next) {
+    setDefinition((current) => (typeof next === "function" ? next(current) : next));
   }
 
   return (
@@ -194,13 +200,10 @@ export default function ModuleBuilderEditor() {
           title={project.name}
           description={project.status === "PUBLISHED" ? "Módulo publicado — los cambios requieren volver a publicar." : "Borrador"}
           actions={
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => flushPendingSave().then(() => navigate("/app/m/runly.core/module-builder"))}>
-                <ArrowLeft className="h-4 w-4" />
-                Volver
-              </Button>
-              <Badge variant={saveStatus === "error" ? "destructive" : "secondary"}>{statusLabel}</Badge>
-            </div>
+            <Button variant="ghost" onClick={() => flushPendingSave().then(() => navigate("/app/m/runly.core/module-builder"))}>
+              <ArrowLeft className="h-4 w-4" />
+              Volver
+            </Button>
           }
         />
 
@@ -234,26 +237,27 @@ export default function ModuleBuilderEditor() {
             <NavigationTab definition={definition} onChange={patchDefinition} capabilities={capabilities} readOnly={Boolean(project.detachedAt)} />
           </TabsContent>
           <TabsContent value="permissions">
-            <PermissionsTab definition={definition} />
+            <PermissionsTab definition={definition} published={project.status === "PUBLISHED"} />
           </TabsContent>
         </Tabs>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/95 backdrop-blur px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
-        <Button variant="outline" onClick={() => flushPendingSave().then(() => exportMutation.mutate())} disabled={exportMutation.isPending}>
-          <Download className="h-4 w-4" />
-          Descargar ZIP
-        </Button>
+      <div className="sticky bottom-0 z-10 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/95 backdrop-blur px-4 md:px-6 py-2.5 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] min-w-0">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${saveStatus === "error" ? "bg-red-500" : saveStatus === "saving" ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+          <span className="truncate">{statusLabel}</span>
+        </span>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => flushPendingSave().then(() => setPreviewOpen(true))}>
+          <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={() => flushPendingSave().then(() => setPreviewOpen(true))}>
             <Eye className="h-4 w-4" />
             Preview
           </Button>
-          <Button variant="outline" onClick={() => flushPendingSave().then(() => validateMutation.mutate())} disabled={validateMutation.isPending}>
+          <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={() => flushPendingSave().then(() => validateMutation.mutate())} disabled={validateMutation.isPending}>
             <ShieldCheck className="h-4 w-4" />
             {validateMutation.isPending ? "Validando..." : "Validar"}
           </Button>
           <Button
+            size="sm"
             className="bg-(--brand-primary) text-(--brand-primary-foreground) hover:bg-(--brand-primary-hover) shadow-sm"
             onClick={() => flushPendingSave().then(() => setPublishOpen(true))}
             disabled={Boolean(project.detachedAt)}
@@ -261,6 +265,27 @@ export default function ModuleBuilderEditor() {
             <Rocket className="h-4 w-4" />
             Publicar
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" aria-label="Más acciones">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top">
+              <DropdownMenuItem className="sm:hidden" onSelect={() => flushPendingSave().then(() => setPreviewOpen(true))}>
+                <Eye />
+                Preview
+              </DropdownMenuItem>
+              <DropdownMenuItem className="sm:hidden" disabled={validateMutation.isPending} onSelect={() => flushPendingSave().then(() => validateMutation.mutate())}>
+                <ShieldCheck />
+                Validar
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={exportMutation.isPending} onSelect={() => flushPendingSave().then(() => exportMutation.mutate())}>
+                <Download />
+                Descargar ZIP
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -274,6 +299,11 @@ export default function ModuleBuilderEditor() {
         onPublished={() => {
           queryClient.invalidateQueries({ queryKey: ["module-builder-project", id] });
           queryClient.invalidateQueries({ queryKey: ["modules"] });
+          // The sidebar/menu and module screens read these, not ["modules"];
+          // without them a freshly published module only appeared after a
+          // full page reload. Same set ModuleCatalog invalidates on install.
+          queryClient.invalidateQueries({ queryKey: ["runtime-modules"] });
+          queryClient.invalidateQueries({ queryKey: ["blueprints"] });
         }}
       />
     </div>

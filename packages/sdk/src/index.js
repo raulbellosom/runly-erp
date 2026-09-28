@@ -276,6 +276,13 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           body: JSON.stringify(payload),
           onlineOnly: true,
         }),
+      queryRecordsView: (key, payload, token) =>
+        request(`/modules/${encodeURIComponent(key)}/records-view/query`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(payload),
+          onlineOnly: true,
+        }),
       updateKanbanRecord: (apiPath, id, patch, token) => {
         if (!/^\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)+$/.test(apiPath) || apiPath.includes('..')) {
           throw new Error('INVALID_MODULE_API_PATH')

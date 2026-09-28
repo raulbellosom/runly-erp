@@ -14,7 +14,9 @@ export const FIELD_BASE = [
   "disabled:cursor-not-allowed disabled:opacity-50",
 ].join(" ");
 
-export const FIELD_NORMAL = "border-border";
+// border-input (not border-border): the generic divider token is too faint
+// around a white field on a white card in light mode.
+export const FIELD_NORMAL = "border-input hover:border-muted-foreground/50";
 export const FIELD_ERROR =
   "border-destructive focus:ring-destructive/20 focus:border-destructive";
 

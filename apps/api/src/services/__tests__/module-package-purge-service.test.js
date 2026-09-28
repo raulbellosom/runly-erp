@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { createModulePackagePurgeService } from '../module-package-purge-service.js'
 
-function createFixture({ core = false, dependentInstalled = false } = {}) {
+function createFixture({ core = false, dependentInstalled = false, builderProject = false } = {}) {
   const state = {
     module: {
       id: '00000000-0000-7000-8000-000000000001',
@@ -30,6 +30,13 @@ function createFixture({ core = false, dependentInstalled = false } = {}) {
     packageExists: true,
     routeLoaded: true,
     audit: [],
+    builderProject: builderProject ? {
+      moduleKey: 'custom.test',
+      status: 'PUBLISHED',
+      definition: { key: 'custom.test' },
+      publishedVersion: '1.0.0',
+      detachedAt: new Date(),
+    } : null,
   }
 
   const deleteMany = (name) => async () => {
@@ -53,6 +60,13 @@ function createFixture({ core = false, dependentInstalled = false } = {}) {
     companyModule: { findMany: async () => state.companyModules, deleteMany: deleteMany('companyModules') },
     moduleDependency: { findMany: async () => state.dependencies, deleteMany: deleteMany('dependencies') },
     auditLog: { create: async ({ data }) => { state.audit.push(data); return data } },
+    moduleBuilderProject: {
+      updateMany: async ({ where, data }) => {
+        if (state.builderProject?.moduleKey !== where.moduleKey) return { count: 0 }
+        Object.assign(state.builderProject, data)
+        return { count: 1 }
+      },
+    },
     $queryRawUnsafe: async (sql) => {
       if (sql.startsWith('SELECT to_regclass')) return [{ table_ref: state.tableExists ? 'test_item' : null }]
       return [{ count: 3n }]
@@ -126,6 +140,17 @@ describe('hard module purge', () => {
       'runtime:modules:raw',
     ])
     assert.equal(state.audit.at(-1).action, 'core.module.purge')
+  })
+
+  it('resets a Builder project that published the purged module back to DRAFT', async () => {
+    const { state, service } = createFixture({ builderProject: true })
+    const result = await service.hardPurgeModule({ key: 'custom.test', confirmation: 'ACEPTO' })
+
+    assert.equal(state.builderProject.status, 'DRAFT')
+    assert.equal(state.builderProject.publishedVersion, null)
+    assert.equal(state.builderProject.detachedAt, null)
+    assert.deepEqual(state.builderProject.definition, { key: 'custom.test' })
+    assert.equal(result.resourcesRemoved.find((entry) => entry.type === 'DATABASE').builderProjectsReset, 1)
   })
 
   it('blocks core modules before deleting resources', async () => {

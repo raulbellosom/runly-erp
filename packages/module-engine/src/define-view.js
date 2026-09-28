@@ -2,6 +2,7 @@ import { BLUEPRINT_KINDS } from './constants.js'
 import { ModuleEngineError } from './errors.js'
 import { validateDashboardSchema } from './dashboard-schema.js'
 import { validateKanbanSchema } from './kanban-schema.js'
+import { RECORDS_VIEW_KINDS, validateRecordsViewSchema } from './records-view-schema.js'
 
 const VALID_KINDS = new Set(Object.values(BLUEPRINT_KINDS))
 const VIEW_DEFAULTS = { version: '0.1.0' }
@@ -66,6 +67,7 @@ function validateKindSchema(kind, schema, errors) {
 
   if (kind === 'DASHBOARD') errors.push(...validateDashboardSchema(schema).errors)
   if (kind === 'KANBAN') errors.push(...validateKanbanSchema(schema).errors)
+  if (RECORDS_VIEW_KINDS.includes(kind)) errors.push(...validateRecordsViewSchema(kind, schema).errors)
 
   if (kind === 'CUSTOM') {
     const component = schema?.component

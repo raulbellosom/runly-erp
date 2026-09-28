@@ -7,7 +7,7 @@
 // and CLAUDE.md's UI-first/mountWithAuth conventions (module route files
 // follow the same createXxxRouter pattern as company-routes.js).
 import { Hono } from 'hono'
-import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, MODULE_ICON_NAMES } from '@runly/module-engine'
+import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, MODULE_ICON_NAMES, RECORDS_VIEW_DATE_FIELD_TYPES, RECORDS_VIEW_KINDS } from '@runly/module-engine'
 import { createModuleBuilderService, ModuleBuilderError } from '../services/module-builder-service.js'
 import { publishActivityFromContext, getActivityContext } from '../services/activity-publisher.js'
 
@@ -31,7 +31,8 @@ export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = nu
     return c.json({
       data: {
         fieldTypes: Object.values(FIELD_TYPES),
-        viewKinds: ['TABLE', 'FORM', 'DETAIL', 'DASHBOARD', 'KANBAN'],
+        viewKinds: ['TABLE', 'FORM', 'DETAIL', 'DASHBOARD', 'KANBAN', ...RECORDS_VIEW_KINDS],
+        recordsViewDateFieldTypes: RECORDS_VIEW_DATE_FIELD_TYPES,
         iconNames: MODULE_ICON_NAMES,
         kanbanGroupFieldTypes: KANBAN_GROUP_FIELD_TYPES,
         kanbanMaxColumns: KANBAN_MAX_COLUMNS,

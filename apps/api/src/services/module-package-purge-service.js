@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { createModuleResourceInventoryService } from './module-resource-inventory-service.js'
 import { purgeModuleFiles, resolveModulesDir } from './module-upload-service.js'
@@ -155,7 +156,25 @@ export function createModulePackagePurgeService({
         await tx.runlyModel.deleteMany({ where: { moduleKey: initial.moduleKey } })
         if (module) await tx.runlyModule.delete({ where: { key: initial.moduleKey } })
 
-        return { droppedTables, rowsDeleted }
+        // A Builder project that published this module would otherwise stay
+        // PUBLISHED pointing at a module that no longer exists, blocking both
+        // re-publishing as a fresh install and deleting the draft. Reset it
+        // to DRAFT (keeping the definition) so the design is not lost.
+        const builderProjectsReset = tx.moduleBuilderProject
+          ? (await tx.moduleBuilderProject.updateMany({
+              where: { moduleKey: initial.moduleKey },
+              data: {
+                status: 'DRAFT',
+                publishedDefinition: Prisma.DbNull,
+                publishedPackageHash: null,
+                publishedVersion: null,
+                publishedAt: null,
+                detachedAt: null,
+              },
+            })).count
+          : 0
+
+        return { droppedTables, rowsDeleted, builderProjectsReset }
       })
       resourcesRemoved.push({ type: 'DATABASE', ...databaseResult })
 

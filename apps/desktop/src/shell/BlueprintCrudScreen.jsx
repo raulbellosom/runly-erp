@@ -6,6 +6,9 @@ import {
   RunlyCrudView,
   RunlyDashboard,
   RunlyKanban,
+  RunlyRecordsView,
+  RUNLY_RECORDS_VIEW_KINDS,
+  fetchSignedUrl,
   Button,
   Card,
   CardHeader,
@@ -632,12 +635,21 @@ export function BlueprintCrudScreen() {
     return moduleRows.find((row) => getBlueprintKind(row) === 'KANBAN' && normalizePath(row?.schema?.path) === normalizedPathname) ?? null
   }, [moduleRows, location.pathname])
 
+  // CARDS / CALENDAR / TIMELINE / REPORT views, routed by schema.path like KANBAN.
+  const recordsViewBlueprint = useMemo(() => {
+    const normalizedPathname = normalizePath(location.pathname)
+    return moduleRows.find((row) => RUNLY_RECORDS_VIEW_KINDS.includes(getBlueprintKind(row)) && normalizePath(row?.schema?.path) === normalizedPathname) ?? null
+  }, [moduleRows, location.pathname])
+
+  // Kanban cards and records views open the entity's detail on the page that
+  // hosts its TABLE view.
+  const dataViewEntity = kanbanBlueprint?.schema?.entity ?? recordsViewBlueprint?.schema?.entity ?? null
   const kanbanDetailPath = useMemo(() => {
-    if (!kanbanBlueprint) return null
-    const table = moduleRows.find((row) => getBlueprintKind(row) === 'TABLE' && row?.schema?.entity === kanbanBlueprint.schema?.entity)
+    if (!dataViewEntity) return null
+    const table = moduleRows.find((row) => getBlueprintKind(row) === 'TABLE' && row?.schema?.entity === dataViewEntity)
     const page = table && moduleRows.find((row) => getBlueprintKind(row) === 'PAGE' && (row?.schema?.view === table.key || row?.schema?.page?.view === table.key))
     return getPagePath(page)
-  }, [kanbanBlueprint, moduleRows])
+  }, [dataViewEntity, moduleRows])
 
   const routeInfo = useMemo(
     () =>
@@ -960,6 +972,18 @@ export function BlueprintCrudScreen() {
       const response = await runly.modules.updateKanbanRecord(apiPath, id, patch, token)
       return response?.data
     }} onCardClick={kanbanDetailPath ? (id) => navigate(`${kanbanDetailPath}/${id}`) : undefined} />
+  }
+
+  if (recordsViewBlueprint) {
+    return <RunlyRecordsView
+      blueprint={recordsViewBlueprint}
+      kind={getBlueprintKind(recordsViewBlueprint)}
+      moduleKey={moduleKey}
+      companyId={activeCompanyId}
+      queryRecordsView={async (payload) => (await runly.modules.queryRecordsView(moduleKey, payload, token))?.data ?? {}}
+      resolveImage={(fileId) => fetchSignedUrl(API_BASE_URL, token, fileId, activeCompanyId)}
+      onOpen={kanbanDetailPath ? (id) => navigate(`${kanbanDetailPath}/${id}`) : undefined}
+    />
   }
 
   if (groupedTabs?.shouldRedirect && groupedTabs.defaultPath) {

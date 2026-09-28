@@ -17,7 +17,7 @@ const Input = forwardRef(function Input(
         "file:border-0 file:bg-transparent file:text-sm file:font-medium",
         error
           ? "border-red-500 focus-visible:ring-red-500/40"
-          : "border-[hsl(var(--border))]",
+          : "border-[hsl(var(--input))]",
         "glass-subtle",
         className,
       )}

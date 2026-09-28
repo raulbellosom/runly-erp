@@ -2,6 +2,7 @@
 // PWA metadata). Module key is immutable once created (module-builder-service
 // re-pins it on every save), shown read-only here.
 import { TextField, TextareaField, SwatchField, IconPickerField, SectionCard } from "@runly/ui";
+import { GitBranch, KeyRound, Package, Smartphone } from "lucide-react";
 import { buildModuleIconOptions } from "../../lib/builderHelpers";
 
 export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
@@ -21,11 +22,12 @@ export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
         <div className="space-y-3">
           <TextField
             label="Nombre"
+            icon={Package}
             value={definition.name ?? ""}
             disabled={readOnly}
             onChange={(e) => set({ name: e.target.value })}
           />
-          <TextField label="Module key" value={definition.key ?? ""} disabled hint="No puede cambiar después de creado." />
+          <TextField label="Module key" icon={KeyRound} value={definition.key ?? ""} disabled hint="No puede cambiar después de creado." />
           <TextareaField
             label="Descripción"
             value={definition.description ?? ""}
@@ -34,6 +36,7 @@ export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
           />
           <TextField
             label="Versión"
+            icon={GitBranch}
             value={definition.version ?? "0.1.0"}
             disabled={readOnly}
             onChange={(e) => set({ version: e.target.value })}
@@ -58,6 +61,7 @@ export function GeneralTab({ definition, onChange, capabilities, readOnly }) {
           />
           <TextField
             label="Nombre corto (PWA)"
+            icon={Smartphone}
             value={definition.pwa?.shortName ?? ""}
             disabled={readOnly}
             maxLength={14}

@@ -1,12 +1,11 @@
 // Module Builder — declarative preview (Etapa 13). Renders the server's
-// buildPreview() response (normalized view + synthetic sample rows) against
-// lightweight @runly/ui table/card primitives — not the production
+// buildPreview() response (normalized view + synthetic sample rows) with
+// lightweight preview components (./preview/*) — not the production
 // RunlyTable/RunlyForm/RunlyDashboard components, which are wired for live
 // API data and column-config persistence. This keeps preview instant and
 // side-effect free (no install, no real data) at the cost of not being a
-// pixel-perfect match for the installed screen; see the plan's "known
-// limitations" note.
-import { useEffect, useState } from "react";
+// pixel-perfect match for the installed screen.
+import { useEffect, useMemo, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -14,108 +13,56 @@ import {
   SheetTitle,
   SheetDescription,
   SelectField,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Badge,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   ErrorState,
   Skeleton,
 } from "@runly/ui";
-import { LayoutDashboard, BarChart3 } from "lucide-react";
+import { CalendarDays, Database, FileText, GanttChart, LayoutDashboard, LayoutGrid, PanelsTopLeft, Sheet as SheetIcon, SquareKanban, SquarePen, Table2 } from "lucide-react";
 import { runly } from "../../../../lib/runly";
+import { navigationItems } from "../../lib/builderHelpers";
+import { PagePreview, TablePreview } from "./preview/PreviewListViews";
+import { DetailPreview, FormPreview } from "./preview/PreviewRecordViews";
+import { DashboardPreview, KanbanPreview } from "./preview/PreviewBoardViews";
+import { RecordsViewPreview } from "./preview/PreviewRecordsViews";
 
-function TablePreview({ entity, rows }) {
-  const fields = entity?.fields ?? [];
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {fields.map((f) => <TableHead key={f.key}>{f.label}</TableHead>)}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.id}>
-            {fields.map((f) => <TableCell key={f.key}>{formatValue(row[f.key])}</TableCell>)}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+const DASHBOARDS_TARGET = "__dashboards";
+const KIND_META = {
+  PAGE: { label: "Página", icon: PanelsTopLeft, order: 0 },
+  TABLE: { label: "Tabla", icon: Table2, order: 1 },
+  FORM: { label: "Formulario", icon: SquarePen, order: 2 },
+  DETAIL: { label: "Detalle", icon: FileText, order: 3 },
+  KANBAN: { label: "Kanban", icon: SquareKanban, order: 4 },
+  CARDS: { label: "Tarjetas", icon: LayoutGrid, order: 5 },
+  CALENDAR: { label: "Calendario", icon: CalendarDays, order: 6 },
+  TIMELINE: { label: "Línea de tiempo", icon: GanttChart, order: 7 },
+  REPORT: { label: "Reporte", icon: SheetIcon, order: 8 },
+  DASHBOARD: { label: "Dashboard", icon: LayoutDashboard, order: 9 },
+};
+
+function targetOf(view) {
+  return view.entity ?? DASHBOARDS_TARGET;
 }
 
-function formatValue(value) {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "boolean") return value ? "Sí" : "No";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return value.label ?? JSON.stringify(value);
-  return String(value);
-}
-
-function DetailPreview({ entity, rows }) {
-  const row = rows[0];
-  if (!row) return null;
-  return (
-    <Card>
-      <CardContent className="pt-4 space-y-2">
-        {(entity?.fields ?? []).map((f) => (
-          <div key={f.key} className="flex items-center justify-between border-b border-[hsl(var(--border))] py-1.5 text-sm">
-            <span className="text-[hsl(var(--muted-foreground))]">{f.label}</span>
-            <span className="font-medium">{formatValue(row[f.key])}</span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function KanbanPreview({ view, entity, rows }) {
-  const groupBy = view.groupBy ?? view.schema?.groupBy;
-  const titleField = view.card?.titleField ?? view.schema?.card?.titleField;
-  const columns = [...new Set(rows.map((r) => r[groupBy]))].filter((v) => v !== undefined);
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {columns.map((columnValue) => (
-        <div key={String(columnValue)} className="min-w-52 space-y-2">
-          <Badge variant="outline">{String(columnValue)}</Badge>
-          {rows.filter((r) => r[groupBy] === columnValue).map((row) => (
-            <Card key={row.id}>
-              <CardContent className="p-3 text-sm">{formatValue(row[titleField]) ?? row.id}</CardContent>
-            </Card>
-          ))}
-        </div>
-      ))}
-      {!columns.length && <p className="text-sm text-[hsl(var(--muted-foreground))]">Selecciona un campo para agrupar en la pestaña Vistas.</p>}
-    </div>
-  );
-}
-
-function DashboardPreview({ view }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {(view.widgets ?? view.schema?.widgets ?? []).map((widget) => (
-        <Card key={widget.key}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              {widget.type === "chart" ? <BarChart3 className="h-4 w-4" /> : <LayoutDashboard className="h-4 w-4" />}
-              {widget.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-[hsl(var(--muted-foreground))]">
-            Vista previa simplificada — {widget.type === "stat" ? "42" : "datos de ejemplo"}
-          </CardContent>
-        </Card>
-      ))}
-      {!(view.widgets ?? view.schema?.widgets ?? []).length && <p className="text-sm text-[hsl(var(--muted-foreground))]">Este dashboard no tiene widgets todavía.</p>}
-    </div>
-  );
+function PreviewBody({ data, definition }) {
+  const view = data.view.schema ? { ...data.view.schema, key: data.view.key } : data.view;
+  switch (data.view.kind) {
+    case "PAGE": {
+      const nav = navigationItems(definition).find((item) => item.page === data.view.key);
+      return <PagePreview entity={data.entity} rows={data.rows} moduleName={definition.name} path={nav?.path} />;
+    }
+    case "TABLE": return <TablePreview entity={data.entity} rows={data.rows} />;
+    case "FORM": return <FormPreview entity={data.entity} rows={data.rows} />;
+    case "DETAIL": return <DetailPreview entity={data.entity} rows={data.rows} />;
+    case "KANBAN": return <KanbanPreview view={view} entity={data.entity} rows={data.rows} />;
+    case "DASHBOARD": return <DashboardPreview view={view} definition={definition} />;
+    case "CARDS":
+    case "CALENDAR":
+    case "TIMELINE":
+    case "REPORT": return <RecordsViewPreview kind={data.view.kind} view={view} entity={data.entity} rows={data.rows} />;
+    default: return <ErrorState title="Tipo de vista no soportado" description={data.view.kind} />;
+  }
 }
 
 export function PreviewSheet({ open, onOpenChange, projectId, token, definition }) {
@@ -126,41 +73,105 @@ export function PreviewSheet({ open, onOpenChange, projectId, token, definition 
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
     runly.builder.previewProject(projectId, viewKey, token)
-      .then((res) => { setData(res.data); if (!viewKey) setViewKey(res.data.view.key); })
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (cancelled) return;
+        setData(res.data);
+        if (!viewKey) setViewKey(res.data.view.key);
+      })
+      .catch((err) => { if (!cancelled) setError(err); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, viewKey, projectId]);
 
+  const availableViews = data?.availableViews ?? [];
+  const currentView = availableViews.find((v) => v.key === viewKey);
+  const target = currentView ? targetOf(currentView) : null;
+
+  const targetOptions = useMemo(() => {
+    const targets = [...new Set(availableViews.map(targetOf))];
+    return targets.map((key) => {
+      if (key === DASHBOARDS_TARGET) return { value: key, label: "Dashboards", icon: LayoutDashboard };
+      const entity = definition?.entities?.find((e) => e.key === key);
+      return { value: key, label: entity?.pluralLabel || entity?.label || key, icon: Database };
+    });
+  }, [availableViews, definition]);
+
+  const targetViews = availableViews
+    .filter((v) => targetOf(v) === target)
+    .sort((a, b) => (KIND_META[a.kind]?.order ?? 9) - (KIND_META[b.kind]?.order ?? 9));
+  const repeatedKinds = new Set(targetViews.map((v) => v.kind).filter((kind, i, all) => all.indexOf(kind) !== i));
+
+  function tabLabel(view) {
+    const meta = KIND_META[view.kind];
+    if (!repeatedKinds.has(view.kind)) return meta?.label ?? view.kind;
+    return `${meta?.label ?? view.kind} · ${view.key.split(".").slice(1, -1).join(".") || view.key}`;
+  }
+
+  function selectTarget(nextTarget) {
+    const first = availableViews
+      .filter((v) => targetOf(v) === nextTarget)
+      .sort((a, b) => (KIND_META[a.kind]?.order ?? 9) - (KIND_META[b.kind]?.order ?? 9))[0];
+    if (first) setViewKey(first.key);
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Preview</SheetTitle>
-          <SheetDescription>Datos de ejemplo, generados a partir de los tipos de campo. No representan información real.</SheetDescription>
+      <SheetContent side="right" className="w-full sm:max-w-3xl flex flex-col gap-0 overflow-hidden">
+        <SheetHeader className="shrink-0 space-y-4 pb-4 pr-8">
+          <div className="space-y-1">
+            <SheetTitle>Vista previa</SheetTitle>
+            <SheetDescription>Así se verá el módulo instalado, con datos de ejemplo generados a partir de los tipos de campo.</SheetDescription>
+          </div>
+          {targetOptions.length > 0 && (
+            <div className="flex flex-col gap-3 md:flex-row md:items-end">
+              {targetOptions.length > 1 && (
+                <div className="shrink-0 md:w-56">
+                  <SelectField
+                    label="Entidad"
+                    options={targetOptions}
+                    value={target ?? ""}
+                    onValueChange={selectTarget}
+                  />
+                </div>
+              )}
+              <div className="min-w-0 flex-1 overflow-x-auto">
+                <Tabs value={viewKey ?? ""} onValueChange={setViewKey}>
+                  <TabsList>
+                    {targetViews.map((view) => {
+                      const Icon = KIND_META[view.kind]?.icon ?? Table2;
+                      return (
+                        <TabsTrigger key={view.key} value={view.key} className="gap-1.5">
+                          <Icon className="h-3.5 w-3.5" />
+                          {tabLabel(view)}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+                </Tabs>
+              </div>
+            </div>
+          )}
         </SheetHeader>
-        <div className="p-4 space-y-4">
-          {data?.availableViews?.length > 0 && (
-            <SelectField
-              label="Vista"
-              options={data.availableViews.map((v) => ({ value: v.key, label: `${v.kind} — ${v.key}` }))}
-              value={viewKey ?? ""}
-              onValueChange={setViewKey}
+
+        <div className="-mx-6 flex-1 min-h-0 overflow-y-auto border-t border-[hsl(var(--border))] px-6 pt-4">
+          {loading && (
+            <div className="space-y-3">
+              <Skeleton className="h-14 w-full rounded-xl" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
+            </div>
+          )}
+          {!loading && error && (
+            <ErrorState
+              title="No se pudo generar la vista previa"
+              description={error.message === "Failed to fetch" ? "No hubo respuesta del servidor. Verifica tu conexión e inténtalo de nuevo." : error.message}
             />
           )}
-          {loading && <Skeleton className="h-48 w-full rounded-xl" />}
-          {error && <ErrorState title="No se pudo generar la vista previa" description={error.message} />}
-          {!loading && !error && data && (
-            <>
-              {data.view.kind === "TABLE" && <TablePreview entity={data.entity} rows={data.rows} />}
-              {(data.view.kind === "FORM" || data.view.kind === "DETAIL") && <DetailPreview entity={data.entity} rows={data.rows} />}
-              {data.view.kind === "KANBAN" && <KanbanPreview view={data.view.schema ?? data.view} entity={data.entity} rows={data.rows} />}
-              {data.view.kind === "DASHBOARD" && <DashboardPreview view={data.view.schema ?? data.view} />}
-            </>
-          )}
+          {!loading && !error && data && <PreviewBody data={data} definition={definition} />}
         </div>
       </SheetContent>
     </Sheet>

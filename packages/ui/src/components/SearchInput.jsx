@@ -17,7 +17,7 @@ export function SearchInput({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="glass-subtle h-10 w-full rounded-lg border border-[hsl(var(--border))] pl-9 pr-8 text-base sm:h-9 sm:text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] transition-colors focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-1"
+        className="glass-subtle h-10 w-full rounded-lg border border-[hsl(var(--input))] pl-9 pr-8 text-base sm:h-9 sm:text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] transition-colors focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-1"
         {...props}
       />
       {value && (

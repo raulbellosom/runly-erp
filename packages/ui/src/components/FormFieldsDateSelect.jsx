@@ -347,14 +347,18 @@ export const SelectField = forwardRef(function SelectField(
   // Explicitly compute the label for the current value so Radix Select doesn't
   // have to rely on its DocumentFragment portal mechanism (unreliable with
   // programmatically-set values in React 19).
-  const selectedLabel = useMemo(() => {
+  const selectedOption = useMemo(() => {
     if (!value) return null;
-    const opt = options.find((o) =>
+    return options.find((o) =>
       typeof o === "string" ? o === value : o.value === value,
-    );
-    if (!opt) return null;
-    return typeof opt === "string" ? opt : opt.label;
+    ) ?? null;
   }, [value, options]);
+  const selectedLabel = selectedOption == null
+    ? null
+    : typeof selectedOption === "string" ? selectedOption : selectedOption.label;
+  // Options may carry an `icon` (lucide component); the selected option's
+  // icon shows in the trigger unless an explicit `icon` prop overrides it.
+  const triggerIcon = icon ?? (typeof selectedOption === "object" ? selectedOption?.icon : undefined);
 
   function handleOpenChange(open) {
     if (!open && validate) {
@@ -371,7 +375,7 @@ export const SelectField = forwardRef(function SelectField(
       required={required}
     >
       <div className="relative">
-        <InputIcon icon={icon} />
+        <InputIcon icon={triggerIcon} />
         <SelectPrimitive.Root
           value={value || ""}
           onValueChange={handleValueChange}
@@ -386,7 +390,7 @@ export const SelectField = forwardRef(function SelectField(
                 error,
                 cn(
                   "flex items-center justify-between cursor-pointer text-left gap-2",
-                  icon && "pl-9",
+                  triggerIcon && "pl-9",
                   className,
                 ),
               ),
@@ -437,6 +441,7 @@ export const SelectField = forwardRef(function SelectField(
                 {options.map((opt) => {
                   const val = typeof opt === "string" ? opt : opt.value;
                   const lbl = typeof opt === "string" ? opt : opt.label;
+                  const OptIcon = typeof opt === "string" ? null : opt.icon;
                   // Radix Select throws on an empty-string item value. Skip such
                   // options rather than crash the whole screen.
                   if (val === "" || val == null) {
@@ -470,6 +475,9 @@ export const SelectField = forwardRef(function SelectField(
                           />
                         </SelectPrimitive.ItemIndicator>
                       </span>
+                      {OptIcon && (
+                        <OptIcon size={14} strokeWidth={1.75} className="mr-2 shrink-0 text-muted-foreground" />
+                      )}
                       <SelectPrimitive.ItemText>{lbl}</SelectPrimitive.ItemText>
                     </SelectPrimitive.Item>
                   );

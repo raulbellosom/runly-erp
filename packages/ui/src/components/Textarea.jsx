@@ -15,7 +15,7 @@ const Textarea = forwardRef(function Textarea(
         "disabled:cursor-not-allowed disabled:opacity-50",
         error
           ? "border-red-500 focus-visible:ring-red-500/40"
-          : "border-[hsl(var(--border))] focus-visible:ring-indigo-500/40",
+          : "border-[hsl(var(--input))] focus-visible:ring-indigo-500/40",
         "glass-subtle",
         className,
       )}

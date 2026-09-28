@@ -15,7 +15,7 @@ const SelectTrigger = forwardRef(function SelectTrigger(
     <SelectPrimitive.Trigger
       ref={ref}
       className={cn(
-        "flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-[hsl(var(--border))] px-3 py-2 text-base sm:h-9 sm:text-sm shadow-sm",
+        "flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-[hsl(var(--input))] px-3 py-2 text-base sm:h-9 sm:text-sm shadow-sm",
         "placeholder:text-[hsl(var(--muted-foreground))]",
         "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/40 focus:ring-offset-0",
         "disabled:cursor-not-allowed disabled:opacity-50",

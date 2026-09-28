@@ -416,7 +416,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `Checkbox` | Checkbox control |
 | `TagsComboboxField` | Multi-value creatable tag input with suggestion dropdown (unlike `TagsField`, which is free-entry only); props `value` (string[]), `onChange`, `suggestions`, `onSearchChange`. Case-insensitive dedupe |
 | `SegmentedControl` | Pill single-choice control for short fixed sets; props `options`, `value`, `onChange` |
-| `CopyableValue` | Read-only label/value with a hover copy button; `mono` for RFC/ids |
+| `CopyableValue` | Read-only label/value with a hover copy button; `mono` for RFC/ids, `copyable={false}` for descriptive values |
 | `Switch` | Toggle switch |
 | `Select`, `SelectTrigger`, `SelectContent`, `SelectItem`, `SelectValue`, `SelectLabel`, `SelectGroup`, `SelectSeparator` | Native select dropdown |
 | `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`, `FormDescription`, `useFormField` | React Hook Form wrappers |
@@ -518,6 +518,11 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `RunlyCardView` | Card grid alternative to RunlyTable |
 | `RunlyDashboard` | Declarative DASHBOARD renderer |
 | `RunlyKanban` | Declarative KANBAN renderer with pointer, touch and keyboard drag/drop; read-only ACL fallback |
+| `RunlyRecordsView` | Runtime entry for the CARDS / CALENDAR / TIMELINE / REPORT view kinds: queries `POST /modules/:key/records-view/query` (month range for CALENDAR) and delegates to the renderers below. Routed by `schema.path` in `BlueprintCrudScreen` like KANBAN |
+| `RunlyCardsView` | CARDS renderer: responsive card grid (title, subtitle, description, badge, image via signed URL) |
+| `RunlyCalendarView` | CALENDAR renderer: Monday-first month grid with color legend; agenda list on phones |
+| `RunlyTimelineView` | TIMELINE renderer: records on a vertical line grouped by day |
+| `RunlyReportView` | REPORT renderer: grouped rows with 1-6 measures, relative bar and totals footer |
 | `BulkActionBar` | Multi-select action toolbar |
 | `CostsSummaryPanel` | Costs summary panel |
 | `normalizeSpanishLabel` | Label normalization helper |

@@ -1,5 +1,6 @@
 import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, RESERVED_NAMESPACES, isModuleIconName, validateDashboardSchema, validateKanbanSchema } from '@runly/module-engine'
 import { moduleSlug, permKey, toKebab } from './templates/helpers.js'
+import { isRecordsViewKind, normalizeRecordsView, validateRecordsView } from './records-views.js'
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/
 const MODULE_KEY = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/
@@ -97,13 +98,14 @@ export function validateModuleDefinition(definition) {
   for (const [viewIndex, view] of (definition.views ?? []).entries()) {
     if (viewKeys.has(view.key)) errors.push(diagnostic(`views[${viewIndex}].key`, 'DUPLICATE_VIEW_KEY', `Duplicate view key "${view.key}".`))
     viewKeys.add(view.key)
-    if (!['DASHBOARD', 'KANBAN'].includes(view.kind) && !entityKeys.has(view.entity)) errors.push(diagnostic(`views[${viewIndex}].entity`, 'VIEW_ENTITY_NOT_FOUND', `View entity "${view.entity}" does not exist.`))
+    if (!['DASHBOARD', 'KANBAN'].includes(view.kind) && !entityKeys.has(view.entity ?? view.schema?.entity)) errors.push(diagnostic(`views[${viewIndex}].entity`, 'VIEW_ENTITY_NOT_FOUND', `View entity "${view.entity}" does not exist.`))
     if (view.kind === 'DASHBOARD') {
       const normalizedView = { ...view, schema: dashboardSchemaFromView(view, definition) }
       const dashboard = validateDashboardSchema(normalizedView.schema)
       for (const message of dashboard.errors) errors.push(diagnostic(`views[${viewIndex}]`, dashboardDiagnosticCode(message), message))
       validateDashboardReferences(normalizedView, definition.entities, viewIndex, errors)
     }
+    if (isRecordsViewKind(view.kind)) validateRecordsView(view, definition, viewIndex, errors)
     if (view.kind === 'KANBAN') {
       const normalizedView = { ...view, schema: kanbanSchemaFromView(view, definition) }
       for (const message of validateKanbanSchema(normalizedView.schema).errors) errors.push(diagnostic(`views[${viewIndex}]`, kanbanDiagnosticCode(message), message))
@@ -193,7 +195,7 @@ export function normalizeModuleDefinition(input) {
   const generatedViewKeys = new Set(generatedViews.map((view) => view.key))
   const customViews = (input.views ?? [])
     .filter((view) => !generatedViewKeys.has(view.key))
-    .map((view) => view.kind === 'DASHBOARD' ? normalizeDashboardView(view, definition) : view.kind === 'KANBAN' ? normalizeKanbanView(view, definition) : view)
+    .map((view) => view.kind === 'DASHBOARD' ? normalizeDashboardView(view, definition) : view.kind === 'KANBAN' ? normalizeKanbanView(view, definition) : isRecordsViewKind(view.kind) ? normalizeRecordsView(view, definition) : view)
   definition.views = [...generatedViews, ...customViews]
   definition.navigation = input.navigation ?? definition.entities.map((entity) => ({
     label: entity.pluralLabel,

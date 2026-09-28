@@ -18,6 +18,7 @@ import {
 import { validateManifest, RESERVED_NAMESPACES } from '@runly/module-engine'
 import { resolveModulesDir } from './module-upload-service.js'
 import { createModulePackageWiring } from './module-package-wiring-service.js'
+import { invalidateModuleCaches } from './module-cache-service.js'
 import { buildDefinitionFromTemplate, BUILDER_TEMPLATE_KEYS } from './module-builder-templates.js'
 import { buildPreview } from './module-builder-preview-service.js'
 
@@ -296,6 +297,12 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
         installResult = await wiring.lifecycleSvc.installModule({ manifest: moduleRow.manifest, actorId, requestId: randomUUID() })
         if (routeLoader) await routeLoader.reloadModule(project.moduleKey).catch(() => null)
         if (bundlerSvc) await bundlerSvc.buildModuleBundle(project.moduleKey).catch(() => null)
+        // publishZip() already busted the module caches, but BEFORE this
+        // install flipped the module to INSTALLED — any /blueprints or
+        // /runtime/modules request in between re-cached the pre-install
+        // state for the cache TTL, so the new module/menu stayed hidden
+        // until a later reload. Bust again now that install is done.
+        await invalidateModuleCaches(cacheDel).catch(() => null)
       }
     }
 

@@ -39,7 +39,7 @@ export function CheckboxField({
             "flex items-center justify-center",
             checked
               ? "bg-primary border-primary"
-              : cn("border-border", !disabled && "group-hover:border-primary/50"),
+              : cn("border-input", !disabled && "group-hover:border-primary/50"),
             error && !checked && "border-destructive",
           )}
         >
@@ -140,7 +140,9 @@ export function SwitchField({
             "relative w-10 h-6 rounded-full transition-all duration-200 shrink-0",
             "focus:outline-none focus:ring-2 focus:ring-primary/30",
             disabled ? "opacity-50 cursor-not-allowed" : "",
-            checked ? "bg-primary" : "bg-muted border border-border",
+            // Unchecked track uses muted-foreground at low alpha: plain
+            // bg-muted was nearly invisible on light glass surfaces (sheets).
+            checked ? "bg-primary" : "bg-[hsl(var(--muted-foreground)/0.3)]",
           )}
         >
           <span
@@ -201,7 +203,7 @@ export function RadioGroupField({
               <div
                 className={cn(
                   "mt-0.5 w-4 h-4 shrink-0 rounded-full border-2 transition-all duration-150 flex items-center justify-center",
-                  isChecked ? "border-primary" : "border-border",
+                  isChecked ? "border-primary" : "border-input",
                 )}
               >
                 {isChecked && (

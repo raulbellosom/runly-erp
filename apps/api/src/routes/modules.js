@@ -52,6 +52,7 @@ import { createModulePackageService } from "../services/module-package-service.j
 import { createModuleSchemaMigrationService } from "../services/module-schema-migration-service.js";
 import { createModuleDashboardQueryService } from "../services/module-dashboard-query-service.js";
 import { createModuleKanbanQueryService } from "../services/module-kanban-query-service.js";
+import { registerRecordsViewRoutes } from "./module-records-view-routes.js";
 
 const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
@@ -622,6 +623,8 @@ export function createModulesRouter({
       return c.json({ error: 'No se pudo consultar el dashboard.' }, 500)
     }
   })
+
+  registerRecordsViewRoutes(app, { prisma, authMiddleware, requirePermission })
 
   app.post('/:key/kanban/query', authMiddleware, async (c) => {
     try {

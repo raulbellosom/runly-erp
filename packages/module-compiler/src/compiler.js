@@ -12,6 +12,8 @@ import { generateApiIndex } from './templates/api-index.js'
 import { generateValidatorsIndex } from './templates/validators-index.js'
 import { dashboardFileName, generateDashboardView } from './templates/dashboard.js'
 import { generateKanbanView, kanbanFileName } from './templates/kanban.js'
+import { generateRecordsView, recordsViewFileName } from './templates/records-view.js'
+import { isRecordsViewKind } from './records-views.js'
 
 function toTemplateConfig(definition) {
   return {
@@ -56,6 +58,7 @@ export function compileModule(rawDefinition) {
     add(dashboardFileName(view), generateDashboardView(view))
   }
   for (const view of definition.views.filter((item) => item.kind === 'KANBAN')) add(kanbanFileName(view), generateKanbanView(view))
+  for (const view of definition.views.filter((item) => isRecordsViewKind(item.kind))) add(recordsViewFileName(view), generateRecordsView(view))
   if (config.preset === 'crud-custom') {
     add('views/dashboard.custom.js', generateCustomDashboardView(config))
     add('components/index.js', generateComponentsIndex(config))
