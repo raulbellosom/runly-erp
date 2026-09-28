@@ -414,6 +414,9 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `Input` | Single-line text input |
 | `Textarea` | Multi-line text input |
 | `Checkbox` | Checkbox control |
+| `TagsComboboxField` | Multi-value creatable tag input with suggestion dropdown (unlike `TagsField`, which is free-entry only); props `value` (string[]), `onChange`, `suggestions`, `onSearchChange`. Case-insensitive dedupe |
+| `SegmentedControl` | Pill single-choice control for short fixed sets; props `options`, `value`, `onChange` |
+| `CopyableValue` | Read-only label/value with a hover copy button; `mono` for RFC/ids |
 | `Switch` | Toggle switch |
 | `Select`, `SelectTrigger`, `SelectContent`, `SelectItem`, `SelectValue`, `SelectLabel`, `SelectGroup`, `SelectSeparator` | Native select dropdown |
 | `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`, `FormDescription`, `useFormField` | React Hook Form wrappers |
@@ -447,6 +450,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 |---|---|
 | `AppShell` | Main app layout: fixed sidebar + scrollable content |
 | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` | Tab navigation |
+| `SectionIndex` | Scroll-spy section index for long forms/pages (`sections=[{id,label,icon,badge}]`); collapses to a jump `SelectField` below md |
 | `Accordion`, `AccordionItem`, `AccordionTrigger`, `AccordionContent` | Collapsible sections (Radix accordion). Use `type="single" collapsible` on `Accordion` for one-open-at-a-time; wrap each section in `AccordionItem value="..."` |
 | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuLabel`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent`, `DropdownMenuRadioGroup`, `DropdownMenuShortcut`, `DropdownMenuGroup`, `DropdownMenuPortal` | Dropdown / context menu |
 | `Breadcrumb`, `BreadcrumbList`, `BreadcrumbItem`, `BreadcrumbLink`, `BreadcrumbPage`, `BreadcrumbSeparator`, `BreadcrumbEllipsis` | Breadcrumb navigation |
