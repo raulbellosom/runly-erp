@@ -1,6 +1,6 @@
 import { toLocalIso } from '../../../lib/localDate.js';
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RunlyTable, Button, ConfirmDialog, ErrorState, PageHeader } from "@runly/ui";
 import { FileSpreadsheet, FileText, Power, PowerOff, Trash2, UserPlus } from "lucide-react";
@@ -9,10 +9,6 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { runly } from "../../../lib/runly";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
-import {
-  ContactFormSheet,
-  resolveContactsBlueprint,
-} from "../components/ContactFormSheet";
 
 const API_BASE_URL = getApiUrl();
 
@@ -38,7 +34,7 @@ const CONTACTS_BLUEPRINT = {
         ],
       },
       { field: "email", label: "Correo", sortable: false },
-      { field: "phone", label: "Telefono", sortable: false },
+      { field: "phone", label: "Teléfono", sortable: false },
       { field: "taxId", label: "RFC / ID fiscal", sortable: false },
       {
         field: "enabled",
@@ -50,7 +46,8 @@ const CONTACTS_BLUEPRINT = {
           { value: false, label: "Inactivo" },
         ],
       },
-      { field: "legalName", label: "Razon social", defaultVisible: false },
+      { field: "legalName", label: "Razón social", defaultVisible: false },
+      { field: "industry", label: "Giro", defaultVisible: false },
       { field: "notesMarkdown", label: "Notas", type: "markdown", defaultVisible: false },
       { field: "createdAt", label: "Creado", type: "date", defaultVisible: false },
     ],
@@ -95,7 +92,6 @@ export default function ContactsScreen() {
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const { activeCompanyId } = useActiveCompany();
-  const authUserId = session?.user?.id ?? "anonymous";
   const permissions = userProfile?.permissions ?? [];
   const hasPermission = (key) => Boolean(userProfile?.isAdmin || permissions.includes(key));
   const canReadContacts = hasPermission("contacts.contacts.read");
@@ -103,90 +99,15 @@ export default function ContactsScreen() {
   const canUpdateContacts = hasPermission("contacts.contacts.update");
   const canDeleteContacts = hasPermission("contacts.contacts.delete");
 
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editingContact, setEditingContact] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [bulkState, setBulkState] = useState(null);
-
-  const { "*": wildcard } = useParams();
   const navigate = useNavigate();
-  const urlContactMatch = wildcard?.match(/^contacts\/([^/]+)$/);
-  const urlContactId = urlContactMatch?.[1] ?? null;
+  const basePath = "/app/m/runly.contacts/contacts";
 
-  const blueprintsQuery = useQuery({
-    queryKey: ["blueprints", "contacts", authUserId],
-    queryFn: () => runly.blueprints.list(token),
-    enabled: Boolean(token),
-  });
-
-  // A URL-referenced contact may not be in the currently-loaded list page
-  // (pagination) — always fetch it independently by id, never assume it's
-  // already among the loaded rows.
-  const urlContactQuery = useQuery({
-    queryKey: ["contact", urlContactId, authUserId],
-    queryFn: () => runly.contacts.getById(urlContactId, token),
-    enabled: Boolean(urlContactId && token),
-  });
-
-  useEffect(() => {
-    if (!urlContactId) return;
-    if (urlContactQuery.data?.data) {
-      setEditingContact(urlContactQuery.data.data);
-      setSheetOpen(true);
-    } else if (urlContactQuery.isError) {
-      toast.error("No se pudo cargar el contacto.");
-      navigate("/app/m/runly.contacts/contacts");
-    }
-  }, [urlContactId, urlContactQuery.data, urlContactQuery.isError, navigate]);
-
-  const formBlueprint = useMemo(
-    () => resolveContactsBlueprint(blueprintsQuery.data?.data ?? []),
-    [blueprintsQuery.data],
-  );
-
-  // Single close path for the sheet, used regardless of how it's closing
-  // (X/backdrop/Escape via onOpenChange, or a successful create/update) — a
-  // contact reached via /contacts/:id must always return the URL to the list
-  // on close, not just on the interactive-close path (spec Section 23 edge
-  // case 3 / acceptance criterion 4).
-  function closeSheet() {
-    setSheetOpen(false);
-    setEditingContact(null);
-    if (urlContactId) navigate("/app/m/runly.contacts/contacts");
-  }
-
-  function openCreate() {
-    if (urlContactId) navigate("/app/m/runly.contacts/contacts");
-    setEditingContact(null);
-    setSheetOpen(true);
-  }
-
-  function openEdit(contact) {
-    setEditingContact(contact);
-    setSheetOpen(true);
-    navigate(`/app/m/runly.contacts/contacts/${contact.id}`);
-  }
-
-  const createMutation = useMutation({
-    mutationFn: (data) => runly.contacts.create(data, token),
-    onSuccess: () => {
-      closeSheet();
-      setRefreshSignal((s) => s + 1);
-      toast.success("Contacto creado");
-    },
-    onError: () => toast.error("No se pudo crear el contacto"),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => runly.contacts.update(id, data, token),
-    onSuccess: () => {
-      closeSheet();
-      setRefreshSignal((s) => s + 1);
-      toast.success("Contacto actualizado");
-    },
-    onError: () => toast.error("No se pudo actualizar el contacto"),
-  });
+  const openCreate = () => navigate(`${basePath}/new`);
+  const openDetail = (contact) => navigate(`${basePath}/${contact.id}`);
+  const openEdit = (contact) => navigate(`${basePath}/${contact.id}/edit`);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => runly.contacts.delete(id, token),
@@ -286,17 +207,6 @@ export default function ContactsScreen() {
     })),
   ].filter(Boolean), [token, canUpdateContacts, canDeleteContacts]);
 
-  function handleFormSubmit(data) {
-    const payload = { ...data, email: data.email || undefined };
-    if (editingContact) {
-      updateMutation.mutate({ id: editingContact.id, data: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
-  }
-
-  const isMutating = createMutation.isPending || updateMutation.isPending;
-
   if (!canReadContacts) {
     return (
       <div className="p-4 md:p-6 space-y-6 min-h-dvh">
@@ -305,7 +215,7 @@ export default function ContactsScreen() {
           title="Contactos"
           description="Clientes, proveedores y personas vinculadas a tu empresa."
         />
-        <ErrorState message="No tienes permisos para ver los contactos." />
+        <ErrorState title="No tienes permisos para ver los contactos." />
       </div>
     );
   }
@@ -332,25 +242,13 @@ export default function ContactsScreen() {
         companyId={activeCompanyId}
         apiBaseUrl={API_BASE_URL}
         onCreate={canCreateContacts ? openCreate : undefined}
+        onView={openDetail}
         onEdit={canUpdateContacts ? openEdit : undefined}
         onToggleEnabled={canUpdateContacts ? (row) =>
           toggleEnabledMutation.mutate({ id: row.id, enabled: !row.enabled }) : undefined}
         onDelete={canDeleteContacts ? (row) => setConfirmDelete(row) : undefined}
         refreshSignal={refreshSignal}
         bulkActions={bulkActions}
-      />
-
-      <ContactFormSheet
-        open={sheetOpen}
-        onOpenChange={(v) => {
-          if (v) setSheetOpen(true);
-          else closeSheet();
-        }}
-        contact={editingContact}
-        blueprint={formBlueprint}
-        onSubmit={handleFormSubmit}
-        isMutating={isMutating}
-        token={token}
       />
 
       <ConfirmDialog
