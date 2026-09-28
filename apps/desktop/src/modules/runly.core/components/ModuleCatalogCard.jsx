@@ -73,8 +73,11 @@ export function CardAction({
     module.status === "UNINSTALLED" &&
     canInstallModules &&
     module.compatibilityStatus !== "BLOCKED";
+  // INSTALLED + enabled:false happens when sync disabled a module whose files
+  // went missing; it must still be re-enable-able from here.
   const canEnable =
-    module.status === "DISABLED" && !isLocked(module) && canDisableModules;
+    (module.status === "DISABLED" || (module.status === "INSTALLED" && !module.enabled)) &&
+    !isLocked(module) && canDisableModules;
   const canRetryInstall =
     module.status === "ERROR" && !isLocked(module) && canInstallModules;
 

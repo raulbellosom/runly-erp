@@ -134,21 +134,31 @@ function expandNav(module, nav, opts) {
 export function mapSearchGroups(groups = []) {
   return (groups ?? [])
     .filter((g) => g && Array.isArray(g.items) && g.items.length > 0)
-    .map((g) => ({
-      id: `search:${g.source}`,
-      title: g.label,
-      items: g.items.map((it) => ({
-        key: `record:${g.source}:${it.id}`,
-        kind: "record",
-        title: it.title,
-        subtitle: it.subtitle || null,
-        keywords: [],
-        icon: it.icon,
-        color: null,
-        target: it.target,
-        blocked: false,
-      })),
-    }));
+    .map((g) => {
+      // Some sources (help) return several hits sharing one id (a module key),
+      // so repeated ids get a positional suffix to keep React keys unique.
+      const seen = new Map();
+      const uniqueKey = (id) => {
+        const count = seen.get(id) ?? 0;
+        seen.set(id, count + 1);
+        return count ? `record:${g.source}:${id}:${count}` : `record:${g.source}:${id}`;
+      };
+      return {
+        id: `search:${g.source}`,
+        title: g.label,
+        items: g.items.map((it) => ({
+          key: uniqueKey(it.id),
+          kind: "record",
+          title: it.title,
+          subtitle: it.subtitle || null,
+          keywords: [],
+          icon: it.icon,
+          color: null,
+          target: it.target,
+          blocked: false,
+        })),
+      };
+    });
 }
 
 function pageItem(page) {

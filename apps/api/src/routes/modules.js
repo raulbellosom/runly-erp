@@ -1359,6 +1359,25 @@ export function createModulesRouter({
           appliedManifestFilenamesByModule.get(moduleKey).add(filename);
         }
 
+        // Modules the stale cleanup below disabled because their files were
+        // gone (MISSING_FILES) are re-enabled once the files are back on disk.
+        // Must run before syncModules, which rewrites lifecycleConfig and
+        // would drop the marker, leaving the module INSTALLED but disabled
+        // (routes never mount) with no trace of why.
+        const restoredModules = [];
+        for (const row of customModuleRows) {
+          if (
+            row.status !== "INSTALLED" ||
+            row.enabled ||
+            row.lifecycleConfig?.discovery?.status !== "MISSING_FILES"
+          ) continue;
+          await prisma.runlyModule.update({
+            where: { key: row.key },
+            data: { enabled: true },
+          });
+          restoredModules.push(row.key);
+        }
+
         let lifecycleSync = { synced: 0, added: 0, updated: 0 };
         const discoveredKeys = new Set(
           validModules.map((record) => record.manifest.key),
@@ -1716,6 +1735,7 @@ export function createModulesRouter({
           manifestMigrationsSync,
           invalidUpserts,
           staleSync,
+          restoredModules,
           automation,
           modules: discovered.map(serializeDiscoveredModule),
         };

@@ -79,7 +79,8 @@ function SheetActions({
   const canInstall = module.status === "UNINSTALLED";
   const canDisable =
     module.status === "INSTALLED" && module.enabled && !locked;
-  const canEnable = module.status === "DISABLED" && !locked;
+  const canEnable =
+    (module.status === "DISABLED" || (module.status === "INSTALLED" && !module.enabled)) && !locked;
   const canRetryInstall = module.status === "ERROR" && !locked;
   const canClearError = module.status === "ERROR" && !locked;
   const canCleanupFailedInstall =
