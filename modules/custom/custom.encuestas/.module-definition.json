@@ -1,0 +1,349 @@
+{
+  "schemaVersion": 1,
+  "key": "custom.encuestas",
+  "name": "Encuestas",
+  "version": "1.1.1",
+  "description": "Crea, publica, responde y analiza encuestas personalizadas.",
+  "icon": "ClipboardList",
+  "color": "#8b5cf6",
+  "pwa": {
+    "shortName": "Encuestas",
+    "startPath": "/dashboard"
+  },
+  "preset": "custom",
+  "dependencies": [
+    {
+      "key": "runly.core"
+    },
+    {
+      "key": "runly.hr"
+    },
+    {
+      "key": "runly.inventory"
+    }
+  ],
+  "entities": [
+    {
+      "id": "encuestas",
+      "key": "encuestas",
+      "label": "Encuesta",
+      "pluralLabel": "Encuestas",
+      "companyScoped": true,
+      "softDelete": true,
+      "fields": [
+        {
+          "key": "titulo",
+          "type": "text",
+          "label": "Título",
+          "required": true
+        },
+        {
+          "key": "descripcion",
+          "type": "text",
+          "label": "Descripción",
+          "required": false
+        },
+        {
+          "key": "estado",
+          "type": "text",
+          "label": "Estado",
+          "required": true
+        },
+        {
+          "key": "anonima",
+          "type": "boolean",
+          "label": "Encuesta anónima",
+          "required": false
+        },
+        {
+          "key": "solicitar_contacto",
+          "type": "boolean",
+          "label": "Solicitar contacto",
+          "required": false
+        },
+        {
+          "key": "capturar_contexto_inventario",
+          "type": "boolean",
+          "label": "Capturar identidad e inventario asignado",
+          "required": false
+        },
+        {
+          "key": "fecha_inicio",
+          "type": "text",
+          "label": "Fecha de inicio",
+          "required": false
+        },
+        {
+          "key": "fecha_cierre",
+          "type": "text",
+          "label": "Fecha de cierre",
+          "required": false
+        },
+        {
+          "key": "mensaje_final",
+          "type": "text",
+          "label": "Mensaje final",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "preguntas",
+      "key": "preguntas",
+      "label": "Pregunta",
+      "pluralLabel": "Preguntas",
+      "companyScoped": true,
+      "softDelete": true,
+      "fields": [
+        {
+          "key": "encuesta_id",
+          "type": "text",
+          "label": "Encuesta",
+          "required": true
+        },
+        {
+          "key": "texto",
+          "type": "text",
+          "label": "Pregunta",
+          "required": true
+        },
+        {
+          "key": "tipo",
+          "type": "text",
+          "label": "Tipo de respuesta",
+          "required": true
+        },
+        {
+          "key": "obligatoria",
+          "type": "boolean",
+          "label": "Obligatoria",
+          "required": false
+        },
+        {
+          "key": "opciones_json",
+          "type": "text",
+          "label": "Opciones",
+          "required": false
+        },
+        {
+          "key": "posicion",
+          "type": "number",
+          "label": "Posición",
+          "required": false
+        },
+        {
+          "key": "ayuda",
+          "type": "text",
+          "label": "Texto de ayuda",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "respuestas",
+      "key": "respuestas",
+      "label": "Respuesta",
+      "pluralLabel": "Respuestas",
+      "companyScoped": true,
+      "softDelete": true,
+      "fields": [
+        {
+          "key": "encuesta_id",
+          "type": "text",
+          "label": "Encuesta",
+          "required": true
+        },
+        {
+          "key": "respondente_nombre",
+          "type": "text",
+          "label": "Nombre",
+          "required": false
+        },
+        {
+          "key": "respondente_correo",
+          "type": "text",
+          "label": "Correo electrónico",
+          "required": false
+        },
+        {
+          "key": "respondente_user_id",
+          "type": "text",
+          "label": "Usuario de Identity",
+          "required": false
+        },
+        {
+          "key": "respondente_user_nombre",
+          "type": "text",
+          "label": "Nombre en Identity",
+          "required": false
+        },
+        {
+          "key": "respondente_user_correo",
+          "type": "text",
+          "label": "Correo en Identity",
+          "required": false
+        },
+        {
+          "key": "respondente_empleado_id",
+          "type": "text",
+          "label": "Colaborador de RR. HH.",
+          "required": false
+        },
+        {
+          "key": "respondente_empleado_nombre",
+          "type": "text",
+          "label": "Nombre del colaborador",
+          "required": false
+        },
+        {
+          "key": "items_asignados_json",
+          "type": "text",
+          "label": "Inventario asignado al responder",
+          "required": false
+        },
+        {
+          "key": "items_asignados_total",
+          "type": "number",
+          "label": "Total de artículos asignados",
+          "required": false
+        },
+        {
+          "key": "respuestas_json",
+          "type": "text",
+          "label": "Respuestas",
+          "required": true
+        },
+        {
+          "key": "enviado_en",
+          "type": "text",
+          "label": "Enviado en",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "key": "encuestas.encuestas.read",
+      "name": "Ver encuestas",
+      "action": "read",
+      "entity": "encuestas"
+    },
+    {
+      "key": "encuestas.encuestas.create",
+      "name": "Crear encuestas",
+      "action": "create",
+      "entity": "encuestas"
+    },
+    {
+      "key": "encuestas.encuestas.update",
+      "name": "Editar encuestas",
+      "action": "update",
+      "entity": "encuestas"
+    },
+    {
+      "key": "encuestas.encuestas.publish",
+      "name": "Publicar o cerrar encuestas",
+      "action": "publish",
+      "entity": "encuestas"
+    },
+    {
+      "key": "encuestas.encuestas.delete",
+      "name": "Eliminar encuestas",
+      "action": "delete",
+      "entity": "encuestas"
+    },
+    {
+      "key": "encuestas.respuestas.create",
+      "name": "Responder encuestas",
+      "action": "create",
+      "entity": "respuestas"
+    },
+    {
+      "key": "encuestas.respuestas.read",
+      "name": "Ver resultados y respuestas",
+      "action": "read",
+      "entity": "respuestas"
+    }
+  ],
+  "views": [
+    {
+      "key": "encuestas.dashboard",
+      "kind": "CUSTOM",
+      "version": "1.1.1",
+      "generated": false,
+      "schema": {
+        "title": "Encuestas",
+        "path": "/app/m/custom.encuestas/dashboard",
+        "component": "custom.encuestas:EncuestasDashboard"
+      }
+    },
+    {
+      "key": "encuestas.constructor",
+      "kind": "CUSTOM",
+      "version": "1.1.1",
+      "generated": false,
+      "schema": {
+        "title": "Constructor",
+        "path": "/app/m/custom.encuestas/constructor",
+        "component": "custom.encuestas:EncuestasStudio"
+      }
+    },
+    {
+      "key": "encuestas.responder",
+      "kind": "CUSTOM",
+      "version": "1.1.1",
+      "generated": false,
+      "schema": {
+        "title": "Responder",
+        "path": "/app/m/custom.encuestas/responder",
+        "component": "custom.encuestas:ResponderEncuesta"
+      }
+    },
+    {
+      "key": "encuestas.resultados",
+      "kind": "CUSTOM",
+      "version": "1.1.1",
+      "generated": false,
+      "schema": {
+        "title": "Resultados",
+        "path": "/app/m/custom.encuestas/resultados",
+        "component": "custom.encuestas:ResultadosEncuestas"
+      }
+    }
+  ],
+  "navigation": [
+    {
+      "icon": "LayoutDashboard",
+      "page": "encuestas.dashboard",
+      "path": "/app/m/custom.encuestas/dashboard",
+      "label": "Resumen",
+      "generated": false,
+      "permission": "encuestas.encuestas.read"
+    },
+    {
+      "icon": "ClipboardList",
+      "page": "encuestas.constructor",
+      "path": "/app/m/custom.encuestas/constructor",
+      "label": "Constructor",
+      "generated": false,
+      "permission": "encuestas.encuestas.read"
+    },
+    {
+      "icon": "ListChecks",
+      "page": "encuestas.responder",
+      "path": "/app/m/custom.encuestas/responder",
+      "label": "Responder",
+      "generated": false,
+      "permission": "encuestas.respuestas.create"
+    },
+    {
+      "icon": "BarChart3",
+      "page": "encuestas.resultados",
+      "path": "/app/m/custom.encuestas/resultados",
+      "label": "Resultados",
+      "generated": false,
+      "permission": "encuestas.respuestas.read"
+    }
+  ]
+}

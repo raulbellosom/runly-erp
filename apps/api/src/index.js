@@ -785,7 +785,9 @@ app.post("/auth/forgot-password", async (c) => {
 });
 
 const BRAND_DIR = path.resolve(currentDir, "../../../apps/desktop/public/brand");
+const RUNLY_BRAND_DIR = path.resolve(currentDir, "../../../apps/desktop/public/runly");
 const ALLOWED_BRAND_FILES = new Set([
+  "runly-email-logo-light.png",
   "runly-logo-horizontal.png",
   "runly-logo-primary.png",
   "runly-logo-isotype.png",
@@ -796,7 +798,9 @@ const ALLOWED_BRAND_FILES = new Set([
 app.get("/brand/:filename", async (c) => {
   const filename = c.req.param("filename");
   if (!ALLOWED_BRAND_FILES.has(filename)) return c.notFound();
-  const filePath = path.join(BRAND_DIR, filename);
+  const filePath = filename === "runly-email-logo-light.png"
+    ? path.join(RUNLY_BRAND_DIR, "runly-logo-horizontal-light.png")
+    : path.join(BRAND_DIR, filename);
   try {
     const { readFile } = await import("node:fs/promises");
     const data = await readFile(filePath);

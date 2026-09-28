@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { BUNDLE_EXTERNALS } from "../module-bundler-service.js";
 import { buildCatalog } from "../../../../../scripts/generate-module-runtime-catalog.mjs";
 
@@ -15,6 +15,14 @@ test("every shared bundler external is documented in the catalog", () => {
   const externals = BUNDLE_EXTERNALS.filter((name) => !name.startsWith("@atlas/") && !name.startsWith("react/"));
   assert.deepEqual(externals.filter((name) => !shared.has(name)), []);
   assert.deepEqual([...shared].filter((name) => !BUNDLE_EXTERNALS.includes(name)), []);
+});
+
+test("QR libraries have browser import-map shims", () => {
+  const viteConfig = readFileSync(new URL("../../../../desktop/vite.config.js", import.meta.url), "utf8");
+  for (const [library, shim] of [["qrcode", "ext-qrcode"], ["@zxing/browser", "ext-zxing-browser"]]) {
+    assert.match(viteConfig, new RegExp(`"${library.replace("/", "\\/")}"\\s*:\\s*"${shim}"`));
+    assert.equal(existsSync(new URL(`../../../../desktop/src/shims/${shim}.js`, import.meta.url)), true);
+  }
 });
 
 test("the public libraries page matches the catalog", async () => {

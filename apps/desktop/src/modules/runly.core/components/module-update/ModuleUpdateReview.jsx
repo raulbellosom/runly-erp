@@ -102,6 +102,9 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
     setApplying(true);
     const result = await applyModuleZip({ moduleKey, file, token });
     setApplying(false);
+    if (result && !report.installed) {
+      toast.info("Falta instalarlo", { description: "Ve al Catálogo de módulos e instala el módulo para usarlo y ver sus pantallas con datos." });
+    }
     if (result) onApplied?.(result);
   }
 
@@ -140,6 +143,14 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
         )}
       </div>
 
+      {!report.blocked && (
+        <p className="rounded-xl bg-sky-500/10 p-3 text-sm text-sky-800 dark:text-sky-300">
+          Esto es solo una revisión: todavía no se ha subido nada. Cuando estés conforme, da clic en{" "}
+          <strong>{report.installed ? "Aplicar actualización" : "Subir módulo"}</strong>
+          {report.installed ? "." : " y después instálalo desde el Catálogo de módulos."}
+        </p>
+      )}
+
       {report.noChanges && (
         <p className="rounded-xl bg-[hsl(var(--muted))] p-3 text-sm">El ZIP es idéntico al módulo instalado; aplicarlo solo vuelve a sincronizarlo.</p>
       )}
@@ -163,11 +174,16 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
           <p className="text-xs text-[hsl(var(--muted-foreground))]">
             Así se verán con tus datos reales. Los datos vienen de la versión instalada del módulo: los cambios en <code>api/</code> se ven hasta aplicar.
           </p>
+          {!report.installed && (
+            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              Este módulo aún no está instalado, así que su API todavía no existe: si tus pantallas consultan datos, en la vista previa verás errores de carga (404). Aplica e instala el módulo para probarlas con datos.
+            </p>
+          )}
           <CustomViewPreview moduleKey={moduleKey} previewId={report.preview.id} views={report.customViews} token={token} />
         </section>
       )}
 
-      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-end gap-2 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))] px-6 py-3">
+      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-end gap-2 border-t border-[hsl(var(--border))] backdrop-blur-md px-6 py-3">
         <Button variant="outline" onClick={onChangeFile} disabled={applying}>Elegir otro archivo</Button>
         <Button onClick={apply} disabled={report.blocked || applying}>
           <Rocket className="h-4 w-4" />

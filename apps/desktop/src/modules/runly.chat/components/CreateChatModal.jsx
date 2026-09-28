@@ -152,7 +152,7 @@ export function CreateChatModal({ open, onClose, onCreated }) {
           )}
         </div>
 
-        <DialogFooter className="px-5 py-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)]">
+        <DialogFooter className="px-5 py-3 border-t border-[hsl(var(--border))]">
           <Button variant="outline" onClick={onClose} disabled={isCreating}>
             Cancelar
           </Button>

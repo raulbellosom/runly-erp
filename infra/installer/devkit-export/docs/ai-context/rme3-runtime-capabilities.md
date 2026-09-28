@@ -89,6 +89,8 @@ There are two categories. Use **Category A** (external) whenever possible — it
 | `sonner` | `toast()` — trigger toast notifications programmatically |
 | `lucide-react` | All Lucide icons (`Music`, `Play`, `Settings`, `Plus` …) |
 | `recharts` | `LineChart`, `BarChart`, `PieChart`, `AreaChart`, `ResponsiveContainer`, `Tooltip`, `Legend` … |
+| `qrcode` | Generación de QR: `toCanvas`, `toDataURL`, `toString` y `create` |
+| `@zxing/browser` | Lectura de QR desde cámara, imagen o video con `BrowserQRCodeReader`; incluye `BrowserMultiFormatReader` |
 
 #### Category B — Bundled by esbuild (works, but adds weight to the module bundle)
 
@@ -98,7 +100,7 @@ There are two categories. Use **Category A** (external) whenever possible — it
 | `motion` (Framer Motion) | ~280 KB — use sparingly |
 | `country-state-city` | Geo data helpers |
 | Any package resolvable from the module's Node resolution chain | esbuild bundles it at install time |
-| CDN: `https://esm.sh/<pkg>` | Browser fetches at runtime — no install needed |
+| CDN: `https://esm.sh/<pkg>@<version>` | El import HTTPS se conserva y el navegador lo descarga en runtime; fija la versión y usa proveedores confiables |
 
 > **Not available** in browser components: Node.js built-ins (`fs`, `path`, `crypto`), `exceljs`, `pdfkit`, `sharp` — use those in `api/` only.
 
@@ -532,7 +534,8 @@ itself.
 
 **Category A (external/shared — no bundle weight):**
 `react`, `react-dom`, `@tanstack/react-query`, `zustand`, `@runly/ui`, `@runly/sdk`,
-`@runly/validators`, `react-router-dom`, `sonner`, `lucide-react`, `recharts`
+`@runly/validators`, `react-router-dom`, `sonner`, `lucide-react`, `recharts`,
+`qrcode`, `@zxing/browser`
 
 **Category B (bundled by esbuild into the module bundle):**
 `react-hook-form`, `motion`, `country-state-city`, `@supabase/supabase-js`

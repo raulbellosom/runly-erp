@@ -67,6 +67,18 @@
       "imports": "ResponsiveContainer, BarChart, LineChart, PieChart, AreaChart, Tooltip, Legend"
     },
     {
+      "name": "qrcode",
+      "version": "1.5.4",
+      "category": "shared",
+      "imports": "QRCode (default), create, toCanvas, toDataURL, toString para generar códigos QR"
+    },
+    {
+      "name": "@zxing/browser",
+      "version": "0.2.1",
+      "category": "shared",
+      "imports": "BrowserQRCodeReader, BrowserMultiFormatReader para leer códigos QR desde cámara, imagen o video"
+    },
+    {
       "name": "react-hook-form",
       "version": "7.75.0",
       "category": "bundled",

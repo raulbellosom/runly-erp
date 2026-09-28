@@ -2,6 +2,7 @@ import { canReceiveResourceEvent } from './notification-access.js';
 import { createSmtpService } from "./smtp-service.js";
 import { createWebPushService } from "./web-push-service.js";
 import { createFcmService } from "./fcm-service.js";
+import { renderRunlyEmailLayout } from "./email-templates.js";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_BATCH_SIZE = 25;
@@ -203,25 +204,15 @@ function labelForSourceType(raw) {
   return SOURCE_TYPE_LABELS[raw] ?? humanizeToken(raw);
 }
 
-// `brand` is resolved per company from BrandingConfig (see resolveCompanyBrand):
-// { logoUrl, companyName }. With a logo we show it; otherwise a text wordmark
-// using the company name, falling back to the "RunlyERP" wordmark.
-function brandHeaderHtml(brand) {
-  const logoUrl = brand?.logoUrl ?? null;
-  if (logoUrl) {
-    const alt = escapeHtml(brand?.companyName || "Logo");
-    return `<img src="${logoUrl}" alt="${alt}" style="max-height:32px;display:block;margin-bottom:10px" />`;
-  }
-  const name = brand?.companyName;
-  if (name) {
-    return `<div style="font-size:18px;font-weight:700;letter-spacing:-.01em;color:#0f172a;margin-bottom:8px">${escapeHtml(name)}</div>`;
-  }
-  return `<div style="font-size:18px;font-weight:700;letter-spacing:-.01em;color:#0f172a;margin-bottom:8px">Runly<span style="color:#2563eb">ERP</span></div>`;
+// Adapt the notification worker's company-brand shape to the shared email shell.
+function emailBrand(brand) {
+  if (!brand) return null;
+  return {
+    name: brand.companyName ?? null,
+    logoUrl: brand.logoUrl ?? null,
+    primaryColor: brand.primaryColor ?? null,
+  };
 }
-
-// Same footer as email-templates.js's renderRunlyEmailLayout: a single plain
-// link to our own root domain, styled visible but not spam-bait.
-const EMAIL_FOOTER_HTML = `<tr><td style="padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;font-size:12px;color:#64748b">Este correo fue generado automaticamente por <a href="https://runly.mx" style="color:#2563eb;font-weight:600;text-decoration:none">Runly ERP</a>.</td></tr>`;
 
 function buildChatEmail({ notification, link, brand, createdAt }) {
   const meta = notification?.metadata ?? {};
@@ -236,32 +227,17 @@ function buildChatEmail({ notification, link, brand, createdAt }) {
     : kind === "chat_thread_reply" ? "Respuesta en un hilo"
     : "Nuevo mensaje de chat";
   const subject = convTitle ? `${senderName} · ${convTitle}` : `Nuevo mensaje de ${senderName}`;
-  const cta = link
-    ? `<a href="${link}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600">Abrir conversación</a>`
-    : "";
-
-  const html = `
-<div style="background:#f3f4f6;padding:24px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#111827">
-  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
-    <tr>
-      <td style="padding:20px 24px;border-bottom:1px solid #eef2ff;background:#f8fafc">
-        ${brandHeaderHtml(brand)}
-        <div style="font-size:12px;color:#6b7280;letter-spacing:.06em;text-transform:uppercase">${escapeHtml(kicker)}</div>
-        <h1 style="margin:6px 0 0 0;font-size:22px;line-height:1.3;color:#0f172a">${escapeHtml(senderName)}</h1>
-        <div style="margin-top:2px;font-size:13px;color:#64748b">${escapeHtml(convTitle || "Conversación directa")}</div>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:20px 24px">
-        <div style="border-left:3px solid #2563eb;padding:2px 0 2px 14px;margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;white-space:pre-wrap">${escapeHtml(snippet) || "(mensaje sin texto)"}</div>
-        ${cta}
-        ${createdAt ? `<div style="margin-top:14px;font-size:12px;color:#94a3b8">Recibido el ${escapeHtml(createdAt)}</div>` : ""}
-      </td>
-    </tr>
-    ${EMAIL_FOOTER_HTML}
-  </table>
-</div>
-  `.trim();
+  const bodyHtml = `
+    <div style="margin:0 0 12px;font-size:13px;color:#64748b">${escapeHtml(convTitle || "Conversación directa")}</div>
+    <div style="border-left:3px solid #FD6016;padding:2px 0 2px 14px;margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;white-space:pre-wrap">${escapeHtml(snippet) || "(mensaje sin texto)"}</div>
+    ${createdAt ? `<div style="margin-top:14px;font-size:12px;color:#94a3b8">Recibido el ${escapeHtml(createdAt)}</div>` : ""}`;
+  const html = renderRunlyEmailLayout({
+    kicker,
+    heading: senderName,
+    bodyHtml,
+    cta: link ? { label: "Abrir conversación", url: link } : null,
+    brand: emailBrand(brand),
+  });
 
   const text = [
     `${senderName} ${verb}${convTitle ? ` en ${convTitle}` : ""}:`,
@@ -290,7 +266,6 @@ function buildNotificationEmail({ notification, appBaseUrl, brand = null }) {
   const body = notification?.body ?? "";
   const eventStart = formatDateTime(notification?.metadata?.startAt);
   const reminderLead = reminderLeadText(notification?.metadata?.minutesBefore);
-  const titleEsc = escapeHtml(title);
   const bodyEsc = escapeHtml(body);
   const eventTypeEsc = escapeHtml(labelForEventType(rawEventType));
   const rawPriority = notification?.priority ?? "medium";
@@ -304,18 +279,7 @@ function buildNotificationEmail({ notification, appBaseUrl, brand = null }) {
     sourceLabel ? `Origen: ${sourceLabel}` : null,
   ].filter(Boolean);
 
-  const html = `
-<div style="background:#f3f4f6;padding:24px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#111827">
-  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
-    <tr>
-      <td style="padding:20px 24px;border-bottom:1px solid #eef2ff;background:#f8fafc">
-        ${brandHeaderHtml(brand)}
-        <div style="font-size:12px;color:#6b7280;letter-spacing:.06em;text-transform:uppercase">Notificaciones Runly</div>
-        <h1 style="margin:6px 0 0 0;font-size:24px;line-height:1.25;color:#0f172a">${titleEsc}</h1>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:20px 24px">
+  const bodyHtml = `
         ${body ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#334155">${bodyEsc}</p>` : ""}
         <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 16px 0;border:1px solid #e5e7eb;border-radius:10px">
           <tr><td style="padding:10px 12px;font-size:13px;color:#475569"><strong style="color:#111827">Tipo:</strong> ${eventTypeEsc}</td></tr>
@@ -328,17 +292,14 @@ function buildNotificationEmail({ notification, appBaseUrl, brand = null }) {
               : ""
           }
         </table>
-        ${
-          link
-            ? `<a href="${link}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600">Abrir notificacion</a>`
-            : ""
-        }
-      </td>
-    </tr>
-    ${EMAIL_FOOTER_HTML}
-  </table>
-</div>
-  `.trim();
+        `;
+  const html = renderRunlyEmailLayout({
+    kicker: "Notificaciones Runly",
+    heading: title,
+    bodyHtml,
+    cta: link ? { label: "Abrir notificación", url: link } : null,
+    brand: emailBrand(brand),
+  });
 
   const text = [
     brand?.companyName || "Runly ERP",
@@ -370,8 +331,7 @@ export function createNotificationDeliveryWorker({
   const webPush = webPushService ?? createWebPushService({ prisma });
   const fcm = fcmService ?? createFcmService({});
 
-  // company id -> { logoUrl, companyName } for the email header. Logo comes from
-  // BrandingConfig; falls back to the company name, then the Runly wordmark.
+  // Company branding overrides the Runly defaults when configured.
   async function resolveCompanyBrands(companyIds) {
     const ids = [...new Set(companyIds.filter(Boolean))];
     const brands = new Map();
@@ -381,7 +341,7 @@ export function createNotificationDeliveryWorker({
     try {
       companies = await prisma.company.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, brandingConfig: { select: { logoFileId: true } } },
+        select: { id: true, name: true, brandingConfig: { select: { logoFileId: true, primaryColor: true } } },
       });
     } catch (err) {
       logger?.warn?.(`[notification-delivery] company brand lookup failed: ${asErrorMessage(err)}`);
@@ -412,7 +372,11 @@ export function createNotificationDeliveryWorker({
           logoUrl = null;
         }
       }
-      brands.set(company.id, { logoUrl, companyName: company.name ?? null });
+      brands.set(company.id, {
+        logoUrl,
+        companyName: company.name ?? null,
+        primaryColor: company.brandingConfig?.primaryColor ?? null,
+      });
     }
     return brands;
   }

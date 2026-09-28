@@ -141,7 +141,7 @@ export function AddChannelMembersDialog({ open, onClose, conversationId, existin
         </div>
 
         <ResourceInvitationControl resourceType="chat" resourceId={conversationId} />
-        <DialogFooter className="px-5 py-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)]">
+        <DialogFooter className="px-5 py-3 border-t border-[hsl(var(--border))]">
           <Button variant="outline" onClick={resetAndClose} disabled={isAdding}>
             Cancelar
           </Button>

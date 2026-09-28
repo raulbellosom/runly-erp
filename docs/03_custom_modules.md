@@ -484,7 +484,7 @@ import { toast } from 'sonner'
 | `@runly/sdk` | Yes | External — Atlas API client |
 | `react-router-dom` | Yes | External — in main Vite bundle |
 | Packages in root `node_modules` | Yes | esbuild bundles them into the module bundle |
-| CDN: `https://esm.sh/<pkg>` | Yes | Browser fetches at runtime |
+| CDN: `https://esm.sh/<pkg>@<version>` | Yes | El import HTTPS se conserva; fija la versión y usa proveedores confiables |
 | Node.js built-ins (`fs`, `path`) | No | Browser environment only |
 | `exceljs`, `pdfkit`, `sharp` | No | API-only; use in `api/` not `components/` |
 

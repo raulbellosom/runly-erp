@@ -28,6 +28,8 @@ const MODULE_EXTERNALS_IMPORTMAP = {
   "sonner":                 "ext-sonner",
   "lucide-react":           "ext-lucide-react",
   "recharts":               "ext-recharts",
+  "qrcode":                 "ext-qrcode",
+  "@zxing/browser":         "ext-zxing-browser",
 };
 
 // Dev-mode: route bare specifiers through the same explicit shim entry points
@@ -177,6 +179,8 @@ export default defineConfig({
       "sonner": resolve(__dirname, "node_modules/sonner"),
       "lucide-react": resolve(__dirname, "node_modules/lucide-react"),
       "recharts": resolve(__dirname, "node_modules/recharts"),
+      "qrcode": resolve(__dirname, "node_modules/qrcode"),
+      "@zxing/browser": resolve(__dirname, "node_modules/@zxing/browser"),
       "@tauri-apps/plugin-store": resolve(
         __dirname,
         "node_modules/@tauri-apps/plugin-store/dist-js/index.js",
@@ -209,6 +213,8 @@ export default defineConfig({
         "ext-sonner":              resolve(__dirname, "src/shims/ext-sonner.js"),
         "ext-lucide-react":        resolve(__dirname, "src/shims/ext-lucide-react.js"),
         "ext-recharts":            resolve(__dirname, "src/shims/ext-recharts.js"),
+        "ext-qrcode":              resolve(__dirname, "src/shims/ext-qrcode.js"),
+        "ext-zxing-browser":       resolve(__dirname, "src/shims/ext-zxing-browser.js"),
       },
       output: {
         // Shim entries get non-hashed names at a predictable path so the

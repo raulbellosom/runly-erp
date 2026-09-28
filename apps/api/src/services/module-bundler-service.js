@@ -27,7 +27,16 @@ export const BUNDLE_EXTERNALS = [
   'sonner',
   'lucide-react',
   'recharts',
+  'qrcode',
+  '@zxing/browser',
 ]
+
+// Preserve HTTPS ESM imports in the generated bundle so the browser can load
+// packages from providers such as esm.sh at runtime. HTTP is intentionally not
+// supported: production is HTTPS and browsers would block mixed content.
+export const BUNDLE_EXTERNAL_URL_PATTERNS = ['https://*']
+
+const ESBUILD_EXTERNALS = [...BUNDLE_EXTERNALS, ...BUNDLE_EXTERNAL_URL_PATTERNS]
 
 export async function computeSourceHash(dir) {
   const entries = await collectFiles(dir)
@@ -94,7 +103,7 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
       format: 'esm',
       jsx: 'automatic',
       loader: { '.js': 'jsx', '.jsx': 'jsx' },
-      external: BUNDLE_EXTERNALS,
+      external: ESBUILD_EXTERNALS,
       outfile: artifactPath,
       sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
     })
@@ -214,7 +223,7 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
       format: 'esm',
       jsx: 'automatic',
       loader: { '.js': 'jsx', '.jsx': 'jsx' },
-      external: BUNDLE_EXTERNALS,
+      external: ESBUILD_EXTERNALS,
       outfile,
       sourcemap: process.env.NODE_ENV === 'development' ? 'inline' : false,
     })
@@ -406,7 +415,9 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
                 if (!normalized?.includes('/components/')) return
                 const parts = normalized.split('/')
                 const key = parts[0]
-                if (!key) return
+                // Internal folders (.staging, .previews, .locks, .backups)
+                // are not modules: upload reviews write components there.
+                if (!key || key.startsWith('.')) return
 
                 clearTimeout(debouncers.get(key))
                 debouncers.set(

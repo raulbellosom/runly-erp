@@ -110,6 +110,26 @@ describe('module-bundler-service', () => {
       assert.ok(content.length > 100, 'bundle should have substantial content (not just empty)')
     })
 
+    it('preserves HTTPS ESM CDN imports for the browser', async () => {
+      const { build } = await import('esbuild')
+      const { BUNDLE_EXTERNALS, BUNDLE_EXTERNAL_URL_PATTERNS } = await import('../module-bundler-service.js')
+      const outfile = path.join(tmpBundlesDir, 'cdn-import.js')
+      await build({
+        stdin: {
+          contents: `import confetti from 'https://esm.sh/canvas-confetti@1.9.4'; export default confetti`,
+          resolveDir: tmpModulesDir,
+          sourcefile: 'cdn-import.js',
+        },
+        bundle: true,
+        format: 'esm',
+        outfile,
+        external: [...BUNDLE_EXTERNALS, ...BUNDLE_EXTERNAL_URL_PATTERNS],
+      })
+
+      const content = await fs.readFile(outfile, 'utf8')
+      assert.match(content, /from \"https:\/\/esm\.sh\/canvas-confetti@1\.9\.4\"/)
+    })
+
     it('builds a module bundle from RUNLY_MODULES_DIR', async () => {
       const externalRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-bundler-external-'))
       const moduleDir = path.join(externalRoot, 'custom.externalbundle', 'components')

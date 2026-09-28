@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "node --watch-path=./src --watch-path=../../packages src/index.js",
     "start": "node src/index.js",
     "build": "echo no-build-needed",
     "lint": "echo lint-pending"

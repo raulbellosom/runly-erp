@@ -239,7 +239,7 @@ Reglas de importación (si no se cumplen, la pantalla no carga):
 - No agregues \`/** @jsxRuntime classic */\` ni importes \`createElement\`.
 - Los archivos de componentes deben ser \`.jsx\` (no TypeScript).
 - No hay APIs de Node en el navegador (\`fs\`, \`path\`, \`crypto\`...): eso va en \`api/\`.
-- Para cualquier otra librería del navegador puedes usar \`https://esm.sh/<paquete>\`, pero prefiere las de la tabla.
+- Para otra librería ESM del navegador puedes importar una URL HTTPS completa, por ejemplo \`https://esm.sh/<paquete>@<versión>\`. Fija la versión, usa proveedores confiables y prefiere las librerías compartidas de la tabla para no depender de la red.
 
 ## 6. Guía de diseño de Runly
 
@@ -266,10 +266,12 @@ Para que tu pantalla se vea y se comporte como el resto de Runly:
 
 ## 7. Subir el módulo
 
-1. Comprime la carpeta (con \`module.manifest.js\` en la raíz del ZIP).
-2. En Runly: **Módulos > Subir módulo**, escribe \`${config.key}\` y selecciona el ZIP. Necesitas el permiso \`core.modules.upload\`.
-3. Runly valida el paquete, aplica cambios de tablas seguros, compila \`components/\` y recarga el módulo. Si el módulo aún no estaba instalado, después dale **Instalar** en su tarjeta del catálogo de Módulos.
-4. Si algo falla, el módulo anterior queda intacto y el mensaje indica en qué etapa falló.
+1. Aumenta \`version\` en \`module.manifest.js\` y comprime la carpeta (con \`module.manifest.js\` en la raíz del ZIP).
+2. En Runly: **Subir actualización** en el editor del Constructor, o **Módulos > Subir módulo** escribiendo \`${config.key}\`. Necesitas el permiso \`core.modules.upload\`.
+3. **Revisión**: Runly valida el paquete, lista los cambios de tablas y muestra una vista previa de tus pantallas. Todavía no se aplica nada. Si el módulo no está instalado, la vista previa muestra errores 404 porque su API aún no existe: es normal.
+4. **Aplicar**: clic en **Subir módulo** / **Aplicar actualización**. Runly aplica los cambios de tablas seguros, compila \`components/\` y recarga el módulo.
+5. **Primera vez**: dale **Instalar** en la tarjeta del módulo en el Catálogo de módulos.
+6. Si algo falla, el módulo anterior queda intacto y el mensaje indica en qué etapa falló. Errores frecuentes: ${DEVELOPER_DOCS_URL}/solucion-problemas
 
 ## 8. Problemas frecuentes
 

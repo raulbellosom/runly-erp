@@ -1,9 +1,9 @@
 // Shared branded Runly ERP email shell + concrete templates.
 // Same visual language as buildNotificationEmail in notification-delivery-worker.js
-// (logo header, white card, blue CTA, footer). Keep new transactional emails
+// (logo header, white card, warm Runly CTA, footer). Keep new transactional emails
 // going through renderRunlyEmailLayout so they stay on-brand.
 
-const CTA_COLOR = "#2563eb";
+const CTA_COLOR = "#FD6016";
 
 // Runly's own site — the footer link on every outbound email points here.
 const RUNLY_SITE_URL = "https://runly.mx";
@@ -67,7 +67,9 @@ function safeHexColor(value, fallback) {
 // link to our own root domain, not the kind of pattern spam filters flag.
 export function renderRunlyEmailLayout({ kicker, heading, bodyHtml = "", cta = null, footnote, brand = null, env = process.env }) {
   const apiBaseUrl = resolveApiBaseUrl(env);
-  const runlyLogoUrl = apiBaseUrl ? `${apiBaseUrl}/brand/runly-logo-horizontal.png` : null;
+  // Keep this URL versioned by filename. The previous endpoint served the
+  // retired Atlas artwork and can remain cached by email clients for days.
+  const runlyLogoUrl = apiBaseUrl ? `${apiBaseUrl}/brand/runly-email-logo-light.png` : null;
   const logoUrl = brand?.logoUrl || runlyLogoUrl;
   const logoAlt = brand?.logoUrl ? (brand?.name ?? "Empresa") : "Runly ERP";
   const accentColor = safeHexColor(brand?.primaryColor, CTA_COLOR);
@@ -75,13 +77,13 @@ export function renderRunlyEmailLayout({ kicker, heading, bodyHtml = "", cta = n
   const runlyCreditHtml = `<a href="${RUNLY_SITE_URL}" style="color:${accentColor};font-weight:600;text-decoration:none">Runly ERP</a>`;
 
   return `
-<div style="background:#f3f4f6;padding:24px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#111827">
-  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
+<div style="background:#f5f3ef;padding:24px;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0c172d">
+  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:14px;overflow:hidden">
     <tr>
-      <td style="padding:20px 24px;border-bottom:1px solid #eef2ff;background:#f8fafc">
-        ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(logoAlt)}" style="height:26px;display:block;margin-bottom:10px" />` : ""}
+      <td style="padding:20px 24px;border-bottom:1px solid #fde4d7;background:#fbfbfc">
+        ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(logoAlt)}" style="height:34px;max-width:220px;object-fit:contain;object-position:left center;display:block;margin-bottom:12px" />` : ""}
         ${kicker ? `<div style="font-size:12px;color:#6b7280;letter-spacing:.06em;text-transform:uppercase">${escapeHtml(kicker)}</div>` : ""}
-        <h1 style="margin:6px 0 0 0;font-size:24px;line-height:1.25;color:#0f172a">${escapeHtml(heading)}</h1>
+        <h1 style="margin:6px 0 0 0;font-size:24px;line-height:1.25;color:#0c172d">${escapeHtml(heading)}</h1>
       </td>
     </tr>
     <tr>
@@ -95,7 +97,7 @@ export function renderRunlyEmailLayout({ kicker, heading, bodyHtml = "", cta = n
       </td>
     </tr>
     <tr>
-      <td style="padding:14px 24px;border-top:1px solid #e5e7eb;background:#f8fafc;font-size:12px;color:#64748b">
+      <td style="padding:14px 24px;border-top:1px solid #e4e7ec;background:#fbfbfc;font-size:12px;color:#64748b">
         ${escapeHtml(foot)}
         <div style="margin-top:6px;color:#94a3b8">Con tecnología de ${runlyCreditHtml}</div>
       </td>
