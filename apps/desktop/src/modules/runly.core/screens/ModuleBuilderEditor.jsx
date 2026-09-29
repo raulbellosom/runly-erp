@@ -35,6 +35,7 @@ import { NavigationTab } from "../components/builder/NavigationTab";
 import { PermissionsTab } from "../components/builder/PermissionsTab";
 import { PublicLinksTab } from "../components/builder/PublicLinksTab";
 import { DiagnosticsPanel } from "../components/builder/DiagnosticsPanel";
+import { describeDiagnostic } from "../lib/builderDiagnostics";
 import { PreviewSheet } from "../components/builder/PreviewSheet";
 import { PublishDialog } from "../components/builder/PublishDialog";
 import { DeveloperModeDialog } from "../components/builder/DeveloperModeDialog";
@@ -151,7 +152,7 @@ export default function ModuleBuilderEditor() {
     onSuccess: (res) => {
       setDiagnostics(res.data);
       if (res.data.valid) toast.success("El módulo es válido.");
-      else toast.error(`${res.data.errors.length} error(es) de validación.`);
+      else toast.error(res.data.errors.length === 1 ? "Falta resolver 1 punto." : `Faltan resolver ${res.data.errors.length} puntos.`, { description: "Revisa la lista arriba de las pestañas." });
     },
     onError: (error) => toast.error(error.message ?? "No se pudo validar."),
   });
@@ -207,22 +208,22 @@ export default function ModuleBuilderEditor() {
     onError: (error) => toast.error(error.message ?? "No se pudo descargar el respaldo."),
   });
   // Export and "convertir a modo desarrollador" both need a valid definition.
-  // On a 422 show the real problems (toast + DiagnosticsPanel) instead of the
-  // raw error, and jump to Datos when the module still has no entity.
+  // On a 422 explain the first problem in the toast and open its tab; with
+  // several, "Ver todos" shows the full DiagnosticsPanel.
   function handleActionError(error, fallback) {
     const errors = error?.details?.error === "INVALID_MODULE_DEFINITION" ? error.details.details?.errors : null;
     if (!errors?.length) {
       toast.error(error?.message ?? fallback);
       return;
     }
-    setDiagnostics({ valid: false, errors, warnings: error.details.details.warnings ?? [] });
+    const first = describeDiagnostic(errors[0], definition);
     setDeveloperOpen(false);
-    const noEntities = errors.some((item) => item.path === "entities" && item.code === "REQUIRED");
-    if (noEntities) setActiveTab("data");
+    setActiveTab(first.tab);
     toast.error(fallback, {
-      description: noEntities
-        ? "El módulo necesita al menos una entidad. Agrégala en la pestaña Datos."
-        : `${errors.length} problema(s) de validación: ${errors[0].message}`,
+      description: errors.length > 1 ? `${first.text} Y ${errors.length - 1} punto(s) más.` : first.text,
+      action: errors.length > 1
+        ? { label: "Ver todos", onClick: () => setDiagnostics({ valid: false, errors, warnings: error.details.details.warnings ?? [] }) }
+        : undefined,
     });
   }
 
@@ -329,7 +330,14 @@ export default function ModuleBuilderEditor() {
           </Alert>
         )}
 
-        {diagnostics && !diagnostics.valid && <DiagnosticsPanel diagnostics={diagnostics} />}
+        {diagnostics && !diagnostics.valid && (
+          <DiagnosticsPanel
+            diagnostics={diagnostics}
+            definition={definition}
+            onGoToTab={setActiveTab}
+            onDismiss={() => setDiagnostics(null)}
+          />
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
