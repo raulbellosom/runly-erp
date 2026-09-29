@@ -15,6 +15,7 @@ import { buildUserWelcomeEmail, resolveAppBaseUrl } from "../../services/email-t
 import { createSmtpService } from "../../services/smtp-service.js";
 import { createCompanyBrandService } from "../../services/company-brand-service.js";
 import { createUserAccessService } from "../../services/user-access-service.js";
+import { USERNAME_TAKEN_ERROR } from "../../services/auth-login-service.js";
 import {
   checkMembershipRoleScope,
   checkProtectedRoleAssignment,
@@ -190,6 +191,10 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
       const companyId = tenant.companyId;
       if (!companyId) return c.json({ error: 'Selecciona una empresa activa para crear un usuario.' }, 400);
       const email = fields.email.trim().toLowerCase();
+      if (fields.username) {
+        const taken = await prisma.$queryRaw`SELECT 1 FROM user_profile WHERE lower(username) = ${fields.username} AND lower(email) <> ${email} LIMIT 1`;
+        if (taken.length) return c.json({ error: USERNAME_TAKEN_ERROR }, 409);
+      }
 
       if (fields.roleId) {
         const targetRole = await prisma.role.findFirst({ where: { id: fields.roleId, enabled: true }, select: { key: true, companyId: true } });
@@ -216,7 +221,7 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
       if (authData?.user?.id) {
         try {
           profile = await prisma.userProfile.create({ data: { authUserId: authData.user.id, firstName: fields.firstName, lastName: fields.lastName,
-            displayName: `${fields.firstName} ${fields.lastName}`.trim(), email } });
+            displayName: `${fields.firstName} ${fields.lastName}`.trim(), email, username: fields.username ?? null } });
         } catch (err) {
           await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
           throw err;
@@ -417,6 +422,7 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
           { header: "Apellidos", key: "lastName", width: 24 },
           { header: "Nombre completo", key: "displayName", width: 30 },
           { header: "Correo", key: "email", width: 32 },
+          { header: "Nombre de usuario", key: "username", width: 20 },
           { header: "Rol", key: "roleName", width: 24 },
           { header: "Empresa", key: "companyName", width: 28 },
           { header: "Estado", key: "enabled", width: 12 },
@@ -432,6 +438,7 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
             lastName: user.lastName ?? "",
             displayName: user.displayName ?? "",
             email: user.email ?? "",
+            username: user.username ?? "",
             roleName: membership?.role?.name ?? "",
             companyName: membership?.company?.name ?? "",
             enabled: user.enabled && membership?.enabled ? "Activo" : "Inactivo",

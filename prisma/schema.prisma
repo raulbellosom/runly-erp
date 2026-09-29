@@ -433,6 +433,8 @@ model UserProfile {
   firstName String   @default("") @map("first_name")
   lastName String   @default("") @map("last_name")
   email        String   @unique
+  // Optional login alias; case-insensitive unique index lives in the migration.
+  username     String?
   avatarFileId String? @db.Uuid @map("avatar_file_id")
   birthDate DateTime? @map("birth_date")
   gender       String?

@@ -458,7 +458,26 @@ export const fileRenameSchema = z.object({
     ),
 });
 
+// Instance-wide login alias. Never contains "@", so a login identifier with
+// "@" is always an email and one without it is always a username.
+export const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "El nombre de usuario debe tener al menos 3 caracteres.")
+  .max(30, "El nombre de usuario no puede superar 30 caracteres.")
+  .regex(
+    /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/,
+    "Solo letras, números, punto, guion o guion bajo (sin empezar ni terminar con símbolo).",
+  );
+
+export const loginSchema = z.object({
+  identifier: z.string().trim().min(1),
+  password: z.string().min(1),
+});
+
 export const createUserSchema = z.object({
+  username: z.preprocess((v) => (v === "" ? undefined : v), usernameSchema.optional()),
   firstName: z.string().min(1, "El nombre es obligatorio."),
   lastName: z.string().min(1, "Los apellidos son obligatorios."),
   email: z.string().email("Correo electrónico inválido."),

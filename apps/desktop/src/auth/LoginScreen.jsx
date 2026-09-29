@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Server, Layers, Building2, Mail, Lock, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Server, Layers, Building2, Mail, Lock, User, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { TextField, PasswordField, Button, AuthAtmosphere, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@runly/ui'
 import { clearServerUrl, isTauriRuntime } from '../lib/serverStore.js'
@@ -22,16 +22,18 @@ const CTA_GRADIENT = { backgroundImage: 'linear-gradient(120deg,#FD6016,#E4262A)
 
 // Same shape the API validates with on POST /auth/forgot-password — kept in
 // sync so "well-formed enough to submit" means the same thing on both sides.
+// Values without "@" are usernames and are resolved by the API.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-function isValidEmail(value) {
-  return EMAIL_RE.test(String(value ?? '').trim())
+function isValidIdentifier(value) {
+  const v = String(value ?? '').trim()
+  return v.includes('@') ? EMAIL_RE.test(v) : v.length > 0
 }
 
 export function LoginScreen({ returnTo = '/app' }) {
   const navigate = useNavigate()
   const destination = normalizeAuthReturnPath(returnTo)
   const { session, loading: authLoading } = useAuth()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -70,22 +72,23 @@ export function LoginScreen({ returnTo = '/app' }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!isValidEmail(email) || !password) return
+    if (!identifier.trim() || !password) return
     setError('')
     setLoading(true)
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
-      if (authError) {
-        if (authError.message.includes('Email not confirmed')) {
-          setError('Tu cuenta no ha sido confirmada. Contacta al administrador.')
-        } else {
-          setError('Credenciales incorrectas. Verifica tu correo y contraseña.')
-        }
-        return
-      }
+      // The API resolves a username to its email and signs in server-side;
+      // setSession hands the tokens to the same client AuthProvider listens to.
+      const { data } = await runly.auth.login({ identifier: identifier.trim(), password })
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      })
+      if (sessionError) throw sessionError
       navigate(destination, { replace: true })
-    } catch {
-      setError('Sin conexión con el servidor. Intenta de nuevo.')
+    } catch (err) {
+      if (err?.status === 401) setError('Credenciales incorrectas. Verifica tus datos e intenta de nuevo.')
+      else if (err?.status === 403 || err?.status === 429) setError(err.message)
+      else setError('Sin conexión con el servidor. Intenta de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -93,11 +96,11 @@ export function LoginScreen({ returnTo = '/app' }) {
 
   async function handleForgotSubmit(e) {
     e.preventDefault()
-    if (!isValidEmail(forgotEmail)) return
+    if (!isValidIdentifier(forgotEmail)) return
     setForgotPhase('sending')
     setForgotError('')
     try {
-      await runly.auth.forgotPassword(forgotEmail)
+      await runly.auth.forgotPassword(forgotEmail.trim())
       setForgotPhase('sent')
     } catch (err) {
       // A 400 here is real (malformed email) — show it inline. Anything else
@@ -213,14 +216,16 @@ export function LoginScreen({ returnTo = '/app' }) {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
               <TextField
-                id="email"
-                icon={Mail}
-                label="Correo electrónico"
-                type="email"
+                id="identifier"
+                icon={User}
+                label="Correo o nombre de usuario"
+                type="text"
                 autoComplete="username"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="tu@empresa.com"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={identifier}
+                onChange={e => setIdentifier(e.target.value)}
+                placeholder="tu@empresa.com o usuario"
                 required
               />
               <PasswordField
@@ -244,7 +249,7 @@ export function LoginScreen({ returnTo = '/app' }) {
                 variant="gradient"
                 style={CTA_GRADIENT}
                 className="w-full justify-center"
-                disabled={loading || !isValidEmail(email) || !password}
+                disabled={loading || !identifier.trim() || !password}
                 aria-busy={loading}
               >
                 {loading ? 'Verificando credenciales...' : 'Acceder al sistema'}
@@ -256,7 +261,7 @@ export function LoginScreen({ returnTo = '/app' }) {
               <button
                 type="button"
                 onClick={() => {
-                  setForgotEmail(email)
+                  setForgotEmail(identifier.trim())
                   setForgotOpen(true)
                 }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer"
@@ -286,7 +291,7 @@ export function LoginScreen({ returnTo = '/app' }) {
               </div>
               <DialogTitle>Enlace enviado</DialogTitle>
               <DialogDescription>
-                Si el correo tiene una cuenta, enviamos un enlace para restablecer la contraseña. Revisa tu bandeja de entrada (y spam).
+                Si la cuenta existe, enviamos un enlace para restablecer la contraseña al correo asociado. Revisa tu bandeja de entrada (y spam).
               </DialogDescription>
               <Button type="button" variant="outline" className="mt-2 w-full justify-center" onClick={closeForgotDialog}>
                 Entendido
@@ -310,19 +315,20 @@ export function LoginScreen({ returnTo = '/app' }) {
               <DialogHeader>
                 <DialogTitle>Restablecer contraseña</DialogTitle>
                 <DialogDescription>
-                  Ingresa tu correo y te enviaremos un enlace para elegir una nueva contraseña.
+                  Ingresa tu correo o nombre de usuario y te enviaremos un enlace para elegir una nueva contraseña.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleForgotSubmit} className="flex flex-col gap-3 pt-1">
                 <TextField
                   id="forgot-email"
                   icon={Mail}
-                  label="Correo electrónico"
-                  type="email"
+                  label="Correo o nombre de usuario"
+                  type="text"
                   autoComplete="username"
+                  autoCapitalize="none"
                   value={forgotEmail}
                   onChange={e => setForgotEmail(e.target.value)}
-                  placeholder="tu@empresa.com"
+                  placeholder="tu@empresa.com o usuario"
                   required
                   autoFocus
                 />
@@ -334,7 +340,7 @@ export function LoginScreen({ returnTo = '/app' }) {
                   variant="gradient"
                   style={CTA_GRADIENT}
                   className="w-full justify-center"
-                  disabled={forgotPhase === 'sending' || !isValidEmail(forgotEmail)}
+                  disabled={forgotPhase === 'sending' || !isValidIdentifier(forgotEmail)}
                   aria-busy={forgotPhase === 'sending'}
                 >
                   {forgotPhase === 'sending' ? 'Enviando...' : 'Enviar enlace de restablecimiento'}

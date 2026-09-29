@@ -24,6 +24,7 @@ import { getSignedUrlByFileId } from "../../lib/signed-url-by-file-id.js";
 import { sendPasswordResetEmail } from "../../lib/send-password-reset-email.js";
 import { isForgotPasswordRateLimited } from "../../lib/forgot-password-rate-limit.js";
 import { createCompanyBrandService } from "../../services/company-brand-service.js";
+import { parseUsernameInput, USERNAME_TAKEN_ERROR, isUniqueViolation } from "../../services/auth-login-service.js";
 import {
   PROTECTED_IDENTITY_ROLE_KEYS,
   assertUserInCompany,
@@ -571,10 +572,35 @@ export function createIdentityUserDetailRouter({ prisma, supabaseAdmin, requireP
           patch.postalCode = body.postalCode.trim() || null;
         if (body.postalCode === null) patch.postalCode = null;
 
-        const user = await prisma.userProfile.update({
-          where: { id },
-          data: patch,
-        });
+        let previousUsername;
+        if (body.username !== undefined) {
+          const parsedUsername = parseUsernameInput(body.username);
+          if (!parsedUsername.ok) return c.json({ error: parsedUsername.error }, 400);
+          patch.username = parsedUsername.value;
+          previousUsername = (await prisma.userProfile.findUnique({ where: { id }, select: { username: true } }))?.username ?? null;
+        }
+
+        let user;
+        try {
+          user = await prisma.userProfile.update({
+            where: { id },
+            data: patch,
+          });
+        } catch (err) {
+          if (isUniqueViolation(err)) return c.json({ error: USERNAME_TAKEN_ERROR }, 409);
+          throw err;
+        }
+        if (previousUsername !== undefined && previousUsername !== user.username) {
+          const { actorName } = getActivityContext(c);
+          await publishActivityFromContext(prisma, c, {
+            type: "identity.user.username_changed",
+            severity: "info",
+            entityType: "UserProfile",
+            entityId: id,
+            summary: `${actorName} cambió el nombre de usuario de ${user.displayName}`,
+            payload: { before: { username: previousUsername }, after: { username: user.username } },
+          });
+        }
 
         if (patch.firstName !== undefined || patch.lastName !== undefined) {
           const newDisplay =

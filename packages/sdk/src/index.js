@@ -121,10 +121,16 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     auth: {
       me: (token) =>
         request("/user/me", { headers: withAuthHeaders(token) }),
-      forgotPassword: (email) =>
+      // identifier: email or username.
+      login: ({ identifier, password }) =>
+        request("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ identifier, password }),
+        }),
+      forgotPassword: (identifier) =>
         request("/auth/forgot-password", {
           method: "POST",
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ identifier }),
         }),
     },
     profile: {

@@ -13,7 +13,7 @@ import {
   SelectField,
   TextField,
 } from "@runly/ui";
-import { ArrowLeft, KeyRound, Mail, Shield, UserRound } from "lucide-react";
+import { ArrowLeft, AtSign, KeyRound, Mail, Shield, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -41,6 +41,7 @@ export default function UserCreateScreen() {
     firstName: "",
     lastName: "",
     email: "",
+    username: "",
     password: "",
     confirmPassword: "",
     roleId: NO_ROLE_VALUE,
@@ -80,6 +81,7 @@ export default function UserCreateScreen() {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       email: form.email.trim(),
+      username: form.username.trim().toLowerCase() || undefined,
       password: form.password,
       notifyByEmail: form.notifyByEmail,
     };
@@ -154,6 +156,17 @@ export default function UserCreateScreen() {
                   setForm((prev) => ({ ...prev, email: e.target.value }))
                 }
                 placeholder="usuario@empresa.com"
+              />
+              <TextField
+                icon={AtSign}
+                label="Nombre de usuario (opcional)"
+                value={form.username}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, username: e.target.value }))
+                }
+                placeholder="jgarcia"
+                hint="3 a 30 caracteres: letras, números, punto, guion o guion bajo."
+                autoCapitalize="none"
               />
               <SelectField
                 icon={Shield}

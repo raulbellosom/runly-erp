@@ -15,6 +15,13 @@ export const IDENTITY_USER_FORM = {
           { name: "firstName", label: "Nombre", type: "text", required: true, icon: "UserRound" },
           { name: "lastName", label: "Apellidos", type: "text", required: true, icon: "UserRound" },
           { name: "email", label: "Correo electrónico", type: "text", required: true, icon: "Mail" },
+          {
+            name: "username",
+            label: "Nombre de usuario",
+            type: "text",
+            icon: "AtSign",
+            hint: "Opcional. 3 a 30 caracteres: letras, números, punto, guion o guion bajo.",
+          },
           { name: "phone", label: "Teléfono", type: "phone", icon: "Phone" },
           { name: "birthDate", label: "Fecha de nacimiento", type: "date", icon: "Calendar" },
           {

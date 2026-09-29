@@ -47,7 +47,7 @@ export function serializeIdentityUser(user, avatarUrlMap, includePersonal = fals
   return {
     ...(includePersonal ? Object.fromEntries(personalFields.map((key) => [key, user[key]])) : {}),
     id: user.id, displayName: user.displayName, firstName: user.firstName, lastName: user.lastName,
-    email: user.email, createdAt: user.createdAt, updatedAt: user.updatedAt,
+    email: user.email, username: user.username ?? null, createdAt: user.createdAt, updatedAt: user.updatedAt,
     enabled: user.enabled && (user.memberships ?? []).some((m) => m.enabled),
     avatarUrl: user.avatarFileId
       ? (avatarUrlMap.get(user.avatarFileId) ?? null)

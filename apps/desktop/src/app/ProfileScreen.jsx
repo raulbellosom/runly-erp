@@ -20,6 +20,7 @@ import {
 import { AdvancedFileViewer } from "@runly/ui";
 import { Country, State, City } from "country-state-city";
 import {
+  AtSign,
   CalendarDays,
   LockKeyhole,
   Mail,
@@ -44,6 +45,7 @@ function toDateInputValue(value) {
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
+  username: "",
   birthDate: "",
   gender: "",
   phone: "",
@@ -121,6 +123,7 @@ export function ProfileScreen() {
     const loaded = {
       firstName: data.firstName ?? "",
       lastName: data.lastName ?? "",
+      username: data.username ?? "",
       birthDate: toDateInputValue(data.birthDate),
       gender: data.gender ?? "",
       phone: data.phone ?? "",
@@ -149,9 +152,11 @@ export function ProfileScreen() {
         description: "Tu información personal se guardó correctamente.",
       });
     },
-    onError: () => {
+    onError: (err) => {
       toast.error("No se pudo guardar", {
-        description: "Ocurrió un error al actualizar tu perfil. Inténtalo de nuevo.",
+        description: err?.status === 400 || err?.status === 409
+          ? err.message
+          : "Ocurrió un error al actualizar tu perfil. Inténtalo de nuevo.",
       });
     },
   });
@@ -299,6 +304,15 @@ export function ProfileScreen() {
                     icon={Mail}
                     value={profile?.email ?? ""}
                     disabled
+                  />
+                  <TextField
+                    label="Nombre de usuario"
+                    icon={AtSign}
+                    value={form.username}
+                    placeholder="Opcional"
+                    hint="Puedes usarlo para iniciar sesión en lugar de tu correo."
+                    autoCapitalize="none"
+                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
                   />
                   <DateField
                     label="Fecha de nacimiento"

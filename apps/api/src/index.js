@@ -17,6 +17,7 @@ import pg from "pg";
 const { PrismaClient } = pkg;
 import { createClient } from "@supabase/supabase-js";
 import {
+  loginSchema,
   moduleInstallSchema,
   setupInitializeSchema,
 } from "@runly/validators";
@@ -104,6 +105,13 @@ import { sendPasswordResetEmail } from "./lib/send-password-reset-email.js";
 import { uploadIdentityAvatar } from "./lib/upload-identity-avatar.js";
 import { getSignedUrlByFileId } from "./lib/signed-url-by-file-id.js";
 import { isForgotPasswordRateLimited } from "./lib/forgot-password-rate-limit.js";
+import {
+  createAuthLoginService,
+  LOGIN_ERROR_RESPONSES,
+  parseUsernameInput,
+  USERNAME_TAKEN_ERROR,
+  isUniqueViolation,
+} from "./services/auth-login-service.js";
 import { createCompanyBrandService } from "./services/company-brand-service.js";
 import {
   get as cacheGet,
@@ -177,6 +185,15 @@ const supabaseAnon = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY,
 );
+// Stateless client for /auth/login: the session belongs to the browser, so the
+// server must never keep or auto-refresh it (that would rotate the user's
+// refresh token out from under them).
+const authLoginService = createAuthLoginService({
+  prisma,
+  supabaseAnon: createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  }),
+});
 const broadcaster = createRealtimeBroadcaster({
   prisma,
   supabaseUrl: process.env.SUPABASE_URL,
@@ -768,23 +785,37 @@ app.get("/health", (c) => {
   });
 });
 
+// Public login with email or username. The client receives the Supabase
+// session tokens and installs them with supabase.auth.setSession().
+app.post("/auth/login", async (c) => {
+  const parsed = loginSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "Datos inválidos." }, 400);
+  const result = await authLoginService.login(parsed.data);
+  if (result.ok) return c.json({ data: result.session });
+  const [status, error] = LOGIN_ERROR_RESPONSES[result.code];
+  return c.json({ error, code: result.code }, status);
+});
+
 // Public, unauthenticated self-service password recovery for the login
 // screen. Always answers with the same generic message so this can't be
 // used to enumerate which emails have an account.
 app.post("/auth/forgot-password", async (c) => {
   const GENERIC_RESPONSE = {
-    data: { ok: true, message: "Si el correo existe, enviamos un enlace para restablecer la contraseña." },
+    data: { ok: true, message: "Si la cuenta existe, enviamos un enlace para restablecer la contraseña." },
   };
   try {
     const body = await c.req.json().catch(() => ({}));
-    const email = String(body?.email ?? "").trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // `identifier` (email or username) is current; `email` is kept for older clients.
+    const identifier = String(body?.identifier ?? body?.email ?? "").trim().toLowerCase();
+    if (!identifier) return c.json({ error: "Ingresa tu correo o nombre de usuario." }, 400);
+    if (identifier.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
       return c.json({ error: "Ingresa un correo válido." }, 400);
     }
-    if (isForgotPasswordRateLimited(email)) {
+    if (isForgotPasswordRateLimited(identifier)) {
       return c.json(GENERIC_RESPONSE);
     }
-    await sendPasswordResetEmail(email, { requestedByAdmin: false, prisma, supabaseAdmin, companyBrandService });
+    const email = await authLoginService.resolveEmail(identifier);
+    if (email) await sendPasswordResetEmail(email, { requestedByAdmin: false, prisma, supabaseAdmin, companyBrandService });
     return c.json(GENERIC_RESPONSE);
   } catch {
     return c.json(GENERIC_RESPONSE);
@@ -1137,6 +1168,7 @@ app.get("/user/me", authMiddleware, async (c) => {
       lastName: context.profile.lastName,
       displayName: context.profile.displayName,
       email: context.profile.email,
+      username: context.profile.username ?? null,
       avatarUrl,
       role: tenant.role?.key ?? null,
       isAdmin: tenant.isAdmin,
@@ -1177,6 +1209,7 @@ app.get(
           lastName: context.profile.lastName,
           displayName: context.profile.displayName,
           email: context.profile.email,
+          username: context.profile.username ?? null,
           avatarUrl,
           avatarFileId: context.profile.avatarFileId,
           birthDate: context.profile.birthDate,
@@ -1224,9 +1257,18 @@ app.put(
       if (body.birthDate && Number.isNaN(birthDate?.getTime())) {
         return c.json({ error: "Fecha de nacimiento invalida." }, 400);
       }
-      const updated = await prisma.userProfile.update({
+      const usernamePatch = {};
+      if (body.username !== undefined) {
+        const parsedUsername = parseUsernameInput(body.username);
+        if (!parsedUsername.ok) return c.json({ error: parsedUsername.error }, 400);
+        usernamePatch.username = parsedUsername.value;
+      }
+      let updated;
+      try {
+        updated = await prisma.userProfile.update({
         where: { id: context.profile.id },
         data: {
+          ...usernamePatch,
           firstName,
           lastName,
           displayName: `${firstName} ${lastName}`.trim(),
@@ -1244,6 +1286,20 @@ app.put(
           bio: body.bio ? String(body.bio).trim() : null,
         },
       });
+      } catch (err) {
+        if (isUniqueViolation(err)) return c.json({ error: USERNAME_TAKEN_ERROR }, 409);
+        throw err;
+      }
+      if ("username" in usernamePatch && usernamePatch.username !== (context.profile.username ?? null)) {
+        await publishActivityFromContext(prisma, c, {
+          type: "identity.user.username_changed",
+          severity: "info",
+          entityType: "UserProfile",
+          entityId: updated.id,
+          summary: `${updated.displayName} cambió su nombre de usuario`,
+          payload: { before: { username: context.profile.username ?? null }, after: { username: updated.username } },
+        });
+      }
       const avatarUrl = await getSignedUrlByFileId(
         updated.avatarFileId,
         "card",
@@ -1257,6 +1313,7 @@ app.put(
           lastName: updated.lastName,
           displayName: updated.displayName,
           email: updated.email,
+          username: updated.username,
           avatarUrl,
           avatarFileId: updated.avatarFileId,
           birthDate: updated.birthDate,
