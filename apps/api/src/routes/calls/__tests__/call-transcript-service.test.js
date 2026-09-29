@@ -501,6 +501,52 @@ describe("createCallTranscriptService.requestTrackTranscription", () => {
   });
 });
 
+describe("createCallTranscriptService egress rejection and fallback", () => {
+  it("keeps the capture CAPTURING with the egress error when every track is rejected, so the sweep retries", async () => {
+    let queryRawCalls = 0;
+    let updateData;
+    const prisma = {
+      $queryRaw: async () => { queryRawCalls += 1; return queryRawCalls === 1 ? memberRows() : [{ company_id: COMPANY }]; },
+      callTranscript: {
+        findFirst: async () => null,
+        create: async ({ data }) => ({ id: TRANSCRIPT, createdAt: new Date(), ...data }),
+        update: async ({ data }) => { updateData = data; },
+      },
+      callParticipant: { findMany: async () => [{ livekitIdentity: USER, userId: USER }] },
+      callGuest: { findMany: async () => [] },
+    };
+    const egress = { startTrackEgress: async () => { throw new Error("no response from servers"); } };
+    const svc = createCallTranscriptService({
+      prisma, env: env(), EgressClientImpl: egress,
+      callService: { getLiveCallOrThrow: async () => liveCall },
+      RoomServiceClientImpl: new FakeRoomService([{ identity: USER, tracks: [{ sid: "TR_USER", type: TrackType.AUDIO }] }]),
+    });
+    const out = await svc.requestTrackTranscription({ callId: CALL, requestedByUserId: USER, profileId: USER });
+    assert.equal(out.status, "CAPTURING");
+    assert.equal(out.tracksStarted, 0);
+    assert.equal(updateData.status, undefined, "must not be marked FAILED");
+    assert.match(updateData.failureReason, /no response from servers/);
+  });
+
+  it("retrying a per-participant transcript with no captured audio falls back to the mixed recording", async () => {
+    let updateData;
+    const prisma = {
+      $queryRaw: async () => memberRows(),
+      callTranscript: {
+        findUnique: async () => ({ id: TRANSCRIPT, callId: CALL, conversationId: CONV, status: "FAILED", sourceKind: "PER_TRACK", recordingId: "rec-1" }),
+        update: async ({ data }) => { updateData = data; return { id: TRANSCRIPT, ...data }; },
+      },
+      callTranscriptTrack: { count: async () => 0 },
+      callRecording: { findFirst: async () => ({ id: "rec-1", status: "READY" }) },
+    };
+    const svc = createCallTranscriptService({ prisma, env: env() });
+    const out = await svc.retryTranscript({ transcriptId: TRANSCRIPT, profileId: USER });
+    assert.equal(out.status, "PENDING");
+    assert.equal(updateData.sourceKind, "MIXED");
+    assert.equal(updateData.recordingId, "rec-1");
+  });
+});
+
 describe("createCallTranscriptService.stopTrackTranscription", () => {
   it("rejects (404) when there is no CAPTURING transcript for this call", async () => {
     const prisma = { callTranscript: { findFirst: async () => null } };

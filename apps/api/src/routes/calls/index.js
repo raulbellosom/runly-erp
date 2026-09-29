@@ -237,7 +237,10 @@ export function createCallsRouter({
         // proves the caller's role carries the permission somewhere.
         const profileId = c.get("userId");
         const data = await recordingService.startRecording({ callId, startedByUserId: profileId, profileId });
-        await startLinkedTrackCapture(c, { callId, profileId, recordingId: data.id });
+        // Not awaited: starting track egress can take many seconds (or time
+        // out) while the composite egress spins up; the recording response
+        // must not wait for it.
+        startLinkedTrackCapture(c, { callId, profileId, recordingId: data.id }).catch(() => {});
         return c.json({ data }, 201);
       } catch (error) { return handleError(c, error, "Error iniciando la grabación."); }
     },

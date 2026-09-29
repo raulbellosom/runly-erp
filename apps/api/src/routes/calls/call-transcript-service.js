@@ -230,7 +230,7 @@ export function createCallTranscriptService({
       .filter((t) => !t.trackSid && TRACK_ACTIVE_STATUSES.includes(t.status))
       .map((t) => t.livekitIdentity));
     const pending = speakers.filter((s) => !capturedSids.has(s.audioTrack.sid) && !legacyActive.has(s.identity));
-    if (!pending.length) return 0;
+    if (!pending.length) return { started: 0, error: null };
     const transcriptId = transcript.id;
     const offsetMs = Math.max(0, now().getTime() - new Date(transcript.createdAt ?? now()).getTime());
 
@@ -249,6 +249,7 @@ export function createCallTranscriptService({
     const client = egressClient();
     const s3 = s3Config(env);
     let started = 0;
+    let lastError = null;
     for (const speaker of pending) {
       const speakerUserId = userIdByIdentity.get(speaker.identity) ?? null;
       const speakerGuestId = guestIdByIdentity.get(speaker.identity) ?? null;
@@ -287,10 +288,15 @@ export function createCallTranscriptService({
         // for the rest — their speech may still be picked up as bleed on
         // another open mic (spec §0.2 accepted edge case), and there is
         // nothing useful to persist for a track that never got an egressId.
-        console.warn(`${LOG_PREFIX} No se pudo iniciar egress de pista:`, call.id, speaker.identity, error?.message ?? error);
+        lastError = String(error?.message ?? error);
+        console.warn(`${LOG_PREFIX} No se pudo iniciar egress de pista:`, call.id, speaker.identity, lastError);
       }
     }
-    return started;
+    return { started, error: lastError };
+  }
+
+  function egressFailureReason(error) {
+    return `LiveKit Egress no aceptó la captura por participante: ${error}`.slice(0, 500);
   }
 
   // recordingId (optional): links the capture to the CallRecording started
@@ -335,14 +341,14 @@ export function createCallTranscriptService({
       },
     });
 
-    const started = await startTrackEgresses({ call, transcript: record, speakers });
+    const { started, error: startError } = await startTrackEgresses({ call, transcript: record, speakers });
 
-    if (!started) {
-      await prisma.callTranscript.update({
-        where: { id: record.id },
-        data: { status: "FAILED", failureReason: "No se pudo iniciar ninguna captura de pista.", completedAt: now() },
-      });
-      throw new CallTranscriptError("No se pudo iniciar la captura por pista.", 500);
+    // Egress commonly rejects the first attempt when it starts together with
+    // a room-composite recording (CPU admission while Chrome spins up). The
+    // row stays CAPTURING and the reconcile sweep retries every 30s; the
+    // error is kept on the row so a persistent rejection is visible.
+    if (!started && startError) {
+      await prisma.callTranscript.update({ where: { id: record.id }, data: { failureReason: egressFailureReason(startError) } });
     }
 
     if (logAudit) {
@@ -425,8 +431,15 @@ export function createCallTranscriptService({
         if (callStillLive && !transcript.captureStoppedAt) {
           try {
             const speakers = await listSpeakers(liveCall.livekitRoomName);
-            const added = await startTrackEgresses({ call: liveCall, transcript, speakers, existingTracks: transcript.tracks });
+            const { started: added, error: addError } = await startTrackEgresses({ call: liveCall, transcript, speakers, existingTracks: transcript.tracks });
             if (added) transcript.tracks = await prisma.callTranscriptTrack.findMany({ where: { transcriptId: transcript.id } });
+            if (addError) {
+              await prisma.callTranscript.update({ where: { id: transcript.id }, data: { failureReason: egressFailureReason(addError) } });
+              transcript.failureReason = egressFailureReason(addError);
+            } else if (added && transcript.failureReason) {
+              await prisma.callTranscript.update({ where: { id: transcript.id }, data: { failureReason: null } });
+              transcript.failureReason = null;
+            }
           } catch (error) {
             console.warn(`${LOG_PREFIX} No se pudo revisar participantes nuevos (se reintentará):`, transcript.id, error?.message ?? error);
           }
@@ -488,6 +501,18 @@ export function createCallTranscriptService({
         // track is terminal. While capture is open, all tracks can be terminal
         // just because everyone dropped at once — they may still reconnect.
         const refreshed = await prisma.callTranscriptTrack.findMany({ where: { transcriptId: transcript.id } });
+        if (!refreshed.length && transcript.captureStoppedAt) {
+          // Egress never accepted a single track during the whole capture.
+          await prisma.callTranscript.update({
+            where: { id: transcript.id },
+            data: {
+              status: "FAILED",
+              failureReason: transcript.failureReason || "No se pudo capturar el audio de ningún participante.",
+              completedAt: now(),
+            },
+          });
+          continue;
+        }
         const allTerminal = refreshed.length > 0 && refreshed.every((t) => t.status === "READY" || t.status === "FAILED");
         if (allTerminal && transcript.captureStoppedAt) {
           const anyReady = refreshed.some((t) => t.status === "READY");
@@ -513,12 +538,34 @@ export function createCallTranscriptService({
       throw new CallTranscriptError("Solo se puede reintentar una transcripción fallida.", 409);
     }
 
+    // A per-participant capture that produced no audio cannot be retried as
+    // such (the call is over). Fall back to transcribing the mixed recording
+    // made alongside it, without speaker attribution.
+    let fallback = {};
+    if (transcript.sourceKind === "PER_TRACK") {
+      const readyTracks = await prisma.callTranscriptTrack.count({ where: { transcriptId, status: "READY" } });
+      if (!readyTracks) {
+        const recording = await prisma.callRecording.findFirst({
+          where: { callId: transcript.callId, status: "READY", ...(transcript.recordingId ? { id: transcript.recordingId } : {}) },
+          orderBy: { startedAt: "desc" },
+        });
+        if (!recording) {
+          throw new CallTranscriptError(
+            "No se capturó el audio de cada participante y no hay una grabación lista para transcribir. Si la grabación aún se procesa, intenta en un momento.",
+            409,
+          );
+        }
+        fallback = { sourceKind: "MIXED", recordingId: recording.id };
+      }
+    }
+
     // A manual retry is a deliberate new attempt by a human — reset the
     // automatic-retry budget rather than counting it against MAX_ATTEMPTS,
     // same spirit as pfm_receipt's retryReceipt() resetting FAILED -> PROCESSING.
     const updated = await prisma.callTranscript.update({
       where: { id: transcriptId },
       data: {
+        ...fallback,
         status: "PENDING",
         attempts: 0,
         failureReason: null,
