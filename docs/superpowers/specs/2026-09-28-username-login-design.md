@@ -6,7 +6,7 @@ Username login — sign in with "email or username".
 
 ## 2. Status
 
-Approved (design approved 2026-09-28).
+Complete. Verified: 2026-09-28 (service unit tests, web build, curl smoke tests on running API, manual login with a real account by the user). Users PDF export column deferred.
 
 ## 3. Context
 
