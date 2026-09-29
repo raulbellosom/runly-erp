@@ -87,6 +87,9 @@ class RouteCollisionError extends Error {
 export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null, relationsCapability = null, aiCapability = null }) {
   let moduleRoots = null
   const routerMap = new Map()
+  // Optional api/public.js routers, served only through the module public-link
+  // gateway (routes/module-public-gateway.js), never by the delegation middleware.
+  const publicRouterMap = new Map()
   const routeOwnerMap = new Map()
   const routeSignaturesByModule = new Map()
   const routeStatusMap = new Map()
@@ -231,6 +234,56 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
       path.resolve(moduleDir, 'api', 'index.js'),
       `api/index.js for ${moduleRow.key}`
     )
+  }
+
+  async function resolveModulePublicApiPath(moduleRow) {
+    const moduleDir = await resolveModuleDir(moduleRow)
+    return ensurePathInsideAllowedRoots(
+      path.resolve(moduleDir, 'api', 'public.js'),
+      `api/public.js for ${moduleRow.key}`
+    )
+  }
+
+  // The gateway sets c.env.publicLink / c.env.publicBody; the wrapper exposes
+  // them as c.get('publicLink') / c.get('publicBody') inside the module router.
+  function wrapPublicRouter(moduleRouter) {
+    const wrapped = new Hono()
+    wrapped.use('*', async (c, next) => {
+      c.set('publicLink', c.env?.publicLink ?? null)
+      c.set('publicBody', c.env?.publicBody ?? null)
+      await next()
+    })
+    wrapped.route('/', moduleRouter)
+    return wrapped
+  }
+
+  async function loadModulePublicRouter(moduleRow) {
+    const moduleKey = moduleRow.key
+    publicRouterMap.delete(moduleKey)
+    const publicPath = await resolveModulePublicApiPath(moduleRow)
+    if (!(await pathExists(publicPath))) return false
+    const moduleNamespace = await importModuleFile(publicPath, path.dirname(path.dirname(publicPath)))
+    const factory =
+      typeof moduleNamespace.default === 'function'
+        ? moduleNamespace.default
+        : typeof moduleNamespace.createPublicRouter === 'function'
+          ? moduleNamespace.createPublicRouter
+          : null
+    if (!factory) throw new Error(`api/public.js does not export a router factory function for ${moduleKey}.`)
+    const moduleRouter = await factory({
+      prisma,
+      cache,
+      moduleContext: {
+        moduleKey,
+        manifest: moduleRow.manifest ?? null,
+        relations: relationsCapability,
+      },
+    })
+    if (!moduleRouter || typeof moduleRouter.fetch !== 'function') {
+      throw new Error(`Public router factory for ${moduleKey} did not return a valid Hono app.`)
+    }
+    publicRouterMap.set(moduleKey, { moduleKey, router: wrapPublicRouter(moduleRouter) })
+    return true
   }
 
   async function resolveModuleComponentsPath(moduleRow) {
@@ -486,6 +539,7 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
     if (!key) return { loaded: false, reason: 'invalid_module_key' }
 
     routerMap.delete(key)
+    publicRouterMap.delete(key)
     unloadModuleRoutes(key)
     unloadModuleComponents(key)
     const moduleRow = await prisma.runlyModule.findUnique({
@@ -507,6 +561,12 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         console.error(`[route-loader] components ${key}: ${message}`)
+      }
+      try {
+        await loadModulePublicRouter(moduleRow)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error(`[route-loader] public routes ${key}: ${message}`)
       }
       return result
     } catch (err) {
@@ -535,6 +595,7 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
     const key = typeof moduleKey === 'string' ? moduleKey.trim() : ''
     if (!key) return false
     const removed = routerMap.delete(key)
+    publicRouterMap.delete(key)
     unloadModuleRoutes(key)
     unloadModuleComponents(key)
     setModuleRouteStatus(key, 'UNLOADED', { reason: 'manual_unload' })
@@ -614,9 +675,14 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
     return ComponentRegistry.getModuleComponents(key)
   }
 
+  function getPublicRouter(moduleKey) {
+    return publicRouterMap.get(normalizeModuleKey(moduleKey))?.router ?? null
+  }
+
   return {
     initialize,
     reloadModule,
+    getPublicRouter,
     unloadModule,
     syncInstalledModules,
     getLoadedModules,

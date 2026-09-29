@@ -2,6 +2,7 @@ import { MODULE_KINDS } from './constants.js'
 import { ModuleEngineError } from './errors.js'
 import { isModuleIconName } from './module-icons.js'
 import { validateAiManifest } from './ai-manifest.js'
+import { validatePublicResources } from './public-resources-manifest.js'
 
 const VALID_KINDS = new Set(Object.values(MODULE_KINDS))
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
@@ -216,6 +217,7 @@ export function validateManifest(manifest, options = {}) {
 
   validateMigrations(manifest.migrations, errors)
   validateAiManifest(manifest.ai, errors)
+  validatePublicResources(manifest, errors)
 
   if (manifest.navigation !== undefined) {
     if (!Array.isArray(manifest.navigation)) {

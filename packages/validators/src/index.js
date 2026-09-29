@@ -1352,6 +1352,7 @@ export * from './calls.js';
 export * from './notes.js';
 export * from './support.js';
 export * from './contacts.js';
+export * from './module-public-links.js';
 
 // Module help system (docs/superpowers/specs/2026-09-26-module-help-system-design.md)
 export const helpSearchQuerySchema = z.object({

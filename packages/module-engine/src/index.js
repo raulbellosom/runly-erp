@@ -5,6 +5,9 @@
 export { ModuleEngineError }             from './errors.js'
 export { validateAiManifest,
          isIdentifyingAiField }          from './ai-manifest.js'
+export { validatePublicResources,
+         findPublicResource,
+         PUBLIC_RESOURCE_MODES }         from './public-resources-manifest.js'
 export { defineRunlyModule,
          // Kept for the @atlas/* package-scope compatibility system (vite.config.js):
          // a custom RME3 module authored against the old @atlas/module-engine import

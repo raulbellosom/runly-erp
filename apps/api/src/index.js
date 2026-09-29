@@ -48,6 +48,9 @@ import { createInventoryNotificationService } from "./services/inventory-notific
 import { createCommentsService, CommentsServiceError } from "./services/comments-service.js";
 import { createInventoryRouter } from "./routes/inventory/index.js";
 import { createModulesRouter } from "./routes/modules.js";
+import { createModulePublicLinksRoutes } from "./routes/module-public-links-routes.js";
+import { createModulePublicGateway } from "./routes/module-public-gateway.js";
+import { createModulePublicLinksService } from "./services/module-public-links-service.js";
 import { createBuilderRouter } from "./routes/builder-routes.js";
 import {
   createPublicWebsiteRouter,
@@ -1958,6 +1961,15 @@ app.route("/public/website", publicCheckoutRouter);
 const storefrontRouter = createStorefrontRouter({ prisma, supabaseAdmin, supabaseAnon });
 app.route("/public/storefront", storefrontRouter);
 
+// Module public links (spec 2026-09-28-module-public-links-design.md): path-scoped
+// gateway to each module's api/public.js; admin endpoints live under /modules.
+const modulePublicLinksService = createModulePublicLinksService({ prisma });
+app.route("/", createModulePublicGateway({
+  linksService: modulePublicLinksService,
+  getPublicRouter: (moduleKey) => routeLoader.getPublicRouter(moduleKey),
+  resolveLogoUrl: (fileId) => getSignedUrlByFileId(fileId, "card", { prisma, supabaseAdmin }).catch(() => null),
+}));
+
 const pwaRouter = createPwaRouter({ prisma });
 app.route("/pwa", pwaRouter);
 
@@ -1995,6 +2007,7 @@ app.get("/public", (c) => {
       { method: "GET",  path: "/public",                                auth: "none",       description: "This index — lists all public endpoints" },
       { method: "GET",  path: "/public/modules",                        auth: "none",       description: "Installed and enabled modules (key, name, version, navigation)" },
       { method: "GET",  path: "/public/blueprints",                     auth: "none",       description: "Public custom views declared by modules (schema, component path)" },
+      { method: "ALL",  path: "/public/m/:moduleKey/:token/*",          auth: "link token", description: "Module public links: _context plus the module api/public.js routes" },
       // Storefront auth
       { method: "POST", path: "/public/storefront/auth/register",       auth: "none",       description: "Register a storefront user account" },
       { method: "POST", path: "/public/storefront/auth/login",          auth: "none",       description: "Login and obtain access + refresh tokens" },
@@ -2175,6 +2188,7 @@ const modulesRouter = createModulesRouter({
   routeLoader,
   bundlerSvc: bundlerService,
 });
+app.route("/modules", createModulePublicLinksRoutes({ prisma, authMiddleware, requirePermission, linksService: modulePublicLinksService }));
 app.route("/modules", modulesRouter);
 
 // Dist-serve middleware — must be registered BEFORE mountWithAuth() calls.

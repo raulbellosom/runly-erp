@@ -1171,6 +1171,12 @@ export function createModuleLifecycleService({ prisma }) {
         }
       }
 
+      // Public links stop working when their module goes away.
+      await tx.modulePublicLink.updateMany({
+        where: { moduleKey: key, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+
       const updated = await tx.runlyModule.update({
         where: { key },
         data: { status: 'UNINSTALLED', enabled: false },
@@ -1220,6 +1226,7 @@ export function createModuleLifecycleService({ prisma }) {
 
     return prisma.$transaction(async (tx) => {
       const rowsDeleted = await handler.purge({ tx, companyId })
+      await tx.modulePublicLink.deleteMany({ where: { moduleKey: key, companyId } })
       await writeAuditLog(tx, {
         action: 'core.module.reset',
         moduleKey: key,

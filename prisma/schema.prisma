@@ -408,6 +408,7 @@ model Company {
   brandingConfig BrandingConfig?
   permissionGrants UserPermissionGrant[]
   moduleBuilderProjects ModuleBuilderProject[]
+  modulePublicLinks     ModulePublicLink[]
 
   hrEmployees    HrEmployee[]
   hrDepartments  HrDepartment[]
@@ -475,6 +476,7 @@ model UserProfile {
   callsInitiated         Call[]                    @relation("CallInitiator")
   callParticipants       CallParticipant[]         @relation("CallParticipantUser")
   callLinksCreated       CallLink[]                @relation("CallLinkCreatedBy")
+  modulePublicLinksCreated ModulePublicLink[]      @relation("ModulePublicLinkCreatedBy")
   callInvitesSent        CallInvite[]              @relation("CallInviteInvitedBy")
   callGuestsAdmitted     CallGuest[]               @relation("CallGuestAdmittedBy")
   callMessagesSent       CallMessage[]             @relation("CallMessageSenderUser")
@@ -3914,4 +3916,32 @@ model ChatMiraiMessage {
 
   @@index([threadId, createdAt])
   @@map("chat_mirai_message")
+}
+
+// Public links to RME3 module resources (spec:
+// docs/superpowers/specs/2026-09-28-module-public-links-design.md).
+model ModulePublicLink {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  companyId       String    @db.Uuid @map("company_id")
+  moduleKey       String    @map("module_key")
+  resourceKey     String    @map("resource_key")
+  recordId        String?   @db.Uuid @map("record_id")
+  token           String    @unique
+  mode            String
+  label           String?
+  expiresAt       DateTime? @map("expires_at")
+  maxUses         Int?      @map("max_uses")
+  useCount        Int       @default(0) @map("use_count")
+  lastUsedAt      DateTime? @map("last_used_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdByUserId String    @db.Uuid @map("created_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy UserProfile @relation("ModulePublicLinkCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([companyId, moduleKey, resourceKey])
+  @@index([companyId, moduleKey, recordId])
+  @@map("module_public_link")
 }

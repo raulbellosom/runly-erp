@@ -566,6 +566,9 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `FileUploader` | File upload widget with progress |
 | `FileViewer` | File preview (PDF, image, etc.) |
 | `AttachmentsPanel` | File attachments list panel |
+| `PublicLinksPanel` | Public links of one module resource: list (status, uses, expiry), create, copy, QR and revoke. Props: `apiBaseUrl`, `token`, `companyId`, `moduleKey`, `resource`, `recordId`. See `rme3-public-links.md`. |
+| `ShareLinkDialog` | Create-one-link dialog (label, expiry, max uses) used by `PublicLinksPanel`; `onCreate(payload)` must return the link. |
+| `PublicLinkFrame` | Branded frame for public pages opened by a link: company logo/name header and Runly footer. Prop: `publicLink` (from the page props), `title`. |
 | `DocumentsPanel` | Documents list panel |
 | `ImageViewer` | Image lightbox |
 | `ThemedEmojiPicker` | Emoji picker themed with Runly tokens (native emojis, compact grid of ~9 per row at 300px, no preview). Props: `onEmojiClick(emojiData)` (`emojiData.emoji` is the character), `width`, `height`, `className`, `style`, `dark` (force a theme; defaults to following the app). Scrolls correctly inside a `Popover` opened from a `Dialog`/`Sheet`. Use it instead of importing `emoji-picker-react` directly. |

@@ -533,6 +533,13 @@ Important distinction:
 
 ---
 
+## Public links (enlaces públicos)
+
+Optional. A module (or its ZIP) can include `publicResources` in the manifest,
+a public CUSTOM view under `/p/`, and `api/public.js`. The ZIP validation
+rejects invalid `publicResources`. Full recipe, security rules and status
+codes: [ai-context/rme3-public-links.md](ai-context/rme3-public-links.md).
+
 ## Module checklist
 
 Use this checklist after completing the 13-step SDD workflow above. An item is complete only when tested.

@@ -96,6 +96,16 @@ After changes: `curl -X POST http://localhost:4010/modules/sync -H "Authorizatio
 
 ---
 
+## Public links and public pages
+
+To let people without a session view a record or submit a form, declare
+`publicResources` in the manifest, add a CUSTOM view with `schema.public: true`
+under `/p/`, and implement `api/public.js` (never expose `api/index.js`
+routes). Runly handles token, expiry, revocation, uses and rate limits. Recipe
+and security rules: `docs/ai-context/rme3-public-links.md`.
+
+---
+
 ## Reference implementation
 
 `scripts/fixtures/rme3-devkit/custom.goldenpath/` is the canonical example of a complete RME3 module.

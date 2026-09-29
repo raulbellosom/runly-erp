@@ -78,9 +78,9 @@ the caller needs the resource's `managePermission` (the module must be
 installed and enabled; unknown resource -> 404).
 
 - `GET /modules/:key/public-links?resource=&recordId=` -> `{ data: [link] }`
-  where `link = { id, resourceKey, recordId, mode, label, url, expiresAt, maxUses, useCount, lastUsedAt, revokedAt, status, createdAt }`
-  and `status` is `activo | vencido | agotado | revocado`. `url` is the public
-  page URL (section 5), built from the instance's public web base URL.
+  where `link = { id, resourceKey, recordId, mode, label, path, expiresAt, maxUses, useCount, lastUsedAt, revokedAt, status, createdAt }`
+  and `status` is `activo | vencido | agotado | revocado`. `path` is the public
+  page path (section 5); the client prefixes its own origin.
 - `POST /modules/:key/public-links` body `{ resource, recordId?, label?, expiresAt?, maxUses? }`
   (Zod in `packages/validators`). `recordId` required when the resource declares
   `entity`. `maxUses` 1..100000, `expiresAt` in the future. Returns the link.

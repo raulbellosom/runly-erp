@@ -260,6 +260,30 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     },
     modules: {
       list: (token) => request("/modules", { headers: withAuthHeaders(token) }),
+      // Module public links (spec 2026-09-28-module-public-links-design.md).
+      publicLinks: {
+        list: (key, { resource, recordId } = {}, token) => {
+          const qs = new URLSearchParams({ resource: resource ?? "" });
+          if (recordId) qs.set("recordId", recordId);
+          return request(`/modules/${encodeURIComponent(key)}/public-links?${qs}`, {
+            headers: withAuthHeaders(token),
+            onlineOnly: true,
+          });
+        },
+        create: (key, payload, token) =>
+          request(`/modules/${encodeURIComponent(key)}/public-links`, {
+            method: "POST",
+            headers: withAuthHeaders(token),
+            body: JSON.stringify(payload),
+            onlineOnly: true,
+          }),
+        revoke: (key, linkId, token) =>
+          request(`/modules/${encodeURIComponent(key)}/public-links/${encodeURIComponent(linkId)}/revoke`, {
+            method: "POST",
+            headers: withAuthHeaders(token),
+            onlineOnly: true,
+          }),
+      },
       getAvailable: (token) =>
         request("/modules/available", { headers: withAuthHeaders(token) }),
       queryDashboard: (key, payload, token) =>

@@ -9,7 +9,7 @@ import { getApiUrl } from '../lib/runtimeConfig.js'
 // bundle version instead of importing and registering it again.
 const bundleLoads = new Map()
 
-function loadBundle(key, bundleVersion) {
+export function loadBundle(key, bundleVersion) {
   const cacheKey = `${key}@${bundleVersion ?? ''}`
   if (bundleVersion != null && bundleLoads.has(cacheKey)) return bundleLoads.get(cacheKey)
   const bundleUrl = new URL(`${getApiUrl()}/modules/${key}/bundle.js`)
