@@ -10,12 +10,15 @@ export const IDENTITY_USER_DETAIL = {
     layout: "two-column",
     hero: {
       titleField: "displayName",
-      subtitleFields: ["email"],
       statusField: "enabled",
       statusMap: ENABLED_STATUS_MAP,
       avatarUserField: "id",
       fallbackIcon: "UserRound",
-      metaChips: [{ field: "phone", label: "Teléfono", icon: "Phone" }],
+      metaChips: [
+        { field: "email", label: "Correo", icon: "Mail" },
+        { field: "username", label: "Nombre de usuario", icon: "AtSign" },
+        { field: "phone", label: "Teléfono", icon: "Phone" },
+      ],
     },
     kpis: [
       { label: "Estado", field: "enabled", type: "select", options: [{ value: true, label: "Activo" }, { value: false, label: "Inactivo" }], icon: "CircleCheck" },
@@ -32,6 +35,7 @@ export const IDENTITY_USER_DETAIL = {
         fields: [
           { field: "firstName", label: "Nombre", icon: "UserRound" },
           { field: "lastName", label: "Apellidos", icon: "UserRound" },
+          { field: "username", label: "Nombre de usuario", icon: "AtSign" },
           { field: "phone", label: "Teléfono", icon: "Phone" },
           { field: "birthDate", label: "Fecha de nacimiento", type: "date", icon: "Calendar" },
           { field: "gender", label: "Sexo", icon: "VenusAndMars" },

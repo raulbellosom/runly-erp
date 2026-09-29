@@ -152,7 +152,15 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
           buildAvatarUrlMapByFileIds(avatarFileIds, "thumb", { prisma, supabaseAdmin }),
           buildCompanyLogoUrlMapByFileIds(logoFileIds, { prisma, supabaseAdmin }),
         ]);
-        const serialized = serializeIdentityUser(user, avatarUrlMap, tenant.isSystemAdmin, companyLogoUrlMap);
+        // Personal fields go to whoever may edit them (the edit form must load
+        // real values, or saving would blank them) and to the owner.
+        const includePersonal = Boolean(
+          tenant.isSystemAdmin ||
+            tenant.isAdmin ||
+            tenant.permissionSet?.has("identity.users.update") ||
+            id === c.get("userContext")?.profile?.id,
+        );
+        const serialized = serializeIdentityUser(user, avatarUrlMap, includePersonal, companyLogoUrlMap);
 
         return c.json({
           data: { ...serialized, membershipsTotal: serialized.memberships.length },

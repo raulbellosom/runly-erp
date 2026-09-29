@@ -493,13 +493,36 @@ export function createIdentityUserDetailRouter({ prisma, supabaseAdmin, requireP
         }
         const body = await c.req.json();
         if (!tenant.isAdmin) {
+          const isSelf = id === c.get("userContext").profile.id;
           const keys = Object.keys(body);
-          if (keys.some((key) => key !== "enabled")) return c.json({ error: "El perfil personal solo puede modificarlo su titular o un administrador." }, 403);
-          if (typeof body.enabled !== "boolean") return c.json({ error: "Datos invalidos." }, 400);
-          if (!body.enabled && id === c.get("userContext").profile.id) return c.json({ error: "No puedes revocar tu propio acceso." }, 400);
-          await prisma.membership.updateMany({ where: { companyId: tenant.companyId, userId: id }, data: { enabled: body.enabled } });
-          cacheDelByPrefix("user_ctx:");
-          return c.json({ data: { id, enabled: body.enabled } });
+          // Enabled-only PATCH (users list toggle) flips the company membership,
+          // never the global UserProfile.enabled flag.
+          if (keys.length > 0 && keys.every((key) => key === "enabled")) {
+            if (typeof body.enabled !== "boolean") return c.json({ error: "Datos invalidos." }, 400);
+            if (!body.enabled && isSelf) return c.json({ error: "No puedes revocar tu propio acceso." }, 400);
+            await prisma.membership.updateMany({ where: { companyId: tenant.companyId, userId: id }, data: { enabled: body.enabled } });
+            cacheDelByPrefix("user_ctx:");
+            return c.json({ data: { id, enabled: body.enabled } });
+          }
+          // Personal-profile edit by an identity.users.update holder (or the
+          // owner). The global enabled flag stays admin-only, and a non-admin
+          // may not edit a Runly Admin / System Admin's profile (email change +
+          // password reset would otherwise be an account-takeover path).
+          delete body.enabled;
+          if (!isSelf) {
+            const target = await prisma.userProfile.findUnique({
+              where: { id },
+              include: {
+                memberships: {
+                  where: { companyId: tenant.companyId },
+                  include: { role: { select: { key: true } } },
+                },
+              },
+            });
+            if (target && hasProtectedIdentityAdminRole(target)) {
+              return c.json({ error: "Solo un administrador puede modificar el perfil de un usuario administrador." }, 403);
+            }
+          }
         }
         const patch = {};
 

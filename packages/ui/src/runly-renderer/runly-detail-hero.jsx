@@ -1,7 +1,7 @@
 // Hero glue for RunlyDetail's opt-in presentation layer: resolves the hero image
 // signed URL client-side and composes DetailHero + StatStrip. Kept out of
 // RunlyDetail.jsx to keep that file under the repo file-size budget.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "../components/Badge.jsx";
 import { Card } from "../components/Card.jsx";
 import { DetailHero } from "../components/DetailHero.jsx";
@@ -60,11 +60,13 @@ export async function fetchSignedUrl(apiBaseUrl, token, fileAssetId, companyId =
 // files-service.js's ALLOWED_FILE_ENTITY_TYPES), so it can't be resolved
 // through fetchSignedUrl even when you know its FileAsset id — it needs
 // this dedicated, permission-gated-by-user-id route instead.
-export async function fetchUserAvatarSignedUrl(apiBaseUrl, token, userId, companyId = null) {
+// `variant` ("thumb" | "card" | "full"); omitted, the API serves "full".
+export async function fetchUserAvatarSignedUrl(apiBaseUrl, token, userId, companyId = null, variant = null) {
   if (!userId) return null;
+  const query = variant ? `?variant=${encodeURIComponent(variant)}` : "";
   try {
     const res = await fetch(
-      joinUrl(apiBaseUrl, `/identity/users/${encodeURIComponent(userId)}/avatar/signed-url`),
+      joinUrl(apiBaseUrl, `/identity/users/${encodeURIComponent(userId)}/avatar/signed-url${query}`),
       { headers: buildApiHeaders(token, companyId) },
     );
     if (!res.ok) return null;
@@ -136,11 +138,20 @@ export function HeroContainer({
   const [imageLoading, setImageLoading] = useState(
     Boolean(heroModel.imageAssetId || heroModel.imageDocsPath),
   );
-  // Only set for an "own" resolvable FileAsset (imageField/imageDocsPath) —
-  // an avatar-fallback photo has no file record to open in a viewer, just
-  // a preview image, so it stays null and the photo isn't clickable.
+  // Set for an "own" resolvable FileAsset (imageField/imageDocsPath).
   const [ownAssetId, setOwnAssetId] = useState(null);
+  // Set when the hero shows a user avatar fallback — opened in the viewer
+  // through the dedicated avatar signed-url route (full variant).
+  const [avatarUserId, setAvatarUserId] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const viewerAssetId = ownAssetId ?? (avatarUserId ? `user-avatar-${avatarUserId}` : null);
+  const resolveViewerUrl = useCallback(
+    () =>
+      ownAssetId
+        ? fetchSignedUrl(apiBaseUrl, token, ownAssetId, companyId, heroModel.signedUrlPath ?? undefined)
+        : fetchUserAvatarSignedUrl(apiBaseUrl, token, avatarUserId, companyId, "full"),
+    [ownAssetId, avatarUserId, apiBaseUrl, token, companyId, heroModel.signedUrlPath],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -157,19 +168,26 @@ export function HeroContainer({
       }
       if (!assetId) {
         if (heroModel.avatarUserId) {
-          const avatarUrl = await fetchUserAvatarSignedUrl(
-            apiBaseUrl,
-            token,
-            heroModel.avatarUserId,
-            companyId,
-          );
-          if (!cancelled) {
-            setImageUrl(avatarUrl);
-            setOwnAssetId(null);
-            setImageLoading(false);
-          }
+          // Progressive: paint the small "card" variant first, then swap in
+          // the full-resolution photo once the browser has fully loaded it.
+          const userId = heroModel.avatarUserId;
+          const cardUrl = await fetchUserAvatarSignedUrl(apiBaseUrl, token, userId, companyId, "card");
+          if (cancelled) return;
+          setImageUrl(cardUrl);
+          setOwnAssetId(null);
+          setAvatarUserId(cardUrl ? userId : null);
+          setImageLoading(false);
+          if (!cardUrl) return;
+          const fullUrl = await fetchUserAvatarSignedUrl(apiBaseUrl, token, userId, companyId, "full");
+          if (cancelled || !fullUrl) return;
+          const img = new Image();
+          img.onload = () => {
+            if (!cancelled) setImageUrl(fullUrl);
+          };
+          img.src = fullUrl;
           return;
         }
+        setAvatarUserId(null);
         if (!cancelled) {
           setImageUrl(null);
           setOwnAssetId(null);
@@ -181,6 +199,7 @@ export function HeroContainer({
       if (!cancelled) {
         setImageUrl(url);
         setOwnAssetId(assetId);
+        setAvatarUserId(null);
         setImageLoading(false);
       }
     }
@@ -231,17 +250,17 @@ export function HeroContainer({
         accentHex={heroModel.accentHex}
         chips={heroModel.chips}
         actions={actions}
-        onImageClick={ownAssetId ? () => setViewerOpen(true) : null}
+        onImageClick={viewerAssetId ? () => setViewerOpen(true) : null}
       />
       {kpiRenderItems.length > 0 ? <StatStrip bare items={kpiRenderItems} /> : null}
-      {ownAssetId ? (
+      {viewerAssetId ? (
         <AdvancedFileViewer
           open={viewerOpen}
           onOpenChange={setViewerOpen}
-          files={[{ id: ownAssetId, fileAssetId: ownAssetId, originalName: heroModel.title || "Imagen", mimeType: "image/*" }]}
+          files={[{ id: viewerAssetId, fileAssetId: ownAssetId, originalName: heroModel.title || "Imagen", mimeType: "image/*" }]}
           activeIndex={0}
           onIndexChange={() => {}}
-          onResolveSignedUrl={() => fetchSignedUrl(apiBaseUrl, token, ownAssetId, companyId, heroModel.signedUrlPath ?? undefined)}
+          onResolveSignedUrl={resolveViewerUrl}
         />
       ) : null}
     </Card>

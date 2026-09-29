@@ -27,6 +27,7 @@ import { getApiUrl } from "../../../lib/runtimeConfig.js";
 import { runly } from "../../../lib/runly";
 import { IDENTITY_USER_FORM } from "../blueprints/identity-user-form.blueprint.js";
 import { componentRegistry } from "../../../lib/moduleComponentRegistry.js";
+import { UserAvatarPreview } from "../components/UserAvatarPreview.jsx";
 
 const API_BASE = getApiUrl();
 const NO_ROLE_VALUE = "__none__";
@@ -157,21 +158,38 @@ export default function UserEditScreen() {
           </Button>
         }
       />
-      {(isSelf || isSystemAdmin) && <Card variant="shell-flat" className="mt-6 p-4 md:p-5 space-y-3">
+      <Card variant="shell-flat" className="mt-6 p-4 md:p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Camera className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
           <h3 className="text-sm font-semibold text-[hsl(var(--foreground))]">Foto de perfil</h3>
         </div>
-        <DistDropZone
-          variant="compact"
-          accept="image/*"
-          maxSizeMB={10}
-          onFile={(file) => avatarMutation.mutate(file)}
-          isUploading={avatarMutation.isPending}
-          emptyLabel="Arrastra o haz clic para subir una foto"
-          emptyHint="JPG, PNG o WebP · máximo 10 MB"
-        />
-      </Card>}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <UserAvatarPreview
+            userId={userId}
+            avatarUrl={user?.avatarUrl}
+            displayName={user?.displayName}
+            token={token}
+            isUploading={avatarMutation.isPending}
+          />
+          <div className="min-w-0 flex-1">
+            {isSelf || isSystemAdmin ? (
+              <DistDropZone
+                variant="compact"
+                accept="image/*"
+                maxSizeMB={10}
+                onFile={(file) => avatarMutation.mutate(file)}
+                isUploading={avatarMutation.isPending}
+                emptyLabel="Arrastra o haz clic para subir una foto"
+                emptyHint="JPG, PNG o WebP · máximo 10 MB"
+              />
+            ) : (
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                Solo la persona titular o un administrador del sistema puede cambiar la foto de perfil.
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
       {!isSelf && (isSystemAdmin || canSubmit) && (
         <Card variant="shell-flat" className="mt-6 p-4 md:p-5 space-y-3">
           <div className="flex items-center gap-2">
@@ -280,7 +298,7 @@ export default function UserEditScreen() {
       />
 
       <div className="mt-6">
-        {!isSelf ? <RunlyForm
+        <RunlyForm
           blueprint={IDENTITY_USER_FORM}
           initialData={user ?? {}}
           mode="edit"
@@ -291,13 +309,14 @@ export default function UserEditScreen() {
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["identity-user", userId] });
             queryClient.invalidateQueries({ queryKey: ["identity-users"] });
+            if (isSelf) {
+              queryClient.invalidateQueries({ queryKey: ["profile-me"] });
+              refreshProfile(session);
+            }
             navigate(`/app/m/runly.identity/identity/users/${userId}`);
           }}
           onCancel={() => navigate(`/app/m/runly.identity/identity/users/${userId}`)}
-        /> : <Card variant="shell-flat" className="p-4">
-          <p>La persona administra su perfil desde Mi perfil. Los roles y el acceso a esta empresa se administran en el detalle del usuario.</p>
-          <Button className="mt-3" onClick={() => navigate(`/app/m/runly.identity/identity/users/${userId}`)}>Administrar acceso empresarial</Button>
-        </Card>}
+        />
       </div>
     </div>
   );

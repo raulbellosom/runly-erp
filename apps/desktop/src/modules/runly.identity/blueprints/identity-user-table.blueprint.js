@@ -5,10 +5,18 @@ export const IDENTITY_USER_TABLE = {
     apiPath: "/identity/users",
     primaryField: "displayName",
     searchable: true,
-    searchPlaceholder: "Buscar usuario...",
+    searchPlaceholder: "Buscar por nombre, usuario o correo...",
     columns: [
-      { field: "avatarUrl", label: "Foto", type: "image", sortable: false },
+      {
+        field: "avatarUrl",
+        label: "Foto",
+        type: "image",
+        sortable: false,
+        avatarUserField: "id",
+        avatarLabelField: "displayName",
+      },
       { field: "displayName", label: "Usuario", sortable: true, link: true },
+      { field: "username", label: "Nombre de usuario", sortable: true },
       { field: "email", label: "Correo", sortable: true },
       { field: "memberships.0.roleName", label: "Rol", sortable: false },
       {

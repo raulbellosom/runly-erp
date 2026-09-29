@@ -67,7 +67,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     setThumbLoading(true);
     const resolve = fileAssetId
       ? resolveSignedUrl(fileAssetId)
-      : fetchUserAvatarSignedUrl(apiBaseUrl, token, avatarUserId, companyId);
+      : fetchUserAvatarSignedUrl(apiBaseUrl, token, avatarUserId, companyId, "thumb");
     resolve.then((url) => {
       if (!cancelled) {
         setThumbUrl(url);
@@ -80,7 +80,13 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
   }, [fileAssetId, avatarUserId, resolveSignedUrl, apiBaseUrl, token, companyId]);
 
   const handleOpen = useCallback(async () => {
-    if (!fileAssetId) return;
+    if (!fileAssetId) {
+      if (!avatarUserId) return;
+      setViewerFiles([{ id: `user-avatar-${avatarUserId}`, avatarUserId, originalName: "Foto de perfil", mimeType: "image/*" }]);
+      setActiveIndex(0);
+      setOpen(true);
+      return;
+    }
     setViewerLoading(true);
     try {
       if (column?.imagesApiPath && row?.id) {
@@ -106,7 +112,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     } finally {
       setViewerLoading(false);
     }
-  }, [fileAssetId, column?.imagesApiPath, row?.id, apiBaseUrl, token, companyId]);
+  }, [fileAssetId, avatarUserId, column?.imagesApiPath, row?.id, apiBaseUrl, token, companyId]);
 
   const avatarLabel = column?.avatarLabelField ? row?.[column.avatarLabelField] : null;
 
@@ -114,9 +120,9 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     return <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>;
   }
 
-  // Only an own FileAsset (fileAssetId) opens the viewer — an avatar
-  // fallback has no file record to open, just a preview photo.
-  const clickable = Boolean(fileAssetId);
+  // An own FileAsset opens its files; an avatar fallback opens the
+  // full-resolution avatar through the dedicated signed-url route.
+  const clickable = Boolean(fileAssetId || (avatarUserId && thumbUrl));
 
   return (
     <>
@@ -144,7 +150,11 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
         files={viewerFiles}
         activeIndex={activeIndex}
         onIndexChange={setActiveIndex}
-        onResolveSignedUrl={(item) => resolveSignedUrl(item?.fileAssetId)}
+        onResolveSignedUrl={(item) =>
+          item?.avatarUserId
+            ? fetchUserAvatarSignedUrl(apiBaseUrl, token, item.avatarUserId, companyId, "full")
+            : resolveSignedUrl(item?.fileAssetId)
+        }
       />
     </>
   );

@@ -133,6 +133,8 @@ export function toIdentitySortOrder(sortBy, sortDir) {
       return [{ displayName: dir }, { createdAt: "desc" }];
     case "email":
       return [{ email: dir }, { createdAt: "desc" }];
+    case "username":
+      return [{ username: { sort: dir, nulls: "last" } }, { createdAt: "desc" }];
     case "enabled":
       return [{ enabled: dir }, { createdAt: "desc" }];
     case "createdAt":
@@ -178,6 +180,7 @@ export function buildIdentityUsersWhere({ search, enabled, companyId }) {
       { firstName: { contains: search, mode: "insensitive" } },
       { lastName: { contains: search, mode: "insensitive" } },
       { email: { contains: search, mode: "insensitive" } },
+      { username: { contains: search, mode: "insensitive" } },
       {
         memberships: {
           some: {

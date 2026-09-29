@@ -31,6 +31,7 @@ import { resolveColorHex } from "./runly-form-utils.js";
 import { formatTableDate } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { ImageAssetCell } from "./ImageAssetCell.jsx";
+import { UserAvatarCell } from "./UserAvatarCell.jsx";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -874,6 +875,17 @@ export function RunlyTable({
                         (o) => String(o.value) === str,
                       );
                       cellContent = opt?.label ?? renderValue(value);
+                    } else if (col.type === "image" && col.avatarUserField) {
+                      cellContent = (
+                        <UserAvatarCell
+                          value={value}
+                          row={row}
+                          column={col}
+                          token={token}
+                          apiBaseUrl={apiBaseUrl}
+                          companyId={companyId}
+                        />
+                      );
                     } else if (col.type === "image") {
                       cellContent = value ? (
                         <img
