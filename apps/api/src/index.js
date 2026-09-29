@@ -1682,14 +1682,16 @@ app.get('/realtime/revision', async (c) => {
 app.post('/realtime/broadcast', authMiddleware, async (c) => {
   const context = await getOrLoadUserContext(c);
   if (!context?.profile?.enabled) return c.json({ error: 'Recurso no disponible.' }, 404);
-  const body = await c.req.json();
+  const body = await c.req.json().catch(() => null);
+  if (!body) return c.json({ error: 'Cuerpo inválido.' }, 400);
   const ok = await realtimeAccess.relay({ topic: body.topic, event: body.event, payload: body.payload, actorId: context.profile.id });
   return c.json({ ok }, ok ? 200 : 404);
 });
 app.post('/realtime/presence', authMiddleware, async (c) => {
   const context = await getOrLoadUserContext(c);
   if (!context?.profile?.enabled) return c.json({ error: 'Recurso no disponible.' }, 404);
-  const body = await c.req.json();
+  const body = await c.req.json().catch(() => null);
+  if (!body) return c.json({ error: 'Cuerpo inválido.' }, 400);
   const data = await realtimeAccess.presence({ topic: body.topic, actorId: context.profile.id, leave: body.leave === true });
   return data ? c.json({ data }) : c.json({ error: 'Recurso no disponible.' }, 404);
 });

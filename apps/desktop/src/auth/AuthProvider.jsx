@@ -174,6 +174,8 @@ export function AuthProvider({ children }) {
         if (eventName === 'TOKEN_REFRESHED' && authUserId && profileLoadedForAuthUserId === authUserId) {
           return
         }
+        // hydrateSession() already loads the profile for the initial session.
+        if (eventName === 'INITIAL_SESSION') return
         const requestedCompanyId = getActiveCompanyId()
         runly.auth.me(session.access_token)
           .then(profile => {

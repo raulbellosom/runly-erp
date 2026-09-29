@@ -26,6 +26,17 @@ export function authorizeRealtimeClient(client) {
     return response.json()
   }
 
+  // All protected channels poll the same revision; share one in-flight request
+  // and back off after a failure so an API restart does not cause a request storm.
+  let revisionPromise = null, revisionFailedAt = 0
+  function fetchRevision() {
+    if (Date.now() - revisionFailedAt < 5_000) return Promise.reject(new Error('Recurso no disponible'))
+    revisionPromise ??= request('revision')
+      .catch((error) => { revisionFailedAt = Date.now(); throw error })
+      .finally(() => { revisionPromise = null })
+    return revisionPromise
+  }
+
   client.channel = (topic, options) => {
     if (!protectedTopic.test(topic)) return nativeChannel(topic, options)
     const bindings = []
@@ -85,7 +96,7 @@ export function authorizeRealtimeClient(client) {
       if (closed || busy) return
       busy = true
       try {
-        const { revision } = await request('revision')
+        const { revision } = await fetchRevision()
         if (closed) return
         if (currentRevision !== revision) {
           if (socket) await nativeRemove(socket)

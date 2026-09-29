@@ -265,6 +265,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Pre-transform the entry graph at server start so the first page load
+    // does not wait for hundreds of on-demand transforms (white screen).
+    warmup: { clientFiles: ["./src/main.jsx"] },
     proxy: (function () {
       const apiTarget = process.env.VITE_RUNLY_API_URL ?? "http://127.0.0.1:4010";
 
