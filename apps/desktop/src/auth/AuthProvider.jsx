@@ -48,7 +48,11 @@ export function AuthProvider({ children }) {
       if (!nextId) _sessionVault.clear().catch(() => {})
     }
 
-    async function forceLogout() {
+    // Guards against a refresh/retry loop when the API keeps rejecting tokens
+    // Supabase considers valid (e.g. API misconfigured against another project).
+    let refreshRetriedForAuthId = null
+
+    async function forceLogout(rejectedToken) {
       // Re-check the shared session BEFORE attempting our own refresh —
       // another module window may have already rotated the (single-use)
       // refresh token and written a fresh session into shared storage.
@@ -61,22 +65,27 @@ export function AuthProvider({ children }) {
       // trying to protect against.
       const { data: freshData } = await supabase.auth.getSession().catch(() => ({ data: null }))
       const freshSession = freshData?.session ?? null
-      if (isSessionFresh(freshSession)) {
+      // Retrying with the exact token the API just rejected would fail again.
+      if (isSessionFresh(freshSession) && freshSession.access_token !== rejectedToken) {
         if (!mounted) return
         setSession(freshSession)
         await refreshProfile(freshSession)
         return
       }
 
-      // No fresh session already available — try refreshing ourselves.
-      // A 401 from the API can be transient (network blip, token rotation
-      // race). Only sign out if the refresh token itself is also dead.
-      const { error: refreshError } = await supabase.auth.refreshSession().catch(() => ({
-        error: new Error('refresh_unavailable'),
-      }))
-      if (!refreshError) {
-        // Refresh succeeded — TOKEN_REFRESHED fires, session is alive.
-        return
+      // No usable session already available — try refreshing ourselves, once
+      // per identity. A 401 from the API can be transient (network blip, token
+      // rotation race). Only sign out if the refresh token itself is also dead
+      // or the API still rejects the refreshed token.
+      if (refreshRetriedForAuthId !== currentAuthId) {
+        refreshRetriedForAuthId = currentAuthId
+        const { error: refreshError } = await supabase.auth.refreshSession().catch(() => ({
+          error: new Error('refresh_unavailable'),
+        }))
+        if (!refreshError) {
+          // Refresh succeeded — TOKEN_REFRESHED fires and re-requests /me.
+          return
+        }
       }
 
       try {
@@ -134,7 +143,7 @@ export function AuthProvider({ children }) {
             })
             .catch(async (error) => {
               if (shouldForceLogout(error)) {
-                await forceLogout()
+                await forceLogout(currentSession.access_token)
                 return
               }
               if (mounted) setProfileSettled(true)
@@ -186,7 +195,7 @@ export function AuthProvider({ children }) {
           })
           .catch(async (error) => {
             if (shouldForceLogout(error)) {
-              await forceLogout()
+              await forceLogout(session.access_token)
               return
             }
             if (mounted) setProfileSettled(true)
@@ -230,8 +239,9 @@ export function AuthProvider({ children }) {
       setProfileCompanyId(requestedCompanyId)
       return profile
     } catch {
-      // Settle anyway so ActiveCompanyGate does not wait forever when offline.
+      // Settle anyway so the boot loader / ActiveCompanyGate never wait forever.
       if (currentIdentityRef.current === activeSession.user?.id && requestedCompanyId === getActiveCompanyId()) {
+        setProfileSettled(true)
         setProfileCompanyId(requestedCompanyId)
       }
       return null

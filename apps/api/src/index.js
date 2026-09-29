@@ -287,6 +287,13 @@ async function authMiddleware(c, next) {
       // Fallback: verify via Supabase network call (handles unknown alg, rotated secrets)
       const { data, error } = await supabaseAdmin.auth.getUser(token);
       if (error || !data.user) {
+        // Never log the token itself — only why Supabase rejected it.
+        console.warn(
+          "[auth] token rejected:",
+          error?.status ?? "",
+          error?.message ?? "no user",
+          jwtSecret ? "(local HS256 verify failed)" : "(SUPABASE_JWT_SECRET unset)",
+        );
         return c.json({ error: "No autorizado. Token invalido o expirado." }, 401);
       }
       userId = data.user.id;
