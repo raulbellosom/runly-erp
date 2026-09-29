@@ -1,6 +1,6 @@
 ---
 title: Desarrollo de módulos en Runly
-summary: Guía para extender con código los módulos creados con el Constructor de módulos — pantallas React, API de los módulos, relaciones, campos y librerías disponibles.
+summary: Guía para extender con código los módulos creados con el Constructor de módulos — pantallas React, API de los módulos, relaciones, enlaces públicos, campos y librerías disponibles.
 order: 0
 ---
 Runly permite crear módulos sin código con el **Constructor de módulos** y extenderlos con código cuando hace falta: pantallas propias en React, integraciones con otros módulos o lógica de API.
@@ -13,6 +13,7 @@ Esta documentación está pensada para personas desarrolladoras **y para asisten
 - [**Pantallas React**](/documentacion/desarrolladores/pantallas-react): vistas `CUSTOM`, registro de componentes, props, llamadas a la API y reglas de diseño.
 - [**API de los módulos**](/documentacion/desarrolladores/api-modulos): endpoints que genera el Constructor para cada entidad, formatos de respuesta, filtros, errores y archivos.
 - [**Relaciones**](/documentacion/desarrolladores/relaciones): relaciones entre entidades del módulo y con módulos del sistema (Flotilla, Inventario, Contactos…), integridad y búsqueda.
+- [**Enlaces y páginas públicas**](/documentacion/desarrolladores/enlaces-publicos): compartir una ficha o un formulario con personas sin cuenta; lo que genera el Constructor, `publicResources`, `api/public.js` y reglas de seguridad.
 - [**Campos**](/documentacion/desarrolladores/campos): tipos de campo, su columna en la base de datos y su valor en la API.
 - [**Librerías disponibles**](/documentacion/desarrolladores/librerias): qué puedes importar en tus componentes, con la versión exacta instalada en Runly, componentes de `@runly/ui` por uso y ejemplos.
 - [**Trabajar con IA**](/documentacion/desarrolladores/ia): `AGENTS.md`, `llms.txt`, cómo pedirle cambios a un asistente y qué revisar antes de subir.

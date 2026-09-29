@@ -206,13 +206,33 @@ export default function ModuleBuilderEditor() {
     },
     onError: (error) => toast.error(error.message ?? "No se pudo descargar el respaldo."),
   });
+  // Export and "convertir a modo desarrollador" both need a valid definition.
+  // On a 422 show the real problems (toast + DiagnosticsPanel) instead of the
+  // raw error, and jump to Datos when the module still has no entity.
+  function handleActionError(error, fallback) {
+    const errors = error?.details?.error === "INVALID_MODULE_DEFINITION" ? error.details.details?.errors : null;
+    if (!errors?.length) {
+      toast.error(error?.message ?? fallback);
+      return;
+    }
+    setDiagnostics({ valid: false, errors, warnings: error.details.details.warnings ?? [] });
+    setDeveloperOpen(false);
+    const noEntities = errors.some((item) => item.path === "entities" && item.code === "REQUIRED");
+    if (noEntities) setActiveTab("data");
+    toast.error(fallback, {
+      description: noEntities
+        ? "El módulo necesita al menos una entidad. Agrégala en la pestaña Datos."
+        : `${errors.length} problema(s) de validación: ${errors[0].message}`,
+    });
+  }
+
   const detachMutation = useMutation({
     mutationFn: () => runly.builder.detachProject(id, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["module-builder-project", id] });
       toast.success("El módulo está en modo desarrollador. Descarga el ZIP para programarlo.");
     },
-    onError: (error) => toast.error(error.message ?? "No se pudo convertir a modo desarrollador."),
+    onError: (error) => handleActionError(error, "No se pudo convertir a modo desarrollador."),
   });
 
   const exportMutation = useMutation({
@@ -227,7 +247,7 @@ export default function ModuleBuilderEditor() {
       a.remove();
       URL.revokeObjectURL(url);
     },
-    onError: (error) => toast.error(error.message ?? "No se pudo exportar el ZIP."),
+    onError: (error) => handleActionError(error, "No se pudo exportar el ZIP."),
   });
 
   const statusLabel = useMemo(() => ({

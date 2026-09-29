@@ -221,10 +221,19 @@ test('deleteDraft: blocks deleting a published project, but allows deleting a pl
   assert.equal(result.deleted, true)
 })
 
-test('detachProject: any project can switch to developer mode, and doing it twice is harmless', async () => {
+test('detachProject: a blank project (no entities) cannot switch to developer mode, since it has no ZIP to download', async () => {
+  const svc = createModuleBuilderService({ prisma: fakePrisma() })
+  const project = await svc.createProject({ companyId: 'company-1', actorId: 'user-1', name: 'X', moduleKey: 'custom.xblank', template: 'blank' })
+  await assert.rejects(
+    () => svc.detachProject({ companyId: 'company-1', actorId: 'user-1', projectId: project.id }),
+    (error) => error instanceof ModuleBuilderError && error.code === 'INVALID_MODULE_DEFINITION' && error.details.errors.some((item) => item.path === 'entities'),
+  )
+})
+
+test('detachProject: any valid project can switch to developer mode, and doing it twice is harmless', async () => {
   const prisma = fakePrisma()
   const svc = createModuleBuilderService({ prisma })
-  const project = await svc.createProject({ companyId: 'company-1', actorId: 'user-1', name: 'X', moduleKey: 'custom.xdetach', template: 'blank' })
+  const project = await svc.createProject({ companyId: 'company-1', actorId: 'user-1', name: 'X', moduleKey: 'custom.xdetach', template: 'simple-crud' })
   const detached = await svc.detachProject({ companyId: 'company-1', actorId: 'user-1', projectId: project.id })
   assert.ok(detached.detachedAt)
   const again = await svc.detachProject({ companyId: 'company-1', actorId: 'user-1', projectId: project.id })

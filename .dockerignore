@@ -25,3 +25,10 @@ coverage
 # runs `vite build`. gen/android alone can reach several GB of local Gradle
 # build cache, which was silently bloating the buildx context transfer.
 apps/desktop/src-tauri/
+
+# Local RME3 modules are instance/test data (git-ignored) and must never be
+# baked into published images; modules are installed at runtime instead.
+modules/custom/*
+!modules/custom/.gitkeep
+modules/official/*
+!modules/official/.gitkeep

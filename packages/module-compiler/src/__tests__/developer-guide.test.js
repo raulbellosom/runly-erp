@@ -24,4 +24,19 @@ test('every package ships a personalized developer guide with real library versi
   const agents = compiled.files.find((file) => file.path === 'AGENTS.md')?.content
   assert.match(agents, /custom\.visitas:<Componente>/)
   assert.match(agents, /runly\.mx\/documentacion\/desarrolladores/)
+  assert.match(guide, /### Enlaces y páginas públicas/)
+  assert.match(guide, /todavía no tiene páginas públicas/)
+  assert.match(agents, /publicResources/)
+})
+
+test('the developer guide lists the public links the Builder generates', () => {
+  const compiled = compileModule({
+    schemaVersion: 1, key: 'custom.visitas', name: 'Visitas', version: '1.0.0', icon: 'Users', color: '#2563EB',
+    pwa: { shortName: 'Visitas', startPath: '/visitas' },
+    entities: [{ key: 'visita', label: 'Visita', pluralLabel: 'Visitas', fields: [{ key: 'nombre', type: 'text', label: 'Nombre' }] }],
+    publicLinks: [{ key: 'ficha', entity: 'visita', mode: 'view', title: 'Ficha de visita', fields: ['nombre'] }],
+  })
+  const guide = compiled.files.find((file) => file.path === 'GUIA_DESARROLLO_RUNLY.md')?.content
+  assert.match(guide, /\| Ficha de visita \| `ficha` \| Ficha \| `visita` \|/)
+  assert.match(guide, /desarrolladores\/enlaces-publicos/)
 })

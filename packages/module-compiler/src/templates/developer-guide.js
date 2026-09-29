@@ -64,6 +64,24 @@ function dataDictionary(config) {
   }).join('\n\n')
 }
 
+function publicLinksNote(config) {
+  const links = config.publicLinks ?? []
+  if (!links.length) {
+    return 'Tu módulo todavía no tiene páginas públicas. Puedes agregarlas sin código en la pestaña **Enlaces** del Constructor, o con código declarando `publicResources` en el manifiesto, una vista CUSTOM con `public: true` y path `/p/...`, y las rutas en `api/public.js`.'
+  }
+  const slug = moduleSlug(config.key)
+  const rows = links.map((link) => `| ${link.title} | \`${link.key}\` | ${link.mode === 'submit' ? 'Formulario' : 'Ficha'} | \`${link.entity}\` |`)
+  return [
+    `Tu módulo comparte estas páginas públicas (pestaña **Enlaces** del Constructor). Se generan en \`publicResources\` del manifiesto, \`views/<clave>.public.js\` (path \`/p/${slug}/...\`) y \`api/public.js\` (\`GET /record\`, \`POST /submit\`):`,
+    '',
+    '| Página | Clave | Tipo | Entidad compartida |',
+    '|---|---|---|---|',
+    ...rows,
+    '',
+    'Esos archivos son del Constructor: si los editas, el módulo pasa a modo desarrollador.',
+  ].join('\n')
+}
+
 function externalRelationsNote(config) {
   const used = [...new Set(config.entities.flatMap((entity) => entity.fields.filter(isExternalRelation).map((field) => field.targetExternal)))]
   const list = used.length
@@ -86,7 +104,7 @@ Este paquete es tu módulo tal como lo generó el Constructor de módulos de Run
 
 > **Modo visual y modo desarrollador.** Si solo **agregas** pantallas React (archivos en \`components/\`, vistas \`views/<nombre>.custom.js\` y sus entradas de menú en el manifiesto), el Constructor las guarda y sigues editando visualmente: se incluyen en cada publicación. Si cambias cualquier otro archivo (por ejemplo \`api/\`, \`models/\` o archivos generados), el proyecto pasa a **modo desarrollador** y el Constructor deja de publicarlo para no borrar tu código; desde el editor puedes volver al modo visual después. No borres \`.module-definition.json\`: con él Runly distingue tus cambios.
 
-**Documentación en línea (siempre actualizada):** ${DEVELOPER_DOCS_URL} — flujo con ZIP, pantallas React, API de los módulos, relaciones, campos y librerías. Para asistentes de IA: ${LLMS_TXT_URL} (índice) y cada página en Markdown (agrega \`.md\` a su URL). Si usas un asistente de código, dale también el archivo \`AGENTS.md\` de este paquete.
+**Documentación en línea (siempre actualizada):** ${DEVELOPER_DOCS_URL} — flujo con ZIP, pantallas React, API de los módulos, relaciones, enlaces públicos, campos y librerías. Para asistentes de IA: ${LLMS_TXT_URL} (índice) y cada página en Markdown (agrega \`.md\` a su URL). Si usas un asistente de código, dale también el archivo \`AGENTS.md\` de este paquete.
 
 ## 1. Estructura del paquete
 
@@ -229,6 +247,14 @@ ${fence}
 
 Tipos: \`contact\`, \`hr_employee\`, \`vehicle\`, \`inventory_item\`, \`project\`, \`task\`, \`calendar_event\`, \`ledger_account\`, \`file\`. Detalles: ${DEVELOPER_DOCS_URL}/relaciones
 
+### Enlaces y páginas públicas
+
+Personas **sin cuenta** en Runly pueden ver un registro o llenar un formulario con un enlace que la empresa crea y puede revocar (con vigencia y límite de usos). Runly protege el enlace; tu módulo solo declara qué se expone.
+
+${publicLinksNote(config)}
+
+En \`api/public.js\` filtra siempre por \`c.get('publicLink').companyId\` (y \`recordId\` si existe), devuelve una lista explícita de campos y valida \`c.get('publicBody')\` con Zod. Receta completa y reglas: ${DEVELOPER_DOCS_URL}/enlaces-publicos
+
 ## 5. Librerías disponibles
 
 ${libraryTable()}
@@ -304,6 +330,7 @@ Este paquete es un módulo de Runly generado por el Constructor de módulos. Ant
 5. Llama a la API con \`fetch(apiBaseUrl + '/${slug}/...', { headers: buildApiHeaders(token, companyId) })\` usando las props del componente (\`token\`, \`companyId\`, \`apiBaseUrl\`). Datos de otros módulos: \`/relation-targets/<tipo>/search\` y \`/resolve\`.
 6. UI con \`@runly/ui\` (PageHeader, SelectField, TextField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton…), nunca \`window.confirm/alert/prompt\` ni controles nativos si existe el componente. Textos en español, sin emojis. Tailwind con tokens del tema (\`hsl(var(--card))\`, \`var(--brand-primary)\`).
 7. Solo usa las librerías listadas en la guía (sección *Librerías disponibles*) con esas versiones.
-8. Sube la versión en \`module.manifest.js\` antes de entregar. La persona sube el ZIP en Runly con "Subir actualización": Runly lo valida y muestra una vista previa antes de aplicar.
+8. Páginas para personas sin cuenta: usa enlaces públicos (\`publicResources\` + vista CUSTOM \`public: true\` en \`/p/...\` + \`api/public.js\`), nunca abras rutas de \`api/index.js\` sin sesión. Filtra por \`publicLink.companyId\`/\`recordId\` y expón solo campos explícitos. Ver ${DEVELOPER_DOCS_URL}/enlaces-publicos.
+9. Sube la versión en \`module.manifest.js\` antes de entregar. La persona sube el ZIP en Runly con "Subir actualización": Runly lo valida y muestra una vista previa antes de aplicar.
 `
 }

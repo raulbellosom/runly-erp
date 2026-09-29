@@ -43,9 +43,9 @@ Si necesitas algo que el Constructor no hace (una pantalla a la medida, una graf
 
 **Pantallas React sin salir del modo visual.** Si tu ZIP solo **agrega** pantallas (archivos en `components/`, vistas `*.custom.js` y sus entradas de menu), el Constructor las guarda en el proyecto y las incluye en cada publicacion; sigues editando todo lo demas visualmente. Aparecen en la pestana **Vistas**, seccion **Pantallas propias (codigo)**, donde tambien puedes quitarlas.
 
-**Modo desarrollador.** Si el ZIP cambia otros archivos (por ejemplo `api/`, los modelos o archivos que genera el Constructor), el proyecto pasa solo a modo desarrollador: el Constructor deja de editarlo y publicarlo para no borrar tu codigo. La revision te avisa antes de aplicar. Tambien puedes congelarlo a mano con **Convertir a modo desarrollador ahora**.
+**Modo desarrollador.** Si el ZIP cambia otros archivos (por ejemplo `api/`, los modelos o archivos que genera el Constructor), el proyecto pasa solo a modo desarrollador: el Constructor deja de editarlo y publicarlo para no borrar tu codigo. La revision te avisa antes de aplicar. Tambien puedes cambiarlo a mano: en el dialogo **Modo desarrollador**, arriba en **Modo de edicion**, usa **Cambiar a modo desarrollador** en la tarjeta Desarrollador. El modulo necesita al menos una entidad.
 
-**Volver al modo visual.** En el dialogo Modo desarrollador, **Volver al modo visual** conserva tus pantallas React. Si hay otros cambios de codigo que se perderian en la siguiente publicacion, te los lista y te deja **Descargar respaldo** del paquete instalado antes de confirmar.
+**Volver al modo visual.** En el mismo dialogo, la tarjeta **Visual** muestra **Volver al modo visual**. Conserva tus pantallas React. Si hay otros cambios de codigo que se perderian en la siguiente publicacion, te los lista y te deja **Descargar respaldo** del paquete instalado antes de confirmar.
 
 ### Errores frecuentes
 

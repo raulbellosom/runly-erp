@@ -836,11 +836,20 @@ Empieza aqui:
 
 ## Publicar una nueva version
 
-Desde la raiz del repositorio (requiere `docker login` y Rust/Buildx para arm64):
+Desde la raiz del repositorio (requiere `docker login` y Docker Buildx):
 
 ```bash
-# Publicar las tres imagenes (multi-platform: linux/amd64 + linux/arm64)
+# Publicar solo las imagenes que cambiaron desde su ultimo release (linux/amd64)
 pnpm docker:release
+
+# Ver que imagenes se publicarian y por que, sin construir nada
+pnpm docker:release:check
+
+# Publicar todas las imagenes aunque no hayan cambiado
+pnpm docker:release:all
+
+# Publicar todas para linux/amd64 + linux/arm64 (servidores ARM; lento, usa emulacion QEMU)
+pnpm docker:release:arm64
 
 # Publicar solo la imagen que cambio
 pnpm docker:release:api

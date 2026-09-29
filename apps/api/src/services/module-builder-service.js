@@ -373,6 +373,10 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     // is then installed through Módulos > Subir módulo (which also detaches
     // automatically, see module-builder-package-sync.js).
     if (project.detachedAt) return serializeProject(project)
+    // Developer mode starts from the downloadable ZIP, which only exists for a
+    // valid definition (e.g. at least one entity); refuse before freezing.
+    const { valid, errors, warnings } = normalizeAndValidate(project.definition)
+    if (!valid) throw new ModuleBuilderError('ModuleDefinition inválida.', { code: 'INVALID_MODULE_DEFINITION', statusCode: 422, details: { errors, warnings } })
     const updated = await prisma.moduleBuilderProject.update({
       where: { id: project.id },
       data: { detachedAt: new Date(), updatedById: actorId },

@@ -42,8 +42,11 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     });
     if (!response.ok) {
       const text = await response.text();
-      const error = new Error(text || `Runly API error ${response.status}`);
+      let details = null;
+      try { details = text ? JSON.parse(text) : null; } catch {}
+      const error = new Error(details?.message || details?.error || text || `Runly API error ${response.status}`);
       error.status = response.status;
+      error.details = details;
       throw error;
     }
     const blob = await response.blob();

@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // infra/docker/build-push.mjs
 //
-// Builds multi-platform images (linux/amd64 + linux/arm64) via docker buildx.
+// Builds linux/amd64 images (plus linux/arm64 with --arm64) via docker buildx.
 //
 // Usage (from repo root):
 //   node infra/docker/build-push.mjs              # build + push only images whose inputs changed
 //                                                 # since their last successful release
 //   node infra/docker/build-push.mjs --all        # build + push every image regardless of changes
 //   node infra/docker/build-push.mjs --dry-run    # print which images would be released and why
+//   node infra/docker/build-push.mjs --arm64      # also build linux/arm64 (slow: QEMU emulation)
 //   node infra/docker/build-push.mjs --build      # local single-platform build only (no push)
 //   node infra/docker/build-push.mjs --push       # multi-platform build + push (same as default)
 //   node infra/docker/build-push.mjs --web        # build + push web image only
@@ -54,7 +55,13 @@ const argv = new Set(process.argv.slice(2));
 const localBuildMode = argv.has("--build");
 
 const REGISTRY  = "raulbellosom/runlyerp";
-const PLATFORMS = "linux/amd64,linux/arm64";
+// amd64 only by default: every current target server is x86_64, and arm64
+// builds run under QEMU emulation on this host (the slowest part of a release).
+// Pass --arm64 to publish a multi-arch image for ARM servers (Oracle Ampere,
+// Hetzner CAX, AWS Graviton). Note: an amd64-only push replaces the multi-arch
+// manifest, so ARM hosts pulling `-latest` afterwards will fail until the
+// next --arm64 release.
+const PLATFORMS = argv.has("--arm64") ? "linux/amd64,linux/arm64" : "linux/amd64";
 const BUILDER   = "runly-multiplatform";
 
 const STATE_FILE = path.join(__dirname, ".release-state.json");
@@ -272,10 +279,11 @@ if (localBuildMode) {
   tryRun("docker", ["image", "prune", "-f"]);
   console.log("\nLocal build done. Images are loaded into your local Docker daemon.");
 } else {
-  // Default / --push: multi-platform build + push via buildx.
-  console.log(`=== Multi-platform build + push (${PLATFORMS}): ${images.map((i) => i.label).join(", ")} ===`);
-  console.log("NOTE: This uses docker buildx. Building linux/arm64 from an amd64 host");
-  console.log("      uses QEMU emulation and may take 10-30 min per image.\n");
+  // Default / --push: build + push via buildx.
+  console.log(`=== Build + push (${PLATFORMS}): ${images.map((i) => i.label).join(", ")} ===`);
+  if (PLATFORMS.includes("arm64")) {
+    console.log("NOTE: Building linux/arm64 from an amd64 host uses QEMU emulation and is slow.\n");
+  }
 
   ensureBuildxBuilder();
 
@@ -297,6 +305,6 @@ if (localBuildMode) {
       writeState(releaseState);
     }
   }
-  console.log("\nMulti-platform build + push done.");
-  console.log(`Images are available on Docker Hub for both linux/amd64 and linux/arm64.`);
+  console.log("\nBuild + push done.");
+  console.log(`Images are available on Docker Hub for ${PLATFORMS}.`);
 }
