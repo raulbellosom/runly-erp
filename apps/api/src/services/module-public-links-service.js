@@ -45,6 +45,12 @@ export function createModulePublicLinksService({ prisma }) {
     return { module: moduleRow, resource, view };
   }
 
+  async function listResources(moduleKey, entity = "") {
+    const moduleRow = await loadActiveModule(moduleKey);
+    const list = Array.isArray(moduleRow?.manifest?.publicResources) ? moduleRow.manifest.publicResources : [];
+    return entity ? list.filter((resource) => resource?.entity === entity) : list;
+  }
+
   function serialize(link, viewPath) {
     return {
       id: link.id,
@@ -145,6 +151,7 @@ export function createModulePublicLinksService({ prisma }) {
 
   return {
     resolveResource,
+    listResources,
     list,
     create,
     revoke,

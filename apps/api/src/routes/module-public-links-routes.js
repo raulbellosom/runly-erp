@@ -40,6 +40,26 @@ export function createModulePublicLinksRoutes({ prisma, authMiddleware, requireP
     return c.json({ error: "No se pudo procesar el enlace." }, 500);
   }
 
+  // Resources of one entity the caller can share (drives the "Compartir"
+  // action on generated record details). Never errors on a missing permission.
+  app.use("/:key/public-resources", authMiddleware);
+  app.get("/:key/public-resources", async (c) => {
+    try {
+      const moduleKey = c.req.param("key");
+      const entity = c.req.query("entity") ?? "";
+      const resources = await linksService.listResources(moduleKey, entity);
+      const data = [];
+      for (const resource of resources) {
+        let allowed = false;
+        await requirePermission(resource.managePermission)(c, async () => { allowed = true; });
+        if (allowed) data.push({ key: resource.key, title: resource.title, mode: resource.mode, entity: resource.entity ?? null });
+      }
+      return c.json({ data });
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
   app.get("/:key/public-links", async (c) => {
     try {
       const moduleKey = c.req.param("key");

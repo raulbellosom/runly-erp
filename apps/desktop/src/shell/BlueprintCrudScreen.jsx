@@ -30,6 +30,7 @@ import { isModuleAvailable } from "../lib/runtimeModules";
 import { componentRegistry } from "../lib/moduleComponentRegistry";
 import { resolveBlueprintPresentation } from "./blueprint-layout-resolver.js";
 import { normalizePath } from '../lib/pathUtils'
+import { useRecordShareAction } from "./useRecordShareAction.jsx";
 
 const API_BASE_URL = getApiUrl();
 
@@ -667,6 +668,14 @@ export function BlueprintCrudScreen() {
     [moduleRows, routeInfo],
   );
 
+  const { extraDetailActions, shareDialog } = useRecordShareAction({
+    moduleKey,
+    entity: selection?.detailBlueprint?.schema?.entity ?? selection?.tableBlueprint?.schema?.entity ?? null,
+    token,
+    companyId: activeCompanyId,
+    apiBaseUrl: API_BASE_URL,
+  });
+
   const presentation = useMemo(
     () =>
       resolveBlueprintPresentation({
@@ -1161,7 +1170,9 @@ export function BlueprintCrudScreen() {
           onCreateSuccess={handleCreateSuccess}
           onEditSuccess={handleEditSuccess}
           onDeleteSuccess={handleDeleteSuccess}
+          extraDetailActions={extraDetailActions}
         />
+        {shareDialog}
       </div>
     </div>
   );

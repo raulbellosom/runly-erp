@@ -112,6 +112,9 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
   // a custom create Sheet outside RunlyCrudView's built-in form) to force the
   // table to refetch — the table has no react-query cache to invalidate.
   refreshSignal: externalRefreshSignal = 0,
+  // Host-provided detail actions: [{ key, label, onClick(record) }] (e.g. the
+  // "Compartir" public-links action added by BlueprintCrudScreen).
+  extraDetailActions = [],
 }, ref) {
   const tableApiPath = getApiPath(tableBlueprint);
   const resolvedInitialMode = MODES.has(initialMode) ? initialMode : "list";
@@ -471,6 +474,11 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                     icon: <ArrowLeft className="h-4 w-4" />,
                     onClick: goToList,
                   },
+                  ...extraDetailActions.map((action) => ({
+                    label: action.label,
+                    icon: action.icon,
+                    onClick: () => action.onClick(recordData),
+                  })),
                   ...detailHeaderActions
                     .filter((action) => isActionVisible(action, recordData))
                     .map((action) => {
@@ -636,6 +644,16 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                       Información del registro seleccionado.
                     </SheetDescription>
                   </SheetHeader>
+                  {extraDetailActions.length > 0 && recordData ? (
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {extraDetailActions.map((action) => (
+                        <Button key={action.key ?? action.label} variant="outline" size="sm" onClick={() => action.onClick(recordData)}>
+                          {action.icon}
+                          {action.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="md:flex-1 md:min-h-0 md:overflow-y-auto pr-1">
                     {renderRecordLoadingOrError() ??
                       (recordData && (

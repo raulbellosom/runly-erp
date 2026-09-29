@@ -92,6 +92,16 @@ export default function createPublicRouter({ prisma }) {
 The panel lists links (status, uses, expiry), creates them (`ShareLinkDialog`),
 copies the URL, shows a QR and revokes with `ConfirmDialog`.
 
+## Builder modules (no code)
+
+The Module Builder "Enlaces" tab stores `definition.publicLinks`; the compiler
+generates the resource, a public view rendered by the built-in
+`runly.public:RecordPage` (from `schema.publicPage`, exposed by
+`GET /public/blueprints`) and `api/public.js` with `GET /record` and
+`POST /submit`. Generated record details show a "Compartir" action when the
+user holds the resource's `managePermission` (`GET /modules/:key/public-resources?entity=`).
+Details: `docs/ai-context/rme3-module-compiler.md`.
+
 ## Security rules for `api/public.js`
 
 - Always scope by `publicLink.companyId`, never by anything in the request.

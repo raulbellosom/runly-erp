@@ -134,3 +134,17 @@ la consulta a modelos owned por el módulo. Aplica compañía, soft-delete,
 filtros/order allowlisted y 200 registros por defecto (máximo 500). El drag
 reutiliza el `PATCH` CRUD con permiso `update`; sin él, el tablero es de lectura.
 SQL, joins, relaciones hidratadas y fuentes cross-module no se admiten en v1.
+
+## Enlaces públicos (`publicLinks`)
+
+Sección opcional de la definición (máximo 10). Cada entrada es una ficha
+pública (`mode: 'view'`, `fields`) o un formulario público (`mode: 'submit'`,
+`targetEntity`, `formFields`, `linkField` opcional). El compilador emite
+`publicResources` en el manifiesto, `views/<key>.public.js` (vista CUSTOM
+pública en `/p/<slug>/<key>` con el componente genérico
+`runly.public:RecordPage` y `schema.publicPage`) y `api/public.js`, que reusa
+los servicios y validadores generados. Solo se exponen los campos listados;
+archivos, JSON y relaciones externas no se aceptan, y todos los campos
+obligatorios del formulario deben estar en `formFields`. Implementación:
+`packages/module-compiler/src/public-links.js`. Plataforma y reglas:
+`docs/ai-context/rme3-public-links.md`.

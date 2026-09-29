@@ -2130,6 +2130,8 @@ app.get("/public/blueprints", async (c) => {
           path: v.schema?.path,
           title: v.schema?.title,
           public: v.schema?.public,
+          // Builder public-link page config (allowlisted field metadata only).
+          ...(v.schema?.publicPage ? { publicPage: v.schema.publicPage } : {}),
         },
         source: "runly-view",
       })),

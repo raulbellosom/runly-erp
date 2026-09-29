@@ -33,6 +33,7 @@ import { EntitiesTab } from "../components/builder/EntitiesTab";
 import { ViewsTab } from "../components/builder/ViewsTab";
 import { NavigationTab } from "../components/builder/NavigationTab";
 import { PermissionsTab } from "../components/builder/PermissionsTab";
+import { PublicLinksTab } from "../components/builder/PublicLinksTab";
 import { DiagnosticsPanel } from "../components/builder/DiagnosticsPanel";
 import { PreviewSheet } from "../components/builder/PreviewSheet";
 import { PublishDialog } from "../components/builder/PublishDialog";
@@ -317,6 +318,7 @@ export default function ModuleBuilderEditor() {
             <TabsTrigger value="views">Vistas</TabsTrigger>
             <TabsTrigger value="navigation">Navegación</TabsTrigger>
             <TabsTrigger value="permissions">Permisos</TabsTrigger>
+            <TabsTrigger value="public">Enlaces</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general">
@@ -352,6 +354,9 @@ export default function ModuleBuilderEditor() {
           </TabsContent>
           <TabsContent value="permissions">
             <PermissionsTab definition={definition} published={summary.published} />
+          </TabsContent>
+          <TabsContent value="public">
+            <PublicLinksTab definition={definition} onChange={patchDefinition} readOnly={Boolean(project.detachedAt)} />
           </TabsContent>
         </Tabs>
       </div>

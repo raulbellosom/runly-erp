@@ -3,6 +3,7 @@ import { dashboardFileName } from './dashboard.js'
 import { kanbanFileName } from './kanban.js'
 import { recordsViewFileName } from './records-view.js'
 import { isRecordsViewKind } from '../records-views.js'
+import { generatePublicResources, publicLinkViewFile } from '../public-links.js'
 
 export function generateManifest(config) {
   const slug = moduleSlug(config.key)
@@ -25,6 +26,7 @@ export function generateManifest(config) {
     .concat((config.views ?? []).filter((view) => view.kind === 'DASHBOARD').map((view) => `  './${dashboardFileName(view)}',`))
     .concat((config.views ?? []).filter((view) => view.kind === 'KANBAN').map((view) => `  './${kanbanFileName(view)}',`))
     .concat((config.views ?? []).filter((view) => isRecordsViewKind(view.kind)).map((view) => `  './${recordsViewFileName(view)}',`))
+    .concat((config.publicLinks ?? []).map((link) => `  './${publicLinkViewFile(link)}',`))
     // Hand-written CUSTOM views kept by the Builder (extensions.js).
     .concat((config.extensions?.views ?? []).map((view) => `  ${JSON.stringify(`./${view.file}`)},`))
     .join('\n')
@@ -126,7 +128,8 @@ ${permissions}
   ],
   navigation: [
 ${navigation}
-  ],
+  ],${config.publicLinks?.length ? `
+  publicResources: ${JSON.stringify(generatePublicResources(config), null, 2).replace(/\n/g, '\n  ')},` : ''}
 })
 `
 }

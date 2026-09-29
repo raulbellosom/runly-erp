@@ -31,6 +31,7 @@ import UserActivitySection from "../modules/runly.identity/components/UserActivi
 import UserSessionSection from "../modules/runly.identity/components/UserSessionSection.jsx";
 import PermissionTreeSection from "../modules/runly.identity/components/PermissionTreeSection.jsx";
 import RoleMembersSection from "../modules/runly.identity/components/RoleMembersSection.jsx";
+import PublicRecordPage from "../shell/PublicRecordPage.jsx";
 
 const _isDev = Boolean(import.meta.env?.DEV);
 
@@ -43,6 +44,9 @@ function warnDev(message) {
 export const componentRegistry = createModuleComponentRegistry({
   warn: warnDev,
 });
+
+// Generic page for Builder public links (module-compiler public-links.js).
+componentRegistry.register("runly.public:RecordPage", PublicRecordPage);
 
 // Static registration for runly.fleet core module components
 componentRegistry.register(

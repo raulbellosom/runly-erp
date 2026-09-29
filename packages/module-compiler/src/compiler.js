@@ -19,6 +19,7 @@ import { dashboardFileName, generateDashboardView } from './templates/dashboard.
 import { generateKanbanView, kanbanFileName } from './templates/kanban.js'
 import { generateRecordsView, recordsViewFileName } from './templates/records-view.js'
 import { isRecordsViewKind } from './records-views.js'
+import { generatePublicApi, generatePublicLinkView, publicLinkViewFile } from './public-links.js'
 
 function toTemplateConfig(definition) {
   return {
@@ -69,6 +70,10 @@ export function compileModule(rawDefinition) {
   }
   for (const view of definition.views.filter((item) => item.kind === 'KANBAN')) add(kanbanFileName(view), generateKanbanView(view))
   for (const view of definition.views.filter((item) => isRecordsViewKind(item.kind))) add(recordsViewFileName(view), generateRecordsView(view))
+  if (definition.publicLinks?.length) {
+    add('api/public.js', generatePublicApi(definition))
+    for (const link of definition.publicLinks) add(publicLinkViewFile(link), generatePublicLinkView(definition, link))
+  }
   // Hand-written React screens kept by the Builder (extensions.js).
   for (const file of definition.extensions?.files ?? []) add(file.path, file.content)
   if (config.preset === 'crud-custom') {

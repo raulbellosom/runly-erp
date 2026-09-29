@@ -132,6 +132,7 @@ export function PublicModuleOutlet() {
     <CustomComponent
       navigate={navigate}
       moduleKey={matchedBlueprint.moduleKey}
+      schema={matchedBlueprint.schema}
       {...(linkToken
         ? { linkToken, apiBaseUrl: linkApiBaseUrl, publicLink: contextQuery.data ?? null }
         : {})}
