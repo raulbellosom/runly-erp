@@ -23,6 +23,8 @@
     "docker:build": "node infra/docker/build-push.mjs --build",
     "docker:push": "node infra/docker/build-push.mjs --push",
     "docker:release": "node infra/docker/build-push.mjs",
+    "docker:release:all": "node infra/docker/build-push.mjs --all",
+    "docker:release:check": "node infra/docker/build-push.mjs --dry-run",
     "docker:release:web": "node infra/docker/build-push.mjs --web",
     "docker:release:api": "node infra/docker/build-push.mjs --api",
     "docker:release:worker": "node infra/docker/build-push.mjs --worker",

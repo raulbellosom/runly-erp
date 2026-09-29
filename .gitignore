@@ -101,3 +101,6 @@ infra/installer/livekit/reverse-proxy.nginx.conf
 
 # Superpowers brainstorming scratch
 .superpowers/
+
+# Per-machine record of the last commit released per Docker image (build-push.mjs).
+infra/docker/.release-state.json
