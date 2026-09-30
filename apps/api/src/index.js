@@ -92,6 +92,8 @@ import {
   getActivityContext,
 } from "./services/activity-publisher.js";
 import { createModuleBundlerService } from "./services/module-bundler-service.js";
+import { createModuleLifecycleService } from "./services/module-lifecycle-service.js";
+import { coreModules } from "./manifests/official/core-modules.js";
 import { createRouteLoaderService } from "./services/route-loader-service.js";
 import { createModuleFilesCapability } from "./services/module-files-service.js";
 import { createModuleAiCapability } from "./services/ai/module-ai-capability.js";
@@ -782,6 +784,16 @@ if (process.env.RUNLY_API_TEST_MODE !== "1") {
 }
 
 ensureBuckets();
+
+// Instances updated to a new image never re-run POST /modules/sync, so tables
+// declared inline in core manifests (e.g. inventory_assistant_thread) are
+// provisioned here on boot. Non-blocking and idempotent.
+if (process.env.RUNLY_API_TEST_MODE !== "1") {
+  createModuleLifecycleService({ prisma })
+    .ensureCoreInlineModels({ manifests: coreModules })
+    .then((keys) => { if (keys.length) console.log(`[modules] core inline models ensured: ${keys.join(", ")}`); })
+    .catch((err) => console.error("[modules] core inline model provisioning failed:", err?.message ?? err));
+}
 
 app.get("/health", (c) => {
   const now = new Date();

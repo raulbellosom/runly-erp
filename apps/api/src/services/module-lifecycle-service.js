@@ -1341,6 +1341,36 @@ export function createModuleLifecycleService({ prisma }) {
     }
   }
 
+  // Built-in manifests can declare Runly ORM models inline. Filesystem
+  // modules continue through their existing discovery/install flow.
+  async function provisionCoreInlineModels({ manifest, actorId }) {
+    const inlineModels = (Array.isArray(manifest.models) ? manifest.models : []).filter(model => model && typeof model === 'object')
+    if (!inlineModels.length || !isOfficialCoreModuleKey(manifest.key)) return false
+    await metadataSvc.syncModuleMetadata({ manifest, models: inlineModels, views: manifest.views ?? [] })
+    await applyModuleOrmMigrations({ moduleKey: manifest.key, actorId })
+    return true
+  }
+
+  // Boot-time repair: an instance updated to a new image never calls
+  // POST /modules/sync, so tables added to a core manifest's inline models
+  // would be missing. Only touches modules already registered in this DB
+  // (uninitialized instances get them on their first sync). Idempotent —
+  // applyModuleOrmMigrations skips plans that are already applied.
+  async function ensureCoreInlineModels({ manifests, actorId = null }) {
+    const provisioned = []
+    for (const manifest of manifests) {
+      if (!Array.isArray(manifest.models) || !manifest.models.length) continue
+      const row = await prisma.runlyModule.findUnique({ where: { key: manifest.key }, select: { id: true } })
+      if (!row) continue
+      try {
+        if (await provisionCoreInlineModels({ manifest, actorId })) provisioned.push(manifest.key)
+      } catch (err) {
+        console.error(`[modules] core inline model provisioning failed for ${manifest.key}:`, err?.message ?? err)
+      }
+    }
+    return provisioned
+  }
+
   async function syncModules({ manifests, actorId }) {
     let added = 0
     let updated = 0
@@ -1390,13 +1420,7 @@ export function createModuleLifecycleService({ prisma }) {
         await upsertManifestPermissions(tx, mod.id, manifest.key, manifest.permissions ?? [], isInstalled)
         await upsertManifestBlueprints(tx, mod.id, manifest.blueprints ?? [])
       })
-      // Built-in manifests can declare Runly ORM models inline. Filesystem
-      // modules continue through their existing discovery/install flow.
-      const inlineModels = (Array.isArray(manifest.models) ? manifest.models : []).filter(model => model && typeof model === 'object')
-      if (inlineModels.length && isOfficialCoreModuleKey(manifest.key)) {
-        await metadataSvc.syncModuleMetadata({ manifest, models: inlineModels, views: manifest.views ?? [] })
-        await applyModuleOrmMigrations({ moduleKey: manifest.key, actorId })
-      }
+      await provisionCoreInlineModels({ manifest, actorId })
     }
 
     await writeAuditLog(prisma, {
@@ -1508,6 +1532,7 @@ export function createModuleLifecycleService({ prisma }) {
     dryRunUninstall,
     dryRunReset,
     syncModules,
+    ensureCoreInlineModels,
     runModuleSeed,
     runModuleTeardown,
   }
