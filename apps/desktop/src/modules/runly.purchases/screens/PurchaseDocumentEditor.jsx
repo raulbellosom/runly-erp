@@ -9,7 +9,7 @@ import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { attachmentsConfig } from '../lib/attachments.js'
-import { errorText, policyReasons, useCapabilities, useDocument, usePurchasesCan, useSaveDocument, useTransition } from '../hooks/usePurchases.js'
+import { errorText, policyReasons, useCapabilities, useDocument, useNextNumber, usePurchasesCan, useSaveDocument, useTransition } from '../hooks/usePurchases.js'
 import { usePurchaseRoute } from '../hooks/usePurchaseRoute.js'
 import { SCHEMAS, defaultsFor, toPayload } from '../lib/document-schema.js'
 import { lineFromApi } from '../lib/document-math.js'
@@ -71,6 +71,10 @@ export default function PurchaseDocumentEditor() {
   const currency = useWatch({ control, name: 'currency' })
   const supplierId = useWatch({ control, name: 'supplierId' })
   const inheritItems = useWatch({ control, name: 'inheritItems' })
+  const issueDate = useWatch({ control, name: 'issueDate' })
+  // Invoices carry the supplier folio; orders and requests get a suggestion.
+  const suggested = useNextNumber(kind, issueDate || undefined, !isEdit && kind !== 'invoices')
+  const folio = isEdit ? { sequence: existing.data?.sequence } : suggested.data
 
   // Load the draft being edited, or prefill an invoice from its order, once.
   const loaded = useRef(false)
@@ -151,7 +155,7 @@ export default function PurchaseDocumentEditor() {
       <form onSubmit={(e) => e.preventDefault()} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="min-w-0 space-y-5">
           <Section title="Datos generales">
-            <HeaderFields kind={kind} control={control} supplier={supplier} onSupplier={setSupplier} />
+            <HeaderFields kind={kind} control={control} supplier={supplier} onSupplier={setSupplier} folio={folio} />
           </Section>
 
           {kind === 'invoices' && caps.has('purchaseOrders') ? (

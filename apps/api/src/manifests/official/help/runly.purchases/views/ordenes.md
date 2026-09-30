@@ -11,3 +11,5 @@ Las órdenes de compra registran lo que pediste a un proveedor.
 - En la pestaña Inventario relacionas activos existentes o creas activos nuevos a partir de un concepto.
 - Si falta una etapa obligatoria (por ejemplo, tres cotizaciones), Runly te muestra qué falta antes de emitir.
 - Desde la ficha de un activo, "Crear orden" abre este editor con el activo ya relacionado.
+- El folio de la orden lo escribes tú: puedes usar el formato de tu empresa o capturar el folio de una orden pasada (la fecha también puede ser anterior). Si lo dejas vacío, Runly lo genera con el formato configurado.
+- Además del folio, cada orden tiene un consecutivo interno automático (N.º 1, 2, 3...) que nunca se repite, aunque escribas folios a mano.

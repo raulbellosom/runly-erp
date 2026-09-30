@@ -51,6 +51,17 @@ export function usePurchasesDashboard() {
   })
 }
 
+// Suggested folio for a new document; a preview, not a reservation.
+export function useNextNumber(kind, date, enabled = true) {
+  const token = useToken()
+  return useQuery({
+    queryKey: ['purchases', 'next-number', kind, date ?? null],
+    queryFn: () => runly.purchases.nextNumber(kind, date ? { date } : {}, token).then(one),
+    enabled: Boolean(token && kind && enabled),
+    staleTime: 15 * 1000,
+  })
+}
+
 export function usePurchasesSettings() {
   const token = useToken()
   return useQuery({

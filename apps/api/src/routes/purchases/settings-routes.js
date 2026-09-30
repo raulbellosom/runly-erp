@@ -20,6 +20,10 @@ export function createPurchasesSettingsRouter({ requirePermission, requireAnyPer
   router.get('/purchases/capabilities', anyPurchasesReader, c =>
     handle(c, async () => ({ data: await workflow.getCapabilities(companyOf(c), actorId(c)) })))
 
+  // Folio suggestion for editors; any purchases reader may ask.
+  router.get('/purchases/numbering/:kind/next', anyPurchasesReader, c =>
+    handle(c, async () => ({ data: await workflow.suggestNumber(companyOf(c), c.req.param('kind'), c.req.query('date')) })))
+
   router.get('/purchases/dashboard', requirePermission('purchases.read'), c =>
     handle(c, async () => ({ data: await workflow.dashboard(companyOf(c), actorId(c)) })))
 

@@ -3,7 +3,7 @@ import { buildStageMap, resolveTransition } from './purchase-policies.js'
 import { policyCheckFor } from './purchase-case-bundle.js'
 import {
   DECISION_STATUS, KINDS, MODULE_KEY, OWNER_TYPE_TO_KIND, PurchasesServiceError, SUPPLIER_SELECT, asDate, asMoney, assertLineCategories,
-  assertSupplier, broadcast, cleanText, createApproval, createCase, currency, dateKey, invalidTransition, nextNumber, normalizeLine,
+  assertSupplier, broadcast, cleanText, createApproval, createCase, currency, dateKey, invalidTransition, allocateNumber, normalizeLine,
   notFound, num, pagination, plain, policyBlocked, relate, replaceLines, resolveApprovals, statusFilter, supplierNames, totalsFromLines, writeAudit,
 } from './purchases-shared.js'
 
@@ -63,7 +63,7 @@ export function createPurchaseProcurementService({ prisma, broadcaster, workflow
     const title = cleanText(input.title, 255)
     if (!title) throw new PurchasesServiceError('El expediente necesita un título.')
     return plain(await audited(companyId, actorId, 'purchase_case', null, 'purchase.case.created', async tx => {
-      const created = await createCase(tx, { companyId, actorId, workflowId: workflow.id, title, currency: input.currency, estimatedTotal: input.estimatedTotal != null ? asMoney(input.estimatedTotal) : null, supplierId: input.supplierId })
+      const created = await createCase(tx, { companyId, actorId, workflowId: workflow.id, number: input.number, title, currency: input.currency, estimatedTotal: input.estimatedTotal != null ? asMoney(input.estimatedTotal) : null, supplierId: input.supplierId })
       if (input.description) return tx.purchaseCase.update({ where: { id: created.id }, data: { description: cleanText(input.description) } })
       return created
     }))
@@ -140,10 +140,10 @@ export function createPurchaseProcurementService({ prisma, broadcaster, workflow
       if (!caseRow) throw notFound('El expediente no existe.')
     }
     return plain(await audited(companyId, actorId, 'purchase_request', null, 'purchase.request.created', async tx => {
-      const number = await nextNumber(tx, companyId, 'SOL', 'purchaseRequest')
+      const { sequence, number } = await allocateNumber(tx, { companyId, kind: 'requests', number: input.number })
       const purchaseCase = caseRow ?? await createCase(tx, { companyId, actorId, workflowId: workflow.id, title: data.title, currency: data.currency, estimatedTotal })
       const request = await tx.purchaseRequest.create({
-        data: { companyId, caseId: purchaseCase.id, number, ...data, estimatedTotal, status: 'DRAFT', requesterId: data.requesterId ?? actorId ?? null, createdById: actorId || null },
+        data: { companyId, caseId: purchaseCase.id, number, sequence, ...data, estimatedTotal, status: 'DRAFT', requesterId: data.requesterId ?? actorId ?? null, createdById: actorId || null },
       })
       if (!caseRow) await tx.purchaseCase.update({ where: { id: purchaseCase.id }, data: { requestId: request.id } })
       await replaceLines(tx, companyId, 'PURCHASE_REQUEST', request.id, lines)
@@ -161,6 +161,8 @@ export function createPurchaseProcurementService({ prisma, broadcaster, workflow
     const data = await requestData(companyId, input, before)
     if (lines) data.estimatedTotal = totalsFromLines(lines).total
     else if ('estimatedTotal' in input) data.estimatedTotal = asMoney(input.estimatedTotal)
+    // The folio is user data; the internal sequence never changes.
+    if (input.number !== undefined) data.number = cleanText(input.number, 40) || before.number
     return plain(await audited(companyId, actorId, 'purchase_request', id, 'purchase.request.updated', async tx => {
       const row = await tx.purchaseRequest.update({ where: { id }, data })
       if (lines) await replaceLines(tx, companyId, 'PURCHASE_REQUEST', id, lines)
@@ -212,9 +214,9 @@ export function createPurchaseProcurementService({ prisma, broadcaster, workflow
       ? { subtotal: Math.round(subtotal * 100) / 100, tax: Math.round(tax * 100) / 100, total: Math.round((subtotal + tax) * 100) / 100 }
       : { subtotal: num(selected?.subtotal ?? request.estimatedTotal), tax: num(selected?.tax), total: num(selected?.total ?? request.estimatedTotal) }
     const order = await prisma.$transaction(async tx => {
-      const number = await nextNumber(tx, companyId, 'OC', 'purchaseOrder')
+      const { sequence, number } = await allocateNumber(tx, { companyId, kind: 'orders', number: payload.number })
       const created = await tx.purchaseOrder.create({
-        data: { companyId, caseId: request.caseId, supplierId, number, issueDate: asDate(null, { fallbackToday: true }), status: 'DRAFT', currency: request.currency, ...totals, notes: request.justification, createdById: actorId || null },
+        data: { companyId, caseId: request.caseId, supplierId, number, sequence, issueDate: asDate(null, { fallbackToday: true }), status: 'DRAFT', currency: request.currency, ...totals, notes: request.justification, createdById: actorId || null },
       })
       await replaceLines(tx, companyId, 'PURCHASE_ORDER', created.id, copies)
       await tx.purchaseRequest.update({ where: { id: request.id }, data: { status: 'ORDERED' } })

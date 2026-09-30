@@ -119,12 +119,76 @@ export async function writeAudit(tx, { companyId, actorId, entityType, entityId,
   })
 }
 
-// Sequential per-company numbering guarded by a transaction-scoped advisory lock.
-export async function nextNumber(tx, companyId, prefix, model) {
-  const lockKey = companyId + ':' + prefix
+// ── Numbering ───────────────────────────────────────────────────────────────
+// Two separate things per document: `sequence`, the automatic per-company
+// consecutive (never edited, never collides), and `number`, the folio, which
+// is user data — a company format, a historical folio, the supplier's invoice
+// number. When the user leaves the folio empty it is built from the company
+// template. Tokens: {N} or {N:6} (sequence, zero padded), {AAAA}, {AA}, {MM}.
+export const NUMBERED_KINDS = ['cases', 'requests', 'orders', 'receipts', 'invoices']
+export const NUMBERING_DEFAULTS = {
+  cases: 'EXP-{N:6}', requests: 'SOL-{N:6}', orders: 'OC-{N:6}', receipts: 'REC-{N:6}', invoices: 'FAC-{N:6}',
+}
+const FOLIO_MAX = { invoices: 100 }
+
+export function formatFolio(template, sequence, date = new Date()) {
+  const year = String(date.getFullYear())
+  return String(template || '{N:6}')
+    .replace(/\{N(?::(\d{1,2}))?\}/g, (_, pad) => String(sequence).padStart(Math.min(12, Number(pad) || 0), '0'))
+    .replace(/\{AAAA\}/g, year)
+    .replace(/\{AA\}/g, year.slice(2))
+    .replace(/\{MM\}/g, String(date.getMonth() + 1).padStart(2, '0'))
+    .slice(0, FOLIO_MAX.invoices)
+}
+
+// Accepts only known kinds and non-empty templates that contain {N}, so a
+// generated folio always changes with the sequence.
+export function normalizeNumbering(input = {}, current = {}) {
+  const out = {}
+  for (const kind of NUMBERED_KINDS) {
+    const raw = cleanText(input?.[kind] ?? current?.[kind], 60)
+    if (raw && !/\{N(?::\d{1,2})?\}/.test(raw)) throw new PurchasesServiceError('Cada formato de folio debe incluir {N} (el consecutivo).', 400, 'VALIDATION')
+    if (raw) out[kind] = raw
+  }
+  return out
+}
+
+async function numberingTemplate(client, companyId, kind) {
+  const workflow = await client.purchaseWorkflow.findFirst({
+    where: { companyId, enabled: true, isDefault: true }, select: { numbering: true },
+  })
+  return workflow?.numbering?.[kind] || NUMBERING_DEFAULTS[kind]
+}
+
+async function nextSequence(client, companyId, kind) {
+  const { _max } = await client[KINDS[kind].model].aggregate({ where: { companyId }, _max: { sequence: true } })
+  return (_max.sequence ?? 0) + 1
+}
+
+// Allocates { sequence, number } inside a transaction, guarded by an advisory
+// lock per company and kind. A generated folio that a user already typed by
+// hand is skipped forward so it never collides.
+export async function allocateNumber(tx, { companyId, kind, number, date }) {
+  const lockKey = `${companyId}:${kind}`
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))::text AS locked`
-  const count = await tx[model].count({ where: { companyId } })
-  return prefix + '-' + String(count + 1).padStart(6, '0')
+  const sequence = await nextSequence(tx, companyId, kind)
+  const typed = cleanText(number, FOLIO_MAX[kind] ?? 40)
+  if (typed) return { sequence, number: typed }
+  const template = await numberingTemplate(tx, companyId, kind)
+  const when = date ? new Date(date) : new Date()
+  for (let offset = 0; offset < 50; offset += 1) {
+    const folio = formatFolio(template, sequence + offset, when)
+    const taken = await tx[KINDS[kind].model].findFirst({ where: { companyId, number: folio }, select: { id: true } })
+    if (!taken) return { sequence, number: folio }
+  }
+  return { sequence, number: formatFolio(template, sequence, when) + '-' + sequence }
+}
+
+// Read-only suggestion for the editor ("folio sugerido"); not reserved.
+export async function previewNumber(client, { companyId, kind, date }) {
+  const sequence = await nextSequence(client, companyId, kind)
+  const template = await numberingTemplate(client, companyId, kind)
+  return { sequence, number: formatFolio(template, sequence, date ? new Date(date) : new Date()), template }
 }
 
 export async function assertSupplier(client, companyId, supplierId) {
@@ -209,11 +273,11 @@ export async function resolveApprovals(tx, { companyId, ownerType, ownerId, deci
 
 export const SUPPLIER_SELECT = { id: true, name: true, legalName: true, email: true, phone: true, taxId: true, avatarFileId: true }
 
-export async function createCase(tx, { companyId, actorId, workflowId, title, currency: code, estimatedTotal, supplierId, requestId }) {
-  const number = await nextNumber(tx, companyId, 'EXP', 'purchaseCase')
+export async function createCase(tx, { companyId, actorId, workflowId, title, currency: code, estimatedTotal, supplierId, requestId, number: typed }) {
+  const { sequence, number } = await allocateNumber(tx, { companyId, kind: 'cases', number: typed })
   return tx.purchaseCase.create({
     data: {
-      companyId, workflowId: workflowId || null, number, title: (cleanText(title, 255) || number),
+      companyId, workflowId: workflowId || null, number, sequence, title: (cleanText(title, 255) || number),
       currency: currency(code), estimatedTotal: estimatedTotal ?? null, supplierId: supplierId || null,
       requestId: requestId || null, createdById: actorId || null,
     },

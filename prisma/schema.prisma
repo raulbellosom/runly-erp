@@ -3646,6 +3646,7 @@ model PurchaseWorkflow {
   capabilities Json
   stages       Json
   policies     Json     @default("[]")
+  numbering    Json     @default("{}")
   enabled      Boolean  @default(true)
   createdById  String?  @map("created_by_id") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
@@ -3661,6 +3662,7 @@ model PurchaseCase {
   companyId      String    @map("company_id") @db.Uuid
   workflowId     String?   @map("workflow_id") @db.Uuid
   number         String    @db.VarChar(40)
+  sequence       Int
   title          String    @db.VarChar(255)
   description    String?   @db.VarChar(2000)
   status         String    @default("OPEN") @db.VarChar(30)
@@ -3677,6 +3679,7 @@ model PurchaseCase {
   @@index([companyId, status, createdAt(sort: Desc)])
   @@index([workflowId])
   @@index([supplierId])
+  @@unique([companyId, sequence])
   @@map("purchase_case")
 }
 
@@ -3685,6 +3688,7 @@ model PurchaseRequest {
   companyId      String    @map("company_id") @db.Uuid
   caseId         String    @map("case_id") @db.Uuid
   number         String    @db.VarChar(40)
+  sequence       Int
   title          String    @db.VarChar(255)
   justification  String?   @db.VarChar(2000)
   neededBy       DateTime? @map("needed_by") @db.Date
@@ -3700,6 +3704,7 @@ model PurchaseRequest {
   @@unique([companyId, number])
   @@index([companyId, status, createdAt(sort: Desc)])
   @@index([caseId])
+  @@unique([companyId, sequence])
   @@map("purchase_request")
 }
 
@@ -3756,6 +3761,7 @@ model PurchaseReceipt {
   caseId       String   @map("case_id") @db.Uuid
   orderId      String   @map("order_id") @db.Uuid
   number       String   @db.VarChar(40)
+  sequence       Int
   receivedAt   DateTime @map("received_at") @db.Date
   status       String   @default("COMPLETED") @db.VarChar(20)
   notes        String?  @db.VarChar(2000)
@@ -3769,6 +3775,7 @@ model PurchaseReceipt {
   @@index([companyId, receivedAt(sort: Desc)])
   @@index([orderId])
   @@index([caseId])
+  @@unique([companyId, sequence])
   @@map("purchase_receipt")
 }
 
@@ -3811,6 +3818,7 @@ model PurchaseOrder {
   caseId      String   @map("case_id") @db.Uuid
   supplierId  String?  @map("supplier_id") @db.Uuid
   number      String   @db.VarChar(40)
+  sequence       Int
   issueDate   DateTime @map("issue_date") @db.Date
   status      String   @default("DRAFT") @db.VarChar(30)
   currency    String   @default("MXN") @db.VarChar(3)
@@ -3832,6 +3840,7 @@ model PurchaseOrder {
   @@index([companyId, status, issueDate(sort: Desc)])
   @@index([caseId])
   @@index([supplierId])
+  @@unique([companyId, sequence])
   @@map("purchase_order")
 }
 
@@ -3841,6 +3850,7 @@ model PurchaseInvoice {
   caseId      String   @map("case_id") @db.Uuid
   supplierId  String?  @map("supplier_id") @db.Uuid
   number      String   @db.VarChar(100)
+  sequence       Int
   fiscalUuid  String?  @map("fiscal_uuid") @db.VarChar(36)
   issueDate   DateTime @map("issue_date") @db.Date
   status      String   @default("PENDING") @db.VarChar(30)
@@ -3863,6 +3873,7 @@ model PurchaseInvoice {
   @@index([companyId, dueDate])
   @@index([caseId])
   @@index([supplierId])
+  @@unique([companyId, sequence])
   @@map("purchase_invoice")
 }
 

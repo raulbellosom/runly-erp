@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { PackageCheck } from 'lucide-react'
 import {
-  Button, DateField, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, NumberField, TextareaField,
+  Button, DateField, TextField, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, NumberField, TextareaField,
 } from '@runly/ui'
 import { errorText, useSaveDocument } from '../../hooks/usePurchases.js'
 import { pendingQuantity } from '../../lib/document-math.js'
@@ -16,12 +16,14 @@ export function ReceiveOrderDialog({ order, open, onOpenChange }) {
   const [qty, setQty] = useState({})
   const [receivedAt, setReceivedAt] = useState(today())
   const [notes, setNotes] = useState('')
+  const [number, setNumber] = useState('')
 
   useEffect(() => {
     if (!open) return
     setQty(Object.fromEntries(pendingLines.map((l) => [l.id, String(pendingQuantity(l))])))
     setReceivedAt(today())
     setNotes('')
+    setNumber('')
   }, [open, pendingLines])
 
   const errors = Object.fromEntries(pendingLines.map((l) => {
@@ -36,7 +38,7 @@ export function ReceiveOrderDialog({ order, open, onOpenChange }) {
 
   const submit = async () => {
     try {
-      await save.mutateAsync({ data: { orderId: order.id, receivedAt, notes: notes.trim() || null, lines: payloadLines } })
+      await save.mutateAsync({ data: { orderId: order.id, number: number.trim() || null, receivedAt, notes: notes.trim() || null, lines: payloadLines } })
       toast.success(completes ? 'Orden recibida completa' : 'Recepción parcial registrada')
       onOpenChange(false)
     } catch (error) {
@@ -56,7 +58,10 @@ export function ReceiveOrderDialog({ order, open, onOpenChange }) {
             <EmptyState icon={PackageCheck} title="Nada por recibir" description="Todos los bienes de esta orden ya se recibieron." />
           ) : (
             <>
-              <DateField label="Fecha de recepción" required value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DateField label="Fecha de recepción" required value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
+                <TextField label="Folio (opcional)" placeholder="Automático" maxLength={40} value={number} onChange={(e) => setNumber(e.target.value)} hint="Remisión o folio propio" />
+              </div>
               <ul className="space-y-2">
                 {pendingLines.map((l) => (
                   <li key={l.id} className="grid items-end gap-3 rounded-xl bg-[hsl(var(--muted))]/35 p-3 sm:grid-cols-[minmax(0,1fr)_9rem]">

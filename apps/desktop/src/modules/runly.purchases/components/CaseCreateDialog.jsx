@@ -13,12 +13,13 @@ import { CURRENCY_OPTIONS, ROOT } from '../lib/purchases-constants.js'
 
 const schema = z.object({
   title: z.string().trim().min(3, 'Describe la compra en al menos 3 caracteres').max(255),
+  number: z.string().trim().max(40, 'Máximo 40 caracteres').optional(),
   description: z.string().max(2000).optional(),
   supplierId: z.string().nullable().optional(),
   estimatedTotal: z.number().min(0),
   currency: z.string().length(3),
 })
-const DEFAULTS = { title: '', description: '', supplierId: null, estimatedTotal: 0, currency: 'MXN' }
+const DEFAULTS = { number: '', title: '', description: '', supplierId: null, estimatedTotal: 0, currency: 'MXN' }
 
 export function CaseCreateDialog({ open, onOpenChange }) {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export function CaseCreateDialog({ open, onOpenChange }) {
 
   const submit = handleSubmit(async (values) => {
     try {
-      const created = await save.mutateAsync({ data: values })
+      const created = await save.mutateAsync({ data: { ...values, number: values.number || null } })
       toast.success('Expediente abierto')
       onOpenChange(false)
       if (created?.id) navigate(`${ROOT}/cases/${created.id}`)
@@ -47,6 +48,7 @@ export function CaseCreateDialog({ open, onOpenChange }) {
         </DialogHeader>
         <form id="purchase-case-form" onSubmit={submit} className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-0.5">
           <TextField label="Qué se compra" required placeholder="Renovación de laptops del área comercial" error={errors.title?.message} {...register('title')} />
+          <TextField label="Folio (opcional)" placeholder="Automático" hint="Déjalo vacío para usar el formato de tu empresa." error={errors.number?.message} {...register('number')} />
           <Controller control={control} name="supplierId" render={({ field }) => (
             <SupplierField value={field.value} onChange={(id) => field.onChange(id)} hint="Opcional; puedes definirlo al cotizar." />
           )} />

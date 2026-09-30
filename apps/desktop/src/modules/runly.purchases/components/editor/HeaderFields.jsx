@@ -25,12 +25,22 @@ const text = (control, name, label, props = {}) => (
   )} />
 )
 
+// Folio: free text. Empty uses the company format; the internal consecutive
+// is separate and automatic, so a typed (or historical) folio never collides.
+const folioCtl = (control, label, folio) => text(control, 'number', label, {
+  placeholder: folio?.number ? `${folio.number} (automático)` : 'Automático',
+  hint: folio?.sequence
+    ? `Escribe tu folio o déjalo vacío para usar el formato. Consecutivo interno N.º ${folio.sequence}.`
+    : 'Escribe tu folio o déjalo vacío para usar el formato de tu empresa.',
+})
+
 // Document header per kind. Each field uses the input that fits its data.
-export function HeaderFields({ kind, control, supplier, onSupplier }) {
+export function HeaderFields({ kind, control, supplier, onSupplier, folio }) {
   if (kind === 'requests') {
     return (
       <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">{text(control, 'title', 'Qué se necesita', { required: true, placeholder: 'Tres laptops para el equipo de ventas' })}</div>
+        <div className="md:col-span-2">{folioCtl(control, 'Folio de la solicitud', folio)}</div>
         <div className="md:col-span-2">
           <Controller control={control} name="priority" render={({ field }) => (
             <div className="space-y-1.5">
@@ -66,7 +76,8 @@ export function HeaderFields({ kind, control, supplier, onSupplier }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div className="md:col-span-2">{supplierCtl(control, supplier, onSupplier)}</div>
-      {dateCtl(control, 'issueDate', 'Fecha de la orden', { required: true })}
+      {folioCtl(control, 'Folio de la orden', folio)}
+      {dateCtl(control, 'issueDate', 'Fecha de la orden', { required: true, hint: 'Puede ser anterior a hoy para registrar órdenes pasadas.' })}
       {dateCtl(control, 'expectedDate', 'Entrega esperada')}
       {text(control, 'supplierReference', 'Referencia del proveedor', { placeholder: 'Cotización o pedido del proveedor' })}
       {text(control, 'paymentTerms', 'Condiciones de pago', { placeholder: 'Crédito 30 días' })}

@@ -1,7 +1,7 @@
 // runly.purchases — goods receipts with partial reception.
 import { buildStageMap } from './purchase-policies.js'
 import {
-  MODULE_KEY, PurchasesServiceError, SUPPLIER_SELECT, asDate, broadcast, cleanText, dateKey, invalidTransition, nextNumber, notFound, num, plain, writeAudit,
+  MODULE_KEY, PurchasesServiceError, SUPPLIER_SELECT, asDate, broadcast, cleanText, dateKey, invalidTransition, allocateNumber, notFound, num, plain, writeAudit,
 } from './purchases-shared.js'
 
 const EPSILON = 1e-6
@@ -87,10 +87,10 @@ export function createPurchaseReceiptsService({ prisma, broadcaster, workflowSer
       // Re-read inside the transaction so concurrent receipts cannot over-receive.
       const orderLines = await tx.purchaseLine.findMany({ where: { companyId, ownerType: 'PURCHASE_ORDER', ownerId: order.id } })
       const plan = planReceipt(orderLines, input.lines)
-      const number = await nextNumber(tx, companyId, 'REC', 'purchaseReceipt')
+      const { sequence, number } = await allocateNumber(tx, { companyId, kind: 'receipts', number: input.number, date: input.receivedAt })
       const created = await tx.purchaseReceipt.create({
         data: {
-          companyId, caseId: order.caseId, orderId: order.id, number, status: 'COMPLETED',
+          companyId, caseId: order.caseId, orderId: order.id, number, sequence, status: 'COMPLETED',
           receivedAt: asDate(input.receivedAt, { fallbackToday: true }), notes: cleanText(input.notes), receivedById: actorId || null,
         },
       })

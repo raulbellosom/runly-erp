@@ -15,6 +15,8 @@ const line = z.object({
 // Concept text is optional; empty rows (no text, no amount) are dropped on save.
 const lines = z.array(line)
 const optionalDate = z.string().optional().nullable()
+// Folio: user data (company format or a historical folio). Empty = generated.
+const folio = z.string().trim().max(40, 'Máximo 40 caracteres').optional().nullable()
 
 const base = {
   currency: z.string().length(3),
@@ -28,6 +30,7 @@ export const SCHEMAS = {
   orders: z.object({
     ...base,
     supplierId: z.string({ error: 'Elige un proveedor' }).min(1, 'Elige un proveedor'),
+    number: folio,
     issueDate: z.string().min(1, 'Indica la fecha'),
     expectedDate: optionalDate,
     supplierReference: z.string().max(100).optional().nullable(),
@@ -47,6 +50,7 @@ export const SCHEMAS = {
   requests: z.object({
     ...base,
     title: z.string().trim().min(3, 'Describe la necesidad').max(255),
+    number: folio,
     justification: z.string().max(2000).optional().nullable(),
     neededBy: optionalDate,
     priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']),
@@ -63,7 +67,7 @@ export function defaultsFor(kind, { doc, inventoryIds = [], caseId = null, reque
   }
   if (kind === 'orders') {
     return {
-      ...common, supplierId: doc?.supplierId ?? null, issueDate: dateInput(doc?.issueDate) || today(),
+      ...common, supplierId: doc?.supplierId ?? null, number: doc?.number ?? '', issueDate: dateInput(doc?.issueDate) || today(),
       expectedDate: dateInput(doc?.expectedDate), supplierReference: doc?.supplierReference ?? '', paymentTerms: doc?.paymentTerms ?? '',
       requestId: doc?.requestId ?? requestId,
     }
@@ -76,7 +80,7 @@ export function defaultsFor(kind, { doc, inventoryIds = [], caseId = null, reque
     }
   }
   return {
-    ...common, title: doc?.title ?? '', justification: doc?.justification ?? '', neededBy: dateInput(doc?.neededBy),
+    ...common, number: doc?.number ?? '', title: doc?.title ?? '', justification: doc?.justification ?? '', neededBy: dateInput(doc?.neededBy),
     priority: doc?.priority ?? 'NORMAL',
   }
 }
@@ -98,7 +102,7 @@ export function toPayload(kind, values, { isEdit } = {}) {
   }
   if (kind === 'orders') {
     return {
-      ...body, supplierId: values.supplierId, issueDate: values.issueDate, expectedDate: blankToNull(values.expectedDate),
+      ...body, supplierId: values.supplierId, number: blankToNull(values.number?.trim()), issueDate: values.issueDate, expectedDate: blankToNull(values.expectedDate),
       supplierReference: blankToNull(values.supplierReference), paymentTerms: blankToNull(values.paymentTerms),
       ...(values.requestId ? { requestId: values.requestId } : {}),
     }
@@ -111,7 +115,7 @@ export function toPayload(kind, values, { isEdit } = {}) {
     }
   }
   return {
-    ...body, title: values.title.trim(), justification: blankToNull(values.justification), neededBy: blankToNull(values.neededBy),
+    ...body, number: blankToNull(values.number?.trim()), title: values.title.trim(), justification: blankToNull(values.justification), neededBy: blankToNull(values.neededBy),
     priority: values.priority, estimatedTotal: totals.total,
   }
 }

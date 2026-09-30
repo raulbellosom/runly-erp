@@ -277,3 +277,21 @@ finance/ledger posting, CFDI XML parsing, supplier portal, e-mailing POs.
 - Real API boot + curl smoke of the new routes (requires the forward migration
   applied by the owner; the database is shared, agents never run
   `db:migrate`).
+
+## 13. Numbering (addendum 2026-10-01, migration `20261001120000_purchases_numbering`)
+
+- `number` (folio) is user data on every numbered document (cases, requests,
+  orders, receipts, invoices): a company format, a historical folio when a past
+  document is captured, or the supplier's folio on invoices. It stays editable
+  while the document is a draft.
+- `sequence` is the automatic per-company consecutive (unique
+  `company_id + sequence`, backfilled in creation order). It never changes and
+  never collides with typed folios.
+- When the folio is left empty it is built from the company template stored
+  in `purchase_workflow.numbering` (`{ orders: 'OC-{AAAA}-{N:4}', ... }`;
+  tokens `{N}`, `{N:d}`, `{AAAA}`, `{AA}`, `{MM}`; defaults `OC-{N:6}`,
+  `FAC-{N:6}`, `SOL-{N:6}`, `REC-{N:6}`, `EXP-{N:6}`). A generated folio that
+  already exists (typed by hand earlier) is skipped forward.
+- `GET /purchases/numbering/:kind/next?date=` returns `{ sequence, number, template }`
+  as a non-reserving suggestion (SDK `nextNumber(kind, params, token)`).
+- Settings accept `numbering`; an empty template resets that kind to default.

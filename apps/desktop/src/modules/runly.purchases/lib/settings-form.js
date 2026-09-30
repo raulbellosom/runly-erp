@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { STAGES, STAGE_ORDER } from './purchases-constants.js'
+import { NUMBERING_KINDS, hasSequenceToken } from './numbering.js'
 
 // Settings form model: { preset, capabilities, modes: { STAGE: mode }, policies }.
 // A stage is part of the flow when its capability is on (CLOSE always).
@@ -14,6 +15,7 @@ export function toFormValues(workflow) {
     preset: workflow?.preset ?? 'BASIC',
     capabilities: { ...(workflow?.capabilities ?? {}) },
     modes,
+    numbering: Object.fromEntries(NUMBERING_KINDS.map(({ kind }) => [kind, workflow?.numbering?.[kind] ?? ''])),
     policies: (workflow?.policies ?? []).map((p, i) => ({
       id: p.id ?? `p${i + 1}`,
       label: p.label ?? '',
@@ -46,6 +48,7 @@ export function toPayload(values) {
     preset: values.preset,
     capabilities: values.capabilities,
     stages: flowStages(values.capabilities, values.modes),
+    numbering: Object.fromEntries(Object.entries(values.numbering ?? {}).map(([kind, t]) => [kind, String(t ?? '').trim()])),
     policies: values.policies.map((p) => ({
       id: p.id,
       label: p.label.trim(),
@@ -59,6 +62,8 @@ export const settingsSchema = z.object({
   preset: z.string(),
   capabilities: z.record(z.string(), z.boolean()),
   modes: z.record(z.string(), z.string()),
+  numbering: z.record(z.string(), z.string().trim().max(60, 'Máximo 60 caracteres')
+    .refine((t) => !t || hasSequenceToken(t), 'Incluye {N} o {N:6} (el consecutivo)')),
   policies: z.array(z.object({
     id: z.string(),
     label: z.string().trim().min(3, 'Describe la regla').max(160),

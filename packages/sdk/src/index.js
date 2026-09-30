@@ -2371,6 +2371,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         getSettings: (token) => get("/purchases/settings", token),
         updateSettings: (data, token) => send("PUT", "/purchases/settings", data, token),
         getCapabilities: (token) => get("/purchases/capabilities", token),
+        nextNumber: (kind, params, token) => get(`/purchases/numbering/${seg(kind)}/next${toQueryString(params)}`, token),
         list: (kind, params, token) => get(`/purchases/${seg(kind)}${toQueryString(params)}`, token),
         get: (kind, id, token) => get(`/purchases/${seg(kind)}/${seg(id)}`, token),
         create: (kind, data, token) => send("POST", `/purchases/${seg(kind)}`, data, token),

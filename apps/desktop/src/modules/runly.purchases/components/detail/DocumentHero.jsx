@@ -34,6 +34,11 @@ export function DocumentHero({ kind, doc, facts = [], actions, onOpenRef }) {
             {doc.title ? <p className="mt-1 max-w-2xl text-base text-teal-50/90">{doc.title}</p> : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <PurchaseStatusBadge kind={kind} status={doc.status} className="bg-white/15 text-white ring-white/30 dark:text-white" />
+              {doc.sequence ? (
+                <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium tabular-nums" title="Consecutivo interno automático">
+                  Consecutivo N.º {doc.sequence}
+                </span>
+              ) : null}
               {supplier?.name ? (
                 supplier.id ? (
                   <Link to={`${ROOT}/suppliers/${supplier.id}`} className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium hover:bg-white/20">{supplier.name}</Link>

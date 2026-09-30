@@ -4,7 +4,8 @@
 import { toLocalIso } from '@runly/core'
 import { STAGE_LABELS, STAGE_MODES, STAGE_ORDER, enabledStages } from './purchase-policies.js'
 import {
-  KINDS, PurchasesServiceError, broadcast, cleanText, dateKey, num, plain, supplierNames, writeAudit,
+  KINDS, NUMBERED_KINDS, NUMBERING_DEFAULTS, PurchasesServiceError, broadcast, cleanText, dateKey, normalizeNumbering, num, plain,
+  previewNumber, supplierNames, writeAudit,
 } from './purchases-shared.js'
 
 export { PurchasesServiceError } from './purchases-shared.js'
@@ -128,7 +129,18 @@ export function createPurchasesService({ prisma, broadcaster }) {
   }
 
   async function getSettings(companyId, actorId) {
-    return { workflow: await ensureWorkflow(companyId, actorId), presets: PURCHASE_PRESETS, stageLabels: STAGE_LABELS }
+    const workflow = await ensureWorkflow(companyId, actorId)
+    return {
+      workflow: { ...workflow, numbering: { ...NUMBERING_DEFAULTS, ...(workflow.numbering ?? {}) } },
+      presets: PURCHASE_PRESETS, stageLabels: STAGE_LABELS, numberingDefaults: NUMBERING_DEFAULTS,
+    }
+  }
+
+  // Suggested folio for a new document (company template + next sequence).
+  async function suggestNumber(companyId, kind, date) {
+    if (!NUMBERED_KINDS.includes(kind)) throw new PurchasesServiceError('Tipo de documento no válido.', 400, 'VALIDATION')
+    await ensureWorkflow(companyId)
+    return previewNumber(prisma, { companyId, kind, date })
   }
 
   async function getCapabilities(companyId, actorId) {
@@ -157,6 +169,7 @@ export function createPurchasesService({ prisma, broadcaster }) {
       capabilities: presetValues ? presetValues.capabilities : sanitizeCapabilities(input.capabilities, workflow.capabilities),
       stages: presetValues ? presetValues.stages : sanitizeStages(input.stages, workflow.stages),
       policies: sanitizePolicies(input.policies, presetValues && presetChanged ? presetValues.policies : workflow.policies),
+      ...(input.numbering !== undefined ? { numbering: normalizeNumbering(input.numbering, workflow.numbering) } : {}),
     }
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.purchaseWorkflow.update({ where: { id: workflow.id }, data })
@@ -315,5 +328,5 @@ export function createPurchasesService({ prisma, broadcaster }) {
     return stages.map((stage, index) => ({ stage: stage.type, label: STAGE_LABELS[stage.type], count: counts[index] }))
   }
 
-  return { ensureWorkflow, getSettings, getCapabilities, assertCapability, updateSettings, dashboard }
+  return { ensureWorkflow, getSettings, getCapabilities, assertCapability, updateSettings, dashboard, suggestNumber }
 }

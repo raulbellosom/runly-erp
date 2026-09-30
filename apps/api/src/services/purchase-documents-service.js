@@ -5,7 +5,7 @@ import { policyCheckFor } from './purchase-case-bundle.js'
 import { inheritFromOrders } from './purchase-relations-service.js'
 import {
   DECISION_STATUS, KINDS, MODULE_KEY, PurchasesServiceError, SUPPLIER_SELECT, asDate, asMoney, assertLineCategories, assertSupplier,
-  broadcast, cleanText, createApproval, createCase, currency, dateKey, invalidTransition, markCaseInProgress, nextNumber,
+  broadcast, cleanText, createApproval, createCase, currency, dateKey, invalidTransition, markCaseInProgress, allocateNumber,
   normalizeLine, notFound, num, plain, policyBlocked, relate, replaceLines, resolveApprovals, totalsFromLines, writeAudit,
 } from './purchases-shared.js'
 
@@ -147,13 +147,13 @@ export function createPurchaseDocumentsService({ prisma, broadcaster, workflowSe
     if (!caseRow && orders.length) caseRow = await prisma.purchaseCase.findFirst({ where: { id: orders[0].caseId, companyId } })
     const totals = totalsFromLines(lines, input)
     const created = await prisma.$transaction(async tx => {
-      const number = cleanText(input.number, kind === 'orders' ? 40 : 100) || await nextNumber(tx, companyId, meta.prefix, meta.model)
+      const { sequence, number } = await allocateNumber(tx, { companyId, kind, number: input.number, date: input.issueDate })
       const purchaseCase = caseRow ?? await createCase(tx, {
         companyId, actorId, workflowId: workflow.id, title: (kind === 'orders' ? 'Orden ' : 'Factura ') + number,
         currency: input.currency, estimatedTotal: totals.total, supplierId: input.supplierId,
       })
       const doc = await tx[meta.model].create({
-        data: { companyId, caseId: purchaseCase.id, number, status: 'DRAFT', ...headerData(kind, input), ...totals, createdById: actorId || null },
+        data: { companyId, caseId: purchaseCase.id, number, sequence, status: 'DRAFT', ...headerData(kind, input), ...totals, createdById: actorId || null },
       })
       await replaceLines(tx, companyId, meta.ownerType, doc.id, lines)
       await relate(tx, { companyId, actorId, sourceType: 'purchase_case', sourceId: purchaseCase.id, targetType: meta.entityType, targetId: doc.id, relationType: 'CONTAINS', origin: 'AUTOMATIC' })
