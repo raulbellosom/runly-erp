@@ -59,6 +59,10 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
   const [fullLoaded, setFullLoaded] = useState(false) // full-resolution <img> onLoad fired
   const [editModalOpen, setEditModalOpen] = useState(false) // table-cell images edit via modal instead of inline mode
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  // Instances without Supabase image transformation (imgproxy) answer
+  // /render/image/public/ with 404 — fall back to the original object URL,
+  // same as NoteCoverBanner. Keyed by src so a replaced image retries.
+  const [transformFailedSrc, setTransformFailedSrc] = useState(null)
 
   const annotations = JSON.parse(node.attrs.annotations || '[]')
   const crop = parseCrop(node.attrs.crop)
@@ -202,8 +206,12 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
     setMode('view')
   }
 
-  const src = withImageVariant(node.attrs.src, 'content')
-  const lqipSrc = withImageVariant(node.attrs.src, 'lqip')
+  const transformFailed = transformFailedSrc === node.attrs.src
+  const src = transformFailed ? node.attrs.src : withImageVariant(node.attrs.src, 'content')
+  const lqipSrc = transformFailed ? null : withImageVariant(node.attrs.src, 'lqip')
+  const onVariantError = () => {
+    if (src !== node.attrs.src) setTransformFailedSrc(node.attrs.src)
+  }
   const ActiveToolIcon = TOOLS.find((t) => t.id === tool)?.icon ?? PenLine
   const displayWidthPct = liveWidthPct ?? widthPct
   // Outer box: controls the resizable width, carries the selection ring and
@@ -416,23 +424,28 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
                 hundred bytes) and shares the full image's aspect ratio, so
                 it corrects the frame size for legacy images that have no
                 stored aspectRatio, well before the full image arrives. */}
+            {lqipSrc && (
+              <img
+                src={lqipSrc}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                onLoad={(e) => setNatural((prev) => prev ?? { w: e.target.naturalWidth, h: e.target.naturalHeight })}
+                onError={onVariantError}
+                style={{
+                  ...imgStyle,
+                  filter: 'blur(16px)',
+                  transform: imgStyle.transform ? `${imgStyle.transform} scale(1.15)` : undefined,
+                }}
+              />
+            )}
             <img
-              src={lqipSrc}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              onLoad={(e) => setNatural((prev) => prev ?? { w: e.target.naturalWidth, h: e.target.naturalHeight })}
-              style={{
-                ...imgStyle,
-                filter: 'blur(16px)',
-                transform: imgStyle.transform ? `${imgStyle.transform} scale(1.15)` : undefined,
-              }}
-            />
-            <img
+              key={src}
               src={src}
               alt={node.attrs.alt ?? ''}
               draggable={false}
               onLoad={(e) => { setNatural({ w: e.target.naturalWidth, h: e.target.naturalHeight }); setFullLoaded(true) }}
+              onError={onVariantError}
               style={{
                 ...imgStyle,
                 opacity: fillSize && fullLoaded ? 1 : 0,
