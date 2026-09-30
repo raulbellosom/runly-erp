@@ -18,6 +18,8 @@ import LeadPriorityBadge from "../modules/runly.growth/components/LeadPriorityBa
 import InventoryDetailAssignmentSection from "../modules/runly.inventory/components/InventoryDetailAssignmentSection.jsx";
 import InventoryDetailCommentsSection from "../modules/runly.inventory/components/InventoryDetailCommentsSection.jsx";
 import InventoryDetailHistorySection from "../modules/runly.inventory/components/InventoryDetailHistorySection.jsx";
+import InventoryDetailAdminSection from "../modules/runly.inventory/components/InventoryDetailAdminSection.jsx";
+import InventoryPurchaseSection from "../modules/runly.purchases/components/InventoryPurchaseSection.jsx";
 
 import HrEmployeeActivityPanel from "../modules/runly.hr/components/HrEmployeeActivityPanel.jsx";
 import OrgChartSection from "../modules/runly.hr/components/OrgChartSection.jsx";
@@ -86,6 +88,14 @@ componentRegistry.register(
 componentRegistry.register(
   "runly.inventory:HistorySection",
   InventoryDetailHistorySection,
+);
+componentRegistry.register(
+  "runly.inventory:AdminSection",
+  InventoryDetailAdminSection,
+);
+componentRegistry.register(
+  "runly.purchases:InventoryPurchaseSection",
+  InventoryPurchaseSection,
 );
 
 componentRegistry.register("runly.hr:HistorySection", HrEmployeeActivityPanel);

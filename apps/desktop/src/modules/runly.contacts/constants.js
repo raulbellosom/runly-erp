@@ -19,6 +19,14 @@ export const TYPE_LABEL = {
   company: "Empresa",
 };
 
+// Hex per type for KPI dots and list/card initials tint.
+export const TYPE_COLOR = {
+  customer: "#10b981",
+  supplier: "#3b82f6",
+  person: "#8b5cf6",
+  company: "#f59e0b",
+};
+
 // Avatar color per type (bg + text)
 export const TYPE_AVATAR_COLORS = {
   customer: {

@@ -807,6 +807,8 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/contacts/duplicates${toQueryString(criteria)}`, { headers: withAuthHeaders(token) }),
       listTags: (q, token) =>
         request(`/contacts/tags${toQueryString({ q })}`, { headers: withAuthHeaders(token) }),
+      getSummary: (token) =>
+        request("/contacts/summary", { headers: withAuthHeaders(token) }),
       uploadAvatar: (id, file, token) => {
         const formData = new FormData();
         formData.append("avatar", file);
@@ -2354,6 +2356,56 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           headers: withAuthHeaders(token),
         }),
     },
+    purchases: (() => {
+      // kind: cases | requests | quotes | orders | receipts | invoices
+      const seg = (value) => encodeURIComponent(value);
+      const get = (path, token) => request(path, { headers: withAuthHeaders(token) });
+      const send = (method, path, data, token) =>
+        request(path, {
+          method,
+          headers: withAuthHeaders(token),
+          ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+        });
+      const api = {
+        dashboard: (token) => get("/purchases/dashboard", token),
+        getSettings: (token) => get("/purchases/settings", token),
+        updateSettings: (data, token) => send("PUT", "/purchases/settings", data, token),
+        getCapabilities: (token) => get("/purchases/capabilities", token),
+        list: (kind, params, token) => get(`/purchases/${seg(kind)}${toQueryString(params)}`, token),
+        get: (kind, id, token) => get(`/purchases/${seg(kind)}/${seg(id)}`, token),
+        create: (kind, data, token) => send("POST", `/purchases/${seg(kind)}`, data, token),
+        update: (kind, id, data, token) => send("PATCH", `/purchases/${seg(kind)}/${seg(id)}`, data, token),
+        transition: (kind, id, action, payload, token) =>
+          send("POST", `/purchases/${seg(kind)}/${seg(id)}/transition`, { ...(payload ?? {}), action }, token),
+        listApprovals: (params, token) => get(`/purchases/approvals${toQueryString(params)}`, token),
+        decideApproval: (id, data, token) => send("POST", `/purchases/approvals/${seg(id)}/decide`, data, token),
+        listRelations: (params, token) => get(`/purchases/relations${toQueryString(params)}`, token),
+        createRelation: (data, token) => send("POST", "/purchases/relations", data, token),
+        bulkRelate: (data, token) => send("POST", "/purchases/relations/bulk", data, token),
+        deleteRelation: (id, token) => send("DELETE", `/purchases/relations/${seg(id)}`, undefined, token),
+        propagationPreview: (params, token) => {
+          const query = { ...(params ?? {}) };
+          if (Array.isArray(query.orderIds)) query.orderIds = query.orderIds.join(",");
+          return get(`/purchases/relations/propagation${toQueryString(query)}`, token);
+        },
+        inventorySummary: (itemId, token) => get(`/purchases/inventory/${seg(itemId)}/summary`, token),
+        inventoryCandidates: (params, token) => get(`/purchases/inventory/candidates${toQueryString(params)}`, token),
+        createInventoryFromLine: (lineId, data, token) =>
+          send("POST", `/purchases/lines/${seg(lineId)}/inventory`, data, token),
+        searchDocuments: (params, token) => get(`/purchases/documents/search${toQueryString(params)}`, token),
+        listSuppliers: (params, token) => get(`/purchases/suppliers${toQueryString(params)}`, token),
+        getSupplier: (contactId, token) => get(`/purchases/suppliers/${seg(contactId)}`, token),
+        updateSupplierProfile: (contactId, data, token) =>
+          send("PUT", `/purchases/suppliers/${seg(contactId)}/profile`, data, token),
+      };
+      // Legacy aliases from the first iteration.
+      api.listCases = (params, token) => api.list("cases", params, token);
+      api.listOrders = (params, token) => api.list("orders", params, token);
+      api.createOrder = (data, token) => api.create("orders", data, token);
+      api.listInvoices = (params, token) => api.list("invoices", params, token);
+      api.createInvoice = (data, token) => api.create("invoices", data, token);
+      return api;
+    })(),
     inventory: {
       // Items
       listItems: (params, token) =>
@@ -2507,6 +2559,57 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       deleteLocation: (id, token) =>
         request(`/inventory/locations/${encodeURIComponent(id)}`, {
           method: "DELETE",
+          headers: withAuthHeaders(token),
+        }),
+      // Conditions (physical condition catalog)
+      listConditions: (token) =>
+        request("/inventory/conditions", {
+          headers: withAuthHeaders(token),
+        }),
+      createCondition: (data, token) =>
+        request("/inventory/conditions", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(data),
+        }),
+      updateCondition: (id, data, token) =>
+        request(`/inventory/conditions/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(data),
+        }),
+      deleteCondition: (id, token) =>
+        request(`/inventory/conditions/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: withAuthHeaders(token),
+        }),
+      // Administrative status (alta / baja)
+      adminTransition: (id, body, token) =>
+        request(`/inventory/items/${encodeURIComponent(id)}/admin-transition`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(body),
+        }),
+      bulkAdminTransition: (body, token) =>
+        request("/inventory/items/admin-transition/bulk", {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify(body),
+        }),
+      listAdminEvents: (id, token) =>
+        request(`/inventory/items/${encodeURIComponent(id)}/admin-events`, {
+          headers: withAuthHeaders(token),
+        }),
+      getDashboardTrend: (params, token) =>
+        request(`/inventory/dashboard/trend${toQueryString(params)}`, {
+          headers: withAuthHeaders(token),
+        }),
+      getDashboard: (params, token) =>
+        request(`/inventory/dashboard${toQueryString(params)}`, {
+          headers: withAuthHeaders(token),
+        }),
+      getSummary: (token) =>
+        request("/inventory/summary", {
           headers: withAuthHeaders(token),
         }),
       // Custom fields

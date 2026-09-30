@@ -18,6 +18,7 @@ function fakePrisma({ items = [], types = [], brands = [], models = [], customFi
     invCategory: make('invCategory'),
     invBrand: make('invBrand'),
     invLocation: make('invLocation'),
+    invCondition: make('invCondition'),
     invModel: make('invModel'),
     invItem: { findMany: async () => items },
     invCustomField: { findMany: async () => customFields },
@@ -119,4 +120,13 @@ test('remote image guard rejects internal addresses and non-http links', () => {
 test('itemOrderBy sorts relation columns by name and falls back to newest', () => {
   assert.deepEqual(itemOrderBy('brandName', 'asc'), [{ brand: { name: 'asc' } }, { createdAt: 'desc' }]);
   assert.deepEqual(itemOrderBy('nope', 'asc'), { createdAt: 'desc' });
+});
+
+test('buildAutoItemName prefers brand + model, then type, then the asset tag', async () => {
+  const { buildAutoItemName } = await import('../inventory-service.js');
+  assert.equal(buildAutoItemName({ brandName: 'Dell', model: 'XPS 15' }), 'Dell XPS 15');
+  assert.equal(buildAutoItemName({ brandName: 'Dell', model: 'Dell XPS 15' }), 'Dell XPS 15');
+  assert.equal(buildAutoItemName({ typeName: 'Laptop', model: 'XPS 15' }), 'Laptop XPS 15');
+  assert.equal(buildAutoItemName({ typeName: 'Monitor' }), 'Monitor');
+  assert.equal(buildAutoItemName({ assetTag: 'INV-2026-0007' }), 'Activo INV-2026-0007');
 });

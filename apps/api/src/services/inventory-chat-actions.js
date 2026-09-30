@@ -14,7 +14,7 @@ const customField = z.object({ label: z.string().trim().min(1).max(100), fieldKe
 const modelData = z.object({ name, typeName: name.max(100), brandName: name.max(100),
   year: z.number().int().min(1900).max(2100).optional(), description: z.string().max(2000).optional() }).strict();
 const itemData = inventoryCommonSchema.omit({ categoryId: true, brandId: true, locationId: true, customValues: true, modelId: true }).extend({
-  status: z.enum(['available', 'maintenance', 'retired', 'lost', 'stolen', 'disposed']).default('available'),
+  status: z.enum(['available', 'maintenance']).default('available'),
   brandName: optionalName, categoryName: optionalName, locationName: optionalName,
   serialNumber: z.string().min(1).max(255).nullable().optional(), assetTag: z.string().min(1).max(100).nullable().optional(),
   licenseKey: z.string().max(500).optional(), licenseExpiry: z.iso.date().optional(), licenseSeats: z.number().int().min(1).max(2147483647).optional(),

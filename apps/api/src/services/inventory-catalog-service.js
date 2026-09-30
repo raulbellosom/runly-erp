@@ -1,5 +1,5 @@
 // inventory-catalog-service.js — runly.inventory catalogs: types (InvCategory),
-// brands, locations and custom fields. Extracted from inventory-service.js.
+// brands, locations, conditions and custom fields. Extracted from inventory-service.js.
 import { InventoryServiceError, assertCompany, createRefGuard } from './inventory-guards.js';
 
 // Seeded once per company (see listCategories) and by the 20260928120000 migration.
@@ -16,6 +16,18 @@ export const DEFAULT_INVENTORY_TYPES = [
   { name: 'Mobiliario', icon: 'Armchair' },
   { name: 'Herramienta', icon: 'Wrench' },
   { name: 'Vehículo', icon: 'Car' },
+];
+
+// Physical conditions seeded the first time a company lists them.
+export const DEFAULT_INVENTORY_CONDITIONS = [
+  { name: 'Nuevo', color: '#16a34a' },
+  { name: 'Semi nuevo', color: '#22c55e' },
+  { name: 'Sin usar', color: '#0ea5e9' },
+  { name: 'En uso', color: '#6366f1' },
+  { name: 'En desuso', color: '#a3a3a3' },
+  { name: 'Instalado', color: '#8b5cf6' },
+  { name: 'Descompuesto', color: '#dc2626' },
+  { name: 'Otros', color: '#78716c' },
 ];
 
 const enabledOnly = { where: { enabled: true } };
@@ -178,6 +190,49 @@ export function createInventoryCatalogService({ prisma }) {
     return prisma.invLocation.update({ where: { id }, data: { enabled: false } });
   }
 
+  // ── Conditions ─────────────────────────────────────────────────────────────
+
+  async function listConditions(companyId) {
+    assertCompany(companyId);
+    // Counts disabled rows too, so a company that removed every condition is not re-seeded.
+    if (await prisma.invCondition.count({ where: { companyId } }) === 0) {
+      await prisma.invCondition.createMany({
+        data: DEFAULT_INVENTORY_CONDITIONS.map((c, index) => ({ companyId, name: c.name, color: c.color, sortOrder: index * 10 })),
+        skipDuplicates: true,
+      });
+    }
+    const rows = await prisma.invCondition.findMany({
+      where: { companyId, enabled: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      include: { _count: { select: { items: enabledOnly } } },
+    });
+    return rows.map(({ _count, ...row }) => ({ ...row, itemCount: _count?.items ?? 0 }));
+  }
+
+  async function createCondition(data, companyId) {
+    assertCompany(companyId);
+    const { name, description, color } = data;
+    if (!String(name ?? '').trim()) throw new InventoryServiceError('Indica el nombre de la condición.', 400);
+    return prisma.invCondition.create({ data: { companyId, name: String(name).trim(), description: description ?? null, color: color ?? null } });
+  }
+
+  async function updateCondition(id, data, companyId) {
+    assertCompany(companyId);
+    const existing = await prisma.invCondition.findFirst({ where: { id, companyId, enabled: true } });
+    if (!existing) throw new InventoryServiceError('Condición no encontrada.', 404);
+    const updateData = {};
+    for (const field of ['name', 'description', 'color']) if (data[field] !== undefined) updateData[field] = data[field];
+    return prisma.invCondition.update({ where: { id }, data: updateData });
+  }
+
+  async function deleteCondition(id, companyId) {
+    assertCompany(companyId);
+    const condition = await prisma.invCondition.findFirst({ where: { id, companyId, enabled: true } });
+    if (!condition) throw new InventoryServiceError('Condición no encontrada.', 404);
+    await assertUnused({ companyId, conditionId: id }, 'esta condición');
+    return prisma.invCondition.update({ where: { id }, data: { enabled: false } });
+  }
+
   // ── Custom Fields ──────────────────────────────────────────────────────────
 
   // categoryId: a type id (its fields + global ones), 'all' (every field) or
@@ -247,10 +302,12 @@ export function createInventoryCatalogService({ prisma }) {
     listCategories, createCategory, updateCategory, deleteCategory,
     listBrands, createBrand, updateBrand, deleteBrand,
     listLocations, createLocation, updateLocation, deleteLocation,
+    listConditions, createCondition, updateCondition, deleteCondition,
     listCustomFields, createCustomField, updateCustomField, deleteCustomField,
     reorderCategories: (companyId, items) => reorderCatalog('invCategory', companyId, items),
     reorderBrands: (companyId, items) => reorderCatalog('invBrand', companyId, items),
     reorderLocations: (companyId, items) => reorderCatalog('invLocation', companyId, items),
+    reorderConditions: (companyId, items) => reorderCatalog('invCondition', companyId, items),
     reorderModels: (companyId, items) => reorderCatalog('invModel', companyId, items),
     reorderCustomFields: (companyId, items) => reorderCatalog('invCustomField', companyId, items),
   };

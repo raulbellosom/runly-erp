@@ -1,7 +1,7 @@
 // inventory-service.test.js — unit tests for atlas.inventory business logic
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { createInventoryService, InventoryServiceError } from '../inventory-service.js'
+import { createInventoryService, InventoryServiceError, normalizeAcquisitionOrigin } from '../inventory-service.js'
 
 const COMPANY_ID  = '01900000-0000-7000-8000-000000000001'
 const USER_ID     = '01900000-0000-7000-8000-000000000002'
@@ -617,5 +617,14 @@ describe('reorderItemFiles', () => {
       () => svc.reorderItemFiles(ITEM_ID, COMPANY_ID, [{ id: 'file-1', sortOrder: 0 }]),
       (err) => { assert.ok(err instanceof InventoryServiceError); assert.equal(err.status, 404); return true },
     )
+  })
+})
+
+describe('normalizeAcquisitionOrigin', () => {
+  it('keeps undefined, defaults blank to OTHER, uppercases known values and rejects unknown ones', () => {
+    assert.equal(normalizeAcquisitionOrigin(undefined), undefined)
+    assert.equal(normalizeAcquisitionOrigin(null), 'OTHER')
+    assert.equal(normalizeAcquisitionOrigin('donation'), 'DONATION')
+    assert.throws(() => normalizeAcquisitionOrigin('GIFT'), (err) => err instanceof InventoryServiceError && err.status === 400)
   })
 })

@@ -26,10 +26,14 @@ export function getByPath(input, path) {
 
 // The title is the link column (the record's name), never the photo column —
 // an image-asset column holds a file id, not something to read.
-export function pickCardColumns(columns, subtitleField = null) {
+// `statusField` (schema.statusField) picks the badge column explicitly;
+// otherwise a column named status/estado/published is used.
+export function pickCardColumns(columns, subtitleField = null, statusField = null) {
   const image = columns.find(isImageColumn) ?? null;
   const color = columns.find((c) => c.type === "color") ?? null;
-  const status = columns.find((c) => /^(status|estado|published)$/i.test(c.field)) ?? null;
+  const status = statusField
+    ? (columns.find((c) => c.field === statusField) ?? null)
+    : (columns.find((c) => /^(status|estado|published)$/i.test(c.field)) ?? null);
   const reserved = new Set([image, color, status].filter(Boolean));
   const primary =
     columns.find((c) => c.isLink && !reserved.has(c)) ??
@@ -47,6 +51,7 @@ export function pickCardColumns(columns, subtitleField = null) {
 function renderValue(value) {
   if (value === undefined || value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (Array.isArray(value)) return value.length ? value.map(String).join(", ") : "—";
   if (typeof value === "object") return JSON.stringify(value);
   const str = String(value);
   return STATUS_LABELS[str.toLowerCase()] ?? str;

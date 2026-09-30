@@ -158,6 +158,29 @@ Navigation: Proyectos (`/app/m/runly.projects`)
 
 Kanban boards with drag-and-drop (desktop + touch), inline @mention for members, optimistic updates, and mobile-first UX. Tasks support file attachments, dependency linking, and push notifications for assignments.
 
+## runly.purchases
+
+Core module (`core: true`, `uninstallable: false`, color `#0f766e`). Owns the acquisition of goods and services: purchase cases (expedientes), requests, quotes, approvals, purchase orders (with lines), receipts (partial reception), supplier invoices with payment status, supplier profiles, and the N:N relations between purchase documents and other modules' records. Spec: `docs/superpowers/specs/2026-09-30-purchases-core-redesign-design.md`.
+
+Depends on: `runly.core`, `runly.contacts`. Consumes (optional): `runly.files`, `runly.inventory`. Works without Inventario, Flotilla or Finanzas installed.
+
+Process model:
+- **Capabilities** (what is used): `requests`, `quotes`, `approvals`, `purchaseOrders`, `receipts`, `invoices`, `payments`, `inventoryRelations`. Navigation, routes, tabs, buttons and endpoints all honour them; the backend enforces them (`CAPABILITY_DISABLED` 409).
+- **Workflow** (how stages are ordered): `REQUEST → QUOTES → APPROVAL → PURCHASE_ORDER → RECEIPT → INVOICE → PAYMENT → CLOSE`, each stage `REQUIRED | OPTIONAL | CONDITIONAL | DISABLED`. Presets: Simple, Básico, Compras + Inventario, Completo, Personalizado. Stored per company.
+- **Policies** (when a conditional stage becomes mandatory): pure `evaluatePolicies()` in `purchase-policies.js`; unsatisfied requirements block `issue` / `pay` / `close` with `POLICY_BLOCKED` 409.
+
+Inventory bridge: relations live in the generic `entity_relation` table (origin `MANUAL | INHERITED | AUTOMATIC | MIGRATED`), money splits in `purchase_allocation`. The inventory item detail renders `runly.purchases:InventoryPurchaseSection` (registered in `apps/desktop/src/lib/moduleComponentRegistry.js`) over `GET /purchases/inventory/:itemId/summary`: an adaptive vertical timeline with only the enabled stages that have documents, the allocated amount, create order/invoice (navigates to the purchases editor with `?inventoryId=`), link existing (`GET /purchases/documents/search`) and unlink. Inventario keeps the object: `inv_item.acquisition_origin` (`PURCHASE | DONATION | TRANSFER | LEASE | INTERNAL | INITIAL_STOCK | OTHER`, validated by `normalizeAcquisitionOrigin` in `inventory-service.js`); the legacy `purchaseDate/purchasePrice/vendorName/invoiceNumber` fields are shown read-only as "Datos de compra heredados" (form only when the item already has them, flagged by `hasLegacyPurchaseData`).
+
+Permissions: `purchases.access`, `purchases.read`, `purchases.case.read|manage`, `purchases.request.read|create|update`, `purchases.quote.read|manage`, `purchases.approval.decide`, `purchases.order.read|create|update`, `purchases.receipt.read|create`, `purchases.invoice.read|create|update`, `purchases.payment.manage`, `purchases.supplier.read|manage`, `purchases.relation.read|manage`, `purchases.settings.read|manage`
+
+Navigation (filtered at runtime by capability): Resumen (`/app/m/runly.purchases/purchases`), Expedientes (`/cases`), Solicitudes (`/requests`), Aprobaciones (`/approvals`), Órdenes (`/orders`), Recepciones (`/receipts`), Facturas (`/invoices`), Pagos (`/payments`), Proveedores (`/suppliers`), Configuración (`/settings`)
+
+Help: `apps/api/src/manifests/official/help/runly.purchases/` (overview + one article per screen), loaded through `loadHelpBlueprints` in the manifest.
+
+MirAI integration points: `apps/api/src/services/purchases-assistant-context.js` exposes read-only, company-scoped helpers (`pendingActions`, `findDocuments`, `supplierSpend`, `itemPurchaseHistory`) returning compact JSON. They are not wired into MirAI yet; a later iteration should expose them as assistant tools following the `inventory-chat-actions.js` pattern (read-only first, any write as a user-confirmed proposal).
+
+Out of scope: automatic workflow selection by amount (the model allows it via `purchase_case.workflow_id`), ledger posting, CFDI XML parsing, supplier portal, e-mailing purchase orders.
+
 ## Source of truth
 
 Canonical runtime/seed manifests for official modules are in:

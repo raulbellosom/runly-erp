@@ -34,6 +34,64 @@ function buildSearchWhere(search) {
   };
 }
 
+const LIST_SORT_FIELDS = {
+  name: "name", type: "type", email: "email", phone: "phone", taxId: "taxId",
+  legalName: "legalName", industry: "industry", website: "website", taxRegime: "taxRegime",
+  enabled: "enabled", createdAt: "createdAt", updatedAt: "updatedAt",
+};
+
+// Only what the list columns show: the default address' city/state and the
+// primary contact person, plus how many people/addresses the contact has.
+const LIST_INCLUDE = {
+  addresses: {
+    orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }],
+    take: 1,
+    select: { city: true, state: true },
+  },
+  persons: {
+    orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+    take: 1,
+    select: { name: true, role: true },
+  },
+  _count: { select: { persons: true, addresses: true } },
+};
+
+function parseDateBound(value, endOfDay = false) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return null;
+  const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function buildListWhere({ companyId, enabled = true, search, tag, type, createdFrom, createdTo }) {
+  const from = parseDateBound(createdFrom);
+  const to = parseDateBound(createdTo, true);
+  return {
+    companyId,
+    enabled: Boolean(enabled),
+    ...buildSearchWhere(search),
+    ...(tag ? { tags: { has: String(tag) } } : {}),
+    ...(type ? { type: String(type) } : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
+  };
+}
+
+export function toListRow(row, avatarUrl) {
+  const { addresses = [], persons = [], _count, ...contact } = row;
+  const address = addresses[0] ?? null;
+  const person = persons[0] ?? null;
+  return {
+    ...contact,
+    avatarUrl,
+    city: address?.city ?? null,
+    state: address?.state ?? null,
+    location: [address?.city, address?.state].filter(Boolean).join(", ") || null,
+    primaryPersonName: person?.name ?? null,
+    primaryPersonRole: person?.role ?? null,
+    personsCount: _count?.persons ?? 0,
+    addressesCount: _count?.addresses ?? 0,
+  };
+}
+
 function normalizeLimit(limit, fallback = 50, max = 100) {
   const parsed = Number.parseInt(String(limit ?? fallback), 10);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
@@ -135,20 +193,14 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
   }
 
   return {
-    async list({ authUserId, companyId: activeCompanyId, search, page, pageSize, sortBy, sortDir, enabled = true, tag }) {
+    async list({ authUserId, companyId: activeCompanyId, search, page, pageSize, sortBy, sortDir, enabled = true, tag, type, createdFrom, createdTo }) {
       const companyId = await getCompanyContext(activeCompanyId);
       const parsedPage = Math.max(1, Number.parseInt(String(page ?? 1), 10) || 1);
       const parsedPageSize = Math.min(200, Math.max(1, Number.parseInt(String(pageSize ?? 20), 10) || 20));
-      const where = {
-        companyId,
-        enabled: Boolean(enabled),
-        ...buildSearchWhere(search),
-        ...(tag ? { tags: { has: String(tag) } } : {}),
-      };
-      const SORT_FIELDS = { name: "name", type: "type", email: "email", phone: "phone", taxId: "taxId" };
+      const where = buildListWhere({ companyId, enabled, search, tag, type, createdFrom, createdTo });
       const dir = sortDir === "desc" ? "desc" : "asc";
-      const orderBy = sortBy && SORT_FIELDS[sortBy]
-        ? { [SORT_FIELDS[sortBy]]: dir }
+      const orderBy = sortBy && LIST_SORT_FIELDS[sortBy]
+        ? { [LIST_SORT_FIELDS[sortBy]]: dir }
         : { createdAt: "desc" };
       const [contacts, total] = await Promise.all([
         prisma.contact.findMany({
@@ -156,6 +208,7 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
           orderBy,
           take: parsedPageSize,
           skip: (parsedPage - 1) * parsedPageSize,
+          include: LIST_INCLUDE,
         }),
         prisma.contact.count({ where }),
       ]);
@@ -163,8 +216,28 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
       const avatarMap = supabaseAdmin && avatarIds.length
         ? await buildAvatarUrlMapByFileIds(avatarIds, "thumb", { prisma, supabaseAdmin }).catch(() => new Map())
         : new Map();
-      const rows = contacts.map((row) => ({ ...row, avatarUrl: avatarMap.get(row.avatarFileId) ?? null }));
+      const rows = contacts.map((row) => toListRow(row, avatarMap.get(row.avatarFileId) ?? null));
       return { rows, total, page: parsedPage, pageSize: parsedPageSize };
+    },
+
+    // Full-resolution photo for the list's avatar viewer; the list itself only
+    // embeds the small "thumb" URL.
+    async getAvatarSignedUrl({ companyId: activeCompanyId, id, variant = "full" }) {
+      const companyId = await getCompanyContext(activeCompanyId);
+      const existing = await assertContactOwnership({ id, companyId });
+      return { signedUrl: await signedAvatar(existing.avatarFileId, variant === "thumb" ? "thumb" : "full") };
+    },
+
+    // KPI strip for the list: active contacts by type plus inactive count.
+    async summary({ companyId: activeCompanyId }) {
+      const companyId = await getCompanyContext(activeCompanyId);
+      const [byType, inactive] = await Promise.all([
+        prisma.contact.groupBy({ by: ["type"], where: { companyId, enabled: true }, _count: { _all: true } }),
+        prisma.contact.count({ where: { companyId, enabled: false } }),
+      ]);
+      const counts = Object.fromEntries(byType.map((row) => [row.type, row._count._all]));
+      const total = byType.reduce((sum, row) => sum + row._count._all, 0);
+      return { total, inactive, byType: counts };
     },
 
     async getById({ authUserId, companyId: activeCompanyId, id }) {

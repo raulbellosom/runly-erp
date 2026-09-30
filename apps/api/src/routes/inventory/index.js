@@ -10,6 +10,7 @@ import { createInventoryAssistantRouter } from './assistant-routes.js';
 import { tenantActiveContext } from '../../lib/active-context.js';
 import { createInventoryModelsRouter } from './models-routes.js';
 import { createInventoryImportRouter } from './import-routes.js';
+import { createInventoryAdminRouter } from './admin-routes.js';
 import { createInventoryModelService } from '../../services/inventory-model-service.js';
 
 export function createInventoryRouter({
@@ -27,6 +28,7 @@ export function createInventoryRouter({
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryAssistantRouter({ prisma, requirePermission }));
   router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
+  router.route('/', createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc }));
   router.route('/', createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError, inventoryService, filesService }));
   const modelDefaults = createInventoryModelService({ prisma });
 
@@ -37,8 +39,8 @@ export function createInventoryRouter({
   router.get("/inventory/items", requirePermission("inventory.item.read"), async (c) => {
     try {
       const companyId = c.get("companyId");
-      const { search, categoryId, brandId, locationId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, page, limit, pageSize, sortBy, sortDir } = c.req.query();
-      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
+      const { search, categoryId, brandId, locationId, conditionId, adminStatus, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, page, limit, pageSize, sortBy, sortDir } = c.req.query();
+      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, conditionId, adminStatus, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
       // `pagination` is the shape RunlyTable reads for its page footer.
       return c.json({ ...result, pagination: { page: result.page, pageSize: result.limit, total: result.total } });
     } catch (err) {
@@ -334,6 +336,7 @@ export function createInventoryRouter({
     ["categories", "catalog", "listCategories", "createCategory", "updateCategory", "deleteCategory", "reorderCategories", "la categoria", "las categorias"],
     ["brands", "catalog", "listBrands", "createBrand", "updateBrand", "deleteBrand", "reorderBrands", "la marca", "las marcas"],
     ["locations", "catalog", "listLocations", "createLocation", "updateLocation", "deleteLocation", "reorderLocations", "la ubicacion", "las ubicaciones"],
+    ["conditions", "catalog", "listConditions", "createCondition", "updateCondition", "deleteCondition", "reorderConditions", "la condicion", "las condiciones"],
     ["custom-fields", "customfield", "listCustomFields", "createCustomField", "updateCustomField", "deleteCustomField", "reorderCustomFields", "el campo personalizado", "los campos personalizados"],
   ];
 

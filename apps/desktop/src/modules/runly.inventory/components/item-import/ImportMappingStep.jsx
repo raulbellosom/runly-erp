@@ -12,7 +12,6 @@ export function ImportMappingStep({ parsed, mapping, onMappingChange }) {
   const sample = (header) => parsed.rows.find((row) => row[header])?.[header] ?? ''
   const embeddedPhotos = parsed.imageCounts.reduce((sum, n) => sum + n, 0)
   const groups = [...new Set(parsed.fields.map((f) => f.group))]
-  const hasName = Boolean(mapping.name || mapping.model)
 
   return (
     <div className="space-y-4">
@@ -33,9 +32,9 @@ export function ImportMappingStep({ parsed, mapping, onMappingChange }) {
           </AlertDescription>
         </Alert>
       ) : null}
-      {!hasName ? (
-        <Alert variant="warning">
-          <AlertDescription>Relaciona la columna del nombre o la del modelo; sin nombre, el activo se nombra con su marca y modelo.</AlertDescription>
+      {!mapping.name ? (
+        <Alert>
+          <AlertDescription>Sin columna de nombre, cada activo se nombra con su marca y modelo (p. ej. «Dell XPS 15»), o con su tipo.</AlertDescription>
         </Alert>
       ) : null}
 

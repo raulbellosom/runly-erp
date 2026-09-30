@@ -180,7 +180,7 @@ export function InventoryItemImportDialog({ open, onOpenChange, onImported }) {
           {step === 'preview' ? <Button type="button" variant="ghost" disabled={busy} onClick={() => setStep('mapping')}>Volver al mapeo</Button> : null}
           <Button type="button" variant="ghost" onClick={() => close(false)}>Cancelar</Button>
           {step === 'mapping' ? (
-            <Button type="button" disabled={busy || !(mapping.name || mapping.model)} onClick={() => runPreview()}>{busy ? 'Analizando...' : 'Revisar'}</Button>
+            <Button type="button" disabled={busy || !Object.values(mapping).some(Boolean)} onClick={() => runPreview()}>{busy ? 'Analizando...' : 'Revisar'}</Button>
           ) : null}
           {step === 'preview' ? (
             <Button type="button" disabled={busy || creatable === 0} onClick={commit}>

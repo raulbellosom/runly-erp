@@ -165,13 +165,29 @@ export function resolveScreen(screenMap, requestedModuleKey, subPath, blueprintS
     return null;
   }
   if (moduleKey === "runly.inventory") {
-    if (subPath === "/" || subPath === "/inventory") return screenMap["runly.inventory:/inventory"] ?? null;
+    // The dashboard is the module landing page; /inventory is the item list.
+    if (subPath === "/") return screenMap["runly.inventory:/inventory/summary"] ?? null;
+    if (subPath === "/inventory") return screenMap["runly.inventory:/inventory"] ?? null;
     if (subPath === "/inventory/new") return screenMap["runly.inventory:/inventory/new"] ?? null;
     if (subPath === "/inventory/assignments") return screenMap["runly.inventory:/inventory/assignments"] ?? null;
     if (subPath === "/inventory/catalogs") return screenMap["runly.inventory:/inventory/catalogs"] ?? null;
+    if (subPath === "/inventory/summary") return screenMap["runly.inventory:/inventory/summary"] ?? null;
     // Parameterized routes — must come after all static path checks
     if (/^\/inventory\/[^/]+\/edit$/.test(subPath)) return screenMap["runly.inventory:/inventory/new"] ?? null;
     if (/^\/inventory\/[^/]+$/.test(subPath)) return screenMap["runly.inventory:/inventory/:id"] ?? null;
+    return null;
+  }
+  if (moduleKey === "runly.purchases") {
+    const screen = (key) => screenMap[`runly.purchases:${key}`] ?? null;
+    if (subPath === "/" || subPath === "/purchases") return screen("/purchases");
+    if (subPath === "/purchases/approvals") return screen("/purchases/approvals");
+    if (subPath === "/purchases/settings") return screen("/purchases/settings");
+    if (subPath === "/purchases/suppliers") return screen("/purchases/suppliers");
+    if (/^\/purchases\/suppliers\/[^/]+$/.test(subPath)) return screen("/purchases/suppliers/:id");
+    if (/^\/purchases\/(orders|invoices|requests|receipts|cases|payments)$/.test(subPath)) return screen("/purchases/list");
+    if (/^\/purchases\/(orders|invoices|requests)\/new$/.test(subPath)) return screen("/purchases/new");
+    if (/^\/purchases\/(orders|invoices|requests)\/[^/]+\/edit$/.test(subPath)) return screen("/purchases/new");
+    if (/^\/purchases\/(orders|invoices|requests|receipts|cases)\/[^/]+$/.test(subPath)) return screen("/purchases/:id");
     return null;
   }
   if (moduleKey === "runly.chat") {

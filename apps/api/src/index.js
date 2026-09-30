@@ -48,6 +48,8 @@ import { createInventoryService, InventoryServiceError } from "./services/invent
 import { createInventoryNotificationService } from "./services/inventory-notification-service.js";
 import { createCommentsService, CommentsServiceError } from "./services/comments-service.js";
 import { createInventoryRouter } from "./routes/inventory/index.js";
+import { createPurchasesRouter } from "./routes/purchases/index.js";
+import { isPurchasesNavVisible } from "./services/purchases-service.js";
 import { createModulesRouter } from "./routes/modules.js";
 import { createModulePublicLinksRoutes } from "./routes/module-public-links-routes.js";
 import { createModulePublicGateway } from "./routes/module-public-gateway.js";
@@ -1829,6 +1831,20 @@ app.get("/runtime/modules", authMiddleware, async (c) => {
   if (tenant.companyId) {
     const disabledIds = await companyModuleService.listDisabledModuleIds(tenant.companyId);
     visibleModules = modulesRaw.filter((m) => m.core || !disabledIds.has(m.id));
+    const purchasesWorkflow = await prisma.purchaseWorkflow.findFirst({
+      where: { companyId: tenant.companyId, enabled: true, isDefault: true },
+      select: { capabilities: true },
+    }).catch(() => null);
+    if (purchasesWorkflow?.capabilities) {
+      const capabilities = purchasesWorkflow.capabilities;
+      visibleModules = visibleModules.map((moduleRow) => {
+        if (moduleRow.key !== "runly.purchases") return moduleRow;
+        const navigation = (moduleRow.manifest?.navigation ?? []).filter((item) =>
+          isPurchasesNavVisible(item.path, capabilities),
+        );
+        return { ...moduleRow, manifest: { ...moduleRow.manifest, navigation } };
+      });
+    }
   }
 
   return c.json({
@@ -2336,6 +2352,7 @@ mountWithAuth(
     enrichFilesWithSignedUrls: filesService.enrichFilesWithSignedUrls.bind(filesService),
   }),
 );
+mountWithAuth(app, createPurchasesRouter({ prisma, requirePermission, requireAnyPermission, broadcaster, inventoryService, supabaseAdmin }));
 
 
 

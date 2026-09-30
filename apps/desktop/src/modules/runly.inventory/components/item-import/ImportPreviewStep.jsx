@@ -12,7 +12,10 @@ function ItemCell({ data }) {
   const meta = [data.type, data.brand, data.model].filter(Boolean).join(' · ')
   return (
     <div className="min-w-0">
-      <p className="truncate font-medium">{data.name || 'Sin nombre'}</p>
+      <p className="truncate font-medium">
+        {data.name}
+        {data.autoName ? <span className="ml-1.5 rounded bg-[hsl(var(--muted))] px-1.5 py-0.5 text-[10px] font-normal text-[hsl(var(--muted-foreground))]">automático</span> : null}
+      </p>
       {meta ? <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">{meta}</p> : null}
     </div>
   )
@@ -53,6 +56,7 @@ export function ImportPreviewStep({ preview, imageCounts, createMissing, onCreat
     ...preview.missing.brands.map((n) => ['Marca', n]),
     ...preview.missing.models.map((n) => ['Modelo', n]),
     ...preview.missing.locations.map((n) => ['Ubicación', n]),
+    ...(preview.missing.conditions ?? []).map((n) => ['Condición', n]),
   ]
   const photos = rows.filter((r) => r.status === 'new').reduce((sum, r) => sum + r.photoCount, 0)
   const normalize = (v) => String(v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.#°º]/g, '').replace(/\s+/g, '_')
@@ -75,7 +79,7 @@ export function ImportPreviewStep({ preview, imageCounts, createMissing, onCreat
       {preview.unknownStatuses.length > 0 ? (
         <section className="space-y-2 rounded-2xl border border-amber-500/40 bg-amber-500/5 p-4">
           <p className="text-sm font-medium text-[hsl(var(--foreground))]">¿A qué estado corresponde cada valor de tu archivo?</p>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">«Asignado» no se importa como tal: la asignación se hace desde la ficha del activo.</p>
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">«Asignado» no se importa como tal: la asignación se hace desde la ficha del activo. Las bajas tampoco: se proponen desde la ficha.</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {preview.unknownStatuses.map((raw) => (
               <SelectField key={raw} label={`«${raw}»`} value={statusMap[normalize(raw)] ?? ''} placeholder="Elegir estado" disabled={busy}

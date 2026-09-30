@@ -8,7 +8,7 @@ import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryItems.js'
-import { INVENTORY_ITEM_FORM } from '../blueprints/inventory-item-form.blueprint.js'
+import { buildItemFormBlueprint } from '../blueprints/inventory-item-form.blueprint.js'
 import { inventoryFormComponents } from '../components/InventoryItemClassification.jsx'
 import { InventoryCaptureTools } from '../components/InventoryCaptureTools.jsx'
 import { MAX_BULK_SERIALS, bulkUnitName, canPinField, captureStorageKey, loadCapture, parseSerials } from '../lib/capture.js'
@@ -17,7 +17,6 @@ import { intakeRequest } from '../lib/intake.js'
 const API_BASE = getApiUrl()
 
 export default function InventoryItemForm() {
-  const blueprint = INVENTORY_ITEM_FORM
   const { '*': wildcard } = useParams()
   const id = useMemo(() => {
     const parts = (wildcard ?? '').split('/')
@@ -72,6 +71,10 @@ export default function InventoryItemForm() {
 
   const itemQuery = useInventoryItem(isEdit ? id : null)
   const editItem = itemQuery.data?.data ?? itemQuery.data ?? null
+  // Legacy purchase fields only stay editable on items that already carry them;
+  // new commercial data is recorded in Compras.
+  const showLegacyPurchase = Boolean(isEdit && editItem?.hasLegacyPurchaseData)
+  const blueprint = useMemo(() => buildItemFormBlueprint(isEdit, { showLegacyPurchase }), [isEdit, showLegacyPurchase])
   const deleteItem = useDeleteInventoryItem()
 
   if (isEdit && itemQuery.isLoading) {

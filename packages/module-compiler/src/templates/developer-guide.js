@@ -30,7 +30,7 @@ function endpointTable(config) {
       `| ${entity.label} | \`GET ${base}/:id\` | Un registro | \`${permKey(slug, entity.name, 'read')}\` |`,
       `| ${entity.label} | \`POST ${base}\` | Crear | \`${permKey(slug, entity.name, 'create')}\` |`,
       `| ${entity.label} | \`PATCH ${base}/:id\` | Editar | \`${permKey(slug, entity.name, 'update')}\` |`,
-      ...(entity.softDelete !== false ? [`| ${entity.label} | \`PATCH ${base}/:id/enabled\` | Activar / desactivar (\`{ "enabled": false }\`) | \`${permKey(slug, entity.name, 'delete')}\` |`] : []),
+      ...(entity.softDelete !== false ? [`| ${entity.label} | \`PATCH ${base}/:id/enabled\` | Desactivar (\`{ "enabled": false }\`) | \`${permKey(slug, entity.name, 'delete')}\` |`] : []),
     ]
   })
   return ['| Entidad | Endpoint | Qué hace | Permiso |', '|---|---|---|---|', ...rows].join('\n')
@@ -223,6 +223,7 @@ Usa siempre \`buildApiHeaders(token, companyId)\` de \`@runly/ui\`: sin el encab
 
 ${endpointTable(config)}
 
+- Formatos: los \`decimal\` llegan como texto (\`"1250.5"\`, usa \`Number(valor)\`) y los \`date\` como \`"AAAA-MM-DDT00:00:00.000Z"\` (muestra \`valor.slice(0, 10)\`); al enviar, las fechas van como \`"AAAA-MM-DD"\`. Ejemplos por tipo de campo: \`docs/api-modulos.md\`.
 - Las listas responden \`{ data: [...], pagination: { page, pageSize, total } }\`; un registro, \`{ data: {...} }\`; los errores, \`{ error: "mensaje" }\`.
 - Los campos de relación incluyen \`<campo>__label\` con el nombre del registro relacionado (y \`<campo>__url\` si es de otro módulo); las listas aceptan \`?<campo>=<id>\` para filtrar por relaciones del mismo módulo y \`?<campo>=<VALOR>\` para campos de selección.
 - Todas las operaciones respetan los permisos y la empresa activa del usuario. Errores: 400 datos inválidos o relación no válida, 403 sin permiso, 404 no existe, 409 duplicado o en uso. Referencia completa: \`docs/api-modulos.md\` (en línea: ${DEVELOPER_DOCS_URL}/api-modulos)

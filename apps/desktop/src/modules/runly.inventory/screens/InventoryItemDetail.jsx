@@ -45,6 +45,9 @@ export default function InventoryItemDetail() {
     )
   }
 
+  // A deregistered item is read-only (the API refuses edits too).
+  const readOnly = item.adminStatus === 'deregistered'
+
   const handleDelete = async () => {
     await deleteItem.mutateAsync(id)
     toast.success('Activo eliminado correctamente')
@@ -62,10 +65,10 @@ export default function InventoryItemDetail() {
         apiBaseUrl={API_BASE}
         componentRegistry={componentRegistry}
         onBack={() => navigate('/app/m/runly.inventory/inventory')}
-        onEdit={() => navigate(`/app/m/runly.inventory/inventory/${id}/edit`)}
+        onEdit={readOnly ? undefined : () => navigate(`/app/m/runly.inventory/inventory/${id}/edit`)}
         heroActions={
           <DetailActionBar
-            primary={{
+            primary={readOnly ? undefined : {
               label: 'Editar',
               onClick: () => navigate(`/app/m/runly.inventory/inventory/${id}/edit`),
             }}

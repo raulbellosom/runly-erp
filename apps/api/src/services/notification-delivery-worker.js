@@ -139,6 +139,7 @@ const EVENT_TYPE_LABELS = {
   "inventory.item.mention": "Mencion en inventario",
   "inventory.item.comment": "Comentario en elemento",
   "inventory.item.reaction": "Reaccion a tu comentario",
+  "inventory.item.deregistration_proposed": "Propuesta de baja por autorizar",
   // Ledger
   "ledger.account_invite": "Invitacion a cuenta",
   "ledger.group_invite": "Invitacion a grupo",

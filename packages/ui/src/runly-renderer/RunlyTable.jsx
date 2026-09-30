@@ -624,7 +624,7 @@ export function RunlyTable({
                         (o) => String(o.value) === str,
                       );
                       cellContent = opt?.label ?? renderValue(value);
-                    } else if (col.type === "image" && col.avatarUserField) {
+                    } else if (col.type === "image" && (col.avatarUserField || col.avatarSignedUrlPath || col.avatarLabelField)) {
                       cellContent = (
                         <UserAvatarCell
                           value={value}
@@ -717,6 +717,7 @@ export function RunlyTable({
         columns={visibleColumns}
         rows={rows}
         subtitleField={schema.subtitleField ?? null}
+        statusField={schema.statusField ?? null}
         selectedIds={selectedIds}
         onToggleSelect={handleToggleRow}
         getRowId={getRowId}
@@ -775,6 +776,8 @@ export function RunlyTable({
         getRowId={getRowId}
         rowMenuItems={rowMenuItems}
         subtitleField={schema.subtitleField ?? null}
+        statusField={schema.statusField ?? null}
+        cardMedia={schema.cardMedia ?? null}
         accentColor={accentColor}
         resolveItemColor={resolveItemColor}
         onView={onView}

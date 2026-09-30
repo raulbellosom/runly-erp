@@ -120,9 +120,17 @@ function buildInitialOrder(columns, savedPreference) {
     .map((c) => c.key)
     .filter((k) => columns.some((c) => c.key === k));
 
-  const savedSet = new Set(saved);
-  const newKeys = columns.filter((c) => !savedSet.has(c.key)).map((c) => c.key);
-  return [...saved, ...newKeys];
+  // Columns added to the blueprint after the preference was saved slot in at
+  // their blueprint position (right after their blueprint predecessor), not at
+  // the far end — a new leading photo column must stay first.
+  const order = [...saved];
+  columns.forEach((col, index) => {
+    if (order.includes(col.key)) return;
+    const prevKey = index > 0 ? columns[index - 1].key : null;
+    const at = prevKey ? order.indexOf(prevKey) + 1 : 0;
+    order.splice(at, 0, col.key);
+  });
+  return order;
 }
 
 function buildInitialVisibility(columns, savedPreference) {

@@ -8,11 +8,11 @@ order: 5
 | `text` | `VARCHAR(255)` | texto | El primer campo de texto es el que busca `?search=` |
 | `textarea` | `TEXT` | texto | |
 | `number` | `INTEGER` | número entero | |
-| `decimal` | `NUMERIC(18,4)` | número | Se muestra como importe |
+| `decimal` | `NUMERIC(18,4)` | se envía número, se **recibe texto** (`"1250.5"`) | Se muestra como importe; convierte con `Number(valor)` |
 | `boolean` | `BOOLEAN` | `true` / `false` | |
 | `select` | `VARCHAR(64)` | el **valor** de la opción | Cada opción tiene etiqueta visible y valor guardado; filtrable con `?campo=VALOR` |
 | `multiselect` | `TEXT[]` | arreglo de valores | |
-| `date` | `DATE` | `"AAAA-MM-DD"` | |
+| `date` | `DATE` | se envía `"AAAA-MM-DD"`, se **recibe** `"AAAA-MM-DDT00:00:00.000Z"` | Muestra `valor.slice(0, 10)`; `new Date(valor)` puede dar el día anterior en México |
 | `datetime` | `TIMESTAMPTZ` | fecha ISO 8601 | |
 | `email` | `VARCHAR(255)` | texto (correo válido) | |
 | `phone` | `VARCHAR(64)` | texto | |
@@ -22,11 +22,13 @@ order: 5
 | `markdown` / `richtext` | `TEXT` | texto | |
 | `color` | `VARCHAR(32)` | `"#RRGGBB"` | |
 
+Ejemplos de petición y respuesta, validaciones y cómo vaciar cada tipo: [API de los módulos > Valores por tipo de campo](/documentacion/desarrolladores/api-modulos#valores-por-tipo-de-campo).
+
 Todos los registros tienen además `id` (UUID v7), `company_id`, `enabled`, `created_at` y `updated_at`.
 
 ## Requerido y condiciones
 
-- `required`: la API responde 400 si falta el valor al crear.
+- `required`: la API responde 400 si falta el valor al crear. Al editar no se vuelve a comprobar.
 - Si el campo está dentro de una pestaña, sección o campo con **condición de visibilidad** (por ejemplo "mostrar si Tipo = Empresa"), solo se exige mientras la condición se cumple; la API aplica la misma regla. Las condiciones solo pueden depender de campos `select` o `boolean`.
 
 ## Cambios en campos publicados

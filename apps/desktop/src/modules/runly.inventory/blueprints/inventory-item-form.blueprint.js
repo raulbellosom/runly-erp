@@ -1,6 +1,14 @@
-import { ITEM_STATUSES } from '../lib/inventory-constants.js'
+import { ITEM_STATUSES, ACQUISITION_ORIGIN_OPTIONS } from '../lib/inventory-constants.js'
+
+export const LEGACY_PURCHASE_SECTION_ID = 'legacy-purchase'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label }))
+// On create an item can only start available or in maintenance.
+const CREATE_STATUS_OPTIONS = STATUS_OPTIONS.filter((s) => s.value !== 'assigned')
+const ADMIN_START_OPTIONS = [
+  { value: 'registered', label: 'Alta' },
+  { value: 'registration_pending', label: 'Pendiente de alta' },
+]
 
 export const INVENTORY_ITEM_FORM = {
   key: 'inventory.item.form',
@@ -20,7 +28,7 @@ export const INVENTORY_ITEM_FORM = {
       imageDocsPath: '/inventory/items/:id/files',
       fallbackIcon: 'Package',
       rows: [
-        { field: 'status', label: 'Estado' },
+        { field: 'status', label: 'Disponibilidad' },
         { field: 'serialNumber', label: 'Serie' },
       ],
     },
@@ -46,7 +54,7 @@ export const INVENTORY_ITEM_FORM = {
         icon: 'IdCard',
         collapsible: true,
         fields: [
-          { field: 'name', label: 'Nombre', type: 'text', required: true, hint: 'Laptop Dell XPS 15' },
+          { field: 'name', label: 'Nombre', type: 'text', hint: 'Opcional. Si lo dejas vacío se genera con la marca y el modelo (p. ej. «Dell XPS 15»).' },
           { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar', hiddenWhen: { field: '__multi', truthy: true } },
           { field: 'serialNumber', label: 'Número de serie', type: 'text', hiddenWhen: { field: '__multi', truthy: true } },
           { field: 'partNumber', label: 'Número de parte', type: 'text' },
@@ -75,14 +83,54 @@ export const INVENTORY_ITEM_FORM = {
               },
             },
           },
-          { field: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
+          { field: 'status', label: 'Disponibilidad', type: 'select', required: true, options: STATUS_OPTIONS },
+          {
+            field: 'conditionId',
+            label: 'Condición',
+            type: 'relation',
+            relation: {
+              apiPath: '/inventory/conditions',
+              labelField: 'name',
+              preload: true,
+              clearable: true,
+              create: {
+                enabled: true,
+                mode: 'quick',
+                apiPath: '/inventory/conditions',
+                label: 'Crear condición',
+                permissionKey: 'inventory.catalog.manage',
+              },
+            },
+          },
+          // Create only (removed by buildItemFormBlueprint on edit): later
+          // changes go through the alta/baja actions in the item detail.
+          { field: 'adminStatus', label: 'Estado inicial', type: 'select', options: ADMIN_START_OPTIONS, hint: 'Pendiente de alta: el activo no se puede asignar hasta que alguien con permiso confirme su alta.' },
         ],
       },
       {
-        label: 'Compra',
+        label: 'Origen de adquisición',
         icon: 'Receipt',
         collapsible: true,
         defaultCollapsed: true,
+        fields: [
+          {
+            field: 'acquisitionOrigin',
+            label: 'Origen',
+            type: 'select',
+            options: ACQUISITION_ORIGIN_OPTIONS,
+            hint: 'Las órdenes, facturas y montos de compra se registran en Compras y se relacionan desde la ficha del activo.',
+          },
+        ],
+      },
+      {
+        // Kept only by buildItemFormBlueprint when the item already carries
+        // pre-Compras purchase data, so it can still be corrected.
+        id: LEGACY_PURCHASE_SECTION_ID,
+        label: 'Datos de compra heredados',
+        icon: 'History',
+        collapsible: true,
+        defaultCollapsed: true,
+        description: 'Datos capturados antes de Compras. Los nuevos datos comerciales se administran desde Compras.',
         fields: [
           { field: 'purchaseDate', label: 'Fecha de compra', type: 'date' },
           { field: 'purchasePrice', label: 'Precio de compra', type: 'currency', currency: 'USD', locale: 'es-PE' },
@@ -151,6 +199,23 @@ export const INVENTORY_ITEM_FORM = {
     submitLabel: 'Guardar activo',
     cancelLabel: 'Cancelar',
   },
+}
+
+// Edit drops the create-only "Estado inicial" field and keeps "Asignado"
+// in the status options so an assigned item still shows its status.
+// Legacy purchase fields only appear when `showLegacyPurchase` (edit of an
+// item that already has them).
+export function buildItemFormBlueprint(isEdit, { showLegacyPurchase = false } = {}) {
+  const sections = INVENTORY_ITEM_FORM.schema.sections
+    .filter((section) => showLegacyPurchase || section.id !== LEGACY_PURCHASE_SECTION_ID)
+    .map((section) => {
+      if (!section.fields) return section
+      const fields = section.fields
+        .filter((f) => !(isEdit && f.field === 'adminStatus'))
+        .map((f) => (f.field === 'status' && !isEdit ? { ...f, options: CREATE_STATUS_OPTIONS } : f))
+      return { ...section, fields }
+    })
+  return { ...INVENTORY_ITEM_FORM, schema: { ...INVENTORY_ITEM_FORM.schema, sections } }
 }
 
 export default INVENTORY_ITEM_FORM

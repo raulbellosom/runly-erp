@@ -1,3 +1,5 @@
+import { ACQUISITION_ORIGIN_OPTIONS } from '../lib/inventory-constants.js'
+
 export const INVENTORY_ITEM_DETAIL = {
   key: 'inventory.item.detail',
   kind: 'DETAIL',
@@ -16,13 +18,14 @@ export const INVENTORY_ITEM_DETAIL = {
         { field: 'assetTag', label: 'Etiqueta', icon: 'Hash' },
         { field: 'categoryName', label: 'Tipo', icon: 'Layers' },
         { field: 'brandName', label: 'Marca', icon: 'Tag' },
+        { field: 'conditionName', label: 'Condición', icon: 'Activity' },
       ],
     },
     kpis: [
       { label: 'Asignado a', field: 'assignedToName', icon: 'UserCheck' },
       { label: 'Fecha de asignación', field: 'assignedAt', type: 'date', icon: 'CalendarDays' },
       { label: 'Vencimiento de garantía', field: 'warrantyExpiry', type: 'date', icon: 'ShieldCheck' },
-      { label: 'Valor de compra', field: 'purchasePrice', type: 'currency', icon: 'Tag' },
+      { label: 'Valor de compra (heredado)', field: 'purchasePrice', type: 'currency', icon: 'Tag' },
     ],
     sections: [
       {
@@ -48,12 +51,26 @@ export const INVENTORY_ITEM_DETAIL = {
         ],
       },
       {
-        label: 'Ubicación y compra',
+        label: 'Ubicación y origen',
         icon: 'MapPin',
         column: 'main',
         columns: 2,
         fields: [
           { field: 'locationName', label: 'Ubicación', icon: 'MapPin' },
+          { field: 'conditionName', label: 'Condición', icon: 'Activity' },
+          { field: 'acquisitionOrigin', label: 'Origen de adquisición', type: 'select', options: ACQUISITION_ORIGIN_OPTIONS, icon: 'Receipt' },
+        ],
+      },
+      {
+        // Read-only pre-Compras purchase data; hidden when the item has none
+        // (the API computes hasLegacyPurchaseData).
+        id: 'legacy-purchase',
+        label: 'Datos de compra heredados',
+        icon: 'History',
+        column: 'main',
+        columns: 2,
+        visibleWhen: { field: 'hasLegacyPurchaseData', truthy: true },
+        fields: [
           { field: 'purchaseDate', label: 'Fecha de compra', type: 'date', icon: 'CalendarDays' },
           { field: 'purchasePrice', label: 'Precio de compra', type: 'currency', icon: 'Tag' },
           { field: 'vendorName', label: 'Proveedor', icon: 'Building2' },
@@ -92,6 +109,22 @@ export const INVENTORY_ITEM_DETAIL = {
           signedUrl: { endpointTemplate: '/files/:fileId/signed-url' },
           fields: { fileAssetId: 'fileAssetId' },
         },
+      },
+      {
+        id: 'admin-status',
+        type: 'component',
+        label: 'Estado del activo',
+        icon: 'ClipboardList',
+        column: 'aside',
+        component: 'runly.inventory:AdminSection',
+      },
+      {
+        id: 'purchases',
+        type: 'component',
+        label: 'Compras relacionadas',
+        icon: 'ShoppingCart',
+        column: 'aside',
+        component: 'runly.purchases:InventoryPurchaseSection',
       },
       {
         id: 'assignment',

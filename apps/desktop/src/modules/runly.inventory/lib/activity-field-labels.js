@@ -1,4 +1,4 @@
-import { ITEM_STATUSES, ITEM_TYPES } from './inventory-constants.js'
+import { ITEM_STATUSES, ITEM_TYPES, ACQUISITION_ORIGIN_OPTIONS } from './inventory-constants.js'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label }))
 const ITEM_TYPE_OPTIONS = ITEM_TYPES.map((t) => ({ value: t.value, label: t.label }))
@@ -22,11 +22,13 @@ export const INVENTORY_ACTIVITY_FIELD_LABELS = {
   model: { label: 'Modelo', type: 'text' },
   serialNumber: { label: 'Número de serie', type: 'text' },
   partNumber: { label: 'Número de parte', type: 'text' },
-  status: { label: 'Estado', type: 'select', options: STATUS_OPTIONS },
+  status: { label: 'Disponibilidad', type: 'select', options: STATUS_OPTIONS },
+  adminStatus: { label: 'Estado' },
   purchaseDate: { label: 'Fecha de compra', type: 'date' },
   purchasePrice: { label: 'Precio de compra', type: 'currency' },
   vendorName: { label: 'Proveedor', type: 'text' },
   invoiceNumber: { label: 'Número de factura', type: 'text' },
+  acquisitionOrigin: { label: 'Origen de adquisición', type: 'select', options: ACQUISITION_ORIGIN_OPTIONS },
   warrantyExpiry: { label: 'Vencimiento de garantía', type: 'date' },
   warrantyNotes: { label: 'Notas de garantía', type: 'markdown' },
   notes: { label: 'Notas', type: 'markdown' },

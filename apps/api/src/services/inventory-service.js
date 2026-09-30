@@ -4,6 +4,24 @@ import { createActivityBridge } from './activity-bridge.js';
 import { buildInventoryWhere } from './inventory-query.js';
 import { InventoryServiceError, assertCompany, createRefGuard } from './inventory-guards.js';
 import { createInventoryCatalogService } from './inventory-catalog-service.js';
+import { DEFAULT_LISTED_ADMIN_STATUSES } from './inventory-admin-service.js';
+
+// Operational statuses a user can set by hand; `assigned` only comes from
+// the assign/return flow, bajas from the administrative transitions.
+const EDITABLE_STATUSES = new Set(['available', 'maintenance']);
+const CREATABLE_ADMIN_STATUSES = new Set(['registered', 'registration_pending']);
+// How the company came to own the item (Compras owns the commercial data).
+export const ACQUISITION_ORIGINS = ['PURCHASE', 'DONATION', 'TRANSFER', 'LEASE', 'INTERNAL', 'INITIAL_STOCK', 'OTHER'];
+const ACQUISITION_ORIGIN_SET = new Set(ACQUISITION_ORIGINS);
+// undefined = untouched; blank = OTHER (the column default); unknown value = 400.
+export function normalizeAcquisitionOrigin(value) {
+  if (value === undefined) return undefined;
+  const origin = String(value ?? '').trim().toUpperCase();
+  if (!origin) return 'OTHER';
+  if (!ACQUISITION_ORIGIN_SET.has(origin)) throw new InventoryServiceError('Origen de adquisición no válido.', 400);
+  return origin;
+}
+const todayDate = () => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); };
 
 export { InventoryServiceError };
 
@@ -25,6 +43,8 @@ const ITEM_SORTS = {
   assetTag: (dir) => ({ assetTag: dir }),
   name: (dir) => ({ name: dir }),
   status: (dir) => ({ status: dir }),
+  adminStatus: (dir) => ({ adminStatus: dir }),
+  conditionName: (dir) => ({ condition: { name: dir } }),
   model: (dir) => ({ model: dir }),
   serialNumber: (dir) => ({ serialNumber: dir }),
   purchaseDate: (dir) => ({ purchaseDate: { sort: dir, nulls: 'last' } }),
@@ -42,6 +62,19 @@ export function itemOrderBy(sortBy, sortDir) {
   const build = ITEM_SORTS[sortBy];
   if (!build) return { createdAt: 'desc' };
   return [build(dir), { createdAt: 'desc' }].flat();
+}
+
+// Name is optional for users: a blank name is generated from what the item
+// is — "Marca Modelo", else "Tipo Modelo"/"Tipo", else "Activo <etiqueta>".
+export function buildAutoItemName({ brandName, typeName, model, assetTag }) {
+  const clean = (v) => String(v ?? '').trim();
+  const modelText = clean(model);
+  const brand = clean(brandName);
+  const type = clean(typeName);
+  // Avoid "Dell Dell XPS" when the model text already starts with the brand.
+  const withBrand = brand && modelText.toLocaleLowerCase('es').startsWith(brand.toLocaleLowerCase('es')) ? modelText : [brand, modelText].filter(Boolean).join(' ');
+  const name = (brand && modelText ? withBrand : '') || [type, modelText].filter(Boolean).join(' ') || brand || '';
+  return (name || `Activo ${clean(assetTag)}`.trim()).slice(0, 255);
 }
 
 export function createInventoryService({ prisma, activityBridge }) {
@@ -64,6 +97,14 @@ export function createInventoryService({ prisma, activityBridge }) {
     return profile?.id ?? null;
   }
 
+  async function autoItemName({ brandId, categoryId, model, assetTag }) {
+    const [brand, type] = await Promise.all([
+      brandId ? prisma.invBrand.findFirst({ where: { id: brandId }, select: { name: true } }) : null,
+      categoryId ? prisma.invCategory.findFirst({ where: { id: categoryId }, select: { name: true } }) : null,
+    ]);
+    return buildAutoItemName({ brandName: brand?.name, typeName: type?.name, model, assetTag });
+  }
+
   // ── Items ──────────────────────────────────────────────────────────────────
 
   async function listItems({
@@ -75,6 +116,8 @@ export function createInventoryService({ prisma, activityBridge }) {
     status,
     assignedToId,
     modelId,
+    conditionId,
+    adminStatus,
     createdFrom,
     createdTo,
     purchaseFrom,
@@ -88,7 +131,10 @@ export function createInventoryService({ prisma, activityBridge }) {
     const take = normalizeLimit(limit);
     const skip = (normalizePage(page) - 1) * take;
 
-    const where = buildInventoryWhere(companyId, { search, categoryId, brandId, locationId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo });
+    const where = buildInventoryWhere(companyId, {
+      search, categoryId, brandId, locationId, conditionId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo,
+      adminStatus: adminStatus === 'all' ? undefined : (adminStatus || DEFAULT_LISTED_ADMIN_STATUSES),
+    });
 
     const [data, total] = await Promise.all([
       prisma.invItem.findMany({
@@ -97,6 +143,7 @@ export function createInventoryService({ prisma, activityBridge }) {
           category: { select: { id: true, name: true, icon: true, color: true } },
           brand: { select: { id: true, name: true } },
           location: { select: { id: true, name: true } },
+          condition: { select: { id: true, name: true, color: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
         },
         orderBy: itemOrderBy(sortBy, sortDir),
@@ -111,6 +158,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       categoryName: item.category?.name ?? null,
       brandName: item.brand?.name ?? null,
       locationName: item.location?.name ?? null,
+      conditionName: item.condition?.name ?? null,
       assignedToName: item.assignedTo
         ? [item.assignedTo.firstName, item.assignedTo.lastName].filter(Boolean).join(' ')
         : null,
@@ -162,6 +210,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       purchasePrice: item.purchasePrice != null ? Number(item.purchasePrice) : null,
       vendorName: item.vendorName ?? null,
       invoiceNumber: item.invoiceNumber ?? null,
+      acquisitionOrigin: item.acquisitionOrigin ?? 'OTHER',
       warrantyExpiry: item.warrantyExpiry ?? null,
       warrantyNotes: item.warrantyNotes ?? null,
       notes: item.notes ?? null,
@@ -176,6 +225,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         category: { select: { id: true, name: true, icon: true, color: true, description: true } },
         brand:    { select: { id: true, name: true, website: true } },
         location: { select: { id: true, name: true, address: true } },
+        condition: { select: { id: true, name: true, color: true } },
         assignedTo: {
           select: { id: true, firstName: true, lastName: true, employeeCode: true, userProfileId: true },
         },
@@ -197,10 +247,13 @@ export function createInventoryService({ prisma, activityBridge }) {
       categoryName: item.category?.name ?? null,
       brandName: item.brand?.name ?? null,
       locationName: item.location?.name ?? null,
+      conditionName: item.condition?.name ?? null,
       assignedToName: item.assignedTo
         ? ([item.assignedTo.firstName, item.assignedTo.lastName].filter(Boolean).join(' ') || null)
         : null,
       coverImageFileId,
+      // Drives the read-only "Datos de compra heredados" detail section.
+      hasLegacyPurchaseData: Boolean(item.purchaseDate || item.purchasePrice != null || item.vendorName || item.invoiceNumber),
     };
   }
 
@@ -209,6 +262,12 @@ export function createInventoryService({ prisma, activityBridge }) {
     await assertRefInCompany('invCategory', data.categoryId, companyId, 'El tipo');
     await assertRefInCompany('invBrand', data.brandId, companyId, 'La marca');
     await assertRefInCompany('invLocation', data.locationId, companyId, 'La ubicacion');
+    await assertRefInCompany('invCondition', data.conditionId, companyId, 'La condicion');
+    if (data.status !== undefined && data.status !== null && !EDITABLE_STATUSES.has(data.status)) {
+      throw new InventoryServiceError('Estado no válido: usa Disponible o Mantenimiento. Las bajas se registran desde la ficha del activo.', 400);
+    }
+    const adminStatus = data.adminStatus ?? 'registered';
+    if (!CREATABLE_ADMIN_STATUSES.has(adminStatus)) throw new InventoryServiceError('Un activo nuevo solo puede registrarse como Alta o Pendiente de alta.', 400);
     const creatorProfileId = await resolveProfileId(creatorId);
     let assetTag = data.assetTag;
     if (!assetTag) {
@@ -232,6 +291,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       purchasePrice,
       vendorName,
       invoiceNumber,
+      acquisitionOrigin,
       warrantyExpiry,
       warrantyNotes,
       licenseKey,
@@ -244,14 +304,17 @@ export function createInventoryService({ prisma, activityBridge }) {
     let itemData = {
       companyId,
       assetTag,
-      name,
+      name: String(name ?? '').trim() || await autoItemName({ brandId, categoryId, model, assetTag }),
       status: status ?? 'available',
+      adminStatus,
+      registeredAt: adminStatus === 'registered' ? todayDate() : null,
       createdById: creatorProfileId ?? undefined,
     };
     if (description !== undefined) itemData.description = description;
     if (categoryId !== undefined) itemData.categoryId = categoryId;
     if (brandId !== undefined) itemData.brandId = brandId;
     if (locationId !== undefined) itemData.locationId = locationId;
+    if (data.conditionId !== undefined) itemData.conditionId = data.conditionId || null;
     if (serialNumber !== undefined) itemData.serialNumber = serialNumber;
     if (model !== undefined) itemData.model = model;
     if (modelId !== undefined) itemData.modelId = modelId || null;
@@ -260,6 +323,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     if (purchasePrice !== undefined) itemData.purchasePrice = purchasePrice;
     if (vendorName !== undefined) itemData.vendorName = vendorName;
     if (invoiceNumber !== undefined) itemData.invoiceNumber = invoiceNumber;
+    if (acquisitionOrigin !== undefined) itemData.acquisitionOrigin = normalizeAcquisitionOrigin(acquisitionOrigin);
     if (warrantyExpiry !== undefined) itemData.warrantyExpiry = warrantyExpiry ? new Date(warrantyExpiry) : null;
     if (warrantyNotes !== undefined) itemData.warrantyNotes = warrantyNotes;
     if (licenseKey !== undefined) itemData.licenseKey = licenseKey;
@@ -364,9 +428,13 @@ export function createInventoryService({ prisma, activityBridge }) {
       },
     });
     if (!existing) throw new InventoryServiceError('Item not found', 404);
+    if (existing.adminStatus === 'deregistered') {
+      throw new InventoryServiceError('El activo está dado de baja; revierte la baja para editarlo.', 409);
+    }
     await assertRefInCompany('invCategory', data.categoryId, companyId, 'El tipo');
     await assertRefInCompany('invBrand', data.brandId, companyId, 'La marca');
     await assertRefInCompany('invLocation', data.locationId, companyId, 'La ubicacion');
+    await assertRefInCompany('invCondition', data.conditionId, companyId, 'La condicion');
 
     const {
       name,
@@ -384,6 +452,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       purchasePrice,
       vendorName,
       invoiceNumber,
+      acquisitionOrigin,
       warrantyExpiry,
       warrantyNotes,
       licenseKey,
@@ -394,7 +463,14 @@ export function createInventoryService({ prisma, activityBridge }) {
     } = data;
 
     const updateData = {};
-    if (name !== undefined) updateData.name = name;
+    if (name !== undefined) {
+      updateData.name = String(name ?? '').trim() || await autoItemName({
+        brandId: brandId !== undefined ? brandId : existing.brandId,
+        categoryId: categoryId !== undefined ? categoryId : existing.categoryId,
+        model: model !== undefined ? model : existing.model,
+        assetTag: assetTag || existing.assetTag,
+      });
+    }
     if (assetTag !== undefined) updateData.assetTag = assetTag;
     if (description !== undefined) updateData.description = description;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
@@ -404,11 +480,18 @@ export function createInventoryService({ prisma, activityBridge }) {
     if (model !== undefined) updateData.model = model;
     if (modelId !== undefined) updateData.modelId = modelId || null;
     if (partNumber !== undefined) updateData.partNumber = partNumber;
-    if (status !== undefined) updateData.status = status;
+    // Forms resend the current status; only a real change is validated.
+    if (status !== undefined && status !== existing.status) {
+      if (!EDITABLE_STATUSES.has(status)) throw new InventoryServiceError('Estado no válido: usa Disponible o Mantenimiento.', 400);
+      if (existing.status === 'assigned') throw new InventoryServiceError('Registra la devolución del activo antes de cambiar su estado.', 409);
+      updateData.status = status;
+    }
+    if (data.conditionId !== undefined) updateData.conditionId = data.conditionId || null;
     if (purchaseDate !== undefined) updateData.purchaseDate = purchaseDate ? new Date(purchaseDate) : null;
     if (purchasePrice !== undefined) updateData.purchasePrice = purchasePrice;
     if (vendorName !== undefined) updateData.vendorName = vendorName;
     if (invoiceNumber !== undefined) updateData.invoiceNumber = invoiceNumber;
+    if (acquisitionOrigin !== undefined) updateData.acquisitionOrigin = normalizeAcquisitionOrigin(acquisitionOrigin);
     if (warrantyExpiry !== undefined) updateData.warrantyExpiry = warrantyExpiry ? new Date(warrantyExpiry) : null;
     if (warrantyNotes !== undefined) updateData.warrantyNotes = warrantyNotes;
     if (licenseKey !== undefined) updateData.licenseKey = licenseKey;
@@ -505,6 +588,8 @@ export function createInventoryService({ prisma, activityBridge }) {
     if (!actorProfileId) throw new InventoryServiceError('Usuario no encontrado.', 400);
     const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true } });
     if (!item) throw new InventoryServiceError('Item not found', 404);
+    if (item.adminStatus === 'registration_pending') throw new InventoryServiceError('El activo está pendiente de alta; confirma el alta antes de asignarlo.', 409);
+    if (item.adminStatus === 'deregistered') throw new InventoryServiceError('El activo está dado de baja y no se puede asignar.', 409);
     await assertRefInCompany('hrEmployee', employeeId, companyId, 'El colaborador');
     const activeAssignment = await prisma.invAssignment.findFirst({ where: { itemId, returnedAt: null } });
     if (activeAssignment) throw new InventoryServiceError('Item is already assigned', 409);

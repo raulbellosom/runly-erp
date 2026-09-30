@@ -11,8 +11,10 @@ import { BrandsPanel } from '../components/catalogs/BrandsPanel.jsx'
 import { ModelsPanel } from '../components/catalogs/ModelsPanel.jsx'
 import { LocationsPanel } from '../components/catalogs/LocationsPanel.jsx'
 import { CustomFieldsPanel } from '../components/catalogs/CustomFieldsPanel.jsx'
+import { ConditionsPanel } from '../components/catalogs/ConditionsPanel.jsx'
+import { useInventoryConditions } from '../hooks/useInventoryAdmin.js'
 
-const PANELS = { types: TypesPanel, brands: BrandsPanel, models: ModelsPanel, locations: LocationsPanel, 'custom-fields': CustomFieldsPanel }
+const PANELS = { types: TypesPanel, brands: BrandsPanel, models: ModelsPanel, locations: LocationsPanel, conditions: ConditionsPanel, 'custom-fields': CustomFieldsPanel }
 const IMPORTABLE = new Set(['types', 'brands', 'models', 'locations'])
 const count = (query) => (query.data?.data ?? query.data ?? []).filter((row) => row.enabled !== false).length
 
@@ -25,6 +27,7 @@ export default function InventoryCatalogsScreen() {
     brands: count(useInventoryBrands()),
     models: count(useInventoryModels()),
     locations: count(useInventoryLocations()),
+    conditions: count(useInventoryConditions()),
     'custom-fields': count(useInventoryCustomFields('all')),
   }
   const Panel = PANELS[active]
@@ -34,7 +37,7 @@ export default function InventoryCatalogsScreen() {
       <PageHeader
         eyebrow="Runly Inventario"
         title="Catálogos"
-        description="Tipos, marcas, modelos, ubicaciones y campos personalizados que se usan al registrar activos."
+        description="Tipos, marcas, modelos, ubicaciones, condiciones y campos personalizados que se usan al registrar activos."
       />
       <div className="grid items-start gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
         <CatalogNav active={active} counts={counts} onSelect={(key) => setSearchParams({ tab: key }, { replace: true })} />

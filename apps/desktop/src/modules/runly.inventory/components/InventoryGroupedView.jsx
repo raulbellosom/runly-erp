@@ -37,7 +37,7 @@ const ALL = '__all__'
 const TREE_COLUMNS = [
   { key: 'assetTag',       label: 'Tag',         defaultVisible: true },
   { key: 'brandName',      label: 'Marca',        defaultVisible: true },
-  { key: 'status',         label: 'Estado',       defaultVisible: true },
+  { key: 'status',         label: 'Disponibilidad', defaultVisible: true },
   { key: 'locationName',   label: 'Ubicacion',    defaultVisible: false },
   { key: 'assignedToName', label: 'Responsable',  defaultVisible: true },
 ]
@@ -51,7 +51,7 @@ const BULK_COLUMNS = [
   { field: 'name',           label: 'Nombre' },
   { field: 'categoryName',   label: 'Tipo' },
   { field: 'brandName',      label: 'Marca' },
-  { field: 'status',         label: 'Estado', type: 'select', options: ITEM_STATUSES.map(s => ({ value: s.value, label: s.label })) },
+  { field: 'status',         label: 'Disponibilidad', type: 'select', options: ITEM_STATUSES.map(s => ({ value: s.value, label: s.label })) },
   { field: 'locationName',   label: 'Ubicacion' },
   { field: 'assignedToName', label: 'Responsable' },
 ]
@@ -125,7 +125,7 @@ function TreeView({ groups, collapsedGroups, onToggleGroup, onItemClick, visible
                           <th className="px-4 py-2 text-left font-medium">Marca</th>
                         )}
                         {visibleCols.has('status') && (
-                          <th className="px-4 py-2 text-left font-medium">Estado</th>
+                          <th className="px-4 py-2 text-left font-medium">Disponibilidad</th>
                         )}
                         {visibleCols.has('locationName') && (
                           <th className="px-4 py-2 text-left font-medium">Ubicacion</th>
@@ -391,7 +391,7 @@ export function InventoryGroupedView({
           onValueChange={v => setStatusFilter(v === ALL ? '' : v)}
         >
           <SelectTrigger className="w-36 h-9">
-            <SelectValue placeholder="Estado" />
+            <SelectValue placeholder="Disponibilidad" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos los estados</SelectItem>

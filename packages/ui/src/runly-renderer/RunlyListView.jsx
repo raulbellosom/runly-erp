@@ -40,6 +40,7 @@ export function RunlyListView({
   columns,
   rows,
   subtitleField = null,
+  statusField = null,
   selectedIds,
   onToggleSelect,
   getRowId,
@@ -50,7 +51,7 @@ export function RunlyListView({
   apiBaseUrl,
   companyId,
 }) {
-  const { primary, subtitle, status, color, image, details } = pickCardColumns(columns, subtitleField);
+  const { primary, subtitle, status, color, image, details } = pickCardColumns(columns, subtitleField, statusField);
 
   return (
     <div className="rounded-2xl glass-shell-flat overflow-clip">

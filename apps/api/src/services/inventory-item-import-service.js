@@ -15,6 +15,7 @@ import {
   MAX_IMAGES_PER_ROW, MAX_ITEM_IMPORT_ROWS, clean, key, normalizeHeader, parseImportDate, parseImportPrice,
 } from './inventory-import-file.js';
 import { fetchRemoteImage, splitImageUrls } from './inventory-import-remote-image.js';
+import { buildAutoItemName } from './inventory-service.js';
 
 export { MAX_ITEM_IMPORT_ROWS, parseImportDate, parseImportPrice, parseItemFile, normalizeHeader } from './inventory-import-file.js';
 
@@ -28,7 +29,9 @@ export const ITEM_IMPORT_FIELDS = [
   { key: 'brand', label: 'Marca', group: 'Modelo, tipo y marca', aliases: ['marca', 'brand', 'fabricante', 'manufacturer'] },
   { key: 'model', label: 'Modelo', group: 'Modelo, tipo y marca', aliases: ['modelo', 'model'] },
   { key: 'location', label: 'Ubicación', group: 'Ubicación y estado', aliases: ['ubicacion', 'location', 'sucursal', 'area', 'sitio'] },
-  { key: 'status', label: 'Estado', group: 'Ubicación y estado', aliases: ['estado', 'estatus', 'status'] },
+  { key: 'adminStatus', label: 'Estado (alta)', group: 'Ubicación y estado', aliases: ['estado', 'estatus', 'status', 'situacion', 'situacion_administrativa', 'alta', 'admin_status'] },
+  { key: 'status', label: 'Disponibilidad', group: 'Ubicación y estado', aliases: ['disponibilidad', 'estado_de_uso', 'uso', 'availability'] },
+  { key: 'condition', label: 'Condición', group: 'Ubicación y estado', aliases: ['condicion', 'estado_fisico', 'condition'] },
   { key: 'purchaseDate', label: 'Fecha de compra', group: 'Compra y garantía', aliases: ['fecha_de_compra', 'compra', 'fecha_compra', 'purchase_date', 'fecha_adquisicion'] },
   { key: 'purchasePrice', label: 'Precio de compra', group: 'Compra y garantía', aliases: ['precio', 'precio_de_compra', 'costo', 'valor', 'price', 'importe'] },
   { key: 'vendorName', label: 'Proveedor', group: 'Compra y garantía', aliases: ['proveedor', 'vendor', 'supplier'] },
@@ -43,17 +46,19 @@ const BASE_KEYS = new Set(ITEM_IMPORT_FIELDS.map((f) => f.key));
 export const IMPORT_STATUSES = [
   { value: 'available', label: 'Disponible' },
   { value: 'maintenance', label: 'Mantenimiento' },
-  { value: 'retired', label: 'Retirado' },
-  { value: 'lost', label: 'Perdido' },
-  { value: 'stolen', label: 'Robado' },
-  { value: 'disposed', label: 'Desechado' },
 ];
+// Baja spellings are refused: bajas go through the administrative flow.
+const BAJA_WORDS = new Set(['retired', 'retirado', 'baja', 'dado_de_baja', 'lost', 'perdido', 'stolen', 'robado', 'disposed', 'desechado']);
+const ADMIN_BY_KEY = new Map([
+  ['registered', 'registered'], ['alta', 'registered'], ['de_alta', 'registered'], ['si', 'registered'],
+  ['registration_pending', 'registration_pending'], ['pendiente', 'registration_pending'], ['pendiente_de_alta', 'registration_pending'],
+]);
 const IMPORTABLE_STATUS = new Set(IMPORT_STATUSES.map((s) => s.value));
 // Status column accepts the internal value or the Spanish label. "Asignado"
 // is not importable: an assignment needs a collaborator and its history.
 const STATUS_BY_KEY = new Map([
   ...IMPORT_STATUSES.flatMap((s) => [[s.value, s.value], [normalizeHeader(s.label), s.value]]),
-  ['en_mantenimiento', 'maintenance'], ['baja', 'retired'], ['dado_de_baja', 'retired'],
+  ['en_mantenimiento', 'maintenance'],
 ]);
 const TRUE_WORDS = new Set(['si', 'sí', 'yes', 'true', '1', 'x', 'verdadero']);
 const FALSE_WORDS = new Set(['no', 'false', '0', 'falso']);
@@ -130,17 +135,18 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
   }
 
   async function loadContext(companyId) {
-    const [types, brands, locations, models, existing, customFields] = await Promise.all([
+    const [types, brands, locations, models, existing, customFields, conditions] = await Promise.all([
       prisma.invCategory.findMany({ where: { companyId }, select: { id: true, name: true } }),
       prisma.invBrand.findMany({ where: { companyId }, select: { id: true, name: true } }),
       prisma.invLocation.findMany({ where: { companyId }, select: { id: true, name: true } }),
       prisma.invModel.findMany({ where: { companyId, enabled: true }, select: { id: true, brandId: true, typeId: true, nameKey: true } }),
       prisma.invItem.findMany({ where: { companyId, enabled: true }, select: { assetTag: true, serialNumber: true } }),
       loadCustomFields(companyId),
+      prisma.invCondition.findMany({ where: { companyId, enabled: true }, select: { id: true, name: true } }),
     ]);
     const byName = (rows) => new Map(rows.map((row) => [key(row.name), row.id]));
     return {
-      types: byName(types), brands: byName(brands), locations: byName(locations), models,
+      types: byName(types), brands: byName(brands), locations: byName(locations), conditions: byName(conditions), models,
       customFields: new Map(customFields.map((f) => [f.id, f])),
       tags: new Set(existing.map((i) => key(i.assetTag)).filter(Boolean)),
       serials: new Set(existing.map((i) => key(i.serialNumber)).filter(Boolean)),
@@ -151,7 +157,6 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
     if (!Array.isArray(rows)) throw new InventoryServiceError('No se recibieron filas.', 400);
     if (rows.length > MAX_ITEM_IMPORT_ROWS) throw new InventoryServiceError('El archivo supera el límite de 2,000 filas.', 400);
     if (!mapping || typeof mapping !== 'object') throw new InventoryServiceError('Falta el mapeo de columnas.', 400);
-    if (!mapping.name && !mapping.model) throw new InventoryServiceError('Relaciona la columna del nombre o la del modelo.', 400);
     for (const field of Object.keys(mapping)) {
       const custom = field.startsWith('custom:') ? field.slice(7) : null;
       if (custom ? !ctx.customFields.has(custom) : !BASE_KEYS.has(field)) throw new InventoryServiceError(`Campo desconocido: ${field}.`, 400);
@@ -170,10 +175,11 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
     const missing = {};
     const unknownStatus = [];
 
-    const name = d.name || [d.brand, d.model].filter(Boolean).join(' ') || d.type || '';
-    if (!name) errors.push('Sin nombre: la fila no tiene Nombre ni Modelo.');
-    else if (name.length > 255) errors.push('El nombre admite hasta 255 caracteres.');
-    else if (!d.name) notes.push(`Nombre tomado de marca y modelo: «${name}».`);
+    // Blank names are generated on create (see buildAutoItemName); the
+    // preview shows the same result.
+    const autoName = !d.name;
+    const name = d.name || buildAutoItemName({ brandName: d.brand, typeName: d.type, model: d.model, assetTag: d.assetTag || '(etiqueta automática)' });
+    if (d.name && d.name.length > 255) errors.push('El nombre admite hasta 255 caracteres.');
 
     let status = 'available';
     if (d.status) {
@@ -181,12 +187,22 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
       const chosen = statusMap?.[normalized];
       if (chosen && IMPORTABLE_STATUS.has(chosen)) status = chosen;
       else if (STATUS_BY_KEY.has(normalized)) status = STATUS_BY_KEY.get(normalized);
+      else if (BAJA_WORDS.has(normalized)) errors.push(`«${d.status}» es una baja: importa el activo y propón su baja desde su ficha.`);
       else {
         // "Asignado" needs a collaborator, so it is resolved like any unknown
         // spelling: the user picks the status it should import as.
         errors.push(`Estado «${d.status}» sin equivalencia.`);
         unknownStatus.push(d.status);
       }
+    }
+    let adminStatus = 'registered';
+    if (d.adminStatus) {
+      const normalized = normalizeHeader(d.adminStatus);
+      if (ADMIN_BY_KEY.has(normalized)) adminStatus = ADMIN_BY_KEY.get(normalized);
+      // An "Estado" column holding availability words (Disponible, Mantenimiento).
+      else if (STATUS_BY_KEY.has(normalized) && !d.status) status = STATUS_BY_KEY.get(normalized);
+      else if (BAJA_WORDS.has(normalized) || normalized.includes('baja')) errors.push(`«${d.adminStatus}»: las bajas no se importan; propónla desde la ficha del activo.`);
+      else errors.push(`Estado «${d.adminStatus}» no válido: usa Alta o Pendiente de alta.`);
     }
     const purchaseDate = d.purchaseDate ? parseImportDate(d.purchaseDate) : null;
     if (d.purchaseDate && !purchaseDate) errors.push(`Fecha de compra «${d.purchaseDate}» no válida (usa AAAA-MM-DD o DD/MM/AAAA).`);
@@ -195,7 +211,7 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
     const purchasePrice = d.purchasePrice ? parseImportPrice(d.purchasePrice) : null;
     if (Number.isNaN(purchasePrice)) errors.push(`Precio «${d.purchasePrice}» no válido.`);
 
-    for (const [field, map] of [['type', ctx.types], ['brand', ctx.brands], ['location', ctx.locations]]) {
+    for (const [field, map] of [['type', ctx.types], ['brand', ctx.brands], ['location', ctx.locations], ['condition', ctx.conditions]]) {
       if (d[field] && !map.has(key(d[field]))) missing[field] = d[field];
     }
     // A model joins the catalog only with its type and brand; an existing
@@ -228,7 +244,7 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
     if (tag && seen.tags.has(tag)) errors.push(`Etiqueta repetida en el archivo (fila ${seen.tags.get(tag)}).`);
     if (serial && seen.serials.has(serial)) errors.push(`Serie repetida en el archivo (fila ${seen.serials.get(serial)}).`);
 
-    const data = { ...d, name, status, purchaseDate, warrantyExpiry, purchasePrice, customValues, photoUrls };
+    const data = { ...d, name, autoName, status, adminStatus, purchaseDate, warrantyExpiry, purchasePrice, customValues, photoUrls };
     const base = { data, missing, unknownStatus };
     if (errors.length) return { ...base, status: 'error', errors, notes };
     if ((tag && ctx.tags.has(tag)) || (serial && ctx.serials.has(serial))) {
@@ -265,7 +281,7 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
     return {
       rows: analyzed,
       counts,
-      missing: { types: pick('type'), brands: pick('brand'), locations: pick('location'), models: pick('model') },
+      missing: { types: pick('type'), brands: pick('brand'), locations: pick('location'), conditions: pick('condition'), models: pick('model') },
       unknownStatuses: unique(analyzed.flatMap((r) => r.unknownStatus)),
     };
   }
@@ -307,8 +323,9 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
         const model = await ensureModel(d.model, categoryId, brandId);
         categoryId = categoryId ?? model?.typeId ?? undefined;
         const locationId = await ensure(ctx.locations, 'invLocation', d.location);
+        const conditionId = await ensure(ctx.conditions, 'invCondition', d.condition);
         item = await inventoryService.createItem({
-          name: d.name,
+          name: d.autoName ? undefined : d.name,
           assetTag: d.assetTag || undefined,
           serialNumber: d.serialNumber || undefined,
           partNumber: d.partNumber || undefined,
@@ -318,6 +335,8 @@ export function createInventoryItemImportService({ prisma, inventoryService, fet
           brandId,
           locationId,
           status: d.status,
+          adminStatus: d.adminStatus,
+          conditionId,
           purchaseDate: d.purchaseDate || undefined,
           purchasePrice: d.purchasePrice ?? undefined,
           vendorName: d.vendorName || undefined,

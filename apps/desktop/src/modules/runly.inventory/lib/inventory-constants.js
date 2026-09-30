@@ -1,11 +1,23 @@
 export const ITEM_STATUSES = [
-  { value: 'available',   label: 'Disponible',    color: '#16a34a', bgColor: '#dcfce7' },
-  { value: 'assigned',    label: 'Asignado',      color: '#2563eb', bgColor: '#dbeafe' },
-  { value: 'maintenance', label: 'Mantenimiento', color: '#d97706', bgColor: '#fef3c7' },
-  { value: 'retired',     label: 'Retirado',      color: '#6b7280', bgColor: '#f3f4f6' },
-  { value: 'lost',        label: 'Perdido',       color: '#dc2626', bgColor: '#fee2e2' },
-  { value: 'stolen',      label: 'Robado',        color: '#7c2d12', bgColor: '#fef2f2' },
-  { value: 'disposed',    label: 'Desechado',     color: '#374151', bgColor: '#f9fafb' },
+  // Disponibilidad: its own hues (teal, indigo, violet) so they never read as
+  // the green/amber/red/blue of the alta/baja Estado.
+  { value: 'available',   label: 'Disponible',    color: '#0d9488', bgColor: '#ccfbf1' },
+  { value: 'assigned',    label: 'Asignado',      color: '#4f46e5', bgColor: '#e0e7ff' },
+  { value: 'maintenance', label: 'Mantenimiento', color: '#9333ea', bgColor: '#f3e8ff' },
+]
+// Retirado / Perdido / Robado / Desechado became administrative bajas
+// (see lib/admin-status.js).
+
+// How the item was acquired (inv_item.acquisition_origin). Commercial data
+// (orders, invoices, amounts) lives in Compras.
+export const ACQUISITION_ORIGIN_OPTIONS = [
+  { value: 'PURCHASE', label: 'Compra' },
+  { value: 'DONATION', label: 'Donación' },
+  { value: 'TRANSFER', label: 'Transferencia' },
+  { value: 'LEASE', label: 'Arrendamiento' },
+  { value: 'INTERNAL', label: 'Producción interna' },
+  { value: 'INITIAL_STOCK', label: 'Inventario inicial' },
+  { value: 'OTHER', label: 'Otro' },
 ]
 
 export const ITEM_TYPES = [
@@ -22,7 +34,7 @@ export const ITEM_TYPES = [
 export const GROUP_BY_OPTIONS = [
   { value: 'category',  label: 'Tipo' },
   { value: 'brand',     label: 'Marca' },
-  { value: 'status',    label: 'Estado' },
+  { value: 'status',    label: 'Disponibilidad' },
   { value: 'location',  label: 'Ubicacion' },
   { value: 'assignee',  label: 'Responsable' },
 ]
@@ -35,12 +47,10 @@ export const VIEW_MODE_OPTIONS = [
 
 export const INVENTORY_EMOJI_PALETTE = ['👍', '❤️', '😄', '😮', '🎯', '🔧', '✅', '❌']
 
+// Operational status only; `assigned` comes from assign/return and bajas
+// from the administrative flow.
 export const ALLOWED_ITEM_STATUS_TRANSITIONS = {
-  available:   ['assigned', 'maintenance', 'retired', 'lost', 'stolen', 'disposed'],
-  assigned:    ['available', 'maintenance', 'retired', 'lost', 'stolen', 'disposed'],
-  maintenance: ['available', 'retired', 'disposed'],
-  retired:     ['disposed'],
-  lost:        ['available'],
-  stolen:      ['available'],
-  disposed:    [],
+  available:   ['assigned', 'maintenance'],
+  assigned:    ['available'],
+  maintenance: ['available'],
 }

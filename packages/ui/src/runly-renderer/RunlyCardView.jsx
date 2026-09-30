@@ -1,8 +1,25 @@
+import { useState } from "react";
 import { Eye, ImageIcon, FileText, Pencil, Trash2 } from "lucide-react";
+import { initialsFromName } from "./runly-detail-hero.jsx";
 import { Checkbox } from "../components/Checkbox.jsx";
 import { ActionMenu } from "../components/ActionMenu.jsx";
 import { ImageAssetCell } from "./ImageAssetCell.jsx";
 import { formatCellText, getByPath, pickCardColumns } from "./table-card-columns.js";
+
+function CardAvatar({ url, title, tint }) {
+  const [failed, setFailed] = useState(false);
+  if (url && !failed) {
+    return <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-11 w-11 shrink-0 rounded-xl border border-[hsl(var(--border))] object-cover" />;
+  }
+  return (
+    <div
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold"
+      style={{ backgroundColor: tint ? `${tint}26` : "hsl(var(--muted))", color: tint ?? "hsl(var(--muted-foreground))" }}
+    >
+      {title && title !== "—" ? initialsFromName(title) : "#"}
+    </div>
+  );
+}
 
 // Grid of record cards. When the table has a photo column the card opens with
 // a cover image; the title is the record's name (the link column), never the
@@ -11,6 +28,10 @@ export function RunlyCardView({
   columns = [],
   rows = [],
   subtitleField = null,
+  statusField = null,
+  // "avatar": people/organizations — the photo is a round-cornered avatar
+  // beside the title (initials without one) instead of a full-width cover.
+  cardMedia = null,
   selectedIds = new Set(),
   onToggleSelect,
   getRowId,
@@ -27,7 +48,9 @@ export function RunlyCardView({
   apiBaseUrl,
   companyId,
 }) {
-  const { primary, subtitle, status, image, details } = pickCardColumns(columns, subtitleField);
+  const { primary, subtitle, status, image: imageColumn, details } = pickCardColumns(columns, subtitleField, statusField);
+  const avatarMode = cardMedia === "avatar" && Boolean(imageColumn);
+  const image = avatarMode ? null : imageColumn;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -99,6 +122,13 @@ export function RunlyCardView({
             <div className="flex flex-1 flex-col gap-3 p-4">
               <div className="flex items-start gap-2">
                 {!image && selectBox && <div className="mt-0.5">{selectBox}</div>}
+                {avatarMode && (
+                  <CardAvatar
+                    url={imageColumn.type === "image" ? (getByPath(row, imageColumn.field) || null) : null}
+                    title={title}
+                    tint={effectiveColor}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"

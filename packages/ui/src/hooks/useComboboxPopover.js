@@ -57,19 +57,29 @@ export function useComboboxPopover({ dropHeight = 260, minWidth = 220 } = {}) {
   const dropdownRef = useRef(null);
   const searchRef = useRef(null);
 
+  // Close on any interaction outside the trigger and the panel. `pointerdown`
+  // in the capture phase, because Radix triggers (menus, dropdowns) call
+  // preventDefault on pointerdown, which suppresses the legacy `mousedown`.
+  // `focusin` covers keyboard jumps that involve no click at all, e.g. the
+  // Ctrl+K command palette taking focus (Escape is handled by the combobox keys).
   useEffect(() => {
-    function handleOutside(e) {
-      if (
-        !containerRef.current?.contains(e.target) &&
-        !dropdownRef.current?.contains(e.target)
-      ) {
+    if (!open) return undefined;
+    const isInside = (node) =>
+      node instanceof Node &&
+      (containerRef.current?.contains(node) || dropdownRef.current?.contains(node));
+    function closeIfOutside(e) {
+      if (!isInside(e.target)) {
         setOpen(false);
         setSearch("");
       }
     }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
+    document.addEventListener("pointerdown", closeIfOutside, true);
+    document.addEventListener("focusin", closeIfOutside, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeIfOutside, true);
+      document.removeEventListener("focusin", closeIfOutside, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;

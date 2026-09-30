@@ -63,7 +63,7 @@ export function CatalogStatStrip({ items, className = '' }) {
   const n = Math.max(1, Math.min(list.length, 4))
   return (
     <div className={`grid grid-cols-1 gap-3 ${SM_COLS[n]} ${LG_COLS[n]} ${className}`}>
-      {list.map((item) => <CatalogStatCard key={item.key} {...item} />)}
+      {list.map(({ key, ...item }) => <CatalogStatCard key={key} {...item} />)}
     </div>
   )
 }

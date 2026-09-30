@@ -1275,7 +1275,7 @@ Verified: 2026-05-25 (`pnpm.cmd install --lockfile-only`; `node --check apps/api
 
 ## Future feature modules
 
-- [ ] Purchases (supplier orders, receiving)
+- [ ] Purchases -> promoted to core module `runly.purchases` (first iteration 2026-09-29; full redesign in progress 2026-09-30: capabilities/workflow/policies, requests, quotes, approvals, orders, partial receipts, invoices with payments, suppliers, inventory timeline + `acquisitionOrigin`, help content). Spec: `docs/superpowers/specs/2026-09-30-purchases-core-redesign-design.md`; plan: `docs/superpowers/plans/2026-09-30-purchases-core-redesign.md` (Workstream C done; A/B and verification V1-V3 tracked there, V3 needs the forward migration applied by the owner)
 - [ ] Reports (cross-module reporting engine)
 
 ## Phase 10 - Responsive foundation, toolbar migrations, and Finance decomposition

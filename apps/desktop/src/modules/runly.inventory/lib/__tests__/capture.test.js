@@ -16,6 +16,7 @@ test('pinnedValues keeps non-empty pinned fields and never serials or tags', () 
 test('bulkUnitName appends the serial and stays within 255 chars', () => {
   assert.equal(bulkUnitName('Laptop Dell', 'ABC'), 'Laptop Dell · ABC')
   assert.equal(bulkUnitName('x'.repeat(300), 'S').length, 255)
+  assert.equal(bulkUnitName('  ', 'S'), undefined)
 })
 
 test('capture settings round-trip and tolerate broken storage', () => {

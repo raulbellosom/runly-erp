@@ -1,7 +1,7 @@
 # Inventory: administrative status (alta / baja) and physical condition
 
 Date: 2026-09-28
-Status: Draft design (product owner, pending approval)
+Status: Approved 2026-09-29 (product owner)
 Module: `runly.inventory`
 
 ## 1. Goal

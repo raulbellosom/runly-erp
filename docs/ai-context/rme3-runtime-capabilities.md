@@ -588,7 +588,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 
 | Export | Description |
 |---|---|
-| `RunlyTable` | Renders TABLE kind blueprints. `sortable: true` columns sort from the header (click cycles asc/desc/none; list/grid views get a sort menu). Filters accept `type: 'daterange'` (sends `${key}From`/`${key}To` as YYYY-MM-DD, override with `fromKey`/`toKey`). List/grid cards use the link column as title, an `image`/`image-asset` column as photo, and optional `schema.subtitleField` under the title |
+| `RunlyTable` | Renders TABLE kind blueprints. `sortable: true` columns sort from the header (click cycles asc/desc/none; list/grid views get a sort menu). Filters accept `type: 'daterange'` (sends `${key}From`/`${key}To` as YYYY-MM-DD, override with `fromKey`/`toKey`). List/grid cards use the link column as title, an `image`/`image-asset` column as photo, optional `schema.subtitleField` under the title, optional `schema.statusField` as the badge (default: a status/estado/published column) and `schema.cardMedia: 'avatar'` to show the photo as an avatar beside the title (initials fallback) instead of a cover. `type: 'image'` columns holding a pre-signed thumb URL accept `avatarLabelField` (initials without photo) and `avatarUserField` or `avatarSignedUrlPath` (e.g. `/contacts/:id/avatar/signed-url`, :id = row id) to open the full-size photo; array values render comma-separated |
 | `RunlyForm` | Renders FORM kind blueprints |
 | `RunlyDetail` | Renders DETAIL kind blueprints |
 | `RunlyCrudView` | Combined list + form + detail view |

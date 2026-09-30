@@ -13,6 +13,7 @@ const IMPORTANT_EVENTS = new Set([
   'chat.mention.new',
   'notes.note.shared',
   'inventory.item.mention',
+  'inventory.item.deregistration_proposed',
 ]);
 
 export function getDefaultNotificationPreference(eventType) {

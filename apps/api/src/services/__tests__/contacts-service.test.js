@@ -83,3 +83,45 @@ describe("contacts-service — getById", () => {
     assert.deepEqual(result, contact);
   });
 });
+
+describe("contacts-service — list filters, rows and summary", () => {
+  it("buildListWhere adds type, tag and inclusive created-date bounds", async () => {
+    const { buildListWhere } = await import("../contacts-service.js");
+    const where = buildListWhere({ companyId: "c-1", type: "supplier", tag: "vip", createdFrom: "2026-09-01", createdTo: "2026-09-30" });
+    assert.equal(where.companyId, "c-1");
+    assert.equal(where.enabled, true);
+    assert.equal(where.type, "supplier");
+    assert.deepEqual(where.tags, { has: "vip" });
+    assert.equal(where.createdAt.gte.getDate(), 1);
+    assert.equal(where.createdAt.lte.getHours(), 23);
+    assert.equal(buildListWhere({ companyId: "c-1", createdFrom: "bad" }).createdAt, undefined);
+  });
+
+  it("toListRow flattens the default address, primary person and counts", async () => {
+    const { toListRow } = await import("../contacts-service.js");
+    const row = toListRow({
+      id: "k-1",
+      name: "ACME",
+      addresses: [{ city: "Monterrey", state: "NL" }],
+      persons: [{ name: "Ana", role: "Compras" }],
+      _count: { persons: 3, addresses: 2 },
+    }, "https://thumb");
+    assert.equal(row.location, "Monterrey, NL");
+    assert.equal(row.primaryPersonName, "Ana");
+    assert.equal(row.personsCount, 3);
+    assert.equal(row.avatarUrl, "https://thumb");
+    assert.equal(row.addresses, undefined);
+  });
+
+  it("summary counts active contacts by type plus inactive ones", async () => {
+    const prisma = {
+      contact: {
+        groupBy: async () => [{ type: "customer", _count: { _all: 4 } }, { type: "supplier", _count: { _all: 2 } }],
+        count: async ({ where }) => (where.enabled === false ? 5 : 0),
+      },
+    };
+    const service = createContactsService({ prisma });
+    const result = await service.summary({ companyId: "c-1" });
+    assert.deepEqual(result, { total: 6, inactive: 5, byType: { customer: 4, supplier: 2 } });
+  });
+});

@@ -32,6 +32,14 @@ export function registerContactsProfileRoutes(app, { prisma, requirePermission, 
     }
   });
 
+  app.get("/contacts/summary", requirePermission("contacts.contacts.read"), async (c) => {
+    try {
+      return c.json({ data: await contactsService.summary(scope(c)) });
+    } catch (err) {
+      return handleError(c, err, "No se pudo cargar el resumen de contactos.");
+    }
+  });
+
   app.get("/contacts/duplicates", requirePermission("contacts.contacts.read"), async (c) => {
     try {
       const data = await contactsService.findDuplicates({
@@ -75,7 +83,16 @@ export function registerContactsProfileRoutes(app, { prisma, requirePermission, 
     }
   });
 
-  app.post("/contacts/:id/avatar", requirePermission("contacts.contacts.update"), async (c) => {
+  app.get("/contacts/:id/avatar/signed-url", requirePermission("contacts.contacts.read"), async (c) => {
+    try {
+      const data = await contactsService.getAvatarSignedUrl({ ...scope(c), id: c.req.param("id"), variant: c.req.query("variant") });
+      return c.json({ data });
+    } catch (err) {
+      return handleError(c, err, "No se pudo cargar la foto.");
+    }
+  });
+
+  app.post("/contacts/:id/avatar",requirePermission("contacts.contacts.update"), async (c) => {
     try {
       const body = await c.req.parseBody();
       const file = body.avatar ?? body.file;

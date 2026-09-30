@@ -398,6 +398,38 @@ const SCREEN_MAP = {
   "runly.inventory:/inventory/assignments": lazy(
     () => import("../modules/runly.inventory/screens/InventoryAssignmentsScreen.jsx"),
   ),
+  "runly.inventory:/inventory/summary": lazy(
+    () => import("../modules/runly.inventory/screens/InventorySummaryScreen.jsx"),
+  ),
+  // runly.purchases: one screen per role; module-screen-resolver maps each
+  // section path (orders, invoices, requests, receipts, cases, payments) to it.
+  "runly.purchases:/": lazy(
+    () => import("../modules/runly.purchases/screens/PurchasesDashboard.jsx"),
+  ),
+  "runly.purchases:/purchases": lazy(
+    () => import("../modules/runly.purchases/screens/PurchasesDashboard.jsx"),
+  ),
+  "runly.purchases:/purchases/list": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseDocumentList.jsx"),
+  ),
+  "runly.purchases:/purchases/new": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseDocumentEditor.jsx"),
+  ),
+  "runly.purchases:/purchases/:id": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseDocumentDetail.jsx"),
+  ),
+  "runly.purchases:/purchases/approvals": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseApprovalsScreen.jsx"),
+  ),
+  "runly.purchases:/purchases/suppliers": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseSuppliersScreen.jsx"),
+  ),
+  "runly.purchases:/purchases/suppliers/:id": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseSupplierDetail.jsx"),
+  ),
+  "runly.purchases:/purchases/settings": lazy(
+    () => import("../modules/runly.purchases/screens/PurchaseSettingsScreen.jsx"),
+  ),
 };
 
 function LoadingFallback() {

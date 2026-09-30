@@ -27,6 +27,12 @@ const ALLOWED_FILE_ENTITY_TYPES = [
   "GeneratedDocument",
   "PfmReceipt",
   "UserProfile",
+  // runly.purchases attachments (AttachmentsPanel; invoice PDF/XML use metadata label pdf/xml)
+  "purchase_order",
+  "purchase_invoice",
+  "purchase_receipt",
+  "purchase_quote",
+  "purchase_request",
 ];
 const ALLOWED_EXACT_MIME_TYPES = new Set([
   ...Object.values(OFFICE_FORMATS).map(format => format.mimeType),

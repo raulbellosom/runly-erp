@@ -155,6 +155,11 @@ export function normalizeColumns(schema) {
           typeof entry.avatarLabelField === "string" && entry.avatarLabelField.trim()
             ? entry.avatarLabelField.trim()
             : null,
+        // type: "image" (UserAvatarCell): full-res photo route, :id = row id.
+        avatarSignedUrlPath:
+          typeof entry.avatarSignedUrlPath === "string" && entry.avatarSignedUrlPath.trim()
+            ? entry.avatarSignedUrlPath.trim()
+            : null,
       };
     })
     .filter(Boolean);
@@ -260,6 +265,7 @@ export function formatTableCurrency(value, currencyCode = "MXN") {
 export function renderValue(value) {
   if (value === undefined || value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (Array.isArray(value)) return value.length ? value.map(String).join(", ") : "—";
   if (typeof value === "object") return JSON.stringify(value);
   const str = String(value);
   return STATUS_LABELS[str.toLowerCase()] ?? str;

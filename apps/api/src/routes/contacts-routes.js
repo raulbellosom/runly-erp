@@ -50,6 +50,9 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
           sortDir,
           enabled,
           tag: c.req.query("tag") || undefined,
+          type: c.req.query("type") || undefined,
+          createdFrom: c.req.query("createdFrom") || undefined,
+          createdTo: c.req.query("createdTo") || undefined,
         });
         return c.json({
           data: result.rows,

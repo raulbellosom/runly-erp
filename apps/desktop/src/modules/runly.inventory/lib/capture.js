@@ -33,8 +33,10 @@ export function pinnedValues(values, pinned) {
   return out
 }
 
+// No name -> undefined, so the API generates one from brand/type/model.
 export function bulkUnitName(name, serial) {
-  return `${String(name ?? '').trim()} · ${serial}`.slice(0, 255)
+  const base = String(name ?? '').trim()
+  return base ? `${base} · ${serial}`.slice(0, 255) : undefined
 }
 
 export function captureStorageKey(companyId, userId) {

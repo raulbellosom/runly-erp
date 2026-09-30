@@ -13,14 +13,19 @@ import { useInventoryModels } from '../hooks/useInventoryModels.js'
 import { ITEM_STATUSES } from '../lib/inventory-constants.js'
 import { useInventoryAssistant } from '../lib/assistant-context.js'
 import { InventoryItemImportDialog } from '../components/InventoryItemImportDialog.jsx'
+import { InventoryAdminKpis } from '../components/InventoryAdminKpis.jsx'
+import { InventoryAdminTransitionDialog } from '../components/InventoryAdminTransitionDialog.jsx'
+import { useInventoryCan, useInventoryConditions, useInventorySummary } from '../hooks/useInventoryAdmin.js'
+import { ADMIN_ACTIONS, ADMIN_FILTER_OPTIONS, ADMIN_STATUSES } from '../lib/admin-status.js'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map(s => ({ value: s.value, label: s.label }))
 // Deep links from Catálogos (e.g. ?categoryId=...) open the list pre-filtered.
-const URL_FILTERS = ['status', 'categoryId', 'brandId', 'locationId', 'modelId']
+const URL_FILTERS = ['status', 'adminStatus', 'conditionId', 'categoryId', 'brandId', 'locationId', 'modelId', 'createdFrom', 'createdTo']
+const ADMIN_OPTIONS = ADMIN_STATUSES.map(s => ({ value: s.value, label: s.label }))
 
 export default function InventoryScreen() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const initialFilters = useMemo(
     () => Object.fromEntries(URL_FILTERS.map(key => [key, searchParams.get(key)]).filter(([, value]) => value)),
     [searchParams],
@@ -34,11 +39,15 @@ export default function InventoryScreen() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [importOpen, setImportOpen] = useState(false)
   const [refreshSignal, setRefreshSignal] = useState(0)
+  const [bulk, setBulk] = useState(null)
+  const can = useInventoryCan()
+  const summary = useInventorySummary()
   const assistant = useInventoryAssistant()
   const setPageContext = assistant?.setPageContext
   const [assistantContext, setAssistantContext] = useState({ mode: 'all', ids: [], filters: {} })
   const updateAssistantContext = useCallback(({ selectedIds, search, filters }) => {
-    const activeFilters = Object.fromEntries(Object.entries({ ...filters, search }).filter(([, value]) => value !== '' && value != null))
+    // 'all' is a list-only value the assistant filters do not accept.
+    const activeFilters = Object.fromEntries(Object.entries({ ...filters, search }).filter(([, value]) => value !== '' && value != null && value !== 'all'))
     const next = selectedIds.length ? { mode: 'selected', ids: selectedIds, filters: {} } : Object.keys(activeFilters).length ? { mode: 'filtered', ids: [], filters: activeFilters } : { mode: 'all', ids: [], filters: {} }
     setAssistantContext(current => JSON.stringify(current) === JSON.stringify(next) ? current : next)
     setPageContext?.(next)
@@ -60,6 +69,19 @@ export default function InventoryScreen() {
     () => (locationsData?.data ?? []).map(l => ({ value: l.id, label: l.name })),
     [locationsData?.data],
   )
+  const { data: conditionsData } = useInventoryConditions()
+  const conditionOptions = useMemo(
+    () => (conditionsData?.data ?? []).map(c => ({ value: c.id, label: c.name })),
+    [conditionsData?.data],
+  )
+
+  // One bulk action per administrative transition the user may perform,
+  // shown only when every selected item is in that action's source status.
+  const bulkActions = useMemo(() => Object.entries(ADMIN_ACTIONS)
+    .filter(([, action]) => can(action.permission))
+    .map(([key, action]) => (rows) => (rows.length && rows.every(r => r.adminStatus === action.from)
+      ? { label: action.label, variant: action.destructive ? 'destructive' : undefined, onClick: (selected) => setBulk({ action: key, ids: selected.map(r => r.id) }) }
+      : null)), [can])
 
   // Only needed to label a ?modelId= deep link; the list has no model filter otherwise.
   const { data: modelsData } = useInventoryModels()
@@ -87,10 +109,12 @@ export default function InventoryScreen() {
         { field: 'categoryName',   label: 'Tipo',        sortable: true  },
         { field: 'brandName',      label: 'Marca',       sortable: true  },
         {
-          field: 'status', label: 'Estado', sortable: true, type: 'select',
+          field: 'status', label: 'Disponibilidad', sortable: true, type: 'select',
           options: STATUS_OPTIONS,
         },
+        { field: 'adminStatus',    label: 'Estado',      sortable: true,  type: 'select', options: ADMIN_OPTIONS },
         { field: 'assignedToName', label: 'Responsable', sortable: true  },
+        { field: 'conditionName',  label: 'Condición',   sortable: true,  defaultVisible: false },
         { field: 'locationName',   label: 'Ubicacion',   sortable: true,  defaultVisible: false },
         { field: 'serialNumber',   label: 'No. Serie',   sortable: true,  defaultVisible: false },
         { field: 'model',          label: 'Modelo',      sortable: true,  defaultVisible: false },
@@ -100,7 +124,9 @@ export default function InventoryScreen() {
         { field: 'updatedAt',      label: 'Actualizado', sortable: true,  type: 'date', defaultVisible: false },
       ],
       filters: [
-        { key: 'status',     label: 'Estado',    type: 'select', options: STATUS_OPTIONS },
+        { key: 'adminStatus', label: 'Estado', type: 'select', options: ADMIN_FILTER_OPTIONS },
+        { key: 'status',     label: 'Disponibilidad', type: 'select', options: STATUS_OPTIONS },
+        { key: 'conditionId', label: 'Condición', type: 'select', options: conditionOptions },
         { key: 'categoryId', label: 'Tipo', type: 'select', options: categoryOptions },
         { key: 'brandId',    label: 'Marca',     type: 'select', options: brandOptions },
         { key: 'locationId', label: 'Ubicacion', type: 'select', options: locationOptions },
@@ -111,7 +137,7 @@ export default function InventoryScreen() {
       ],
       emptyState: { message: 'No hay activos registrados.' },
     },
-  }), [categoryOptions, brandOptions, locationOptions, modelOptions, initialFilters.modelId])
+  }), [categoryOptions, brandOptions, locationOptions, conditionOptions, modelOptions, initialFilters.modelId])
 
   const deleteMutation = useMutation({
     mutationFn: id => runly.inventory.deleteItem(id, token),
@@ -143,8 +169,21 @@ export default function InventoryScreen() {
         }
       />
 
+      <InventoryAdminKpis
+        summary={summary.data}
+        isLoading={summary.isLoading}
+        active={searchParams.get('adminStatus') || null}
+        onSelect={(value) => {
+          const next = new URLSearchParams(searchParams)
+          if (searchParams.get('adminStatus') === value) next.delete('adminStatus')
+          else next.set('adminStatus', value)
+          setSearchParams(next, { replace: true })
+        }}
+      />
+
       <RunlyTable
         key={`${activeCompanyId}:${filterKey}`}
+        bulkActions={bulkActions}
         initialFilters={initialFilters}
         onContextChange={updateAssistantContext}
         blueprint={blueprint}
@@ -164,6 +203,14 @@ export default function InventoryScreen() {
         refreshSignal={refreshSignal}
       />
 
+
+      <InventoryAdminTransitionDialog
+        action={bulk?.action}
+        ids={bulk?.ids}
+        open={Boolean(bulk)}
+        onOpenChange={(open) => { if (!open) setBulk(null) }}
+        onDone={() => setRefreshSignal(s => s + 1)}
+      />
 
       <InventoryItemImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => setRefreshSignal(s => s + 1)} />
 

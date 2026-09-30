@@ -1,6 +1,6 @@
 import { toLocalIso } from '../../../lib/localDate.js';
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RunlyTable, Button, ConfirmDialog, ErrorState, PageHeader } from "@runly/ui";
 import { FileSpreadsheet, FileText, Power, PowerOff, Trash2, UserPlus } from "lucide-react";
@@ -9,62 +9,10 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { runly } from "../../../lib/runly";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { ContactsKpis } from "../components/ContactsKpis.jsx";
+import { buildContactsBlueprint, CONTACTS_URL_FILTERS } from "../lib/contacts-list-blueprint.js";
 
 const API_BASE_URL = getApiUrl();
-
-const CONTACTS_BLUEPRINT = {
-  key: "contacts.list",
-  schema: {
-    apiPath: "/contacts",
-    primaryField: "name",
-    searchable: true,
-    searchPlaceholder: "Buscar contacto...",
-    columns: [
-      { field: "name", label: "Nombre", sortable: true, link: true },
-      {
-        field: "type",
-        label: "Tipo",
-        sortable: true,
-        type: "select",
-        options: [
-          { value: "customer", label: "Cliente" },
-          { value: "supplier", label: "Proveedor" },
-          { value: "person", label: "Persona" },
-          { value: "company", label: "Empresa" },
-        ],
-      },
-      { field: "email", label: "Correo", sortable: false },
-      { field: "phone", label: "Teléfono", sortable: false },
-      { field: "taxId", label: "RFC / ID fiscal", sortable: false },
-      {
-        field: "enabled",
-        label: "Estado",
-        type: "select",
-        sortable: false,
-        options: [
-          { value: true, label: "Activo" },
-          { value: false, label: "Inactivo" },
-        ],
-      },
-      { field: "legalName", label: "Razón social", defaultVisible: false },
-      { field: "industry", label: "Giro", defaultVisible: false },
-      { field: "notesMarkdown", label: "Notas", type: "markdown", defaultVisible: false },
-      { field: "createdAt", label: "Creado", type: "date", defaultVisible: false },
-    ],
-    filters: [
-      {
-        key: "enabled",
-        label: "Estado",
-        type: "select",
-        options: [
-          { value: "true", label: "Activo" },
-          { value: "false", label: "Inactivo" },
-        ],
-      },
-    ],
-    emptyState: { message: "No hay contactos registrados." },
-  },
-};
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -103,6 +51,44 @@ export default function ContactsScreen() {
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [bulkState, setBulkState] = useState(null);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilters = useMemo(
+    () => Object.fromEntries(CONTACTS_URL_FILTERS.map((key) => [key, searchParams.get(key)]).filter(([, value]) => value)),
+    [searchParams],
+  );
+  const filterKey = JSON.stringify(initialFilters);
+  const activeTile = initialFilters.enabled === "false"
+    ? "inactive"
+    : initialFilters.type ?? (Object.keys(initialFilters).length ? null : "all");
+
+  const summaryQuery = useQuery({
+    queryKey: ["contacts", "summary", activeCompanyId, refreshSignal],
+    queryFn: () => runly.contacts.getSummary(token),
+    enabled: Boolean(token && canReadContacts),
+    staleTime: 30_000,
+  });
+  const tagsQuery = useQuery({
+    queryKey: ["contact-tags", "", activeCompanyId],
+    queryFn: () => runly.contacts.listTags("", token),
+    enabled: Boolean(token && canReadContacts),
+    staleTime: 60_000,
+  });
+  const blueprint = useMemo(
+    () => buildContactsBlueprint({ tagOptions: (tagsQuery.data?.data ?? []).map((tag) => ({ value: tag, label: tag })) }),
+    [tagsQuery.data],
+  );
+
+  // KPI tiles replace the type/state filters; clicking the active tile clears it.
+  const selectTile = (value) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("type");
+    next.delete("enabled");
+    if (value !== activeTile) {
+      if (value === "inactive") next.set("enabled", "false");
+      else if (value !== "all") next.set("type", value);
+    }
+    setSearchParams(next, { replace: true });
+  };
   const basePath = "/app/m/runly.contacts/contacts";
 
   const openCreate = () => navigate(`${basePath}/new`);
@@ -236,8 +222,17 @@ export default function ContactsScreen() {
         }
       />
 
+      <ContactsKpis
+        summary={summaryQuery.data?.data}
+        isLoading={summaryQuery.isLoading}
+        active={activeTile}
+        onSelect={selectTile}
+      />
+
       <RunlyTable
-        blueprint={CONTACTS_BLUEPRINT}
+        key={`${activeCompanyId}:${filterKey}`}
+        initialFilters={initialFilters}
+        blueprint={blueprint}
         token={token}
         companyId={activeCompanyId}
         apiBaseUrl={API_BASE_URL}

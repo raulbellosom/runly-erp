@@ -18,20 +18,27 @@ export function inventoryDayStart(value, dayOffset = 0, timeZone = getConfigured
 export const inventoryFiltersSchema = z.object({
   search: z.string().max(200).optional(),
   categoryId: z.uuid().optional(), brandId: z.uuid().optional(), locationId: z.uuid().optional(), assignedToId: z.uuid().optional(),
-  status: z.enum(['available', 'assigned', 'maintenance', 'retired', 'lost', 'stolen', 'disposed']).optional(),
+  status: z.enum(['available', 'assigned', 'maintenance']).optional(),
+  adminStatus: z.enum(['registration_pending', 'registered', 'deregistration_proposed', 'deregistered']).optional(),
+  conditionId: z.uuid().optional(),
   model: z.string().max(255).optional(), modelId: z.uuid().optional(),
   missingSerial: z.boolean().optional(), createdFrom: z.iso.date().optional(), createdTo: z.iso.date().optional(),
   purchaseFrom: z.iso.date().optional(), purchaseTo: z.iso.date().optional(),
 }).strict();
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const ADMIN_STATUS_SET = new Set(['registration_pending', 'registered', 'deregistration_proposed', 'deregistered']);
 
 export function buildInventoryWhere(companyId, filters = {}) {
   if (!companyId) throw new Error('Empresa requerida.');
   const where = { companyId, enabled: true };
   const q = String(filters.search ?? '').trim();
   if (q) where.OR = ['name', 'assetTag', 'serialNumber'].map(field => ({ [field]: { contains: q, mode: 'insensitive' } }));
-  for (const field of ['categoryId', 'brandId', 'locationId', 'assignedToId', 'status', 'model', 'modelId']) if (filters[field]) where[field] = filters[field];
+  for (const field of ['categoryId', 'brandId', 'locationId', 'conditionId', 'assignedToId', 'status', 'model', 'modelId']) if (filters[field]) where[field] = filters[field];
+  // adminStatus: one value, a CSV/array of values, or 'all' (no filter).
+  const adminStatuses = (Array.isArray(filters.adminStatus) ? filters.adminStatus : String(filters.adminStatus ?? '').split(','))
+    .map((v) => String(v).trim()).filter((v) => ADMIN_STATUS_SET.has(v));
+  if (adminStatuses.length) where.adminStatus = adminStatuses.length === 1 ? adminStatuses[0] : { in: adminStatuses };
   if (filters.missingSerial) where.AND = [{ OR: [{ serialNumber: null }, { serialNumber: '' }] }];
   const createdFrom = ISO_DAY.test(String(filters.createdFrom ?? '')) ? filters.createdFrom : null;
   const createdTo = ISO_DAY.test(String(filters.createdTo ?? '')) ? filters.createdTo : null;

@@ -4,13 +4,17 @@ const text = (max) => z.string().max(max).nullable().optional();
 const ref = z.uuid().nullable().optional();
 const date = z.iso.date().nullable().optional();
 export const inventoryCommonSchema = z.object({
-  name: z.string().trim().min(1, 'Escribe el nombre del equipo.').max(255),
+  // Optional: a blank name is generated from brand/type/model on create.
+  name: z.string().trim().max(255).optional().default(''),
   description: text(2000),
   modelId: ref,
   categoryId: ref, brandId: ref, locationId: ref,
   model: text(255), partNumber: text(255),
-  status: z.enum(['available', 'assigned', 'maintenance', 'retired', 'lost', 'stolen', 'disposed']).default('available'),
+  status: z.enum(['available', 'maintenance']).default('available'),
+  adminStatus: z.enum(['registered', 'registration_pending']).default('registered'),
+  conditionId: ref,
   purchaseDate: date, purchasePrice: z.number().finite().min(0).max(9999999999.99).nullable().optional(),
+  acquisitionOrigin: z.enum(['PURCHASE', 'DONATION', 'TRANSFER', 'LEASE', 'INTERNAL', 'INITIAL_STOCK', 'OTHER']).optional(),
   vendorName: text(255), invoiceNumber: text(100), warrantyExpiry: date, warrantyNotes: text(500), notes: text(2000),
   customValues: z.array(z.object({ fieldId: z.uuid(), value: text(2000) })).max(100).optional(),
 });
