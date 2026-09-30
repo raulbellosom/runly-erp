@@ -587,7 +587,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 
 | Export | Description |
 |---|---|
-| `RunlyTable` | Renders TABLE kind blueprints |
+| `RunlyTable` | Renders TABLE kind blueprints. `sortable: true` columns sort from the header (click cycles asc/desc/none; list/grid views get a sort menu). Filters accept `type: 'daterange'` (sends `${key}From`/`${key}To` as YYYY-MM-DD, override with `fromKey`/`toKey`). List/grid cards use the link column as title, an `image`/`image-asset` column as photo, and optional `schema.subtitleField` under the title |
 | `RunlyForm` | Renders FORM kind blueprints |
 | `RunlyDetail` | Renders DETAIL kind blueprints |
 | `RunlyCrudView` | Combined list + form + detail view |

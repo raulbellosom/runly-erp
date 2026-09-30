@@ -1,6 +1,7 @@
 import { ChevronDown, X } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from './Popover.jsx'
 import { cn } from '../lib/utils.js'
+import { DateRangeFilter } from './DateRangeFilter.jsx'
 
 export function FilterBar({ filters = [], value = {}, onChange, className }) {
   const activeCount = Object.values(value).filter(Boolean).length
@@ -11,13 +12,19 @@ export function FilterBar({ filters = [], value = {}, onChange, className }) {
 
   function clearAll() {
     const reset = {}
-    filters.forEach((f) => { reset[f.key] = '' })
+    filters.forEach((f) => {
+      if (f.type === 'daterange') { reset[f.fromKey] = ''; reset[f.toKey] = '' }
+      else reset[f.key] = ''
+    })
     onChange(reset)
   }
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       {filters.map((filter) => {
+        if (filter.type === 'daterange') {
+          return <DateRangeFilter key={filter.key} filter={filter} value={value} onChange={onChange} />
+        }
         const active = value[filter.key]
         const activeLabel = filter.options.find((o) => o.value === active)?.label
 

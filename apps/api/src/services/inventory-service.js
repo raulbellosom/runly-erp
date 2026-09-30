@@ -19,6 +19,31 @@ function normalizePage(page) {
   return parsed;
 }
 
+// Table sort keys -> Prisma orderBy. Relation name columns sort by the related
+// row's name; unknown keys fall back to newest first.
+const ITEM_SORTS = {
+  assetTag: (dir) => ({ assetTag: dir }),
+  name: (dir) => ({ name: dir }),
+  status: (dir) => ({ status: dir }),
+  model: (dir) => ({ model: dir }),
+  serialNumber: (dir) => ({ serialNumber: dir }),
+  purchaseDate: (dir) => ({ purchaseDate: { sort: dir, nulls: 'last' } }),
+  warrantyExpiry: (dir) => ({ warrantyExpiry: { sort: dir, nulls: 'last' } }),
+  createdAt: (dir) => ({ createdAt: dir }),
+  updatedAt: (dir) => ({ updatedAt: dir }),
+  categoryName: (dir) => ({ category: { name: dir } }),
+  brandName: (dir) => ({ brand: { name: dir } }),
+  locationName: (dir) => ({ location: { name: dir } }),
+  assignedToName: (dir) => [{ assignedTo: { firstName: dir } }, { assignedTo: { lastName: dir } }],
+};
+
+export function itemOrderBy(sortBy, sortDir) {
+  const dir = sortDir === 'asc' ? 'asc' : 'desc';
+  const build = ITEM_SORTS[sortBy];
+  if (!build) return { createdAt: 'desc' };
+  return [build(dir), { createdAt: 'desc' }].flat();
+}
+
 export function createInventoryService({ prisma, activityBridge }) {
   const bridge =
     activityBridge ??
@@ -50,6 +75,10 @@ export function createInventoryService({ prisma, activityBridge }) {
     status,
     assignedToId,
     modelId,
+    createdFrom,
+    createdTo,
+    purchaseFrom,
+    purchaseTo,
     sortBy,
     sortDir,
     page = 1,
@@ -59,7 +88,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     const take = normalizeLimit(limit);
     const skip = (normalizePage(page) - 1) * take;
 
-    const where = buildInventoryWhere(companyId, { search, categoryId, brandId, locationId, status, assignedToId, modelId });
+    const where = buildInventoryWhere(companyId, { search, categoryId, brandId, locationId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo });
 
     const [data, total] = await Promise.all([
       prisma.invItem.findMany({
@@ -70,7 +99,7 @@ export function createInventoryService({ prisma, activityBridge }) {
           location: { select: { id: true, name: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
         },
-        orderBy: { [new Set(['assetTag', 'name', 'status', 'purchaseDate', 'warrantyExpiry', 'updatedAt']).has(sortBy) ? sortBy : 'createdAt']: sortDir === 'asc' ? 'asc' : 'desc' },
+        orderBy: itemOrderBy(sortBy, sortDir),
         skip,
         take,
       }),

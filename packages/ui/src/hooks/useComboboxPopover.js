@@ -77,6 +77,29 @@ export function useComboboxPopover({ dropHeight = 260, minWidth = 220 } = {}) {
     return () => cancelAnimationFrame(id);
   }, [open]);
 
+  // The dropdown is portaled to <body>, outside any open Radix Dialog/Sheet.
+  // Their focus trap listens for focusin/focusout on `document` and pulls
+  // focus back into the dialog, so the search input could never be typed in.
+  // Stop those events before they reach `document` while focus moves between
+  // the trigger and the dropdown.
+  useEffect(() => {
+    if (!open) return undefined;
+    const dropdown = dropdownRef.current;
+    const container = containerRef.current;
+    if (!dropdown || !container) return undefined;
+    const inDropdown = (node) => node instanceof Node && dropdown.contains(node);
+    const stopFocusIn = (e) => { if (inDropdown(e.target)) e.stopPropagation(); };
+    const stopFocusOut = (e) => { if (inDropdown(e.relatedTarget)) e.stopPropagation(); };
+    dropdown.addEventListener("focusin", stopFocusIn);
+    dropdown.addEventListener("focusout", stopFocusOut);
+    container.addEventListener("focusout", stopFocusOut);
+    return () => {
+      dropdown.removeEventListener("focusin", stopFocusIn);
+      dropdown.removeEventListener("focusout", stopFocusOut);
+      container.removeEventListener("focusout", stopFocusOut);
+    };
+  }, [open]);
+
   const handleOpen = useCallback(
     (onWillOpen) => {
       const willOpen = !open;

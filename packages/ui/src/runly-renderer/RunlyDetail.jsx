@@ -513,6 +513,7 @@ function renderValue(field, value, record = {}) {
 function gridClass(columns) {
   if (columns === 1) return "grid gap-4";
   if (columns === 2) return "grid gap-4 md:grid-cols-2";
+  if (columns === 3) return "grid gap-4 md:grid-cols-3";
   return "grid gap-4 lg:grid-cols-2";
 }
 

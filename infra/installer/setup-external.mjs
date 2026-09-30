@@ -210,6 +210,12 @@ const OPTIONAL_VAR_GROUPS = [
       { key: "CORS_ORIGIN",    placeholder: "http://localhost:5173",  comment: null },
       { key: "ATLAS_API_URL",  placeholder: "http://localhost:4010",  comment: null },
       {
+        key: "RUNLY_APP_URL",
+        // Defaults to the first CORS origin (the frontend the browser loads).
+        placeholder: (content) => (parseEnvValue(content, "CORS_ORIGIN") || "http://localhost:5173").split(",")[0].trim().replace(/\/+$/, ""),
+        comment: "# Public root URL of this Runly instance (email links, Office, storefront). Must be HTTPS in production.",
+      },
+      {
         key: "RUNLY_SUPABASE_PUBLIC_URL",
         placeholder: "",
         comment: "# Leave unset for managed Supabase Cloud (SUPABASE_URL is already public). Set only if SUPABASE_URL is an internal address the browser cannot resolve.",
@@ -435,7 +441,7 @@ async function appendMissingOptionalVars(filePath) {
     lines.push("", ...group.header);
     for (const { key, placeholder, comment } of missingVars) {
       if (comment) lines.push(comment);
-      lines.push(`${key}=${placeholder}`);
+      lines.push(`${key}=${typeof placeholder === "function" ? placeholder(content) : placeholder}`);
       addedKeys.push(key);
     }
   }

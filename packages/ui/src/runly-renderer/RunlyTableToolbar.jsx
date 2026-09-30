@@ -1,11 +1,11 @@
-import { Columns3, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Columns3, RefreshCw } from "lucide-react";
 import { Button } from "../components/Button.jsx";
 import { Badge } from "../components/Badge.jsx";
 import { SearchInput } from "../components/SearchInput.jsx";
 import { FilterBar } from "../components/FilterBar.jsx";
 import { MobileFiltersSheet } from "../components/MobileFiltersSheet.jsx";
 import { ViewModeSwitch } from "../components/ViewModeSwitch.jsx";
-import { cn } from "../lib/utils.js";
+import { RunlySortMenu } from "./RunlySortMenu.jsx";
 
 export function RunlyTableToolbar({
   storageKey,
@@ -21,6 +21,7 @@ export function RunlyTableToolbar({
   sortBy = "",
   sortDir = "asc",
   onSortChange,
+  showSortMenu = false,
   views = ["table", "cards", "grid"],
   view,
   onViewChange,
@@ -41,7 +42,7 @@ export function RunlyTableToolbar({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
-            className="flex-1 min-w-0"
+            className="min-w-48 flex-1"
           />
         )}
 
@@ -67,42 +68,16 @@ export function RunlyTableToolbar({
           </>
         )}
 
-        {sortableColumns.length > 0 && (
-          <div className="hidden sm:inline-flex items-center gap-0.5 rounded-xl border border-[hsl(var(--border))] px-1 py-1">
-            {sortableColumns.map((col) => {
-              const isActive = sortBy === col.field;
-              const handlePillClick = () => {
-                if (isActive) {
-                  onSortChange({
-                    sortBy: col.field,
-                    sortDir: sortDir === "asc" ? "desc" : "asc",
-                  });
-                } else {
-                  onSortChange({ sortBy: col.field, sortDir: "asc" });
-                }
-              };
-              return (
-                <button
-                  key={col.key}
-                  type="button"
-                  onClick={handlePillClick}
-                  className={cn(
-                    "inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition-colors",
-                    isActive
-                      ? "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"
-                      : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]",
-                  )}
-                >
-                  {col.label}
-                  {isActive &&
-                    (sortDir === "asc" ? (
-                      <ChevronUp className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    ))}
-                </button>
-              );
-            })}
+        {/* Table view sorts from the column headers; list/grid views have
+            no headers, so they get a compact sort menu instead. */}
+        {showSortMenu && sortableColumns.length > 0 && (
+          <div className="hidden sm:block">
+            <RunlySortMenu
+              columns={sortableColumns}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSortChange={onSortChange}
+            />
           </div>
         )}
 

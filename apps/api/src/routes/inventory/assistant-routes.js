@@ -11,6 +11,7 @@ export function createInventoryAssistantRouter({ prisma, requirePermission, assi
     try { return c.json({ data: await action(c) }); }
     catch (error) {
       const status = error instanceof SyntaxError ? 400 : [400, 403, 404, 409, 429, 502, 503].includes(error.status) ? error.status : 500;
+      if (status === 500) console.error(`[inventory-ai] ${c.req.method} ${c.req.path} failed:`, error);
       return c.json({ error: status === 500 ? 'No se pudo abrir o guardar la conversación. Intenta de nuevo.' : error.message }, status);
     }
   };

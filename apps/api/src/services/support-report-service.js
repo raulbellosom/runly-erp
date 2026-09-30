@@ -81,9 +81,17 @@ export function createSupportReportService({ prisma, env = process.env }) {
       await platformSmtp.sendEmail(email);
       return;
     } catch (platformError) {
+      console.error("[support] platform SMTP send failed:", platformError?.message);
       if (!companyId) throw platformError;
       const companySmtp = createSmtpService({ prisma, companyId, env });
-      await companySmtp.sendEmail(email);
+      try {
+        await companySmtp.sendEmail(email);
+      } catch (companyError) {
+        console.error("[support] company SMTP send failed:", companyError?.message);
+        // Surface the platform error when it was a real send failure: a
+        // missing company relay would otherwise mask it as "not configured".
+        throw /SMTP no configurado/.test(platformError?.message ?? "") ? companyError : platformError;
+      }
     }
   }
 
@@ -126,8 +134,11 @@ export function createSupportReportService({ prisma, env = process.env }) {
         attachments: attachments.length ? attachments : undefined,
       });
     } catch (err) {
+      const notConfigured = /SMTP no configurado/.test(err?.message ?? "");
       throw new SupportReportError(
-        "No se pudo enviar el reporte (SMTP no configurado).",
+        notConfigured
+          ? "No se pudo enviar el reporte (SMTP no configurado)."
+          : "No se pudo enviar el reporte (el servidor SMTP rechazo el envio).",
         502,
         "smtp_error",
       );

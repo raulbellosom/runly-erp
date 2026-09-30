@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Sparkles } from 'lucide-react'
+import { Plus, Sparkles, Upload } from 'lucide-react'
 import { RunlyTable, Button, ConfirmDialog, PageHeader } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -12,6 +12,7 @@ import { useInventoryCategories, useInventoryBrands, useInventoryLocations } fro
 import { useInventoryModels } from '../hooks/useInventoryModels.js'
 import { ITEM_STATUSES } from '../lib/inventory-constants.js'
 import { useInventoryAssistant } from '../lib/assistant-context.js'
+import { InventoryItemImportDialog } from '../components/InventoryItemImportDialog.jsx'
 
 const STATUS_OPTIONS = ITEM_STATUSES.map(s => ({ value: s.value, label: s.label }))
 // Deep links from Catálogos (e.g. ?categoryId=...) open the list pre-filtered.
@@ -31,6 +32,7 @@ export default function InventoryScreen() {
   const queryClient = useQueryClient()
 
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [refreshSignal, setRefreshSignal] = useState(0)
   const assistant = useInventoryAssistant()
   const setPageContext = assistant?.setPageContext
@@ -68,6 +70,8 @@ export default function InventoryScreen() {
     schema: {
       apiPath: '/inventory/items',
       primaryField: 'name',
+      // List/grid cards show the tag under the item's name.
+      subtitleField: 'assetTag',
       searchable: true,
       searchPlaceholder: 'Buscar item...',
       columns: [
@@ -80,18 +84,19 @@ export default function InventoryScreen() {
         },
         { field: 'assetTag',       label: 'Tag',         sortable: true  },
         { field: 'name',           label: 'Nombre',      sortable: true,  link: true },
-        { field: 'categoryName',   label: 'Tipo',   sortable: false },
-        { field: 'brandName',      label: 'Marca',       sortable: false },
+        { field: 'categoryName',   label: 'Tipo',        sortable: true  },
+        { field: 'brandName',      label: 'Marca',       sortable: true  },
         {
           field: 'status', label: 'Estado', sortable: true, type: 'select',
           options: STATUS_OPTIONS,
         },
-        { field: 'assignedToName', label: 'Responsable', sortable: false },
-        { field: 'locationName',   label: 'Ubicacion',   sortable: false, defaultVisible: false },
-        { field: 'serialNumber',   label: 'No. Serie',   sortable: false, defaultVisible: false },
-        { field: 'model',          label: 'Modelo',      sortable: false, defaultVisible: false },
+        { field: 'assignedToName', label: 'Responsable', sortable: true  },
+        { field: 'locationName',   label: 'Ubicacion',   sortable: true,  defaultVisible: false },
+        { field: 'serialNumber',   label: 'No. Serie',   sortable: true,  defaultVisible: false },
+        { field: 'model',          label: 'Modelo',      sortable: true,  defaultVisible: false },
         { field: 'purchaseDate',   label: 'Compra',      sortable: true,  type: 'date', defaultVisible: false },
         { field: 'warrantyExpiry', label: 'Garantia',    sortable: true,  type: 'date', defaultVisible: false },
+        { field: 'createdAt',      label: 'Alta',        sortable: true,  type: 'date', defaultVisible: false },
         { field: 'updatedAt',      label: 'Actualizado', sortable: true,  type: 'date', defaultVisible: false },
       ],
       filters: [
@@ -100,6 +105,9 @@ export default function InventoryScreen() {
         { key: 'brandId',    label: 'Marca',     type: 'select', options: brandOptions },
         { key: 'locationId', label: 'Ubicacion', type: 'select', options: locationOptions },
         ...(initialFilters.modelId ? [{ key: 'modelId', label: 'Modelo', type: 'select', options: modelOptions }] : []),
+        // -> createdFrom/createdTo and purchaseFrom/purchaseTo on /inventory/items.
+        { key: 'created',    label: 'Fecha de alta',   type: 'daterange' },
+        { key: 'purchase',   label: 'Fecha de compra', type: 'daterange' },
       ],
       emptyState: { message: 'No hay activos registrados.' },
     },
@@ -125,6 +133,7 @@ export default function InventoryScreen() {
         actions={
           <>
           <Button variant="ghost" onClick={() => assistant?.openAssistant(assistantContext)}><Sparkles className="mr-2 h-4 w-4" />Consultar con IA</Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Importar</Button>
           <Button variant="outline" onClick={() => navigate('/app/m/runly.inventory/inventory/intake')}><Sparkles className="mr-2 h-4 w-4" />Registro con IA</Button>
           <Button onClick={() => navigate('/app/m/runly.inventory/inventory/new')}>
             <Plus className="mr-2 h-4 w-4" />
@@ -155,6 +164,8 @@ export default function InventoryScreen() {
         refreshSignal={refreshSignal}
       />
 
+
+      <InventoryItemImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => setRefreshSignal(s => s + 1)} />
 
       <ConfirmDialog
         open={Boolean(confirmDelete)}

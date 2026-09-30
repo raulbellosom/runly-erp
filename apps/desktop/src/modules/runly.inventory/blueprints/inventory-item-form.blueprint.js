@@ -26,17 +26,6 @@ export const INVENTORY_ITEM_FORM = {
     },
     sections: [
       {
-        label: 'Identificación',
-        icon: 'IdCard',
-        collapsible: true,
-        fields: [
-          { field: 'name', label: 'Nombre', type: 'text', required: true, hint: 'Laptop Dell XPS 15' },
-          { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar', hiddenWhen: { field: '__multi', truthy: true } },
-          { field: 'serialNumber', label: 'Número de serie', type: 'text', hiddenWhen: { field: '__multi', truthy: true } },
-          { field: 'partNumber', label: 'Número de parte', type: 'text' },
-        ],
-      },
-      {
         // Model picker that fills Tipo and Marca — InventoryItemClassification.jsx,
         // resolved through the componentRegistry the inventory screens pass.
         id: 'classification',
@@ -50,6 +39,17 @@ export const INVENTORY_ITEM_FORM = {
           { field: 'model', label: 'Nombre del modelo', type: 'text' },
           { field: 'categoryId', label: 'Tipo', type: 'relation' },
           { field: 'brandId', label: 'Marca', type: 'relation' },
+        ],
+      },
+      {
+        label: 'Identificación',
+        icon: 'IdCard',
+        collapsible: true,
+        fields: [
+          { field: 'name', label: 'Nombre', type: 'text', required: true, hint: 'Laptop Dell XPS 15' },
+          { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar', hiddenWhen: { field: '__multi', truthy: true } },
+          { field: 'serialNumber', label: 'Número de serie', type: 'text', hiddenWhen: { field: '__multi', truthy: true } },
+          { field: 'partNumber', label: 'Número de parte', type: 'text' },
         ],
       },
       {

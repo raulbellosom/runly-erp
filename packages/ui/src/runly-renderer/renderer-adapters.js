@@ -237,8 +237,8 @@ export function normalizeRelationDescriptor(fieldLike) {
  */
 export function normalizeToFilterBarFilters(normalizedFilters) {
   return normalizedFilters
-    .filter((f) => f.type === "select" && Array.isArray(f.options) && f.options.length > 0)
-    .map((f) => ({
+    .filter((f) => f.type === "daterange" || (f.type === "select" && Array.isArray(f.options) && f.options.length > 0))
+    .map((f) => f.type === "daterange" ? { key: f.key, label: f.label, type: "daterange", fromKey: f.fromKey, toKey: f.toKey } : ({
       key: f.key,
       label: f.label,
       options: f.options.map((o) => {

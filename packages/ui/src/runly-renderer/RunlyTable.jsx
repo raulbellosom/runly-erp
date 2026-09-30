@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "../components/Table.jsx";
 import { RunlyCardView } from "./RunlyCardView.jsx";
+import { RunlyListSkeleton, RunlyListView } from "./RunlyListView.jsx";
 import { RunlyTableToolbar } from "./RunlyTableToolbar.jsx";
 import { BulkActionBar } from "./BulkActionBar.jsx";
 import { ColumnConfigPanel } from "./ColumnConfigPanel.jsx";
@@ -32,273 +33,23 @@ import { formatTableDate } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { ImageAssetCell } from "./ImageAssetCell.jsx";
 import { UserAvatarCell } from "./UserAvatarCell.jsx";
-
-const DEFAULT_PAGE_SIZE = 20;
-
-function inferRowActionKind(label) {
-  const normalized = String(label ?? "")
-    .trim()
-    .toLowerCase();
-  if (!normalized) return "unknown";
-  if (
-    normalized.includes("desactivar") ||
-    normalized.includes("eliminar") ||
-    normalized.includes("borrar") ||
-    normalized.includes("inactivar") ||
-    normalized.includes("disable") ||
-    normalized.includes("delete") ||
-    normalized.includes("remove")
-  ) {
-    return "delete";
-  }
-  if (
-    normalized.includes("editar") ||
-    normalized.includes("modificar") ||
-    normalized.includes("actualizar") ||
-    normalized.includes("edit") ||
-    normalized.includes("update")
-  ) {
-    return "edit";
-  }
-  if (
-    normalized.includes("activar") ||
-    normalized.includes("reactivar") ||
-    normalized.includes("habilitar") ||
-    normalized.includes("enable")
-  ) {
-    return "toggle";
-  }
-  if (
-    normalized.includes("ver") ||
-    normalized.includes("detalle") ||
-    normalized.includes("view") ||
-    normalized.includes("detail")
-  ) {
-    return "view";
-  }
-  return "unknown";
-}
-
-function getRowId(row, index) {
-  if (row?.__runlyRowKey != null) return String(row.__runlyRowKey);
-  return row?.id != null ? String(row.id) : `row-${index}`;
-}
-
-function withUniqueRowKeys(rows) {
-  const seen = new Map();
-  return rows.map((row, index) => {
-    const baseId = row?.id != null ? String(row.id) : `row-${index}`;
-    const nextCount = (seen.get(baseId) ?? 0) + 1;
-    seen.set(baseId, nextCount);
-    if (nextCount === 1) {
-      return { ...row, __runlyRowKey: baseId };
-    }
-    return { ...row, __runlyRowKey: `${baseId}__dup${nextCount - 1}` };
-  });
-}
-
-function joinUrl(baseUrl, apiPath) {
-  const base = String(baseUrl ?? "")
-    .trim()
-    .replace(/\/+$/, "");
-  const path = String(apiPath ?? "").trim();
-  if (!path.startsWith("/")) return `${base}/${path}`;
-  return `${base}${path}`;
-}
-
-function replacePathTokens(pathTemplate, tokenMap) {
-  let path = String(pathTemplate ?? "");
-  for (const [key, rawValue] of Object.entries(tokenMap ?? {})) {
-    const safeValue = encodeURIComponent(String(rawValue ?? "").trim());
-    path = path.replace(new RegExp(`:${key}\\b`, "g"), safeValue);
-  }
-  return path;
-}
-
-function hasUnresolvedPathToken(path) {
-  return /:[a-zA-Z0-9_.-]+\b/.test(String(path ?? ""));
-}
-
-function isBlank(value) {
-  return value === undefined || value === null || String(value).trim() === "";
-}
-
-function getByPath(input, path) {
-  if (!path) return undefined;
-  return String(path)
-    .split(".")
-    .filter(Boolean)
-    .reduce((acc, key) => (acc == null ? undefined : acc[key]), input);
-}
-
-function normalizeColumns(schema) {
-  const rawColumns = Array.isArray(schema?.columns) ? schema.columns : [];
-  const primaryFieldName =
-    schema?.primaryField ?? schema?.recordTitleField ?? null;
-
-  const cols = rawColumns
-    .map((entry) => {
-      if (typeof entry === "string") {
-        return {
-          key: entry,
-          field: entry,
-          label: entry,
-          component: null,
-          sortable: false,
-          isLink: primaryFieldName === entry,
-        };
-      }
-      if (!entry || typeof entry !== "object") return null;
-      const field = entry.field ?? entry.key ?? entry.name ?? null;
-      if (!field) return null;
-      const fieldStr = String(field);
-      const isLink =
-        Boolean(entry.primary) ||
-        Boolean(entry.link) ||
-        (primaryFieldName !== null && fieldStr === primaryFieldName);
-      return {
-        key: fieldStr,
-        field: fieldStr,
-        label: normalizeSpanishLabel(entry.label ?? entry.title ?? fieldStr),
-        component: entry.component ?? null,
-        type: entry.type ?? null,
-        options: Array.isArray(entry.options) ? entry.options : null,
-        hrefTemplate:
-          typeof entry.hrefTemplate === "string" && entry.hrefTemplate.trim()
-            ? entry.hrefTemplate.trim()
-            : null,
-        sortable: Boolean(entry.sortable),
-        defaultVisible: entry.defaultVisible !== false,
-        isLink,
-        // type: "image-asset" (ImageAssetCell) options — see its own doc
-        // comment for what each does.
-        imagesApiPath:
-          typeof entry.imagesApiPath === "string" && entry.imagesApiPath.trim()
-            ? entry.imagesApiPath.trim()
-            : null,
-        avatarUserField:
-          typeof entry.avatarUserField === "string" && entry.avatarUserField.trim()
-            ? entry.avatarUserField.trim()
-            : null,
-        avatarLabelField:
-          typeof entry.avatarLabelField === "string" && entry.avatarLabelField.trim()
-            ? entry.avatarLabelField.trim()
-            : null,
-      };
-    })
-    .filter(Boolean);
-
-  if (cols.length > 0 && !cols.some((c) => c.isLink)) {
-    cols[0] = { ...cols[0], isLink: true };
-  }
-
-  return cols;
-}
-
-function normalizeFilters(schema) {
-  const rawFilters = schema?.filters;
-  if (Array.isArray(rawFilters)) {
-    return rawFilters
-      .map((entry) => {
-        if (!entry || typeof entry !== "object") return null;
-        const key = entry.field ?? entry.key ?? entry.name ?? null;
-        if (!key) return null;
-        return {
-          key: String(key),
-          label: normalizeSpanishLabel(
-            entry.label ?? entry.title ?? String(key),
-          ),
-          type: entry.type === "select" ? "select" : "text",
-          options: Array.isArray(entry.options) ? entry.options : [],
-        };
-      })
-      .filter(Boolean);
-  }
-  if (rawFilters && typeof rawFilters === "object") {
-    return Object.entries(rawFilters)
-      .map(([key, value]) => {
-        if (value && typeof value === "object") {
-          return {
-            key,
-            label: value.label ?? value.title ?? key,
-            type: value.type === "select" ? "select" : "text",
-            options: Array.isArray(value.options) ? value.options : [],
-          };
-        }
-        return { key, label: key, type: "text", options: [] };
-      })
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function readPagination(payload, fallbackPage, fallbackPageSize, dataLength) {
-  const pagination = payload?.pagination ?? {};
-  const page = Number.isFinite(Number(pagination.page))
-    ? Number(pagination.page)
-    : fallbackPage;
-  const pageSize = Number.isFinite(Number(pagination.pageSize))
-    ? Number(pagination.pageSize)
-    : fallbackPageSize;
-  const total = Number.isFinite(Number(pagination.total))
-    ? Number(pagination.total)
-    : dataLength;
-  return {
-    page: Math.max(1, page),
-    pageSize: Math.max(1, pageSize),
-    total: Math.max(0, total),
-  };
-}
-
-const STATUS_LABELS = {
-  active: "Activo",
-  inactive: "Inactivo",
-  maintenance: "En mantenimiento",
-  retired: "Retirado",
-  pending: "Pendiente",
-  disabled: "Desactivado",
-  draft: "Borrador",
-  finalized: "Finalizado",
-};
-
-
-function formatTableCurrency(value, currencyCode = "MXN") {
-  const amount = Number(value ?? 0);
-  if (!Number.isFinite(amount)) return "—";
-  const code = currencyCode && /^[A-Z]{3}$/.test(String(currencyCode).toUpperCase())
-    ? String(currencyCode).toUpperCase()
-    : "MXN";
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: code,
-  }).format(amount);
-}
-
-function renderValue(value) {
-  if (value === undefined || value === null || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Sí" : "No";
-  if (typeof value === "object") return JSON.stringify(value);
-  const str = String(value);
-  return STATUS_LABELS[str.toLowerCase()] ?? str;
-}
-
-function ColorCell({ value }) {
-  if (!value || value === "—")
-    return <span className="text-muted-foreground">—</span>;
-  const hex = resolveColorHex(value);
-  const displayName = value.startsWith("#") ? value : value;
-  return (
-    <span className="flex items-center gap-1.5">
-      {hex && (
-        <span
-          className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border border-border shadow-sm"
-          style={{ backgroundColor: hex }}
-        />
-      )}
-      <span>{displayName}</span>
-    </span>
-  );
-}
+import {
+  ColorCell,
+  DEFAULT_PAGE_SIZE,
+  getByPath,
+  getRowId,
+  hasUnresolvedPathToken,
+  inferRowActionKind,
+  isBlank,
+  joinUrl,
+  normalizeColumns,
+  normalizeFilters,
+  readPagination,
+  renderValue,
+  formatTableCurrency,
+  replacePathTokens,
+  withUniqueRowKeys,
+} from "./runly-table-helpers.jsx";
 
 export function RunlyTable({
   blueprint,
@@ -582,16 +333,6 @@ export function RunlyTable({
 
   const rowActions = Array.isArray(schema.rowActions) ? schema.rowActions : [];
 
-  const viewActionLabel =
-    rowActions.find((a) => inferRowActionKind(a?.label) === "view")?.label ??
-    "Ver detalle";
-  const editActionLabel =
-    rowActions.find((a) => inferRowActionKind(a?.label) === "edit")?.label ??
-    "Editar";
-  const deleteActionLabel =
-    rowActions.find((a) => inferRowActionKind(a?.label) === "delete")?.label ??
-    "Eliminar";
-
   const rowMenuItems = (row) => {
     if (rowActions.length === 0) {
       return [
@@ -701,6 +442,32 @@ export function RunlyTable({
     }
   };
 
+  // Error / empty placeholder shared by every view (null when there are rows).
+  const renderStatusView = () => {
+    if (error) {
+      return (
+        <ErrorState
+          description={error}
+          onRetry={() => setReloadTick((c) => c + 1)}
+        />
+      );
+    }
+    if (rows.length === 0) {
+      return (
+        <EmptyState
+          title="Sin registros"
+          description={normalizeSpanishLabel(
+            schema?.emptyState?.message ?? "No hay registros para mostrar.",
+          )}
+          action={
+            onCreate ? { label: "Agregar", onClick: onCreate } : undefined
+          }
+        />
+      );
+    }
+    return null;
+  };
+
   // ── Table view ────────────────────────────────────────────────────────────
 
   const renderTableView = () => {
@@ -742,28 +509,8 @@ export function RunlyTable({
       );
     }
 
-    if (error) {
-      return (
-        <ErrorState
-          description={error}
-          onRetry={() => setReloadTick((c) => c + 1)}
-        />
-      );
-    }
-
-    if (rows.length === 0) {
-      return (
-        <EmptyState
-          title="Sin registros"
-          description={normalizeSpanishLabel(
-            schema?.emptyState?.message ?? "No hay registros para mostrar.",
-          )}
-          action={
-            onCreate ? { label: "Agregar", onClick: onCreate } : undefined
-          }
-        />
-      );
-    }
+    const statusView = renderStatusView();
+    if (statusView) return statusView;
 
     return (
       <div className="rounded-2xl glass-shell-flat overflow-clip">
@@ -796,6 +543,8 @@ export function RunlyTable({
                       moveColumn(key, "right");
                       schedulePreferenceSave();
                     }}
+                    sortDir={sortBy === col.field ? sortDir : null}
+                    onSort={(field, dir) => handleSortChange({ sortBy: field, sortDir: dir })}
                   >
                     {col.label}
                   </ColumnHeaderMenu>
@@ -959,198 +708,25 @@ export function RunlyTable({
     );
   };
 
-  // ── List view (stacked rows) ───────────────────────────────────────────────
+  // ── List view (stacked rows) — RunlyListView.jsx ─────────────────────────
 
   const renderListView = () => {
-    const primaryCol = visibleColumns[0] ?? null;
-    const statusCol =
-      visibleColumns.find((c) => /^(status|estado|published)$/i.test(c.field)) ?? null;
-    const colorCol = visibleColumns.find((c) => c.type === "color") ?? null;
-    const imageCol = visibleColumns.find((c) => c.type === "image") ?? null;
-    const detailCols = visibleColumns.filter(
-      (c) => c !== primaryCol && c !== statusCol && c !== colorCol && c !== imageCol,
-    );
-
-    if (loading) {
-      return (
-        <div className="rounded-2xl glass-shell-flat overflow-clip">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={`sk-list-${i}`}
-              className="flex items-center gap-3 px-4 py-4 border-b border-[hsl(var(--border))] last:border-0"
-            >
-              <Skeleton className="h-4 w-4 rounded shrink-0" />
-              <Skeleton className="h-9 w-9 rounded-xl shrink-0" />
-              <div className="shrink-0 w-36 space-y-1.5">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-              </div>
-              <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-2 flex-1">
-                {Array.from({ length: 5 }).map((__, j) => (
-                  <div key={j} className="space-y-1">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-3.5 w-24" />
-                  </div>
-                ))}
-              </div>
-              <Skeleton className="h-7 w-7 rounded-md shrink-0" />
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <ErrorState
-          description={error}
-          onRetry={() => setReloadTick((c) => c + 1)}
-        />
-      );
-    }
-
-    if (rows.length === 0) {
-      return (
-        <EmptyState
-          title="Sin registros"
-          description={normalizeSpanishLabel(
-            schema?.emptyState?.message ?? "No hay registros para mostrar.",
-          )}
-          action={
-            onCreate ? { label: "Agregar", onClick: onCreate } : undefined
-          }
-        />
-      );
-    }
-
-    return (
-      <div className="rounded-2xl glass-shell-flat overflow-clip">
-        {rows.map((row, rowIndex) => {
-          const id = getRowId(row, rowIndex);
-          const isSelected = selectedIds.has(id);
-          const titleVal = primaryCol
-            ? renderValue(getByPath(row, primaryCol.field))
-            : `Registro ${rowIndex + 1}`;
-          const initials =
-            titleVal !== "—" && titleVal.length > 0
-              ? titleVal.charAt(0).toUpperCase()
-              : "#";
-          const menuItems = rowMenuItems(row);
-          const itemColorHex = colorCol
-            ? resolveColorHex(getByPath(row, colorCol.field)) || null
-            : null;
-          const avatarBg = itemColorHex
-            ? `${itemColorHex}33`
-            : accentColor
-              ? `${accentColor}26`
-              : "hsl(var(--muted))";
-          const avatarText =
-            itemColorHex ?? accentColor ?? "hsl(var(--muted-foreground))";
-          const rowImageUrl = imageCol ? (getByPath(row, imageCol.field) || null) : null;
-          const statusVal = statusCol
-            ? (() => {
-                const v = getByPath(row, statusCol.field);
-                if (statusCol.type === "select" && statusCol.options) {
-                  const opt = statusCol.options.find(
-                    (o) => String(o.value) === String(v ?? ""),
-                  );
-                  return opt?.label ?? renderValue(v);
-                }
-                return renderValue(v);
-              })()
-            : null;
-
-          return (
-            <div
-              key={id}
-              className={`flex items-center gap-3 px-4 py-3.5 border-b border-[hsl(var(--border))] last:border-0 hover:bg-[hsl(var(--muted))]/30 transition-colors${isSelected ? " bg-indigo-500/5" : ""}`}
-            >
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={() => handleToggleRow(id)}
-                aria-label="Seleccionar"
-                className="shrink-0"
-              />
-              {rowImageUrl ? (
-                <img
-                  src={rowImageUrl}
-                  alt={titleVal}
-                  className="h-9 w-9 rounded-xl shrink-0 object-cover"
-                />
-              ) : (
-                <div
-                  className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: avatarBg }}
-                >
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: avatarText }}
-                  >
-                    {initials}
-                  </span>
-                </div>
-              )}
-
-              {/* Title + status — fixed width column */}
-              <div className="shrink-0 w-36 min-w-0">
-                <button
-                  type="button"
-                  onClick={onView ? () => onView(row) : undefined}
-                  className="truncate text-sm font-semibold text-[hsl(var(--foreground))] hover:underline focus:outline-none focus-visible:underline text-left w-full"
-                >
-                  {titleVal}
-                </button>
-                {statusVal && statusVal !== "—" && (
-                  <span className="mt-1 inline-block text-xs font-medium text-[hsl(var(--foreground))] bg-[hsl(var(--muted))] rounded-full px-2.5 py-0.5">
-                    {statusVal}
-                  </span>
-                )}
-              </div>
-
-              {/* Detail columns grid — fills remaining space */}
-              {detailCols.length > 0 && (
-                <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-1.5 flex-1 min-w-0">
-                  {detailCols.map((col) => {
-                    const rawVal = getByPath(row, col.field);
-                    let formatted;
-                    if (col.type === "date") {
-                      formatted = formatTableDate(rawVal, false);
-                    } else if (col.type === "datetime") {
-                      formatted = formatTableDate(rawVal, true);
-                    } else if (col.type === "currency" || col.type === "decimal") {
-                      formatted = formatTableCurrency(rawVal, row.currency);
-                    } else if (col.type === "select" && col.options) {
-                      const opt = col.options.find(
-                        (o) => String(o.value) === String(rawVal ?? ""),
-                      );
-                      formatted = opt?.label ?? renderValue(rawVal);
-                    } else if (col.type === "markdown") {
-                      formatted = stripMarkdown(rawVal);
-                    } else {
-                      formatted = renderValue(rawVal);
-                    }
-                    if (formatted === "—") return null;
-                    return (
-                      <div key={col.key} className="min-w-0">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]/70 truncate">
-                          {col.label}
-                        </p>
-                        <p className="text-xs text-[hsl(var(--foreground))] truncate">
-                          {formatted}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {menuItems.length > 0 && (
-                <ActionMenu items={menuItems} label="Acciones del registro" />
-              )}
-            </div>
-          );
-        })}
-      </div>
+    if (loading) return <RunlyListSkeleton />;
+    return renderStatusView() ?? (
+      <RunlyListView
+        columns={visibleColumns}
+        rows={rows}
+        subtitleField={schema.subtitleField ?? null}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleRow}
+        getRowId={getRowId}
+        rowMenuItems={rowMenuItems}
+        onView={onView}
+        accentColor={accentColor}
+        token={token}
+        apiBaseUrl={apiBaseUrl}
+        companyId={companyId}
+      />
     );
   };
 
@@ -1182,28 +758,8 @@ export function RunlyTable({
       );
     }
 
-    if (error) {
-      return (
-        <ErrorState
-          description={error}
-          onRetry={() => setReloadTick((c) => c + 1)}
-        />
-      );
-    }
-
-    if (rows.length === 0) {
-      return (
-        <EmptyState
-          title="Sin registros"
-          description={normalizeSpanishLabel(
-            schema?.emptyState?.message ?? "No hay registros para mostrar.",
-          )}
-          action={
-            onCreate ? { label: "Agregar", onClick: onCreate } : undefined
-          }
-        />
-      );
-    }
+    const statusView = renderStatusView();
+    if (statusView) return statusView;
 
     const cardColorCol = visibleColumns.find((c) => c.type === "color") ?? null;
     const resolveItemColor = cardColorCol
@@ -1217,14 +773,14 @@ export function RunlyTable({
         selectedIds={selectedIds}
         onToggleSelect={handleToggleRow}
         getRowId={getRowId}
-        viewActionLabel={viewActionLabel}
-        editActionLabel={editActionLabel}
-        deleteActionLabel={deleteActionLabel}
+        rowMenuItems={rowMenuItems}
+        subtitleField={schema.subtitleField ?? null}
         accentColor={accentColor}
         resolveItemColor={resolveItemColor}
         onView={onView}
-        onEdit={onEdit}
-        onDelete={onDelete}
+        token={token}
+        apiBaseUrl={apiBaseUrl}
+        companyId={companyId}
       />
     );
   };
@@ -1259,6 +815,7 @@ export function RunlyTable({
           sortBy={sortBy}
           sortDir={sortDir}
           onSortChange={handleSortChange}
+          showSortMenu={view !== "table"}
           views={["table", "cards", "grid"]}
           view={view}
           onViewChange={setView}

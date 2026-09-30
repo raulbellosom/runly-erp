@@ -21,7 +21,10 @@ export const inventoryFiltersSchema = z.object({
   status: z.enum(['available', 'assigned', 'maintenance', 'retired', 'lost', 'stolen', 'disposed']).optional(),
   model: z.string().max(255).optional(), modelId: z.uuid().optional(),
   missingSerial: z.boolean().optional(), createdFrom: z.iso.date().optional(), createdTo: z.iso.date().optional(),
+  purchaseFrom: z.iso.date().optional(), purchaseTo: z.iso.date().optional(),
 }).strict();
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function buildInventoryWhere(companyId, filters = {}) {
   if (!companyId) throw new Error('Empresa requerida.');
@@ -30,9 +33,19 @@ export function buildInventoryWhere(companyId, filters = {}) {
   if (q) where.OR = ['name', 'assetTag', 'serialNumber'].map(field => ({ [field]: { contains: q, mode: 'insensitive' } }));
   for (const field of ['categoryId', 'brandId', 'locationId', 'assignedToId', 'status', 'model', 'modelId']) if (filters[field]) where[field] = filters[field];
   if (filters.missingSerial) where.AND = [{ OR: [{ serialNumber: null }, { serialNumber: '' }] }];
-  if (filters.createdFrom || filters.createdTo) where.createdAt = {
-    ...(filters.createdFrom ? { gte: inventoryDayStart(filters.createdFrom) } : {}),
-    ...(filters.createdTo ? { lt: inventoryDayStart(filters.createdTo, 1) } : {}),
+  const createdFrom = ISO_DAY.test(String(filters.createdFrom ?? '')) ? filters.createdFrom : null;
+  const createdTo = ISO_DAY.test(String(filters.createdTo ?? '')) ? filters.createdTo : null;
+  if (createdFrom || createdTo) where.createdAt = {
+    ...(createdFrom ? { gte: inventoryDayStart(createdFrom) } : {}),
+    ...(createdTo ? { lt: inventoryDayStart(createdTo, 1) } : {}),
+  };
+  // purchase_date is a DATE column: compare calendar days directly (UTC midnight).
+  const day = (value) => (ISO_DAY.test(String(value ?? '')) ? new Date(`${value}T00:00:00Z`) : null);
+  const purchaseFrom = day(filters.purchaseFrom);
+  const purchaseTo = day(filters.purchaseTo);
+  if (purchaseFrom || purchaseTo) where.purchaseDate = {
+    ...(purchaseFrom ? { gte: purchaseFrom } : {}),
+    ...(purchaseTo ? { lte: purchaseTo } : {}),
   };
   return where;
 }

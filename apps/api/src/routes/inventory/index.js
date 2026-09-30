@@ -27,7 +27,7 @@ export function createInventoryRouter({
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryAssistantRouter({ prisma, requirePermission }));
   router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
-  router.route('/', createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError }));
+  router.route('/', createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError, inventoryService }));
   const modelDefaults = createInventoryModelService({ prisma });
 
   const isInvErr = (err) => err instanceof InventoryServiceError;
@@ -37,9 +37,10 @@ export function createInventoryRouter({
   router.get("/inventory/items", requirePermission("inventory.item.read"), async (c) => {
     try {
       const companyId = c.get("companyId");
-      const { search, categoryId, brandId, locationId, status, assignedToId, modelId, page, limit, pageSize, sortBy, sortDir } = c.req.query();
-      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, modelId, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
-      return c.json(result);
+      const { search, categoryId, brandId, locationId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, page, limit, pageSize, sortBy, sortDir } = c.req.query();
+      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
+      // `pagination` is the shape RunlyTable reads for its page footer.
+      return c.json({ ...result, pagination: { page: result.page, pageSize: result.limit, total: result.total } });
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
       return c.json({ error: "No se pudieron cargar los items." }, 500);

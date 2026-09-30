@@ -728,6 +728,9 @@ async function writeLocalEnv(supabaseInput, identity) {
   const publicApiUrl = deploymentValues.RUNLY_API_URL ?? "";
 
   const corsOrigin         = parseEnvValue(existingEnvContent, "CORS_ORIGIN")                 || "http://localhost:5173";
+  // Public root URL of the web app (email links, Office, storefront). Defaults
+  // to the first CORS origin, which is the frontend the browser loads.
+  const appUrl = (deploymentValues.RUNLY_APP_URL || corsOrigin.split(",")[0].trim()).replace(/\/+$/, "");
   const googleClientId     = parseEnvValue(existingEnvContent, "GOOGLE_OAUTH_CLIENT_ID")     || "<YOUR_GOOGLE_OAUTH_CLIENT_ID>";
   const googleClientSecret = parseEnvValue(existingEnvContent, "GOOGLE_OAUTH_CLIENT_SECRET") || "<YOUR_GOOGLE_OAUTH_CLIENT_SECRET>";
   const googleRedirectUri  = parseEnvValue(existingEnvContent, "GOOGLE_OAUTH_REDIRECT_URI")  || "https://your-atlas-domain.com/app/google/calendar/callback";
@@ -910,6 +913,7 @@ VITE_SUPABASE_ANON_KEY=${supabase.anonKey}
 RUNLY_SUPABASE_PUBLIC_URL=${deploymentValues.RUNLY_SUPABASE_PUBLIC_URL ?? ""}
 VITE_ATLAS_API_URL=${publicApiUrl || "http://localhost:4010"}
 CORS_ORIGIN=${corsOrigin}
+RUNLY_APP_URL=${appUrl}
 
 # ── Identity-level SMTP (password reset, cross-company mail) ─────────────────
 # Ajustes -> SMTP configures a SPECIFIC COMPANY's outgoing mail and always wins

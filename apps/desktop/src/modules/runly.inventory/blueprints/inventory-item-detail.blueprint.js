@@ -26,15 +26,23 @@ export const INVENTORY_ITEM_DETAIL = {
     ],
     sections: [
       {
+        label: 'Modelo, tipo y marca',
+        icon: 'Boxes',
+        column: 'main',
+        columns: 3,
+        fields: [
+          { field: 'model', label: 'Modelo', icon: 'Package' },
+          { field: 'categoryName', label: 'Tipo', icon: 'Layers' },
+          { field: 'brandName', label: 'Marca', icon: 'Tag' },
+        ],
+      },
+      {
         label: 'Identificación',
         icon: 'IdCard',
         column: 'main',
         columns: 2,
         fields: [
           { field: 'assetTag', label: 'Etiqueta de activo', icon: 'Hash' },
-          { field: 'categoryName', label: 'Tipo', icon: 'Layers' },
-          { field: 'brandName', label: 'Marca', icon: 'Tag' },
-          { field: 'model', label: 'Modelo', icon: 'Package' },
           { field: 'serialNumber', label: 'Número de serie', icon: 'Hash' },
           { field: 'partNumber', label: 'Número de parte', icon: 'Hash' },
         ],

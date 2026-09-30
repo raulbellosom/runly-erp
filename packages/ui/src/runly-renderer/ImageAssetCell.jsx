@@ -26,7 +26,15 @@ function joinUrl(baseUrl, apiPath) {
 // company-scoped file entity the generic route above can resolve.
 // Optional `column.avatarLabelField`: row field used to render initials
 // instead of a generic icon when there's no photo at all.
-export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, column }) {
+// `variant`: "thumb" (table cell, default), "avatar" (list rows, 40px) or
+// "cover" (full-width card cover; shows a placeholder instead of "—").
+const VARIANT_CLS = {
+  thumb: "h-9 w-9 rounded-lg border border-[hsl(var(--border))]",
+  avatar: "h-10 w-10 shrink-0 rounded-xl border border-[hsl(var(--border))]",
+  cover: "aspect-4/3 w-full",
+};
+
+export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, column, variant = "thumb" }) {
   const fileAssetId = value ? String(value) : null;
   const avatarUserId =
     !fileAssetId && column?.avatarUserField
@@ -116,7 +124,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
 
   const avatarLabel = column?.avatarLabelField ? row?.[column.avatarLabelField] : null;
 
-  if (!fileAssetId && !avatarUserId && !avatarLabel) {
+  if (!fileAssetId && !avatarUserId && !avatarLabel && variant === "thumb") {
     return <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span>;
   }
 
@@ -130,7 +138,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
         type="button"
         onClick={handleOpen}
         disabled={viewerLoading || !clickable}
-        className="relative inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] enabled:hover:border-[hsl(var(--ring))]"
+        className={`relative inline-flex items-center justify-center overflow-hidden bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] enabled:hover:border-[hsl(var(--ring))] ${VARIANT_CLS[variant] ?? VARIANT_CLS.thumb}`}
         aria-label="Ver imagen"
       >
         {thumbLoading || viewerLoading ? (
@@ -140,7 +148,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
         ) : avatarLabel ? (
           <span className="text-[11px] font-semibold">{initialsFromName(avatarLabel)}</span>
         ) : (
-          <ImageIcon className="h-4 w-4" aria-hidden="true" />
+          <ImageIcon className={variant === "cover" ? "h-8 w-8 opacity-40" : "h-4 w-4"} aria-hidden="true" />
         )}
       </button>
 
