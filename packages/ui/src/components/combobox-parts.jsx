@@ -1,33 +1,26 @@
 // packages/ui/src/components/combobox-parts.jsx
 //
-// Shared pieces behind ComboboxField, RelationSelectField and
-// CreatableComboboxField: keyboard navigation (ArrowUp/Down, Tab/Shift+Tab,
-// Home/End, Enter, Escape), the dropdown panel/option styling (same glass
-// surface as Popover/DateField so every picker reads as one family) and the
-// inline "Crear «X»" row shown only once the typed text has no exact match.
+// Headless helpers behind the unified Combobox (Combobox.jsx): search
+// matching, the "offer Crear?" rule and keyboard navigation (ArrowUp/Down,
+// Tab/Shift+Tab, Home/End, Enter, Escape). Visual pieces live in
+// combobox-rows.jsx.
 import { useEffect, useRef, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
-import { cn } from "../lib/utils.js";
 
-export const dropdownPanelCls = "glass-strong rounded-xl shadow-lg overflow-hidden";
-
-export function optionCls({ active, selected, disabled }) {
-  return cn(
-    "w-full text-left px-2.5 py-2 text-sm rounded-md transition-colors duration-100 flex items-center gap-2 outline-none",
-    selected ? "text-foreground font-medium" : "text-foreground/90",
-    active
-      ? "bg-foreground/10"
-      : selected
-        ? "bg-foreground/[0.06]"
-        : "hover:bg-foreground/[0.06]",
-    disabled && "opacity-50 cursor-not-allowed pointer-events-none",
-  );
-}
-
-// Every search word must appear in the option label or its optional
-// `keywords` string, so "dell 2023" matches "XPS 15 · Dell · 2023".
+// Every search word must appear in the option label, description, hint or
+// its optional `keywords` string, so "dell 2023" matches "XPS 15 · Dell · 2023".
 export function optionMatchesSearch(option, search) {
-  const haystack = `${option.label ?? ""} ${option.keywords ?? ""}`.toLowerCase();
+  const haystack = [
+    option.label,
+    option.keywords,
+    option.description,
+    option.hint,
+    option.meta?.title,
+    option.meta?.subtitle,
+    option.meta?.badge,
+  ]
+    .filter((part) => typeof part === "string" || typeof part === "number")
+    .join(" ")
+    .toLowerCase();
   return search.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
 }
 
@@ -92,6 +85,9 @@ export function useListboxNav({ open, count, initialIndex = 0, onPick, onClose, 
         if (countRef.current > 0) { e.preventDefault(); setActiveIndex(countRef.current - 1); }
         break;
       case "Enter":
+      case " ":
+        // Space only picks when focus is on the listbox itself (no search box).
+        if (e.key === " " && e.target instanceof HTMLInputElement) break;
         e.preventDefault();
         if (activeIndex >= 0 && activeIndex < countRef.current) onPick(activeIndex);
         break;
@@ -109,85 +105,4 @@ export function useListboxNav({ open, count, initialIndex = 0, onPick, onClose, 
   }
 
   return { activeIndex, setActiveIndex, onKeyDown, resetActive };
-}
-
-// Opens the dropdown from the closed trigger with ArrowDown/ArrowUp.
-export function triggerKeyDown(open, openFn) {
-  return (e) => {
-    if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-      e.preventDefault();
-      openFn();
-    }
-  };
-}
-
-export function SearchRow({ inputRef, value, onChange, onClear, onKeyDown, placeholder, flipped, activeId }) {
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2.5",
-        flipped ? "border-t border-foreground/10" : "border-b border-foreground/10",
-      )}
-    >
-      <Search size={13} className="text-muted-foreground shrink-0" />
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={onChange}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        role="combobox"
-        aria-expanded="true"
-        aria-autocomplete="list"
-        aria-activedescendant={activeId}
-        className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
-      />
-      {value && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={onClear}
-          aria-label="Limpiar búsqueda"
-          className="flex items-center justify-center h-4 w-4 rounded-full bg-foreground/10 hover:bg-foreground/20 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-        >
-          <X size={10} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-export function CreateOption({ id, index, active, term, text, isCreating, disabled, onClick, onHover }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      tabIndex={-1}
-      role="option"
-      aria-selected={active}
-      data-nav-index={index}
-      disabled={disabled || isCreating}
-      onClick={onClick}
-      onMouseEnter={onHover}
-      className={cn(
-        "w-full text-left px-2.5 py-2 text-sm rounded-md transition-colors duration-100 flex items-center gap-2.5 outline-none",
-        active ? "bg-primary/20" : "bg-primary/10 hover:bg-primary/20",
-        (disabled || isCreating) && "opacity-50 cursor-not-allowed",
-      )}
-    >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-        <Plus size={12} strokeWidth={2.5} />
-      </span>
-      {isCreating ? (
-        <span className="text-foreground">Creando...</span>
-      ) : text ? (
-        <span className="min-w-0 truncate text-foreground font-medium">{text}</span>
-      ) : (
-        <span className="min-w-0 truncate text-foreground">
-          Crear <span className="font-semibold">&ldquo;{term}&rdquo;</span>
-        </span>
-      )}
-    </button>
-  );
 }

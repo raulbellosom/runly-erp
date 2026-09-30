@@ -46,6 +46,7 @@ components/               (tuyo) Pantallas React: index.js registra, *.jsx imple
 .module-definition.json   Definición del Constructor. No lo borres: con él Runly distingue tus cambios
 GUIA_DESARROLLO_RUNLY.md  Guía personalizada de tu módulo (se ignora al subir)
 AGENTS.md                 Instrucciones para asistentes de IA (se ignora al subir)
+docs/                     Esta documentación en Markdown, para leerla sin internet (se ignora al subir)
 ```
 
 ### Reglas que no se deben romper

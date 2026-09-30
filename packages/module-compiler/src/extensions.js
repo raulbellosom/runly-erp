@@ -5,6 +5,8 @@
 // package differs from what the Builder generates only by such extensions.
 // See docs/superpowers/specs/2026-09-28-rme3-builder-code-extensions-design.md.
 
+import { isDeveloperDocPath } from './developer-docs.js'
+
 export const EXTENSIONS_MAX_BYTES = 1.5 * 1024 * 1024
 export const DEFINITION_FILE = '.module-definition.json'
 const COMPONENT_FILE = /^components\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.(?:jsx?|css|json|svg)$/
@@ -58,7 +60,8 @@ export function validateExtensions(definition, permissionKeys, errors) {
 const eol = (text) => String(text ?? '').replace(/\r\n/g, '\n')
 const stripDot = (value) => String(value ?? '').replace(/^\.\//, '')
 // Documentation files may be edited freely (e.g. by an AI assistant).
-const IGNORED = new Set([DEFINITION_FILE, 'GUIA_DESARROLLO_RUNLY.md', 'AGENTS.md'])
+const IGNORED_FILES = new Set([DEFINITION_FILE, 'GUIA_DESARROLLO_RUNLY.md', 'AGENTS.md'])
+const IGNORED = { has: (path) => IGNORED_FILES.has(path) || isDeveloperDocPath(path) }
 
 // files: [{ path, content }] (text), manifest: the package's loaded manifest
 // object. `compile` is compileModule (injected to avoid a circular import).

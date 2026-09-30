@@ -11,6 +11,7 @@ Los módulos de Runly están pensados para que un asistente de IA pueda trabajar
 |---|---|---|
 | `AGENTS.md` (en el ZIP) | Reglas del módulo: qué archivos puede tocar, cómo se registran pantallas, prohibiciones (SQL, UUID, diálogos nativos). | Déjalo en la raíz de la carpeta: Claude Code, Cursor, Codex y Copilot lo leen solos. |
 | `GUIA_DESARROLLO_RUNLY.md` (en el ZIP) | Diccionario de datos de **tu** módulo: tablas, columnas, endpoints, permisos, relaciones y librerías con versión. | Menciónalo en tu petición: *"lee GUIA_DESARROLLO_RUNLY.md antes de empezar"*. |
+| `docs/` (en el ZIP) | Esta misma documentación de desarrolladores en Markdown, tal como estaba al descargar el ZIP. | El asistente la lee sin internet; es la referencia principal si no puede abrir runly.mx. |
 | [`/llms.txt`](https://runly.mx/llms.txt) | Índice de esta documentación y de la ayuda de cada módulo, en formato para IA. | Pega la URL si el asistente puede navegar. |
 | [`/llms-full.txt`](https://runly.mx/llms-full.txt) | Toda la documentación para desarrolladores en un solo archivo de texto. | Adjúntalo o pega la URL cuando el asistente no tenga acceso al ZIP. |
 | Cada página en Markdown | Agrega `.md` a la URL de cualquier página (`/documentacion/desarrolladores/pantallas-react.md`). | Para darle solo el tema que necesita. |
@@ -19,7 +20,7 @@ Los módulos de Runly están pensados para que un asistente de IA pueda trabajar
 
 ```
 Estoy extendiendo el módulo de Runly custom.encuestas (carpeta actual).
-Lee AGENTS.md y GUIA_DESARROLLO_RUNLY.md antes de empezar.
+Lee AGENTS.md, GUIA_DESARROLLO_RUNLY.md y docs/ antes de empezar.
 
 Quiero una pantalla "Resultados" que muestre, por encuesta, una gráfica de
 barras con el conteo de respuestas por opción.

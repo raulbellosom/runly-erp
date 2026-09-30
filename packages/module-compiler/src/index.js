@@ -10,6 +10,7 @@ export {
 } from './definition.js'
 export { compileModule } from './compiler.js'
 export { archiveModule } from './archive.js'
+export { DEVELOPER_DOCS_DIR, developerDocFiles, isDeveloperDocPath } from './developer-docs.js'
 export { DEFINITION_FILE, EXTENSIONS_MAX_BYTES, hasExtensions, isExtensionFilePath } from './extensions.js'
 import { classifyPackage } from './extensions.js'
 import { compileModule } from './compiler.js'

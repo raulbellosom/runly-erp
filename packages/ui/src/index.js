@@ -48,6 +48,7 @@ export {
   CarColorPickerField,
   RelationSelectField,
 } from "./components/FormFields.jsx";
+export { Combobox } from "./components/Combobox.jsx";
 export { MarkdownField } from "./components/MarkdownField.jsx";
 export { MarkdownViewer } from "./components/MarkdownViewer.jsx";
 export { SortableList } from "./components/SortableList.jsx";

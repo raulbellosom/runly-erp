@@ -109,7 +109,7 @@ export function CatalogImportDialog({ catalog, title, open, onOpenChange }) {
           <DialogTitle>Importar {title}</DialogTitle>
           <DialogDescription>Carga un archivo CSV o Excel con las columnas de la plantilla. Los registros que ya existen se omiten.</DialogDescription>
         </DialogHeader>
-        <ImportStepIndicator steps={STEPS} current={step} className="shrink-0" />
+        <ImportStepIndicator layout="bar" steps={STEPS} current={step} className="mt-1 shrink-0" />
         <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
           {step === 'template' ? (
             <div className="space-y-3">

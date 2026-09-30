@@ -182,8 +182,11 @@ test('exportPackage: produces a ZIP whose module.manifest.js matches the compile
   assert.ok(filename.startsWith('custom.xfoo-'))
   const zip = await JSZip.loadAsync(buffer)
   assert.ok(zip.file('module.manifest.js'))
+  assert.ok(zip.file('docs/index.md'), 'the download ships the offline developer docs')
+  assert.ok(zip.file('docs/api-modulos.md'))
   const compiled = await svc.compileProject({ companyId: 'company-1', projectId: project.id })
   assert.equal(packageHash, compiled.packageHash)
+  assert.ok(!compiled.files.some((file) => file.path.startsWith('docs/')), 'docs/ stays out of the installable package')
 })
 
 test('publishProject: refuses to publish once a project has been detached to Advanced mode', async () => {

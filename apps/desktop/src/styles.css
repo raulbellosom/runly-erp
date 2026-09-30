@@ -547,6 +547,38 @@ body,
   }
 }
 
+/* ── Combobox (@runly/ui Combobox.jsx) ─────────────────────
+   Row entrance stagger (delay set inline per row), pop-in for check marks,
+   chips and clear buttons, fade for empty/error states. */
+@keyframes runly-cbx-item-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes runly-cbx-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes runly-cbx-fade {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.runly-cbx-item-in {
+  animation: runly-cbx-item-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.runly-cbx-pop {
+  animation: runly-cbx-pop 160ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.runly-cbx-fade {
+  animation: runly-cbx-fade 200ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .runly-cbx-item-in,
+  .runly-cbx-pop,
+  .runly-cbx-fade {
+    animation: none;
+  }
+}
+
 /* ── TipTap Notes editor ─────────────────────────────────── */
 /* Tailwind preflight resets h1-h6, strong, em, etc. to inherit.
    These rules restore visual meaning inside the editor content area. */

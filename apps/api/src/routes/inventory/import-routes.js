@@ -3,12 +3,15 @@
 import { Hono } from 'hono';
 import { createInventoryCatalogImportService, parseCatalogFile } from '../../services/inventory-catalog-import-service.js';
 import {
-  ITEM_IMPORT_FIELDS, createInventoryItemImportService, parseItemFile, suggestItemMapping,
+  createInventoryItemImportService, parseItemFile, suggestItemMapping,
 } from '../../services/inventory-item-import-service.js';
+import { tenantActiveContext } from '../../lib/active-context.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
+// Item files may carry embedded photos.
+const MAX_ITEM_BYTES = 25 * 1024 * 1024;
 
-export function createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError, inventoryService }) {
+export function createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError, inventoryService, filesService }) {
   const router = new Hono();
   const imports = createInventoryCatalogImportService({ prisma });
   const itemImports = createInventoryItemImportService({ prisma, inventoryService });
@@ -19,6 +22,16 @@ export function createInventoryImportRouter({ prisma, requirePermission, Invento
   const itemGuard = requirePermission('inventory.item.create');
 
   // ── Items (column mapping) ───────────────────────────────────────────────
+  // Parse returns the rows so the client can map and preview without
+  // re-uploading; commit takes the file again because pictures placed in the
+  // XLSX only travel with the file.
+  async function readItemFile(c, form, options) {
+    const file = form.get('file');
+    if (!file || typeof file.arrayBuffer !== 'function') throw new InventoryServiceError('Adjunta un archivo CSV o Excel.', 400);
+    if (file.size > MAX_ITEM_BYTES) throw new InventoryServiceError('El archivo supera 25 MB.', 400);
+    return parseItemFile(Buffer.from(await file.arrayBuffer()), file.name, options);
+  }
+
   router.get('/inventory/item-import/template', itemGuard, async (c) => {
     try {
       const file = await itemImports.template();
@@ -29,26 +42,42 @@ export function createInventoryImportRouter({ prisma, requirePermission, Invento
   router.post('/inventory/item-import/parse', itemGuard, async (c) => {
     try {
       const form = await c.req.formData();
-      const file = form.get('file');
-      if (!file || typeof file.arrayBuffer !== 'function') return c.json({ error: 'Adjunta un archivo CSV o Excel.' }, 400);
-      if (file.size > MAX_BYTES) return c.json({ error: 'El archivo supera 5 MB.' }, 400);
-      const { headers, rows } = await parseItemFile(Buffer.from(await file.arrayBuffer()), file.name);
-      const fields = ITEM_IMPORT_FIELDS.map(({ key, label, required }) => ({ key, label, required: Boolean(required) }));
-      return c.json({ data: { headers, rows, fields, mapping: suggestItemMapping(headers) } });
+      const { headers, rows, rowNumbers, images } = await readItemFile(c, form);
+      const { fields, customFields, statuses } = await itemImports.fields(c.get('companyId'));
+      const imageCounts = rowNumbers.map((n) => images.get(n)?.length ?? 0);
+      return c.json({ data: { headers, rows, rowNumbers, imageCounts, fields, statuses, mapping: suggestItemMapping(headers, customFields) } });
     } catch (err) { return fail(c, err, 'No se pudo leer el archivo.'); }
   });
 
   router.post('/inventory/item-import/preview', itemGuard, async (c) => {
     try {
-      const { rows, mapping, createMissing } = await c.req.json();
-      return c.json({ data: await itemImports.preview(rows, mapping, c.get('companyId'), { createMissing: createMissing === true }) });
+      const { rows, rowNumbers, mapping, createMissing, statusMap } = await c.req.json();
+      return c.json({ data: await itemImports.preview(rows, mapping, c.get('companyId'), { createMissing: createMissing === true, statusMap, rowNumbers }) });
     } catch (err) { return fail(c, err, 'No se pudo analizar el archivo.'); }
   });
 
   router.post('/inventory/item-import/commit', itemGuard, async (c) => {
     try {
-      const { rows, mapping, createMissing } = await c.req.json();
-      return c.json({ data: await itemImports.commit(rows, mapping, c.get('companyId'), c.get('authUserId'), { createMissing: createMissing === true }) });
+      const form = await c.req.formData();
+      const parsed = await readItemFile(c, form, { withImages: true });
+      let options;
+      try { options = JSON.parse(String(form.get('options') ?? '{}')); } catch { return c.json({ error: 'Opciones de importación no válidas.' }, 400); }
+      const companyId = c.get('companyId');
+      const authUserId = c.get('authUserId');
+      const activeContext = tenantActiveContext(c);
+      const attachImage = filesService ? async (itemId, image) => {
+        const asset = await filesService.upload({
+          authUserId,
+          activeContext,
+          file: new File([image.buffer], image.name, { type: image.type }),
+          fields: { moduleKey: 'runly.inventory', entityType: 'InvItem', entityId: itemId },
+        });
+        await inventoryService.addItemFile(itemId, asset.id, companyId, null);
+      } : null;
+      const result = await itemImports.commit(parsed, options.mapping, companyId, authUserId, {
+        createMissing: options.createMissing === true, statusMap: options.statusMap, attachImage,
+      });
+      return c.json({ data: result });
     } catch (err) { return fail(c, err, 'No se pudo importar.'); }
   });
 

@@ -13,7 +13,7 @@ import {
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { cn } from "../lib/utils.js";
 
-const MONTHS = [
+export const MONTHS = [
   "Enero",
   "Febrero",
   "Marzo",
@@ -28,7 +28,7 @@ const MONTHS = [
   "Diciembre",
 ];
 
-const DAYS_HEADER = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
+export const DAYS_HEADER = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
 
 export function parseDate(value) {
   if (!value) return null;
@@ -89,7 +89,7 @@ export function formatDateTimeDisplay(value) {
   return `${datePart}, ${displayHour}:${String(mStr ?? "00").padStart(2, "0")} ${meridiem}`;
 }
 
-function buildCalendarGrid(year, month) {
+export function buildCalendarGrid(year, month) {
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   // Monday = 0 offset

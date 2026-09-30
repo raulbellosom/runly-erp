@@ -501,8 +501,9 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `DateField` | Date picker |
 | `DateTimeField` | Date + time picker |
 | `YearField` | Year-only picker |
-| `SelectField` | Controlled select dropdown |
-| `ComboboxField` | Searchable select with autocomplete; use for read-only option sets |
+| `Combobox` | The single select/combobox engine; every field below is a preset over it, and all of them accept its props. Options: string or `{ value, label, disabled, group, icon, avatar (URL or {src,name}, initials fallback), color, description, hint, badge, keywords }`. Props: `multiple` (chips + checkboxes, `maxChips`), `clearable`, `searchable` (`true`/`false`/`"auto"` = more than 8 options), `onSearchChange` + `filter={false}` for remote search, `minSearchLength`, `loading`/`loadError`/`onRetry`, `onCreate` + `createMode` (`"search"`/`"empty-search"`), `createLabel`, `isCreating`, `missingLabel`, `emptyText`/`emptyDescription`, `onOpenChange`. Animated open/close, search box focused on open, sliding active highlight, match highlighting, grouped sections, results count, type-ahead when there is no search box, focus returns to the trigger |
+| `SelectField` | `Combobox` preset for short fixed lists (`searchable="auto"`); `validate` runs on close; `className` styles the trigger |
+| `ComboboxField` | `Combobox` preset, always searchable; use for read-only option sets |
 | `CreatableComboboxField` | Searchable combobox that shows a "+ Crear «X»" row when the typed term doesn't match any option; calls `onCreate(name)` on select. Search is per word: every typed word must appear in the option `label` or its optional `keywords` string. Use `placeholder="Buscar o crear..."`. Preferred over `SelectField` whenever new entries are possible. |
 | `CheckboxField` | Controlled checkbox |
 | `SwitchField` | Controlled toggle switch |

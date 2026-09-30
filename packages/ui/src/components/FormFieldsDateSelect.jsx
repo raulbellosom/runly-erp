@@ -6,10 +6,10 @@
 // existing import path (package index and sibling components) keeps
 // working without edits.
 import { useState, useEffect, useMemo, forwardRef, useId } from "react";
-import { Check, ChevronDown, ChevronUp, Phone, CalendarDays } from "lucide-react";
-import * as SelectPrimitive from "@radix-ui/react-select";
+import { Phone, CalendarDays } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { fieldCls, InputIcon, FieldWrapper } from "./form-field-base.jsx";
+import { Combobox } from "./Combobox.jsx";
 import {
   Calendar,
   DateSelectorShell,
@@ -319,180 +319,42 @@ export function YearField({
 }
 
 // ─── SelectField ─────────────────────────────────────────────────────────────
+// Preset over the unified Combobox: the search box appears automatically once
+// the list is long enough (> 8 options). Options may be strings or
+// `{ value, label, icon?, disabled?, ... }` (any Combobox option field works).
 
 export const SelectField = forwardRef(function SelectField(
-  {
-    label,
-    error: externalError,
-    hint,
-    required,
-    validate,
-    id,
-    icon,
-    options = [],
-    placeholder,
-    value,
-    onValueChange,
-    onChange,
-    disabled,
-    className,
-  },
+  { validate, error: externalError, options = [], value, onValueChange, onChange, className, ...props },
   ref,
 ) {
   const [localError, setLocalError] = useState("");
   const error = externalError || localError;
 
-  const handleValueChange = onValueChange ?? onChange;
-
-  // Explicitly compute the label for the current value so Radix Select doesn't
-  // have to rely on its DocumentFragment portal mechanism (unreliable with
-  // programmatically-set values in React 19).
-  const selectedOption = useMemo(() => {
-    if (!value) return null;
-    return options.find((o) =>
-      typeof o === "string" ? o === value : o.value === value,
-    ) ?? null;
-  }, [value, options]);
-  const selectedLabel = selectedOption == null
-    ? null
-    : typeof selectedOption === "string" ? selectedOption : selectedOption.label;
-  // Options may carry an `icon` (lucide component); the selected option's
-  // icon shows in the trigger unless an explicit `icon` prop overrides it.
-  const triggerIcon = icon ?? (typeof selectedOption === "object" ? selectedOption?.icon : undefined);
-
-  function handleOpenChange(open) {
-    if (!open && validate) {
-      setLocalError(validate(value) || "");
-    }
-  }
+  // Empty-string values were never selectable (Radix threw on them); keep
+  // skipping them so existing option lists render the same.
+  const cleanOptions = useMemo(
+    () =>
+      options.filter((opt) => {
+        const val = typeof opt === "object" && opt !== null ? opt.value : opt;
+        return val !== "" && val != null;
+      }),
+    [options],
+  );
 
   return (
-    <FieldWrapper
-      label={label}
-      labelFor={id}
+    <Combobox
+      ref={ref}
+      searchable="auto"
+      triggerClassName={className}
       error={error}
-      hint={hint}
-      required={required}
-    >
-      <div className="relative">
-        <InputIcon icon={triggerIcon} />
-        <SelectPrimitive.Root
-          value={value || ""}
-          onValueChange={handleValueChange}
-          onOpenChange={handleOpenChange}
-          disabled={disabled}
-        >
-          <SelectPrimitive.Trigger
-            id={id}
-            ref={ref}
-            className={cn(
-              fieldCls(
-                error,
-                cn(
-                  "flex items-center justify-between cursor-pointer text-left gap-2",
-                  triggerIcon && "pl-9",
-                  className,
-                ),
-              ),
-            )}
-            aria-label={label}
-          >
-            <span
-              className={cn(
-                "flex-1 truncate text-sm",
-                selectedLabel == null && "text-muted-foreground",
-              )}
-            >
-              {selectedLabel != null ? (
-                selectedLabel
-              ) : (
-                <SelectPrimitive.Value
-                  placeholder={placeholder || "Seleccionar..."}
-                />
-              )}
-            </span>
-            <SelectPrimitive.Icon asChild>
-              <ChevronDown
-                size={14}
-                strokeWidth={1.75}
-                className="text-muted-foreground/60 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180"
-              />
-            </SelectPrimitive.Icon>
-          </SelectPrimitive.Trigger>
-
-          <SelectPrimitive.Portal>
-            <SelectPrimitive.Content
-              position="popper"
-              sideOffset={5}
-              className={cn(
-                "z-50 min-w-(--radix-select-trigger-width) overflow-hidden rounded-lg",
-                "border border-border bg-card text-foreground shadow-xl",
-                "data-[state=open]:animate-in data-[state=closed]:animate-out",
-                "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-                "data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1",
-              )}
-            >
-              <SelectPrimitive.ScrollUpButton className="flex cursor-default items-center justify-center py-1 text-muted-foreground">
-                <ChevronUp size={13} />
-              </SelectPrimitive.ScrollUpButton>
-
-              <SelectPrimitive.Viewport className="p-1 max-h-64 overflow-y-auto">
-                {options.map((opt) => {
-                  const val = typeof opt === "string" ? opt : opt.value;
-                  const lbl = typeof opt === "string" ? opt : opt.label;
-                  const OptIcon = typeof opt === "string" ? null : opt.icon;
-                  // Radix Select throws on an empty-string item value. Skip such
-                  // options rather than crash the whole screen.
-                  if (val === "" || val == null) {
-                    if (import.meta.env?.DEV) {
-                      console.warn(
-                        "[SelectField] skipped an option with an empty value:",
-                        lbl,
-                      );
-                    }
-                    return null;
-                  }
-                  return (
-                    <SelectPrimitive.Item
-                      key={val}
-                      value={val}
-                      disabled={typeof opt === "object" && Boolean(opt?.disabled)}
-                      className={cn(
-                        "relative flex w-full cursor-default select-none items-center",
-                        "rounded-md py-2 pl-8 pr-3 text-sm outline-none",
-                        "transition-colors duration-100",
-                        "focus:bg-muted focus:text-foreground",
-                        "data-[state=checked]:text-primary data-[state=checked]:bg-primary/10 data-[state=checked]:font-medium",
-                        "data-disabled:pointer-events-none data-disabled:opacity-50",
-                      )}
-                    >
-                      <span className="absolute left-2.5 flex h-3.5 w-3.5 items-center justify-center">
-                        <SelectPrimitive.ItemIndicator>
-                          <Check
-                            size={11}
-                            strokeWidth={2.5}
-                            className="text-primary"
-                          />
-                        </SelectPrimitive.ItemIndicator>
-                      </span>
-                      {OptIcon && (
-                        <OptIcon size={14} strokeWidth={1.75} className="mr-2 shrink-0 text-muted-foreground" />
-                      )}
-                      <SelectPrimitive.ItemText>{lbl}</SelectPrimitive.ItemText>
-                    </SelectPrimitive.Item>
-                  );
-                })}
-              </SelectPrimitive.Viewport>
-
-              <SelectPrimitive.ScrollDownButton className="flex cursor-default items-center justify-center py-1 text-muted-foreground">
-                <ChevronDown size={13} />
-              </SelectPrimitive.ScrollDownButton>
-            </SelectPrimitive.Content>
-          </SelectPrimitive.Portal>
-        </SelectPrimitive.Root>
-      </div>
-    </FieldWrapper>
+      options={cleanOptions}
+      value={value}
+      onChange={onValueChange ?? onChange}
+      onOpenChange={(open) => {
+        if (!open && validate) setLocalError(validate(value) || "");
+      }}
+      {...props}
+    />
   );
 });
 

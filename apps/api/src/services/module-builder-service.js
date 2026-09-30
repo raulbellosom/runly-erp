@@ -12,6 +12,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import {
   compileModule,
   archiveModule,
+  developerDocFiles,
   normalizeModuleDefinition,
   validateModuleDefinition,
 } from '@runly/module-compiler'
@@ -255,7 +256,8 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
   async function exportPackage({ companyId, projectId }) {
     const project = await requireProject({ companyId, projectId })
     const compiled = compileDefinition(project.definition)
-    const buffer = await archiveModule(compiled)
+    // The download also carries docs/ (offline developer docs); publish/install packages do not.
+    const buffer = await archiveModule({ ...compiled, files: [...compiled.files, ...developerDocFiles()] })
     return { buffer, filename: `${project.moduleKey}-${compiled.definition.version}.zip`, packageHash: compiled.packageHash }
   }
 

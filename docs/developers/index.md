@@ -21,7 +21,7 @@ Esta documentación está pensada para personas desarrolladoras **y para asisten
 
 ## Inicio rápido
 
-1. En Runly abre tu módulo en el **Constructor de módulos** y usa **Modo desarrollador > Descargar ZIP con guía**. El ZIP trae `GUIA_DESARROLLO_RUNLY.md` (personalizada para tu módulo) y `AGENTS.md` (instrucciones para asistentes de IA).
+1. En Runly abre tu módulo en el **Constructor de módulos** y usa **Modo desarrollador > Descargar ZIP con guía**. El ZIP trae `GUIA_DESARROLLO_RUNLY.md` (personalizada para tu módulo), `AGENTS.md` (instrucciones para asistentes de IA) y la carpeta `docs/` con esta documentación para leerla sin internet.
 2. Agrega tus pantallas en `components/` y una vista `views/<nombre>.custom.js` (ver *Pantallas React*).
 3. Aumenta la versión en `module.manifest.js`, comprime la carpeta y ábrela con **Subir actualización**: Runly la revisa y muestra una vista previa **sin aplicar nada**.
 4. Da clic en **Subir módulo** (o **Aplicar actualización**). Si es la primera vez, instálalo desde el **Catálogo de módulos**.

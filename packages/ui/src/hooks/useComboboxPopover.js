@@ -112,6 +112,30 @@ export function useComboboxPopover({ dropHeight = 260, minWidth = 220 } = {}) {
     [open, dropHeight, minWidth],
   );
 
+  // Keep the fixed-position panel glued to its trigger while an ancestor
+  // (page, Dialog body, Sheet) scrolls or the window resizes. Scrolls inside
+  // the panel itself are ignored.
+  useEffect(() => {
+    if (!open) return undefined;
+    let frame = 0;
+    function reposition(e) {
+      if (e?.type === "scroll" && dropdownRef.current?.contains(e.target)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (containerRef.current) {
+          setDropdownStyle(computeDropdownStyle(containerRef.current, dropHeight, minWidth, true));
+        }
+      });
+    }
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [open, dropHeight, minWidth]);
+
   const close = useCallback(() => {
     setOpen(false);
     setSearch("");

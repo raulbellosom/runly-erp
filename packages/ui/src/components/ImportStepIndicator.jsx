@@ -5,8 +5,49 @@ import { cn } from "../lib/utils.js";
 // manual CSV/XLSX importers). Renders as a narrow vertical rail on desktop
 // so wizard chrome doesn't eat width from the step's own content (a review
 // table), and collapses to a single compact horizontal strip on mobile.
-export function ImportStepIndicator({ steps, current, className }) {
+// `layout="bar"`: a horizontal stepper with connectors, for wizards that live
+// in a dialog where the step content sits below instead of beside the steps.
+export function ImportStepIndicator({ steps, current, className, layout = "rail" }) {
   const currentIdx = steps.findIndex((s) => s.key === current);
+
+  if (layout === "bar") {
+    return (
+      <ol className={cn("flex items-center gap-2", className)}>
+        {steps.map((step, idx) => {
+          const state = idx < currentIdx ? "done" : idx === currentIdx ? "active" : "pending";
+          return (
+            <li key={step.key} className={cn("flex min-w-0 items-center gap-2", idx < steps.length - 1 && "flex-1")}>
+              <span
+                className={cn(
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors",
+                  state === "active" && "bg-(--brand-primary) text-(--brand-primary-foreground) ring-4 ring-(--brand-soft)",
+                  state === "done" && "bg-(--brand-soft) text-(--brand-primary)",
+                  state === "pending" && "border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
+                )}
+              >
+                {state === "done" ? <Check size={14} strokeWidth={2.5} /> : idx + 1}
+              </span>
+              <span
+                className={cn(
+                  "truncate text-sm",
+                  state === "active" ? "font-semibold text-[hsl(var(--foreground))]" : "text-[hsl(var(--muted-foreground))]",
+                  state !== "active" && "hidden sm:inline",
+                )}
+              >
+                {step.label}
+              </span>
+              {idx < steps.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className={cn("mx-1 h-px min-w-4 flex-1", idx < currentIdx ? "bg-(--brand-primary)" : "bg-[hsl(var(--border))]")}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
 
   return (
     <div

@@ -104,7 +104,7 @@ Este paquete es tu módulo tal como lo generó el Constructor de módulos de Run
 
 > **Modo visual y modo desarrollador.** Si solo **agregas** pantallas React (archivos en \`components/\`, vistas \`views/<nombre>.custom.js\` y sus entradas de menú en el manifiesto), el Constructor las guarda y sigues editando visualmente: se incluyen en cada publicación. Si cambias cualquier otro archivo (por ejemplo \`api/\`, \`models/\` o archivos generados), el proyecto pasa a **modo desarrollador** y el Constructor deja de publicarlo para no borrar tu código; desde el editor puedes volver al modo visual después. No borres \`.module-definition.json\`: con él Runly distingue tus cambios.
 
-**Documentación en línea (siempre actualizada):** ${DEVELOPER_DOCS_URL} — flujo con ZIP, pantallas React, API de los módulos, relaciones, enlaces públicos, campos y librerías. Para asistentes de IA: ${LLMS_TXT_URL} (índice) y cada página en Markdown (agrega \`.md\` a su URL). Si usas un asistente de código, dale también el archivo \`AGENTS.md\` de este paquete.
+**Documentación completa en este paquete:** la carpeta \`docs/\` (empieza por \`docs/index.md\`) trae la referencia de desarrolladores — flujo con ZIP, pantallas React, API de los módulos, relaciones, enlaces públicos, campos y librerías — vigente cuando descargaste el ZIP. Funciona sin internet y es lo primero que debe leer un asistente de IA, junto con \`AGENTS.md\`. La versión en línea más reciente está en ${DEVELOPER_DOCS_URL} (índice para IA: ${LLMS_TXT_URL}).
 
 ## 1. Estructura del paquete
 
@@ -118,6 +118,7 @@ components/               (tú lo creas) Tus componentes React
 .module-definition.json   Definición usada por el Constructor
 GUIA_DESARROLLO_RUNLY.md  Esta guía
 AGENTS.md                 Instrucciones para asistentes de IA
+docs/                     Documentación de desarrolladores (Markdown, sin internet)
 ${fence}
 
 ## 2. Crear una pantalla React paso a paso
@@ -224,7 +225,7 @@ ${endpointTable(config)}
 
 - Las listas responden \`{ data: [...], pagination: { page, pageSize, total } }\`; un registro, \`{ data: {...} }\`; los errores, \`{ error: "mensaje" }\`.
 - Los campos de relación incluyen \`<campo>__label\` con el nombre del registro relacionado (y \`<campo>__url\` si es de otro módulo); las listas aceptan \`?<campo>=<id>\` para filtrar por relaciones del mismo módulo y \`?<campo>=<VALOR>\` para campos de selección.
-- Todas las operaciones respetan los permisos y la empresa activa del usuario. Errores: 400 datos inválidos o relación no válida, 403 sin permiso, 404 no existe, 409 duplicado o en uso. Referencia completa: ${DEVELOPER_DOCS_URL}/api-modulos
+- Todas las operaciones respetan los permisos y la empresa activa del usuario. Errores: 400 datos inválidos o relación no válida, 403 sin permiso, 404 no existe, 409 duplicado o en uso. Referencia completa: \`docs/api-modulos.md\` (en línea: ${DEVELOPER_DOCS_URL}/api-modulos)
 
 ### Datos de tu módulo
 
@@ -245,7 +246,7 @@ fetch(\`\${apiBaseUrl}/relation-targets/vehicle/resolve\`, {
 })
 ${fence}
 
-Tipos: \`contact\`, \`hr_employee\`, \`vehicle\`, \`inventory_item\`, \`project\`, \`task\`, \`calendar_event\`, \`ledger_account\`, \`file\`. Detalles: ${DEVELOPER_DOCS_URL}/relaciones
+Tipos: \`contact\`, \`hr_employee\`, \`vehicle\`, \`inventory_item\`, \`project\`, \`task\`, \`calendar_event\`, \`ledger_account\`, \`file\`. Detalles: \`docs/relaciones.md\` (en línea: ${DEVELOPER_DOCS_URL}/relaciones)
 
 ### Enlaces y páginas públicas
 
@@ -253,7 +254,7 @@ Personas **sin cuenta** en Runly pueden ver un registro o llenar un formulario c
 
 ${publicLinksNote(config)}
 
-En \`api/public.js\` filtra siempre por \`c.get('publicLink').companyId\` (y \`recordId\` si existe), devuelve una lista explícita de campos y valida \`c.get('publicBody')\` con Zod. Receta completa y reglas: ${DEVELOPER_DOCS_URL}/enlaces-publicos
+En \`api/public.js\` filtra siempre por \`c.get('publicLink').companyId\` (y \`recordId\` si existe), devuelve una lista explícita de campos y valida \`c.get('publicBody')\` con Zod. Receta completa y reglas: \`docs/enlaces-publicos.md\` (en línea: ${DEVELOPER_DOCS_URL}/enlaces-publicos)
 
 ## 5. Librerías disponibles
 
@@ -297,7 +298,7 @@ Para que tu pantalla se vea y se comporte como el resto de Runly:
 3. **Revisión**: Runly valida el paquete, lista los cambios de tablas y muestra una vista previa de tus pantallas. Todavía no se aplica nada. Si el módulo no está instalado, la vista previa muestra errores 404 porque su API aún no existe: es normal.
 4. **Aplicar**: clic en **Subir módulo** / **Aplicar actualización**. Runly aplica los cambios de tablas seguros, compila \`components/\` y recarga el módulo.
 5. **Primera vez**: dale **Instalar** en la tarjeta del módulo en el Catálogo de módulos.
-6. Si algo falla, el módulo anterior queda intacto y el mensaje indica en qué etapa falló. Errores frecuentes: ${DEVELOPER_DOCS_URL}/solucion-problemas
+6. Si algo falla, el módulo anterior queda intacto y el mensaje indica en qué etapa falló. Errores frecuentes: \`docs/solucion-problemas.md\` (en línea: ${DEVELOPER_DOCS_URL}/solucion-problemas)
 
 ## 8. Problemas frecuentes
 
@@ -316,21 +317,22 @@ export function generateAgentsFile(config) {
   const slug = moduleSlug(config.key)
   return `# Instrucciones para asistentes de IA — ${config.key}
 
-Este paquete es un módulo de Runly generado por el Constructor de módulos. Antes de cambiar nada, lee \`GUIA_DESARROLLO_RUNLY.md\` (personalizada para este módulo) y la documentación actual:
+Este paquete es un módulo de Runly generado por el Constructor de módulos. Antes de cambiar nada, lee:
 
-- Índice para IA: ${LLMS_TXT_URL}
-- Documentación de desarrolladores: ${DEVELOPER_DOCS_URL} (cada página también en Markdown agregando \`.md\`)
+1. \`GUIA_DESARROLLO_RUNLY.md\`: personalizada para este módulo (endpoints, campos, permisos, librerías).
+2. \`docs/\`: la documentación completa de desarrolladores en Markdown, empezando por \`docs/index.md\`. Está en el paquete, así que no necesitas internet; úsala como referencia principal.
+3. Opcional, si tienes acceso a internet: la versión en línea más reciente en ${DEVELOPER_DOCS_URL} (índice para IA: ${LLMS_TXT_URL}). Si no puedes abrirla, basta con \`docs/\`.
 
 ## Reglas
 
 1. Para mantener el módulo editable en el Constructor, **solo agrega**: archivos en \`components/\` (.js, .jsx, .css, .json, .svg), vistas \`views/<nombre>.custom.js\` de tipo CUSTOM y sus entradas en \`views\` y \`navigation\` de \`module.manifest.js\`. Cambiar cualquier otro archivo pasa el módulo a modo desarrollador.
-2. No edites ni borres \`.module-definition.json\`, \`models/\`, ni los archivos generados de \`api/\`, \`views/\` y \`validators/\` salvo que la persona pida explícitamente trabajar en modo desarrollador.
+2. No edites ni borres \`docs/\` (se ignora al subir el ZIP), \`.module-definition.json\`, \`models/\`, ni los archivos generados de \`api/\`, \`views/\` y \`validators/\` salvo que la persona pida explícitamente trabajar en modo desarrollador.
 3. Componentes en \`.jsx\` (sin TypeScript), runtime JSX automático, hooks con import nombrado (\`import { useState } from 'react'\`, nunca \`React.useState\`). Sin APIs de Node en el navegador.
 4. Registra cada componente en \`components/index.js\` con la clave \`${config.key}:<Componente>\`; la vista CUSTOM usa esa clave en \`schema.component\` y la URL completa \`/app/m/${config.key}/...\` en \`schema.path\`.
 5. Llama a la API con \`fetch(apiBaseUrl + '/${slug}/...', { headers: buildApiHeaders(token, companyId) })\` usando las props del componente (\`token\`, \`companyId\`, \`apiBaseUrl\`). Datos de otros módulos: \`/relation-targets/<tipo>/search\` y \`/resolve\`.
 6. UI con \`@runly/ui\` (PageHeader, SelectField, TextField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton…), nunca \`window.confirm/alert/prompt\` ni controles nativos si existe el componente. Textos en español, sin emojis. Tailwind con tokens del tema (\`hsl(var(--card))\`, \`var(--brand-primary)\`).
 7. Solo usa las librerías listadas en la guía (sección *Librerías disponibles*) con esas versiones.
-8. Páginas para personas sin cuenta: usa enlaces públicos (\`publicResources\` + vista CUSTOM \`public: true\` en \`/p/...\` + \`api/public.js\`), nunca abras rutas de \`api/index.js\` sin sesión. Filtra por \`publicLink.companyId\`/\`recordId\` y expón solo campos explícitos. Ver ${DEVELOPER_DOCS_URL}/enlaces-publicos.
+8. Páginas para personas sin cuenta: usa enlaces públicos (\`publicResources\` + vista CUSTOM \`public: true\` en \`/p/...\` + \`api/public.js\`), nunca abras rutas de \`api/index.js\` sin sesión. Filtra por \`publicLink.companyId\`/\`recordId\` y expón solo campos explícitos. Ver \`docs/enlaces-publicos.md\` (en línea: ${DEVELOPER_DOCS_URL}/enlaces-publicos).
 9. Sube la versión en \`module.manifest.js\` antes de entregar. La persona sube el ZIP en Runly con "Subir actualización": Runly lo valida y muestra una vista previa antes de aplicar.
 `
 }

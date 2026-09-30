@@ -1,9 +1,13 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from './Button.jsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './Select.jsx'
 import { cn } from '../lib/utils.js'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
+// Pagination footer under a table: a quiet line (no band of its own) with the
+// record count, rows-per-page and the pager. The page-size picker and pager
+// only appear when there is more than one page's worth of rows.
 export function PageFooter({
   total = 0,
   pageIndex = 0,
@@ -19,55 +23,46 @@ export function PageFooter({
 }) {
   const from = total === 0 ? 0 : pageIndex * pageSize + 1
   const to = Math.min((pageIndex + 1) * pageSize, total)
+  const showSize = Boolean(onPageSizeChange) && total > Math.min(...pageSizeOptions)
+  const showPager = pageCount > 1
 
   return (
-    <div className={cn('flex items-center justify-between gap-4 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 md:px-6', className)}>
-      <p className="text-xs text-[hsl(var(--muted-foreground))]">
-        {total === 0 ? 'Sin registros' : `${from}–${to} de ${total} registros`}
+    <div className={cn('flex flex-wrap items-center justify-between gap-3 px-1 pt-3 text-xs text-[hsl(var(--muted-foreground))]', className)}>
+      <p className="tabular-nums">
+        {total === 0 ? 'Sin registros' : total <= pageSize ? `${total} ${total === 1 ? 'registro' : 'registros'}` : `${from}–${to} de ${total} registros`}
       </p>
 
-      <div className="flex items-center gap-3">
-        {onPageSizeChange && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">Por página</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-7 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-xs text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-            >
-              {pageSizeOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-        )}
+      {(showSize || showPager) && (
+        <div className="flex items-center gap-4">
+          {showSize && (
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline">Filas por página</span>
+              <Select value={String(pageSize)} onValueChange={(v) => onPageSizeChange(Number(v))}>
+                <SelectTrigger className="h-8 w-18 rounded-lg px-2.5 text-xs" aria-label="Filas por página">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((s) => (
+                    <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-        {pageCount > 1 && (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Página anterior"
-              onClick={onPrevious}
-              disabled={!canPrevious}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="min-w-[4rem] text-center text-xs text-[hsl(var(--muted-foreground))]">
-              {pageIndex + 1} / {pageCount}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Página siguiente"
-              onClick={onNext}
-              disabled={!canNext}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
+          {showPager && (
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="icon-sm" className="h-8 w-8 rounded-lg" aria-label="Página anterior" onClick={onPrevious} disabled={!canPrevious}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-20 text-center tabular-nums">Página {pageIndex + 1} de {pageCount}</span>
+              <Button variant="outline" size="icon-sm" className="h-8 w-8 rounded-lg" aria-label="Página siguiente" onClick={onNext} disabled={!canNext}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
