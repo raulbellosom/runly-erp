@@ -10,10 +10,13 @@ import { CallChatPanel } from "./CallChatPanel";
 import { CallShareDialog } from "./CallShareDialog";
 import { CallInvitePanel } from "./CallInvitePanel";
 import { MiniCallBubble } from "./MiniCallBubble";
+import { RemoteAudio } from "./RemoteAudio";
 import { useCallGuests } from "./hooks/useCallGuests";
 import { useCallEphemeral } from "./hooks/useCallEphemeral";
 import { useCallRecording } from "./hooks/useCallRecording";
 import { useTrackTranscription } from "./hooks/useTrackTranscription";
+import { useScreenWakeLock } from "./hooks/useScreenWakeLock";
+import { useCallAutoRejoin, useNativeCallKeepAlive } from "./hooks/useCallBackgroundKeepAlive";
 import { CallGuestSheet } from "./CallGuestSheet";
 import { CallRoomLayout } from "./CallRoomLayout";
 import { useNativeScreenShare } from './useNativeScreenShare';
@@ -41,8 +44,10 @@ function writeChatCollapsedPref(collapsed) {
   }
 }
 
-export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, minimized = false, onMinimize, onRestore, guestPanelNonce = 0 }) {
+export function CallRoom({ session, onLeave, onUnanswered, onReconnect, isInitiator = false, minimized = false, onMinimize, onRestore, guestPanelNonce = 0 }) {
   const nativeScreen = useNativeScreenShare(session.call.id);
+  // Held for the whole call (full or minimized) so the device doesn't auto-lock.
+  useScreenWakeLock(true);
   const room = useMemo(() => new Room({ adaptiveStream: true, dynacast: true }), [session.callId]);
   const [renderVersion, setRenderVersion] = useState(0);
   const [connectionState, setConnectionState] = useState("connecting");
@@ -52,6 +57,15 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
   const mediaInitRef = useRef(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(session.call.kind === "VIDEO");
+  // What the user had on — restored when the call rejoins after a drop instead
+  // of forcing mic/camera back on.
+  const mediaPrefsRef = useRef({ mic: true, camera: session.call.kind === "VIDEO" });
+  mediaPrefsRef.current = { mic: micEnabled, camera: cameraEnabled };
+  // True after an unexpected LiveKit disconnect (device locked/asleep, network
+  // lost) until the rejoin connects again.
+  const [dropped, setDropped] = useState(false);
+  const droppedRef = useRef(false);
+  droppedRef.current = dropped;
   const [browserScreenEnabled, setScreenEnabled] = useState(false);
   const screenEnabled = nativeScreen.supported ? nativeScreen.active : browserScreenEnabled;
   const [layoutMode, setLayoutMode] = useState("focus");
@@ -158,14 +172,17 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
     const handleDisconnected = () => {
       setConnectionState("disconnected");
       setEngineReady(false);
-      playCallEndSound();
+      setDropped(true);
     };
     // The RTC engine (PeerConnection) — not signaling. Publishing a track or
     // data before this is Connected throws "engine not connected within
     // timeout". Every publish path is gated on `engineReady`.
     const handleConnStateChanged = (state) => {
       setEngineReady(state === ConnectionState.Connected);
-      if (state === ConnectionState.Connected) setConnectionState("connected");
+      if (state === ConnectionState.Connected) {
+        setConnectionState("connected");
+        setDropped(false);
+      }
       else if (state === ConnectionState.Reconnecting || state === ConnectionState.SignalReconnecting) {
         setConnectionState("reconnecting");
       } else if (state === ConnectionState.Connecting) setConnectionState("connecting");
@@ -216,6 +233,7 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         if (room.state === ConnectionState.Connected) {
           setEngineReady(true);
           setConnectionState("connected");
+          setDropped(false);
         }
         await room.startAudio().catch(() => {
           if (!cancelled) setNeedsAudio(true);
@@ -224,7 +242,8 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
       } catch (error) {
         if (cancelled) return;
         setConnectionState("failed");
-        toast.error(error?.message || "No se pudo conectar a la llamada.");
+        // A rejoin attempt that fails keeps retrying via useCallAutoRejoin.
+        if (!droppedRef.current) toast.error(error?.message || "No se pudo conectar a la llamada.");
       }
     }
     connect();
@@ -254,17 +273,22 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
     if (!engineReady || mediaInitRef.current) return;
     mediaInitRef.current = true;
     let cancelled = false;
+    // First connect: mic on + camera for VIDEO calls. After a rejoin: whatever
+    // the user had before the drop.
+    const prefs = mediaPrefsRef.current;
     (async () => {
-      try {
-        await room.localParticipant.setMicrophoneEnabled(true);
-        if (!cancelled) setMicEnabled(true);
-      } catch (error) {
-        if (!cancelled) {
-          setMicEnabled(false);
-          toast.error(error?.message || "No se pudo activar el microfono.");
+      if (prefs.mic) {
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+          if (!cancelled) setMicEnabled(true);
+        } catch (error) {
+          if (!cancelled) {
+            setMicEnabled(false);
+            toast.error(error?.message || "No se pudo activar el microfono.");
+          }
         }
       }
-      if (session.call.kind === "VIDEO") {
+      if (prefs.camera) {
         try {
           await room.localParticipant.setCameraEnabled(true);
           if (!cancelled) {
@@ -281,7 +305,18 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
       if (!cancelled) refresh();
     })();
     return () => { cancelled = true; };
-  }, [engineReady, room, session.call.kind, refresh, refreshCameraCapabilities]);
+  }, [engineReady, room, refresh, refreshCameraCapabilities]);
+
+  useCallAutoRejoin({
+    needsRejoin: dropped && (connectionState === "disconnected" || connectionState === "failed"),
+    connected: connectionState === "connected",
+    rejoin: onReconnect,
+  });
+  useNativeCallKeepAlive({
+    video: session.call.kind === "VIDEO" || cameraEnabled,
+    micLive: micEnabled && engineReady,
+    cameraLive: cameraEnabled && engineReady,
+  });
 
   useEffect(() => {
     const started = new Date(session.call.startedAt ?? session.call.createdAt ?? Date.now()).getTime();
@@ -532,8 +567,15 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
       ? <CallChatPanel conversationId={conversationId} onClose={handleChatClose} />
       : null;
 
+  // Kept outside the minimized/full branches so audio survives minimizing.
+  const remoteAudio = remoteParticipants.map((participant) => (
+    <RemoteAudio key={`audio-${participant.identity}`} participant={participant} />
+  ));
+
   if (minimized) {
     return (
+      <>
+      {remoteAudio}
       <MiniCallBubble
         remoteParticipants={remoteParticipants}
         localParticipant={room.localParticipant}
@@ -543,11 +585,13 @@ export function CallRoom({ session, onLeave, onUnanswered, isInitiator = false, 
         onRestore={onRestore}
         onHangUp={handleLeave}
       />
+      </>
     );
   }
 
   return (
     <>
+    {remoteAudio}
     <CallRoomLayout
       view={{
         session,

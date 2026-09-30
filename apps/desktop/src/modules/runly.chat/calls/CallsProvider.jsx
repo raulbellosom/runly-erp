@@ -448,6 +448,23 @@ export function CallsProvider({ children }) {
     }
   }, [token, userProfile?.id]);
 
+  // Fresh LiveKit token for the same call after the connection dropped (device
+  // locked/asleep). Same call id -> CallRoom stays mounted and reconnects.
+  const rejoinActive = useCallback(async () => {
+    const callId = activeRef.current?.call?.id;
+    if (!callId) return;
+    try {
+      if (!connectWithResponse(await runly.calls.join(callId, token))) throw new Error("REJOIN_EMPTY");
+    } catch (error) {
+      // Ended or we were marked LEFT meanwhile: nothing to rejoin.
+      if (error?.status === 409 || error?.status === 404 || error?.status === 403) {
+        finishLocalCall(callId);
+        return;
+      }
+      throw error;
+    }
+  }, [token, connectWithResponse, finishLocalCall]);
+
   const endUnansweredCall = useCallback(() => {
     leaveActive({ unanswered: true });
   }, [leaveActive]);
@@ -520,6 +537,7 @@ export function CallsProvider({ children }) {
             session={activeSession}
             onLeave={leaveActive}
             onUnanswered={endUnansweredCall}
+            onReconnect={rejoinActive}
             isInitiator={activeSession.call.initiatedByUserId === userProfile?.id}
             minimized={minimized}
             onMinimize={minimizeCall}

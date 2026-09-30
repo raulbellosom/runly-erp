@@ -170,6 +170,25 @@ class ScreenSharePlugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun status(invoke: Invoke) { invoke.resolve(snapshot()) }
 
+  // Idempotent: called again once mic/camera are granted so the foreground
+  // service picks up the microphone/camera types.
+  @Command
+  fun callKeepAliveStart(invoke: Invoke) {
+    val video = invoke.getArgs().optBoolean("video", false)
+    try {
+      CallKeepAliveService.start(activity, video)
+      invoke.resolve()
+    } catch (error: Exception) {
+      invoke.reject("No se pudo mantener la llamada activa en segundo plano.")
+    }
+  }
+
+  @Command
+  fun callKeepAliveStop(invoke: Invoke) {
+    CallKeepAliveService.stop(activity)
+    invoke.resolve()
+  }
+
   companion object {
     private var instance: ScreenSharePlugin? = null
     fun stopCurrent() {

@@ -83,6 +83,18 @@ export const native = {
     async stop() { if (native.supports('screen-share')) await invoke('host_screen_stop') },
     async status() { return native.supports('screen-share') ? invoke('host_screen_status') : { active: false } },
   },
+  // Android foreground service that keeps an in-progress call running with the
+  // screen locked. No-op on hosts without the capability (web, desktop, iOS).
+  callKeepAlive: {
+    async start({ video = false } = {}) {
+      await getHostInfo()
+      if (native.supports('call-keepalive')) await invoke('host_call_keepalive_start', { video: Boolean(video) })
+    },
+    async stop() {
+      await getHostInfo()
+      if (native.supports('call-keepalive')) await invoke('host_call_keepalive_stop')
+    },
+  },
   haptics: {
     async impact(style = 'light') {
       await native.requireCapability('haptics')

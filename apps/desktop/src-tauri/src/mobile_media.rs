@@ -92,6 +92,22 @@ pub async fn host_screen_status(window: WebviewWindow, app: AppHandle) -> Result
 }
 
 #[tauri::command]
+pub async fn host_call_keepalive_start(
+    window: WebviewWindow,
+    app: AppHandle,
+    video: bool,
+) -> Result<Value, String> {
+    super::mobile_host::check_remote(&window)?;
+    run(app, "callKeepAliveStart", json!({ "video": video })).await
+}
+
+#[tauri::command]
+pub async fn host_call_keepalive_stop(window: WebviewWindow, app: AppHandle) -> Result<Value, String> {
+    super::mobile_host::check_remote(&window)?;
+    run(app, "callKeepAliveStop", json!({})).await
+}
+
+#[tauri::command]
 pub async fn host_fcm_token(window: WebviewWindow, app: AppHandle) -> Result<Value, String> {
     super::mobile_host::check_remote(&window)?;
     run(app, "currentToken", json!({})).await

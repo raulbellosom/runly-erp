@@ -174,7 +174,12 @@ export function useCallSynchronization({
 
   useEffect(() => {
     if (!activeCallId || !token) return undefined;
-    const leaveOnPageHide = () => leaveCallOnPageHide(activeCallId, token);
+    // persisted = the page is only being suspended (bfcache / mobile background)
+    // and may resume; leaving then would block the automatic rejoin.
+    const leaveOnPageHide = (event) => {
+      if (event?.persisted) return;
+      leaveCallOnPageHide(activeCallId, token);
+    };
     window.addEventListener("pagehide", leaveOnPageHide);
     return () => window.removeEventListener("pagehide", leaveOnPageHide);
   }, [activeCallId, token]);

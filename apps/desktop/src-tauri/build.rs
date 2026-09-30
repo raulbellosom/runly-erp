@@ -64,6 +64,8 @@ fn main() {
             "host_notification_show",
             "host_screen_stop",
             "host_screen_status",
+            "host_call_keepalive_start",
+            "host_call_keepalive_stop",
             "host_fcm_token",
         ]),
     ))

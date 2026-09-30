@@ -5,6 +5,7 @@ import { Mic, MicOff, Camera, CameraOff, MonitorUp, PhoneOff, MessageSquare, Han
 import { GuestRoomChat } from "./GuestRoomChat";
 import { useGuestChatUpload } from "./useGuestChatUpload";
 import { useCallEphemeral } from "../hooks/useCallEphemeral";
+import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
 import { CallReactionsOverlay } from "../CallReactionsOverlay";
 import { CallReactionButton } from "../CallReactionButton";
 import { RecordingBanner } from "../RecordingBanner";
@@ -35,6 +36,7 @@ export function GuestCallRoom({
   // so chat replaces the video view instead (matches CallRoom.jsx's own
   // mobile breakpoint for the member side).
   const isMobile = useIsMobile(1024);
+  useScreenWakeLock(true);
   const { uploadFile } = useGuestChatUpload(presignAttachment);
   const room = useMemo(() => new Room({ adaptiveStream: true, dynacast: true }), []);
   const [, force] = useState(0);

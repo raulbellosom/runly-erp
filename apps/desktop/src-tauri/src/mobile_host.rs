@@ -171,6 +171,7 @@ pub fn host_info(window: WebviewWindow) -> Result<serde_json::Value, String> {
     if cfg!(target_os = "android") {
         capabilities.push("notification-actions");
         capabilities.push("screen-share");
+        capabilities.push("call-keepalive");
     }
     Ok(serde_json::json!({
         "platform": std::env::consts::OS, "nativeHostVersion": VERSION,

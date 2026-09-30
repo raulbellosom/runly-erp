@@ -49,6 +49,16 @@ description = "Read Android screen sharing state without credentials."
 commands.allow = ["host_screen_status"]
 
 [[permission]]
+identifier = "allow-host-call-keepalive-start"
+description = "Start the Android foreground service that keeps an active call alive with the screen locked."
+commands.allow = ["host_call_keepalive_start"]
+
+[[permission]]
+identifier = "allow-host-call-keepalive-stop"
+description = "Stop the Android active-call foreground service."
+commands.allow = ["host_call_keepalive_stop"]
+
+[[permission]]
 identifier = "allow-host-confirm-origin"
 description = "Persist and navigate to a server origin that already passed preflight."
 commands.allow = ["host_confirm_origin"]

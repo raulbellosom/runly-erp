@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Button } from "@runly/ui";
 import {
   Camera,
@@ -39,22 +39,6 @@ function formatDuration(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function RemoteAudio({ participant }) {
-  const audioRef = useRef(null);
-  const publication = participant?.getTrackPublication?.(Track.Source.Microphone);
-  const track = publication?.track;
-
-  useEffect(() => {
-    const element = audioRef.current;
-    if (!track || !element) return undefined;
-    track.attach(element);
-    return () => track.detach(element);
-  }, [track]);
-
-  // react-doctor-disable-next-line media-has-caption no-autoplay-without-muted -- This is live call audio after explicit acceptance; muting it would break the call.
-  return <audio ref={audioRef} autoPlay />;
 }
 
 function OutgoingCallTone({ active }) {
@@ -270,10 +254,6 @@ export function CallRoomLayout({ view, actions, chat }) {
         )}
           </>
         )}
-        {remoteParticipants.map((participant) => (
-          <RemoteAudio key={`audio-${participant.identity}`} participant={participant} />
-        ))}
-
         {invitePanel && !mobileChatOpen && !screenShareEntry && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-end justify-center p-4 sm:items-center">
             <div className="pointer-events-auto w-full max-w-sm">{invitePanel}</div>
