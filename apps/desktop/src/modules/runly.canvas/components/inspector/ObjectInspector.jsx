@@ -16,7 +16,7 @@ function GeometryFields({ object, onPatch }) {
   const b = boxOf(object), linear = isLinear(object), fixedSize = object.type === 'hotspot'
   // Width/height edits keep the visual center where it is, like design tools.
   const setSize = (key, value) => {
-    if (linear) return onPatch({ geometry: { [key]: value } })
+    if (linear) return onPatch({ geometry: { [key === 'width' ? 'x2' : 'y2']: value } })
     const next = { ...b, [key]: Math.max(4, value) }
     const center = centerOf(b)
     onPatch({ transform: { x: center.x - next.width / 2, y: center.y - next.height / 2 }, geometry: { width: next.width, height: next.height } })

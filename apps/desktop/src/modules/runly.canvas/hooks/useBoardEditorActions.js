@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { defaultBox, defaultStyle, toolToType } from '../lib/objectFactory.js'
+import { buildObjectData, defaultBox } from '../lib/objectFactory.js'
 import { buildOperations, createHistory, snapshot } from '../lib/history.js'
 import { useCreateHotspot, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
@@ -92,16 +92,10 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     if (!layer) return toast.error(tool === 'hotspot' ? 'Esta página no tiene capa de hotspots.' : 'No hay una capa de dibujo disponible.')
     if (layer.locked) return toast.error(`La capa «${layer.name}» está bloqueada.`)
     if (layer.id !== layerId) setLayerId(layer.id)
-    const { type, properties } = toolToType(tool)
-    const geometryBox = box ?? defaultBox(tool, point)
+    const data = buildObjectData(tool, box ?? defaultBox(tool, point)), type = data.type
     setTool('select')
     try {
-      const [created] = await createRows([{
-        pageId, layerId: layer.id, type, position: topPosition(layer.id),
-        transform: { x: geometryBox.x, y: geometryBox.y, rotation: 0, scaleX: 1, scaleY: 1 },
-        geometry: { width: geometryBox.width, height: geometryBox.height },
-        style: defaultStyle(tool), properties: tool === 'text' ? { text: 'Texto' } : properties,
-      }], 'Crear')
+      const [created] = await createRows([{ ...data, pageId, layerId: layer.id, position: topPosition(layer.id) }], 'Crear')
       if (!created) return
       if (type === 'hotspot') {
         openDialog({ kind: 'hotspot', id: created.id })

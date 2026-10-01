@@ -1,7 +1,8 @@
 // Pure geometry for Canvas objects. An object is a box (transform.x/y +
 // geometry.width/height) rotated `transform.rotation` degrees around its
-// center; lines and arrows are a segment from (x, y) to (x + width, y + height)
-// and never rotate (their endpoints carry the direction).
+// center; lines and arrows are a segment from (x, y) to (x + x2, y + y2) —
+// the API stores their signed end offset as geometry.x2/y2 and rejects
+// negative width/height — and never rotate (the endpoints carry direction).
 
 export const MIN_SIZE = 4
 export const ROTATE_HANDLE_OFFSET = 28
@@ -16,7 +17,15 @@ const num = (value, fallback = 0) => { const n = Number(value); return Number.is
 
 export function boxOf(object) {
   const t = object.transform ?? {}, g = object.geometry ?? {}
-  return { x: num(t.x), y: num(t.y), width: num(g.width, 120), height: num(g.height, 80), rotation: isLinear(object) ? 0 : num(t.rotation) }
+  if (isLinear(object)) return { x: num(t.x), y: num(t.y), width: num(g.x2 ?? g.width), height: num(g.y2 ?? g.height), rotation: 0 }
+  return { x: num(t.x), y: num(t.y), width: num(g.width, 120), height: num(g.height, 80), rotation: num(t.rotation) }
+}
+
+// Persisted geometry for a box, in the shape the API validates per type.
+export function geometryFromBox(type, box, previous = {}) {
+  const { width: _w, height: _h, x2: _x2, y2: _y2, ...rest } = previous
+  if (LINEAR.has(type)) return { ...rest, x2: box.width, y2: box.height }
+  return { ...rest, width: Math.max(Math.abs(box.width), MIN_SIZE), height: Math.max(Math.abs(box.height), MIN_SIZE) }
 }
 
 // Axis-aligned bounds in world space (rotation included).
@@ -127,7 +136,7 @@ export function withBox(object, box) {
   return {
     ...object,
     transform: { ...object.transform, x: box.x, y: box.y },
-    geometry: { ...object.geometry, width: box.width, height: box.height },
+    geometry: geometryFromBox(object.type, box, object.geometry),
   }
 }
 

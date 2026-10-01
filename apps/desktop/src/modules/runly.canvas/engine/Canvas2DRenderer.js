@@ -111,7 +111,7 @@ export class Canvas2DRenderer {
     switch (object.type) {
       case 'hotspot': this.drawHotspot(ctx, object, w, h, stroke, zoom); break
       case 'ellipse': ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke); break
-      case 'polygon': this.polygonPath(ctx, object.properties?.shape, x, y, w, h); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke); break
+      case 'polygon': this.polygonPath(ctx, object, x, y, w, h); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke); break
       case 'text': this.drawText(ctx, object, x, y, w); break
       case 'image': this.drawImage(ctx, object, x, y, w, h, images); break
       default: ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(Number(style.radius ?? 8), w / 2, h / 2)); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke)
@@ -119,10 +119,19 @@ export class Canvas2DRenderer {
     ctx.restore()
   }
 
-  polygonPath(ctx, shape, x, y, w, h) {
+  // Points are box-relative (0..1); older rows without points fall back to
+  // the named shape.
+  polygonPath(ctx, object, x, y, w, h) {
+    const points = Array.isArray(object.geometry?.points) && object.geometry.points.length > 2
+      ? object.geometry.points
+      : object.properties?.shape === 'diamond'
+        ? [{ x: 0.5, y: 0 }, { x: 1, y: 0.5 }, { x: 0.5, y: 1 }, { x: 0, y: 0.5 }]
+        : [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
     ctx.beginPath()
-    if (shape === 'diamond') { ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h / 2); ctx.lineTo(x + w / 2, y + h); ctx.lineTo(x, y + h / 2) }
-    else { ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h) }
+    points.forEach((point, index) => {
+      const px = x + Number(point.x) * w, py = y + Number(point.y) * h
+      if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+    })
     ctx.closePath()
   }
 
