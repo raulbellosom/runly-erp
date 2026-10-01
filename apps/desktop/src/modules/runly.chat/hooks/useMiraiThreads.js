@@ -40,7 +40,17 @@ export function useMiraiThreads({ enabled = true } = {}) {
 
   const create = useMutation({
     mutationFn: async () => (await runly.chat.mirai.createThread(token))?.data,
-    onSuccess: (thread) => { if (thread?.id) setActiveId(thread.id); refresh(); },
+    onSuccess: (thread) => {
+      if (!thread?.id) return;
+      // Put the new thread in the cached list before activating it; otherwise
+      // the panel falls back to the previous thread until the refetch lands.
+      qc.setQueryData(KEY, (old) => [
+        { id: thread.id, title: thread.title, lastMessageAt: new Date().toISOString(), preview: "" },
+        ...(old ?? []).filter((t) => t.id !== thread.id),
+      ]);
+      setActiveId(thread.id);
+      refresh();
+    },
   });
   const rename = useMutation({
     mutationFn: ({ id, title }) => runly.chat.mirai.renameThread(id, title, token),
