@@ -161,6 +161,7 @@ everything goes through the global MirAI sidebar and the user's MirAI conversati
 | runly.ledger | `routes/ledger/mirai-capabilities.js` | accounts, transactions, summaries; transaction actions; statement import from a chat attachment |
 | runly.hr | `routes/hr/mirai-capabilities.js` | employees and headcount, same field restrictions as the HR routes |
 | runly.fleet | `routes/fleet/mirai-capabilities.js` | vehicles, drivers, expirations, public vehicle specs |
+| runly.canvas | `routes/canvas/mirai-capabilities.js` | board types guide, boards search, exact board summary (elements per page, hotspots per status, links), hotspot search with linked records; board create, hotspot update (broadcasts `canvas.changed`). Drawing/moving shapes not exposed |
 
 Not covered yet: runly.files, runly.documents, runly.pos, runly.website,
 runly.growth, and RME3 custom modules (they keep `moduleContext.ai`).

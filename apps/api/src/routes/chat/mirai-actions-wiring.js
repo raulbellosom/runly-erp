@@ -22,6 +22,7 @@ import { createNotesMiraiCapabilities } from "../notes/mirai-capabilities.js";
 import { createHrMiraiCapabilities } from "../hr/mirai-capabilities.js";
 import { createFleetMiraiCapabilities } from "../fleet/mirai-capabilities.js";
 import { createLedgerMiraiCapabilities } from "../ledger/mirai-capabilities.js";
+import { createCanvasMiraiCapabilities } from "../canvas/mirai-capabilities.js";
 import { createChatAttachmentAccess } from "./chat-attachment-access.js";
 
 function createActionNotePoster({ prisma, broadcaster }) {
@@ -85,6 +86,7 @@ export function createMiraiActionsStack({ prisma, broadcaster = null, notificati
     createHrMiraiCapabilities({ prisma }),
     createFleetMiraiCapabilities({ prisma }),
     createLedgerMiraiCapabilities({ prisma, attachments }),
+    createCanvasMiraiCapabilities({ prisma, broadcaster }),
   ];
   const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
   const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext, capabilities });

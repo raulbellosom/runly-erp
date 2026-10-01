@@ -17,6 +17,7 @@ import { useBoard, useCanvasImages, useCanvasObjects, useEntityLinks } from '../
 import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
+import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
 
 const HINTS = { text: 'Toca el lienzo para escribir un texto', hotspot: 'Toca el lienzo para colocar un hotspot' }
 const hintFor = (tool) => HINTS[tool] ?? (SHAPES[tool] ? `Arrastra para dibujar: ${SHAPES[tool].label.toLowerCase()} · Shift mantiene proporción` : null)
@@ -55,6 +56,8 @@ export default function BoardEditor() {
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId)
   const { presence } = useCanvasRealtime(boardId)
+  // Lets MirAI answer about "this Board" without the user naming it.
+  useMiraiRecordContext({ recordType: 'board', recordId: board.data?.id, label: board.data?.name })
 
   const layerOrder = useMemo(() => new Map(layers.map((layer, index) => [layer.id, index])), [layers])
   const hiddenLayerIds = useMemo(() => new Set(layers.filter((layer) => !layer.visible).map((layer) => layer.id)), [layers])
