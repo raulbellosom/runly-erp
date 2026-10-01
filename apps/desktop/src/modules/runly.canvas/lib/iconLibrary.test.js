@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import { isKnownIcon, allIconNames } from '../engine/icons.js'
+import { CURATED_ICONS, ICON_CATEGORIES, searchCurated } from './iconLibrary.js'
+
+describe('Canvas hotspot icon library', () => {
+  it('only references icons that exist in the installed lucide-react', () => {
+    const missing = ICON_CATEGORIES.flatMap((category) => category.items).filter((item) => !isKnownIcon(item.name))
+    assert.deepEqual(missing.map((item) => item.name), [])
+    assert.ok(CURATED_ICONS.length >= 200)
+    assert.ok(allIconNames().length > 1500)
+  })
+
+  it('searches Spanish labels and keywords ignoring accents', () => {
+    assert.ok(searchCurated('extintor').some((item) => item.name === 'fire-extinguisher'))
+    assert.ok(searchCurated('cámara').some((item) => item.name === 'cctv'))
+    assert.ok(searchCurated('', 'Vehiculos y transporte').some((item) => item.name === 'truck'))
+  })
+})

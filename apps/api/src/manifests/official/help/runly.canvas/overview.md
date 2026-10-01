@@ -29,7 +29,7 @@ Puedes ocultar una capa (icono de ojo) o bloquearla (candado) para no moverla po
 
 ### Hotspots y registros vinculados
 
-Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se abre con doble clic, con Enter o con el boton del inspector. En la ficha puedes poner titulo, descripcion, estado (Activo, En revision, Resuelto, Inactivo), color, **vincular registros de Runly** y **adjuntar archivos** (fotos, fichas tecnicas, manuales). Cualquier forma tambien puede tener registros vinculados desde el inspector; los elementos vinculados muestran un pequeno distintivo en el lienzo.
+Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se abre con doble clic, con Enter o con el boton del inspector. En la ficha puedes poner titulo, descripcion, estado (Activo, En revision, Resuelto, Inactivo), color, **icono del pin** (mas de 200 iconos recomendados por categoria —seguridad, electricidad, agua, redes, oficina, almacen, mantenimiento, vehiculos, personas, lugares y estados— con busqueda en espanol, y la libreria completa de mas de 1800 iconos), **vincular registros de Runly** y **adjuntar archivos** (fotos, fichas tecnicas, manuales). Cualquier forma tambien puede tener registros vinculados desde el inspector; los elementos vinculados muestran un pequeno distintivo en el lienzo.
 
 ### Imagenes y PDF
 
@@ -46,6 +46,7 @@ Con la pestana de MirAI abierta puedes pedirle, por ejemplo:
 - "Busca el hotspot del tablero electrico"
 - "Crea un Board de tipo plano llamado Bodega norte"
 - "Marca como resuelto el hotspot Fuga en bano"
+- "Ponle el icono de extintor al hotspot Pasillo norte"
 
 Si tienes un Board abierto, MirAI sabe cual es: puedes preguntar por "este Board" sin repetir su nombre. Para crear o cambiar algo te muestra una tarjeta para confirmar antes de guardar.
 

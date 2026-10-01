@@ -1,5 +1,6 @@
 import { boxOf, centerOf, handlesOf, hitObject, isLinear, objectBounds, rotatePoint } from './geometry.js'
 import { readCanvasTheme } from './theme.js'
+import { drawIconNode, getIconNode } from './icons.js'
 import { TEXT_LINE_HEIGHT, textFont, wrapLines } from './text.js'
 import { screenToWorld, worldToScreen } from './viewport.js'
 
@@ -165,11 +166,19 @@ export class Canvas2DRenderer {
   }
 
   drawHotspot(ctx, object, w, h, color, zoom) {
-    const r = Math.min(w, h) / 2
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
-    ctx.globalAlpha *= 0.18; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha /= 0.18
-    ctx.lineWidth = 2 / Math.max(zoom, 0.5); ctx.strokeStyle = color; ctx.stroke()
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.38, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
+    const r = Math.min(w, h) / 2, iconNode = getIconNode(object.hotspot?.icon)
+    if (iconNode) {
+      // Solid pin with a white glyph; a thin light ring keeps it readable on
+      // dark plans and photos.
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
+      ctx.lineWidth = 2 / Math.max(zoom, 0.5); ctx.strokeStyle = '#ffffff'; ctx.stroke()
+      drawIconNode(ctx, iconNode, 0, 0, r * 1.15, '#ffffff', 2.25)
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.globalAlpha *= 0.18; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha /= 0.18
+      ctx.lineWidth = 2 / Math.max(zoom, 0.5); ctx.strokeStyle = color; ctx.stroke()
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.38, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
+    }
     const title = object.hotspot?.title
     if (title && zoom >= 0.5) {
       const size = 12 / zoom

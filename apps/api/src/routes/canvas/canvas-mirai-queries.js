@@ -143,7 +143,7 @@ export function createCanvasMiraiQueries({ prisma }) {
       return {
         total,
         hotspots: rows.map((row) => ({
-          hotspotId: row.id, titulo: row.title, descripcion: clip(row.description), estado: HOTSPOT_STATUS[row.status] ?? row.status,
+          hotspotId: row.id, titulo: row.title, descripcion: clip(row.description), estado: HOTSPOT_STATUS[row.status] ?? row.status, icono: row.icon ?? null,
           boardId: row.board.id, board: row.board.name, pagina: row.object?.page?.name ?? null, link: boardLink(row.board.id),
           registros: links.filter((link) => link.targetId === row.id).map((link) => link.metadata?.resolved?.title ?? link.entityType),
         })),

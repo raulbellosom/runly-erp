@@ -3,7 +3,8 @@ import { ArrowDownToLine, ArrowUpToLine, Copy, Lock, MapPin, Pencil, Trash2 } fr
 import { boxOf, canRotate, centerOf, isLinear } from '../../engine/geometry.js'
 import { CANVAS_COLORS, objectLabel } from '../../lib/objectFactory.js'
 import { measureTextHeight } from '../../engine/text.js'
-import { Choice, ColorSwatches, NumberInput, Section } from './fields.jsx'
+import { Choice, ColorSwatches, FieldLabel, NumberInput, Section } from './fields.jsx'
+import { HotspotIconPicker } from '../HotspotIconPicker.jsx'
 
 const STROKE_WIDTHS = [0, 1, 2, 4, 8].map((value) => ({ value, label: value === 0 ? '—' : String(value), ariaLabel: value === 0 ? 'Sin borde' : `${value} px` }))
 const DASHES = [{ value: 'solid', label: '———', ariaLabel: 'Continua' }, { value: 'dashed', label: '– – –', ariaLabel: 'Discontinua' }, { value: 'dotted', label: '· · ·', ariaLabel: 'Punteada' }]
@@ -41,14 +42,18 @@ function GeometryFields({ object, onPatch }) {
 
 export const hotspotColor = (object) => object.hotspot?.color || object.style?.stroke || '#ef4444'
 
-function StyleFields({ object, onPatch, onHotspotColor }) {
+function StyleFields({ object, onPatch, onHotspotChange }) {
   const style = object.style ?? {}, setStyle = (patch) => onPatch({ style: patch })
   if (object.type === 'hotspot') {
     // The pin color lives on the hotspot record (same field as its sheet),
     // not in the shape style, so both places always show the same color.
     return (
       <Section title="Apariencia">
-        <ColorSwatches label="Color del pin" value={hotspotColor(object)} colors={CANVAS_COLORS} onChange={onHotspotColor} />
+        <div>
+          <FieldLabel>Icono</FieldLabel>
+          <HotspotIconPicker value={object.hotspot?.icon ?? null} color={hotspotColor(object)} onChange={(icon) => onHotspotChange({ icon })} />
+        </div>
+        <ColorSwatches label="Color del pin" value={hotspotColor(object)} colors={CANVAS_COLORS} onChange={(color) => onHotspotChange({ color })} />
         <Choice label="Opacidad" value={Number(style.opacity ?? 1)} options={OPACITY} onChange={(opacity) => setStyle({ opacity })} />
       </Section>
     )
@@ -99,7 +104,7 @@ function StyleFields({ object, onPatch, onHotspotColor }) {
   )
 }
 
-export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotColor, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
+export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-2 px-0.5">
@@ -122,7 +127,7 @@ export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotC
       ) : (
         <>
           <GeometryFields object={object} onPatch={onPatch} />
-          <StyleFields object={object} onPatch={onPatch} onHotspotColor={onHotspotColor} />
+          <StyleFields object={object} onPatch={onPatch} onHotspotChange={onHotspotChange} />
           <Section title="Organizar">
             <div className="grid grid-cols-3 gap-1.5">
               <Button type="button" variant="outline" size="sm" className="h-11 flex-col gap-0.5 px-1 text-[11px] sm:h-12" onClick={onDuplicate}><Copy />Duplicar</Button>

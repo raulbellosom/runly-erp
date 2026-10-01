@@ -156,9 +156,9 @@ export default function BoardEditor() {
       presence={presence}
       actions={{
         patch: actions.patch, remove: actions.remove,
-        hotspotColor: (object, color) => {
+        hotspotChange: (object, data) => {
           if (!object.hotspot) return toast.info('Espera un momento: el hotspot todavía se está guardando.')
-          updateHotspot.mutate({ hotspotId: object.hotspot.id, data: { color } }, { onError: (error) => toast.error(error.message) })
+          updateHotspot.mutate({ hotspotId: object.hotspot.id, data }, { onError: (error) => toast.error(error.message) })
         }, duplicate: actions.duplicate, arrange: actions.arrange,
         openHotspot: (object) => setDialog({ kind: 'hotspot', id: object.id }),
         editText: (object) => setDialog({ kind: 'text', id: object.id }),

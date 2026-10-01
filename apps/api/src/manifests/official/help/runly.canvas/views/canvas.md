@@ -9,7 +9,7 @@ En la lista de Boards usa **Nuevo Board**, ponle nombre y elige la plantilla (En
 
 - Elige una forma en la barra inferior (rectangulo, elipse, triangulo, rombo, linea o flecha) y **arrastra** en el lienzo para dibujarla del tamano que quieras. Un clic sin arrastrar la crea con tamano por defecto. Shift mantiene la proporcion (cuadrado, circulo, lineas a 45 grados).
 - **Texto**: toca el lienzo y escribe; doble clic para editarlo despues.
-- **Hotspot**: toca el lienzo; se abre su ficha para agregar informacion, archivos y registros.
+- **Hotspot**: toca el lienzo; se abre su ficha para agregar informacion, archivos y registros. En **Icono del pin** busca por palabra (extintor, camara, agua, wifi...) o explora por categoria; el icono tambien se cambia desde el inspector.
 - **Imagen o PDF**: boton de insertar o tecla I.
 
 **Editar**

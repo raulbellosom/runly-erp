@@ -20,6 +20,7 @@ const updateArgs = z.object({
   description: z.string().trim().max(5000).optional(),
   status: z.enum(Object.keys(HOTSPOT_STATUS)).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  icon: z.string().regex(/^[a-z0-9-]{1,60}$/).nullable().optional(),
 })
 
 export function createCanvasMiraiActions({ prisma, service, broadcaster = null }) {
@@ -66,12 +67,12 @@ export function createCanvasMiraiActions({ prisma, service, broadcaster = null }
     operation: 'update',
     label: 'Actualizar hotspot',
     permission: 'canvas.edit',
-    description: 'Cambia titulo, descripcion, estado (ACTIVE, REVIEW, RESOLVED, INACTIVE) o color (#RRGGBB) de un hotspot. Requiere hotspotId de canvas_hotspots.',
+    description: 'Cambia titulo, descripcion, estado (ACTIVE, REVIEW, RESOLVED, INACTIVE), color (#RRGGBB) o icono de un hotspot. El icono es un nombre de lucide en kebab-case (p. ej. fire-extinguisher, plug-zap, cctv, droplet, wifi, wrench) o null para quitarlo. Requiere hotspotId de canvas_hotspots.',
     parameters: {
       type: 'object',
       properties: {
         hotspotId: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' },
-        status: { type: 'string', enum: Object.keys(HOTSPOT_STATUS) }, color: { type: 'string' },
+        status: { type: 'string', enum: Object.keys(HOTSPOT_STATUS) }, color: { type: 'string' }, icon: { type: ['string', 'null'] },
       },
       required: ['hotspotId'],
     },
@@ -89,6 +90,7 @@ export function createCanvasMiraiActions({ prisma, service, broadcaster = null }
       if (a.description !== undefined && a.description !== (hotspot.description ?? '')) { data.description = a.description; fields.push({ label: 'Descripcion', value: a.description.slice(0, 300) }) }
       if (a.status && a.status !== hotspot.status) { data.status = a.status; fields.push({ label: 'Estado', value: `${HOTSPOT_STATUS[hotspot.status] ?? hotspot.status} -> ${HOTSPOT_STATUS[a.status]}` }) }
       if (a.color && a.color.toLowerCase() !== (hotspot.color ?? '').toLowerCase()) { data.color = a.color.toLowerCase(); fields.push({ label: 'Color', value: a.color }) }
+      if (a.icon !== undefined && a.icon !== (hotspot.icon ?? null)) { data.icon = a.icon; fields.push({ label: 'Icono', value: a.icon ?? 'Sin icono' }) }
       if (!Object.keys(data).length) return { error: 'El hotspot ya tiene esos valores; no hay nada que cambiar.' }
       return { input: { hotspotId: hotspot.id, boardId: hotspot.boardId, data }, preview: { title: 'Actualizar hotspot', fields } }
     },

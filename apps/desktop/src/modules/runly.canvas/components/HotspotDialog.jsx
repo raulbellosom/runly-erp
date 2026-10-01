@@ -9,8 +9,9 @@ import { runly } from '../../../lib/runly.js'
 import { useAttachmentMutations, useAttachments, useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { CANVAS_COLORS } from '../lib/objectFactory.js'
 import { hotspotColor } from './inspector/ObjectInspector.jsx'
+import { HotspotIconPicker } from './HotspotIconPicker.jsx'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
-import { Choice, ColorSwatches, Section } from './inspector/fields.jsx'
+import { Choice, ColorSwatches, FieldLabel, Section } from './inspector/fields.jsx'
 
 export const HOTSPOT_STATUSES = [
   { value: 'ACTIVE', label: 'Activo' },
@@ -63,10 +64,10 @@ function AttachmentsSection({ boardId, hotspotId }) {
 function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose }) {
   const update = useUpdateHotspot(boardId, pageId)
   const [form, setForm] = useState({
-    title: hotspot.title ?? '', description: hotspot.description ?? '', status: hotspot.status ?? 'ACTIVE', color: initialColor,
+    title: hotspot.title ?? '', description: hotspot.description ?? '', status: hotspot.status ?? 'ACTIVE', color: initialColor, icon: hotspot.icon ?? null,
   })
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  const dirty = form.title !== (hotspot.title ?? '') || form.description !== (hotspot.description ?? '') || form.status !== (hotspot.status ?? 'ACTIVE') || form.color !== initialColor
+  const dirty = form.title !== (hotspot.title ?? '') || form.description !== (hotspot.description ?? '') || form.status !== (hotspot.status ?? 'ACTIVE') || form.color !== initialColor || form.icon !== (hotspot.icon ?? null)
 
   async function save(event) {
     event.preventDefault()
@@ -89,6 +90,10 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
           <TextField label="Título" required value={form.title} onChange={(event) => set('title', event.target.value)} maxLength={300} placeholder="Ej. Tablero eléctrico principal" />
           <TextareaField label="Descripción" value={form.description} onChange={(event) => set('description', event.target.value)} rows={3} placeholder="Notas, ubicación exacta, instrucciones…" />
           <Choice label="Estado" value={form.status} options={HOTSPOT_STATUSES} onChange={(value) => set('status', value)} />
+          <div>
+            <FieldLabel>Icono del pin</FieldLabel>
+            <HotspotIconPicker value={form.icon} color={form.color} onChange={(value) => set('icon', value)} />
+          </div>
           <ColorSwatches label="Color del pin" value={form.color} colors={CANVAS_COLORS} onChange={(value) => set('color', value)} />
         </div>
         <EntityLinksSection boardId={boardId} targetType="HOTSPOT" targetId={hotspot.id} links={links} />

@@ -135,7 +135,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
       await Promise.all(created.map((object, index) => {
         const source = sources[index]
         if (source.type !== 'hotspot') return null
-        return hotspot.mutateAsync({ objectId: object.id, title: `${source.hotspot?.title ?? 'Hotspot'} (copia)`, description: source.hotspot?.description, color: source.hotspot?.color, status: source.hotspot?.status })
+        return hotspot.mutateAsync({ objectId: object.id, title: `${source.hotspot?.title ?? 'Hotspot'} (copia)`, description: source.hotspot?.description, color: source.hotspot?.color, icon: source.hotspot?.icon, status: source.hotspot?.status })
       }))
     } catch (error) { fail(error) }
   }
