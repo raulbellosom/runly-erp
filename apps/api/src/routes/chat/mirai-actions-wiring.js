@@ -19,6 +19,10 @@ import { createProjectsTaskEffects } from "../projects/projects-task-effects.js"
 import { createProjectsNotificationService } from "../projects/projects-notification-service.js";
 import { createProjectsCalendarBridge } from "../projects/projects-calendar-bridge.js";
 import { createNotesMiraiCapabilities } from "../notes/mirai-capabilities.js";
+import { createHrMiraiCapabilities } from "../hr/mirai-capabilities.js";
+import { createFleetMiraiCapabilities } from "../fleet/mirai-capabilities.js";
+import { createLedgerMiraiCapabilities } from "../ledger/mirai-capabilities.js";
+import { createChatAttachmentAccess } from "./chat-attachment-access.js";
 
 function createActionNotePoster({ prisma, broadcaster }) {
   return async function postNote({ proposal, text }) {
@@ -53,7 +57,11 @@ function createActionNotePoster({ prisma, broadcaster }) {
   };
 }
 
-export function createMiraiActionsStack({ prisma, broadcaster = null, notificationService = null, resolveUserContext, calendarEventService }) {
+export function createMiraiActionsStack({ prisma, broadcaster = null, notificationService = null, resolveUserContext, calendarEventService, listMessages = null, signAttachmentUrl = null }) {
+  // Lets capabilities read chat attachments with the caller's own access (ledger statement import).
+  const attachments = listMessages && signAttachmentUrl
+    ? createChatAttachmentAccess({ prisma, listMessages, signAttachmentUrl })
+    : null;
   const capabilities = [
     createCalendarMiraiCapabilities({
       prisma,
@@ -74,6 +82,9 @@ export function createMiraiActionsStack({ prisma, broadcaster = null, notificati
       }),
     }),
     createNotesMiraiCapabilities({ prisma }),
+    createHrMiraiCapabilities({ prisma }),
+    createFleetMiraiCapabilities({ prisma }),
+    createLedgerMiraiCapabilities({ prisma, attachments }),
   ];
   const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
   const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext, capabilities });

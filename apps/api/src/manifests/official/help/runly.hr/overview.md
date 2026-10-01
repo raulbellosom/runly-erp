@@ -15,3 +15,14 @@ Runly RRHH administra la informacion de las personas que trabajan en tu compania
 - Los archivos adjuntos al expediente de un colaborador (contratos, identificaciones, comprobantes) usan el modulo de Archivos por debajo; puedes verlos directo desde el expediente sin navegar a otro modulo.
 - Dar de baja a un colaborador cambia su estado a "terminado"; no borra su expediente ni su historial — sigue disponible para consulta y auditoria.
 - RRHH no calcula nomina ni procesa pagos; es el expediente y la estructura organizacional, no un modulo de nomina.
+
+### Con MirAI
+
+Con la pestaña de MirAI abierta puedes pedirle, por ejemplo:
+
+- "Cuantos empleados hay por departamento"
+- "Dame los datos de contacto de Ana Lopez"
+- "Da de alta a un colaborador nuevo en el puesto de Desarrollador"
+- "Que colaboradores ingresaron este mes"
+
+Si tienes el expediente de un colaborador abierto, MirAI sabe cual es: puedes pedirle "cambia su puesto a Gerente" sin repetir el nombre. Como con cualquier accion, te muestra una tarjeta para confirmar antes de guardar algo.

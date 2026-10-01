@@ -11,6 +11,18 @@ function makeFetch(status = 200) {
 }
 
 describe('atlas SDK — fleet namespace', () => {
+  it('getVehicle GETs /fleet/vehicles/:id', async () => {
+    const fetchMock = makeFetch()
+    const { createRunlyClient } = await import('../index.js')
+    const client = createRunlyClient({ baseUrl: 'http://api' })
+    globalThis.fetch = fetchMock
+    await client.fleet.getVehicle('v-1', 'tok')
+    const [url, opts] = fetchMock.mock.calls[0].arguments
+    assert.equal(url, 'http://api/fleet/vehicles/v-1')
+    assert.equal(opts.headers.Authorization, 'Bearer tok')
+    fetchMock.mock.restore()
+  })
+
   it('getVehicleDocuments GETs /fleet/vehicles/:id/documents', async () => {
     const fetchMock = makeFetch()
     const { createRunlyClient } = await import('../index.js')

@@ -2321,6 +2321,10 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/fleet/vehicles${toQueryString(params)}`, {
           headers: withAuthHeaders(token),
         }),
+      getVehicle: (id, token) =>
+        request(`/fleet/vehicles/${encodeURIComponent(id)}`, {
+          headers: withAuthHeaders(token),
+        }),
       getVehicleDocuments: (vehicleId, token) =>
         request(`/fleet/vehicles/${encodeURIComponent(vehicleId)}/documents`, {
           headers: withAuthHeaders(token),

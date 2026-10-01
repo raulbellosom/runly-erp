@@ -10,6 +10,7 @@ import {
 } from "./validators.js";
 import { createLedgerService, LedgerServiceError } from "./ledger-service.js";
 import { createSummaryService } from "./summary-service.js";
+import { createLedgerEffects } from "./ledger-effects.js";
 import {
   publishActivityFromContext,
   getActivityContext,
@@ -35,6 +36,7 @@ export function createAccountsRouter({ prisma, requirePermission }) {
   const app = new Hono();
   const service = createLedgerService({ prisma });
   const summary = createSummaryService({ prisma });
+  const effects = createLedgerEffects({ prisma });
 
   // ── Accounts ──────────────────────────────────────────────────────────────
 
@@ -278,14 +280,7 @@ export function createAccountsRouter({ prisma, requirePermission }) {
           accountId,
           data: parsed.data,
         });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: "ledger.transaction.create",
-          severity: "success",
-          entityType: "FinanceTransaction",
-          entityId: tx?.id ?? null,
-          summary: `${actorName} registró un movimiento contable`,
-        });
+        await effects.afterCreateTransaction(c, tx);
         return c.json({ data: tx }, 201);
       } catch (err) {
         return handleError(c, err, "No se pudo crear el movimiento.");
@@ -373,16 +368,7 @@ export function createAccountsRouter({ prisma, requirePermission }) {
           transactionId: c.req.param("txId"),
           enabled: parsed.data.enabled,
         });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: parsed.data.enabled
-            ? "ledger.transaction.enable"
-            : "ledger.transaction.disable",
-          severity: parsed.data.enabled ? "info" : "warning",
-          entityType: "FinanceTransaction",
-          entityId: c.req.param("txId"),
-          summary: `${actorName} ${parsed.data.enabled ? "reactivó" : "anuló"} un movimiento contable`,
-        });
+        await effects.afterSetTransactionEnabled(c, tx);
         return c.json({ data: tx });
       } catch (err) {
         return handleError(

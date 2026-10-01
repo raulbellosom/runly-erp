@@ -22,42 +22,22 @@ test("TOOL_DEFS lists every read tool with JSON schemas", () => {
   const names = TOOL_DEFS.map((t) => t.function.name).sort();
   assert.deepEqual(names, [
     "describe_image", "get_call_transcript", "get_conversation_messages", "get_recent_messages",
-    "list_bank_accounts", "list_call_transcripts", "list_conversation_files",
-    "read_attachment", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
+    "list_call_transcripts", "list_conversation_files",
+    "read_attachment", "search_module_help", "search_my_conversations", "search_runly",
   ]);
   for (const t of TOOL_DEFS) assert.equal(t.type, "function");
-});
-
-test("search_inventory: gated by inventory.item.read; maps rows to the safe shape", async () => {
-  const withPerm = async () => ({ profile: { id: "p1" }, memberships: [membership({ companyId: "co1", permissions: ["inventory.item.read"] })] });
-  const inventoryService = {
-    listItems: async ({ companyId, search, limit }) => {
-      assert.equal(companyId, "co1"); assert.equal(search, "laptop"); assert.equal(limit, 8);
-      return { data: [{ name: "Laptop Dell", assetTag: "IT-001", serialNumber: "SN9", status: "IN_USE", category: { name: "Computo" } }], total: 1 };
-    },
-  };
-  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: withPerm, inventoryService });
-  const out = await runners.search_inventory({ query: "laptop" }, { actorAuthUserId: "a", companyId: "co1" });
-  assert.equal(out.items[0].nombre, "Laptop Dell");
-  assert.equal(out.items[0].categoria, "Computo");
-  assert.equal(out.total, 1);
-
-  const noPerm = async () => ({ profile: { id: "p1" }, memberships: [membership({ companyId: "co1" })] });
-  const r2 = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: noPerm, inventoryService });
-  const denied = await r2.search_inventory({ query: "x" }, { actorAuthUserId: "a", companyId: "co1" });
-  assert.match(denied.error, /acceso/i);
 });
 
 // list_my_tasks was removed 2026-09-30: runly.projects now exposes
 // projects_list_tasks/projects_task_summary through the MirAI capability
 // registry (routes/projects/projects-mirai-queries.js), replacing this
 // core tool. See routes/projects/__tests__/projects-mirai.test.js.
-
-test("a missing ERP service dep -> friendly error, no throw", async () => {
-  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: async () => ({ profile: { id: "p" }, memberships: [{ companyId: "c" }], isAdmin: true, permissionSet: new Set() }) });
-  const out = await runners.list_bank_accounts({}, { actorAuthUserId: "a", companyId: "c" });
-  assert.match(out.error, /no esta disponible/i);
-});
+//
+// search_inventory and list_bank_accounts were removed 2026-09-30: runly.
+// inventory and runly.ledger now expose their own MirAI capabilities
+// (routes/inventory/mirai-capabilities.js, routes/ledger/mirai-capabilities.js)
+// via list_modules/use_module, replacing these two core tools. See
+// routes/ledger/__tests__/ledger-mirai.test.js.
 
 test("search_runly: runs only the providers the caller is allowed, returns grouped hits", async () => {
   const resolveUserContext = async (authUserId) => {
@@ -75,13 +55,15 @@ test("search_runly: runs only the providers the caller is allowed, returns group
   assert.ok(out.groups === undefined ? out.note : true);
 });
 
-test("search_inventory: admin in Company A does NOT leak admin access into a tool call scoped to Company B", async () => {
-  // Regression test for the exact bug this fix closes: erpContext used to
-  // read uctx.isAdmin/uctx.permissionSet, which getUserContextByAuthId built
-  // by UNIONING every membership's role across every company the user
-  // belongs to — so a runly.admin role in Company A leaked admin access
-  // into any tool call, regardless of which company ctx.companyId (the
-  // caller's actual active company) named.
+test("search_runly: admin in Company A does NOT leak admin access into a tool call scoped to Company B", async () => {
+  // Regression test for the exact bug this fix closes: the scoped context
+  // resolver (mirai-scoped-context.js) used to read uctx.isAdmin/
+  // uctx.permissionSet, which getUserContextByAuthId built by UNIONING every
+  // membership's role across every company the user belongs to — so a
+  // runly.admin role in Company A leaked admin access into any tool call,
+  // regardless of which company ctx.companyId (the caller's actual active
+  // company) named. Previously exercised via the (now retired) search_inventory
+  // core tool; search_runly uses the same resolveScopedErpContext path.
   const resolveUserContext = async () => ({
     profile: { id: "p1" },
     memberships: [
@@ -89,30 +71,26 @@ test("search_inventory: admin in Company A does NOT leak admin access into a too
       membership({ companyId: "companyB", permissions: [] }), // no special role in B
     ],
   });
-  const inventoryService = {
-    listItems: async () => ({ data: [], total: 0 }),
-  };
   const runners = buildToolRunners({
-    prisma: { permission: { findMany: async () => [{ key: "inventory.item.read" }] } },
+    prisma: { permission: { findMany: async () => [{ key: "contacts.contacts.read" }] } },
     listMessages: async () => ({ data: [] }),
     chatSearchService: {},
     visionService: {},
     signAttachmentUrl: async () => "x",
     resolveUserContext,
-    inventoryService,
   });
 
-  const asAdminInA = await runners.search_inventory(
-    { query: "laptop" },
+  const asAdminInA = await runners.search_runly(
+    { query: "Juan" },
     { actorAuthUserId: "a", companyId: "companyA" },
   );
   assert.equal(asAdminInA.error, undefined, "runly.admin in the active company must be allowed");
 
-  const asPlainInB = await runners.search_inventory(
-    { query: "laptop" },
+  const asPlainInB = await runners.search_runly(
+    { query: "Juan" },
     { actorAuthUserId: "a", companyId: "companyB" },
   );
-  assert.match(asPlainInB.error, /acceso/i, "no admin permissions in Company B must be refused there");
+  assert.match(asPlainInB.error, /permiso/i, "no admin permissions in Company B must be refused there");
 });
 
 test("search_runly: caller with no search permission is refused", async () => {

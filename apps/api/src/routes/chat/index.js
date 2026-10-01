@@ -162,7 +162,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   // it) is unchanged — MirAI never gets broader read access than the user
   // asking it would get calling the REST endpoint directly.
   const callTranscriptService = createCallTranscriptService({ prisma });
-  const miraiActions = createMiraiActionsStack({ prisma, broadcaster, notificationService, resolveUserContext, calendarEventService });
+  const miraiActions = createMiraiActionsStack({ prisma, broadcaster, notificationService, resolveUserContext, calendarEventService, listMessages: chatService.listMessages, signAttachmentUrl });
   const miraiService = createMiraiService({
     prisma,
     visionService,

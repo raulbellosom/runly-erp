@@ -12,6 +12,7 @@
 import { SEARCH_PROVIDERS } from "../../services/search-providers.js";
 import { createHelpService } from "../../services/help-service.js";
 import { createAttachmentReader } from "../../services/ai/attachment-reader.js";
+import { createChatAttachmentAccess, ChatAttachmentAccessError } from "./chat-attachment-access.js";
 import { createScopedErpContextResolver } from "./mirai-scoped-context.js";
 
 const RECENT_MAX = 50;
@@ -124,34 +125,12 @@ export const TOOL_DEFS = [
     type: "function",
     function: {
       name: "search_module_help",
-      description: "Busca en la documentacion de ayuda de los modulos de Runly (que es cada modulo, para que sirve, como se usa cada pantalla, limites y alcances). Usalo cuando el usuario pregunta como funciona el ERP o un modulo especifico. NO uses esto para datos de negocio (contactos, inventario, cuentas, etc.) — para eso estan search_runly/search_inventory/list_bank_accounts.",
+      description: "Busca en la documentacion de ayuda de los modulos de Runly (que es cada modulo, para que sirve, como se usa cada pantalla, limites y alcances). Usalo cuando el usuario pregunta como funciona el ERP o un modulo especifico. NO uses esto para datos de negocio (contactos, inventario, cuentas, etc.) — para eso esta search_runly, o las herramientas del modulo (list_modules/use_module).",
       parameters: {
         type: "object",
         properties: { query: { type: "string", description: "Palabras clave sobre que modulo o funcionalidad quiere entender el usuario." } },
         required: ["query"],
       },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "search_inventory",
-      description: "Busca activos/equipos del inventario de la empresa por nombre, etiqueta o numero de serie. Ej: 'cuantas laptops hay', 'donde esta el activo ABC-123'.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string", description: "Texto a buscar (nombre, etiqueta, serie)." },
-          status: { type: "string", description: "Filtro opcional de estado del activo." },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "list_bank_accounts",
-      description: "Lista las cuentas bancarias de la empresa que el usuario puede ver, con su saldo actual. Ej: 'cuanto tenemos en el banco', 'saldo de BBVA'.",
-      parameters: { type: "object", properties: {} },
     },
   },
   {
@@ -193,23 +172,12 @@ function trimMessage(m) {
 
 export function buildToolRunners({
   prisma, listMessages, chatSearchService, visionService, signAttachmentUrl, resolveUserContext,
-  inventoryService, ledgerService,
   callTranscriptService,
   attachmentReader = createAttachmentReader({ vision: visionService }),
+  attachmentAccess = createChatAttachmentAccess({ prisma, listMessages, signAttachmentUrl }),
 }) {
   const helpService = createHelpService({ prisma });
   const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
-
-  // Assert a single module read permission on top of the scoped context.
-  // Returns { uctx, companyId, userId } on success or { error } for the runner to return.
-  async function erpContext(ctx, permissionKey) {
-    const resolved = await resolveScopedErpContext(ctx);
-    if (resolved.error) return resolved;
-    if (!resolved.isAdmin && !resolved.permissionSet.has(permissionKey)) {
-      return { error: "No tienes acceso a esa informacion." };
-    }
-    return { uctx: resolved.uctx, companyId: resolved.companyId, userId: resolved.userId };
-  }
 
   async function get_recent_messages(args, ctx) {
     const limit = Math.min(Math.max(parseInt(args?.limit, 10) || 30, 1), RECENT_MAX);
@@ -292,25 +260,19 @@ export function buildToolRunners({
   async function describe_image(args, ctx) {
     const attachmentId = String(args?.attachmentId ?? "").trim();
     if (!attachmentId) return { error: "Falta attachmentId." };
-    const [att] = await prisma.$queryRaw`
-      SELECT a.id, a.mime_type, a.object_key, a.bucket, a.conversation_id
-      FROM chat_attachments a
-      WHERE a.id = ${attachmentId}::uuid
-      LIMIT 1
-    `;
-    if (!att) return { error: "Sin acceso a ese adjunto." };
+    let att;
     try {
-      await listMessages({ conversationId: att.conversation_id, authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null, limit: 1, before: null });
-    } catch {
-      return { error: "Sin acceso a ese adjunto." };
+      att = await attachmentAccess.checkAccess(attachmentId, ctx);
+    } catch (err) {
+      return { error: err instanceof ChatAttachmentAccessError ? err.message : `No pude analizar la imagen: ${String(err?.message ?? err).slice(0, 160)}` };
     }
     if (!String(att.mime_type ?? "").startsWith("image/")) {
       return { error: "Ese adjunto no es una imagen; solo puedo describir imagenes." };
     }
     try {
-      const buffer = await fetchAttachmentBuffer({ signAttachmentUrl, att });
+      const file = await attachmentAccess.download(att);
       const { description } = await visionService.describeImage({
-        imageBase64: buffer.toString("base64"), mimeType: att.mime_type, question: args?.question,
+        imageBase64: file.buffer.toString("base64"), mimeType: file.mimeType, question: args?.question,
       });
       return { description };
     } catch (err) {
@@ -321,24 +283,17 @@ export function buildToolRunners({
   async function read_attachment(args, ctx) {
     const attachmentId = String(args?.attachmentId ?? "").trim();
     if (!attachmentId) return { error: "Falta attachmentId." };
-    const [att] = await prisma.$queryRaw`
-      SELECT a.id, a.file_name, a.mime_type, a.object_key, a.bucket, a.conversation_id
-      FROM chat_attachments a
-      WHERE a.id = ${attachmentId}::uuid
-      LIMIT 1
-    `;
-    if (!att) return { error: "Sin acceso a ese adjunto." };
+    let file;
     try {
-      await listMessages({ conversationId: att.conversation_id, authUserId: ctx.actorAuthUserId, companyId: ctx.companyId ?? null, limit: 1, before: null });
-    } catch {
-      return { error: "Sin acceso a ese adjunto." };
+      file = await attachmentAccess.fetchForActor(attachmentId, ctx);
+    } catch (err) {
+      return { error: err instanceof ChatAttachmentAccessError ? err.message : `No pude leer ese archivo: ${String(err?.message ?? err).slice(0, 160)}` };
     }
     const MAX_CHARS = 12000;
     try {
-      const buffer = await fetchAttachmentBuffer({ signAttachmentUrl, att });
-      const result = await attachmentReader.read({ buffer, name: att.file_name, mimeType: att.mime_type, question: args?.question });
+      const result = await attachmentReader.read({ buffer: file.buffer, name: file.name, mimeType: file.mimeType, question: args?.question });
       const text = String(result.text ?? "");
-      return { name: att.file_name, text: text.slice(0, MAX_CHARS), truncated: Boolean(result.truncated) || text.length > MAX_CHARS };
+      return { name: file.name, text: text.slice(0, MAX_CHARS), truncated: Boolean(result.truncated) || text.length > MAX_CHARS };
     } catch (err) {
       return { error: `No pude leer ese archivo: ${String(err?.message ?? err).slice(0, 160)}` };
     }
@@ -378,55 +333,6 @@ export function buildToolRunners({
         fragmento: r.snippet,
       })),
     };
-  }
-
-  async function search_inventory(args, ctx) {
-    if (!inventoryService?.listItems) return { error: "El modulo de inventario no esta disponible." };
-    const c = await erpContext(ctx, "inventory.item.read");
-    if (c.error) return c;
-    try {
-      const res = await inventoryService.listItems({
-        companyId: c.companyId,
-        search: String(args?.query ?? "").trim() || undefined,
-        status: args?.status || undefined,
-        limit: 8,
-      });
-      const rows = res?.data ?? res ?? [];
-      return {
-        items: rows.slice(0, 8).map((it) => ({
-          nombre: it.name ?? null,
-          etiqueta: it.assetTag ?? null,
-          serie: it.serialNumber ?? null,
-          estado: it.status ?? null,
-          categoria: it.category?.name ?? it.categoryName ?? null,
-          ubicacion: it.location?.name ?? it.locationName ?? null,
-          asignadoA: it.assignedTo?.displayName ?? it.assignedToName ?? null,
-        })),
-        total: res?.total ?? rows.length,
-      };
-    } catch (err) {
-      return { error: `No pude consultar inventario: ${String(err?.message ?? err).slice(0, 140)}` };
-    }
-  }
-
-  async function list_bank_accounts(_args, ctx) {
-    if (!ledgerService?.listAccounts) return { error: "El modulo de bancos no esta disponible." };
-    const c = await erpContext(ctx, "ledger.accounts.read");
-    if (c.error) return c;
-    try {
-      const res = await ledgerService.listAccounts({ companyId: c.companyId, actorId: c.userId });
-      const rows = res?.data ?? res ?? [];
-      return {
-        cuentas: rows.map((a) => ({
-          nombre: a.name ?? null,
-          banco: a.bank_name ?? a.bankName ?? null,
-          moneda: a.currency ?? null,
-          saldo: a.current_balance != null ? Number(a.current_balance) : (a.currentBalance ?? null),
-        })),
-      };
-    } catch (err) {
-      return { error: `No pude consultar los bancos: ${String(err?.message ?? err).slice(0, 140)}` };
-    }
   }
 
   async function list_call_transcripts(args, ctx) {
@@ -485,7 +391,6 @@ export function buildToolRunners({
   return {
     get_recent_messages, get_conversation_messages, search_my_conversations,
     list_conversation_files, describe_image, read_attachment, search_runly, search_module_help,
-    search_inventory, list_bank_accounts,
     list_call_transcripts, get_call_transcript,
   };
 }
@@ -616,17 +521,4 @@ export function buildChannelToolRunners({ prisma, callTranscriptService }) {
   }
 
   return { get_channel_messages, list_call_transcripts, get_call_transcript };
-}
-
-// Download an attachment's bytes via a service-role signed URL. `signAttachmentUrl`
-// is injected by mirai-service (Task 6), so this module never imports supabase
-// and the non-image/non-attachment tests never reach here. Shared by
-// describe_image (images only) and read_attachment (any supported format).
-async function fetchAttachmentBuffer({ signAttachmentUrl, att }) {
-  const url = await signAttachmentUrl(att.bucket, att.object_key);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`descarga fallo (${res.status})`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > 10 * 1024 * 1024) throw new Error("archivo demasiado grande");
-  return buf;
 }

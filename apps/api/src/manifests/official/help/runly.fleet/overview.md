@@ -15,3 +15,14 @@ Runly Flota administra los vehiculos de tu compania: quien los maneja, sus segur
 - Un reporte queda asociado siempre a un vehiculo especifico; el historial completo de una unidad se arma solo con sus reportes a lo largo del tiempo.
 - La licencia de un chofer y la vigencia de una poliza pueden tener fecha de vencimiento para que se les de seguimiento y no se venzan sin avisar.
 - Flota no reemplaza al modulo de Contactos para los datos generales de una persona; aqui solo gestionas la parte especifica de choferes (licencia, asignacion de vehiculo).
+
+### Con MirAI
+
+Con la pestaña de MirAI abierta puedes pedirle, por ejemplo:
+
+- "Que seguros vencen este mes"
+- "Busca las especificaciones de este modelo" (con un vehiculo abierto)
+- "Cuantos vehiculos estan en mantenimiento"
+- "Asigna este vehiculo al chofer Juan Perez"
+
+Si tienes un vehiculo abierto, MirAI sabe cual es: puedes pedirle "cambia su estado a mantenimiento" sin repetir la matricula. Como con cualquier accion, te muestra una tarjeta para confirmar antes de guardar algo.
