@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { runly } from "../../../lib/runly";
+import { useMiraiRecordContext } from "../../runly.chat/lib/miraiPageContext";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
 import { ContactHeroCard } from "../components/detail/ContactHeroCard";
 import { ContactPeopleTab, ContactSummaryTab } from "../components/detail/ContactSummaryTab";
@@ -84,6 +85,12 @@ export default function ContactDetailScreen() {
     enabled: Boolean(token && contactId && canRead),
   });
   const contact = profileQuery.data?.data ?? null;
+
+  useMiraiRecordContext({
+    recordType: "contact",
+    recordId: contact?.id,
+    label: contact?.name,
+  });
 
   const deleteMutation = useMutation({
     mutationFn: () => runly.contacts.delete(contactId, token),

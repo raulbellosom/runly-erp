@@ -23,6 +23,7 @@ import { NoteShareModal } from './components/NoteShareModal.jsx'
 import { NoteTitleEditor } from './components/NoteTitleEditor.jsx'
 import { ZoomControl } from './components/ZoomControl.jsx'
 import { useNoteZoom } from './hooks/useNoteZoom.js'
+import { useMiraiRecordContext } from '../runly.chat/lib/miraiPageContext'
 
 // Lazy so the Excalidraw bundle only loads when a canvas note is opened.
 const CanvasEditor = lazy(() =>
@@ -64,6 +65,7 @@ export default function NotesScreen() {
   const isTrashView = activeView === 'trash'
 
   const [selectedNote, setSelectedNote] = useState(null)
+  useMiraiRecordContext({ recordType: 'note', recordId: selectedNote?.id, label: selectedNote?.title })
   const [viewingNoteId, setViewingNoteId] = useState(null)
   const viewOnly = viewingNoteId === selectedNote?.id
   const [settingsOpen, setSettingsOpen] = useState(false)

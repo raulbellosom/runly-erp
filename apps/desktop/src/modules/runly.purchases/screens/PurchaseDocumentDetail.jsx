@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { runly } from '../../../lib/runly.js'
+import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
 import { useCapabilities, useDocument, usePurchasesCan } from '../hooks/usePurchases.js'
 import { usePurchaseRoute } from '../hooks/usePurchaseRoute.js'
 import { KINDS, PAYMENT_METHODS, PRIORITY_OPTIONS, ROOT, docPath } from '../lib/purchases-constants.js'
@@ -49,6 +50,12 @@ export default function PurchaseDocumentDetail() {
   const [dialog, setDialog] = useState(null)
   const [lineForItems, setLineForItems] = useState(null)
   const doc = query.data
+
+  useMiraiRecordContext({
+    recordType: 'document',
+    recordId: doc?.id,
+    label: doc?.number ?? doc?.title,
+  })
 
   const actions = useMemo(() => getDocumentActions(kind, doc, { has: caps.has, can }), [kind, doc, caps.has, can])
   const shell = (node) => <div className="min-h-dvh p-4 md:p-6">{node}</div>

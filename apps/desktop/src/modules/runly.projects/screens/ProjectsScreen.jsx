@@ -36,6 +36,7 @@ import TaskFormModal from "../components/TaskFormModal.jsx";
 import StatusEditor from "../components/StatusEditor.jsx";
 import MembersPanel from "../components/MembersPanel.jsx";
 import ProjectFieldsSheet from "../components/ProjectFieldsSheet.jsx";
+import { useMiraiRecordContext } from "../../runly.chat/lib/miraiPageContext";
 
 const VIEWS = [
   { key: "kanban", label: "Kanban", Icon: LayoutGrid },
@@ -122,6 +123,14 @@ export default function ProjectsScreen() {
   const effectiveId = selectedProject?.id ?? null;
 
   useProjectRealtime(effectiveId);
+
+  // An open task takes priority over the project itself — MirAI should
+  // describe whichever is the more specific thing on screen.
+  useMiraiRecordContext(
+    taskPanelId
+      ? { recordType: "task", recordId: taskPanelId }
+      : { recordType: "project", recordId: effectiveId, label: selectedProject?.name },
+  );
 
   const linkedChannelQuery = useQuery({
     queryKey: ["project-linked-channel", effectiveId],
