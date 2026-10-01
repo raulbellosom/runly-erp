@@ -1,6 +1,6 @@
 # MirAI capability: runly.inventory + attachments (step 3 of the MirAI roadmap)
 
-- Status: Draft
+- Status: Implemented, pending manual acceptance (§7)
 - Date: 2026-09-30
 - Contract: `docs/ai-context/mirai-module-capabilities.md`
 
