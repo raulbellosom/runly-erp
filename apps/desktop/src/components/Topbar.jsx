@@ -30,6 +30,8 @@ export function Topbar({
   const isSyncing    = useOfflineStore((s) => s.isSyncing);
   const lastSyncAt   = useOfflineStore((s) => s.lastSyncAt);
   const syncError    = useOfflineStore((s) => s.syncError);
+  const reconnect    = useOfflineStore((s) => s.reconnect);
+  const syncNow      = useOfflineStore((s) => s.syncNow);
   const canReadNotifications = Boolean(
     userProfile?.isAdmin ||
     (userProfile?.permissions ?? []).includes("notifications.read"),
@@ -160,6 +162,8 @@ export function Topbar({
             pendingCount={pendingCount}
             syncError={syncError}
             networkBusy={networkBusy}
+            onReconnect={reconnect ?? undefined}
+            onSyncNow={syncNow ?? undefined}
           />
           {token && (
             <span className="hidden md:contents">

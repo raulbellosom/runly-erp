@@ -538,7 +538,7 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`, `DialogClose`, `DialogPortal`, `DialogOverlay` | Modal dialog |
 | `Sheet`, `SheetTrigger`, `SheetContent`, `SheetHeader`, `SheetFooter`, `SheetTitle`, `SheetDescription`, `SheetClose`, `SheetPortal`, `SheetOverlay` | Slide-in panel |
 | `Popover`, `PopoverTrigger`, `PopoverContent`, `PopoverAnchor` | Floating popover |
-| `SyncStatusPopover` | One-icon Topbar site status (online/offline/syncing/pending) with a popover detail panel |
+| `SyncStatusPopover` | One-icon Topbar site status (online/offline/syncing/pending) with a popover detail panel; `onReconnect` (resolves to the new online state) shows "Reintentar conexion" while offline, `onSyncNow` shows "Sincronizar ahora" while online |
 | `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider` | Tooltip |
 | `Toaster` | Toast notification renderer (mount once in app root) |
 | `Alert`, `AlertTitle`, `AlertDescription` | Inline alert banner |

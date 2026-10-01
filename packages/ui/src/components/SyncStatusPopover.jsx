@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { RefreshCw, CheckCircle, WifiOff } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from './Popover.jsx'
 import { Button } from './Button.jsx'
@@ -24,8 +25,24 @@ export function SyncStatusPopover({
   syncError = null,
   networkBusy = false,
   onSyncNow,
+  onReconnect,
 }) {
+  const [reconnecting, setReconnecting] = useState(false)
+  const [reconnectFailed, setReconnectFailed] = useState(false)
   const busy = isSyncing || networkBusy
+
+  async function handleReconnect() {
+    setReconnecting(true)
+    setReconnectFailed(false)
+    try {
+      const online = await onReconnect()
+      setReconnectFailed(online === false)
+    } catch {
+      setReconnectFailed(true)
+    } finally {
+      setReconnecting(false)
+    }
+  }
   const hasPending = pendingCount > 0
 
   let StatusIcon
@@ -92,6 +109,25 @@ export function SyncStatusPopover({
           <p className="mt-1 text-xs text-[hsl(var(--destructive))] break-words">
             {syncError}
           </p>
+        )}
+        {onReconnect && !isOnline && (
+          <>
+            {reconnectFailed && !reconnecting && (
+              <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                Aun sin conexion con el servidor. Revisa tu red e intenta de nuevo.
+              </p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full"
+              onClick={handleReconnect}
+              disabled={reconnecting}
+            >
+              <RefreshCw className={reconnecting ? 'animate-spin motion-reduce:animate-none' : undefined} />
+              {reconnecting ? 'Reconectando...' : 'Reintentar conexion'}
+            </Button>
+          </>
         )}
         {onSyncNow && isOnline && !isSyncing && (
           <Button

@@ -437,7 +437,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
           {/* Two rows: meta (task number + actions) on top, full-width title
               below. On desktop the right padding clears the Sheet's close
               button; on mobile that button sits in the drag-handle row above. */}
-          <SheetHeader className="gap-1 border-b border-border px-5 pb-3 pt-1 max-md:bg-background md:pl-6 md:pr-14 md:pt-4">
+          <SheetHeader className="gap-1 border-b border-border px-5 pb-3 pt-1 md:pl-6 md:pr-14 md:pt-4">
             <SheetTitle className="sr-only">Detalles de tarea</SheetTitle>
             {isLoading && !task ? (
               <>

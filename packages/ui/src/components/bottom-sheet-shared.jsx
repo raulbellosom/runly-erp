@@ -18,13 +18,17 @@ import { cn } from "../lib/utils.js";
 //   lives in the scrolling flow still stays pinned at the top.
 // - `min-h-[50dvh]` → the sheet always covers at least half the screen
 //   instead of hugging tiny content.
+// - On mobile the surface is opaque (--card) so the sticky header can use the
+//   exact same color: a translucent header stacked on the translucent glass
+//   surface rendered as a visibly lighter band.
 export const BOTTOM_SHEET_SURFACE_CLASS =
-  "overflow-hidden rounded-t-2xl px-6 pt-9! pb-6 min-h-[50dvh] max-h-[85dvh]";
+  "overflow-hidden rounded-t-2xl px-6 pt-9! pb-6 min-h-[50dvh] max-h-[85dvh] max-md:bg-[hsl(var(--card))]!";
 
 // Mobile-only sticky header behavior for SheetHeader / DialogHeader. Has no
-// effect when the header already sits outside the scroll region.
+// effect when the header already sits outside the scroll region. Its
+// background matches the opaque surface so it never reads as a separate band.
 export const BOTTOM_SHEET_STICKY_HEADER_CLASS =
-  "max-md:sticky max-md:top-0 max-md:z-10 max-md:bg-[var(--glass-bg-strong)] max-md:backdrop-blur-xl";
+  "max-md:sticky max-md:top-0 max-md:z-10 max-md:bg-[hsl(var(--card))]";
 
 const SHEET_EASING = "280ms cubic-bezier(0.32, 0.72, 0, 1)";
 

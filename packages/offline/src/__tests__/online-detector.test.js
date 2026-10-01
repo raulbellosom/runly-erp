@@ -36,6 +36,24 @@ test('OnlineDetector - multiple onChange callbacks all fire', () => {
   assert.deepEqual(calls, ['a:false', 'b:false'])
 })
 
+test('OnlineDetector - checkNow probes immediately and reports the result', async () => {
+  const realFetch = globalThis.fetch
+  let reachable = false
+  globalThis.fetch = async () => { if (!reachable) throw new Error('down'); return {} }
+  const detector = new OnlineDetector({ getNavigatorOnline: () => false, probeUrl: 'http://api.example/health' })
+  try {
+    const changes = []
+    detector.onChange((v) => changes.push(v))
+    assert.equal(await detector.checkNow(), false)
+    reachable = true
+    assert.equal(await detector.checkNow(), true)
+    assert.deepEqual(changes, [true])
+  } finally {
+    detector.destroy()
+    globalThis.fetch = realFetch
+  }
+})
+
 test('OnlineDetector - destroy removes all listeners', () => {
   const detector = new OnlineDetector({ getNavigatorOnline: () => true })
   const calls = []

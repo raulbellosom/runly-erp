@@ -60,6 +60,19 @@ export class OnlineDetector {
     }
   }
 
+  // Manual reconnect: probes right away instead of waiting for the next
+  // interval tick. Resolves to the resulting online state.
+  async checkNow() {
+    if (!this._probeUrl) {
+      if (this._getNavigatorOnline()) this._handleOnline()
+      else this._handleOffline()
+      return this._currentState
+    }
+    while (this._probing) await new Promise((resolve) => setTimeout(resolve, 100))
+    await this._probe()
+    return this._currentState
+  }
+
   async _probe() {
     if (!this._probeUrl || this._probing) return
     this._probing = true

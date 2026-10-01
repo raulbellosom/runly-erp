@@ -7,6 +7,10 @@ const stateCreator = (set) => ({
   lastSyncAt: null,
   isSyncing: false,
   syncError: null,
+  // Registered by OfflineProvider; null when no provider is mounted.
+  reconnect: null,
+  syncNow: null,
+  setControls: ({ reconnect = null, syncNow = null } = {}) => set({ reconnect, syncNow }),
   setOnline: (isOnline) => set({ isOnline }),
   setPendingCount: (pendingCount) => set({ pendingCount }),
   incrementPending: () => set((s) => ({ pendingCount: s.pendingCount + 1 })),

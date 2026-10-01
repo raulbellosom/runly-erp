@@ -32,6 +32,7 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady, sessio
   const setLastSyncAt = useOfflineStore((s) => s.setLastSyncAt)
   const setSyncing = useOfflineStore((s) => s.setSyncing)
   const setPendingCount = useOfflineStore((s) => s.setPendingCount)
+  const setControls = useOfflineStore((s) => s.setControls)
 
   useEffect(() => {
     const databaseName = offlineDatabaseName({ apiBaseUrl, userId, companyId })
@@ -183,7 +184,14 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady, sessio
 
     if (initialOnline) runSync()
 
+    setControls({
+      // onChange above already runs a sync when the probe flips to online.
+      reconnect: () => detector.checkNow(),
+      syncNow: () => runSync(),
+    })
+
     return () => {
+      setControls()
       detector.destroy()
       clearInterval(intervalRef.current)
       onTransportReady?.(null)
@@ -192,7 +200,7 @@ export function OfflineProvider({ children, apiBaseUrl, onTransportReady, sessio
         console.warn('[runly/offline] Cleanup failed', err?.message ?? err)
       })
     }
-  }, [apiBaseUrl, companyId, userId, setOnline, setLastSyncAt, setSyncing, setPendingCount, onTransportReady])
+  }, [apiBaseUrl, companyId, userId, setOnline, setLastSyncAt, setSyncing, setPendingCount, setControls, onTransportReady])
 
   return (
     <OfflineContext.Provider value={{ dbRef, engineRef, ledgerStoreRef, ledgerSyncAdapterRef }}>

@@ -21,7 +21,7 @@ export function CreateBoardDialog({ open, onOpenChange, onSubmit, pending }) {
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="flex max-h-[min(90dvh,720px)] flex-col gap-0 p-0 sm:max-w-lg">
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
+          <DialogHeader className="mb-0 shrink-0 px-5 pt-4 pb-2">
             <DialogTitle>Nuevo Board</DialogTitle>
             <DialogDescription>Un espacio visual para planos, mapas técnicos y diagramas conectados con Runly.</DialogDescription>
           </DialogHeader>
@@ -61,7 +61,7 @@ export function CreateBoardDialog({ open, onOpenChange, onSubmit, pending }) {
               </div>
             </fieldset>
           </div>
-          <DialogFooter className="shrink-0 border-t border-[hsl(var(--border))] px-5 py-4">
+          <DialogFooter className="mt-0 shrink-0 px-5 py-4">
             <Button type="button" variant="outline" onClick={() => close(false)}>Cancelar</Button>
             <Button type="submit" disabled={!form.name.trim() || pending}>
               {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : null}
