@@ -12,7 +12,7 @@
 - `GET /chat/mirai` (ensure) keeps its shape and returns the most recent thread.
 
 ## Track A — backend
-- [ ] Migration `prisma/migrations/20261001090000_mirai_multiple_threads/migration.sql`: `DROP INDEX IF EXISTS "<name from 20260919130000_chat_mirai_rename>";` Apply with `pnpm db:migrate`.
+- [ ] Migration `prisma/migrations/20261001140000_mirai_multiple_threads/migration.sql`: `DROP INDEX IF EXISTS "<name from 20260919130000_chat_mirai_rename>";` Apply with `pnpm db:migrate`.
 - [ ] `apps/api/src/routes/chat/mirai-threads-service.js`: list/create/rename/remove + `latestThread`; ensure/create logic moved out of `mirai-service.js` (`ensureMiraiConversation` delegates to it) with the advisory lock; remove cancels pending proposals (`UPDATE mirai_action_proposals SET status='cancelled' ... WHERE conversation_id = $id AND status='pending'`).
 - [ ] Routes per contract (in `mirai-routes.js` or a new routes file mounted next to it under the existing `/chat/mirai/*` auth).
 - [ ] Auto-title in the MirAI user-message path (`handleUserMessage`): if title is the default (`MirAI` or `Nueva conversacion`) and this is the first user message, set title to the first 60 chars.
