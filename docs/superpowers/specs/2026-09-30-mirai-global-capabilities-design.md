@@ -1,6 +1,6 @@
 # MirAI everywhere — global sidebar and module capability contract
 
-- Status: Draft (pending user review)
+- Status: Implemented (foundation + calendar), pending manual acceptance (§14)
 - Date: 2026-09-30
 - Builds on: `2026-09-30-mirai-actions-design.md` (confirmable actions, implemented)
 - Roadmap position: step 1 of 4 (1 foundation + calendar, 2 PFM, 3 inventory, 4 remaining modules)
