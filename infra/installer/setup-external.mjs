@@ -393,7 +393,6 @@ const OPTIONAL_VAR_GROUPS = [
     ],
     vars: [
       { key: "INVENTORY_AI_SIGNING_SECRET", placeholder: "", comment: "# Falls back to GROQ_API_KEY" },
-      { key: "PFM_ASSISTANT_MODEL",         placeholder: "", comment: "# Default: openai/gpt-oss-120b" },
       { key: "CHAT_MIRAI_MODEL",            placeholder: "", comment: "# Default: openai/gpt-oss-120b" },
       { key: "CHAT_MIRAI_ROUTER_MODEL",     placeholder: "", comment: "# Default: openai/gpt-oss-120b" },
       { key: "CHAT_MIRAI_WEB",              placeholder: "true", comment: null },

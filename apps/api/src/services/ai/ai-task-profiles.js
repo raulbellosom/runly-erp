@@ -44,12 +44,6 @@ export const TASK_PROFILES = {
     envOverrideVar: "HELP_ASSISTANT_MODEL",
     groqDefaultModel: "openai/gpt-oss-120b",
   },
-  pfm_assistant: {
-    weight: "heavy",
-    localCapable: true,
-    envOverrideVar: "PFM_ASSISTANT_MODEL",
-    groqDefaultModel: "openai/gpt-oss-120b",
-  },
   pfm_vision: {
     weight: "heavy",
     localCapable: false,

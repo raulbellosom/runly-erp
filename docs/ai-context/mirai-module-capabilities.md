@@ -141,3 +141,33 @@ A module's MirAI capability is complete only when:
    knows what the user is viewing.
 4. Update the module's help `overview.md` with a short "Con MirAI" section
    listing example requests (see `runly.calendar`'s).
+
+## 6. Status by module
+
+Single assistant: the per-module assistants of PFM and Inventory were removed;
+everything goes through the global MirAI sidebar and the user's MirAI conversation.
+
+| Module | Capability file | Notes |
+|---|---|---|
+| runly.calendar | `routes/calendar/mirai-capabilities.js` | list, summary, free slots; create/update/delete events |
+| runly.pfm | `routes/pfm/mirai-capabilities.js` | cross-wallet search and summaries per currency; movement create/update/delete |
+| runly.inventory | `routes/inventory/mirai-capabilities.js` | summary, search, catalogs, manufacturer lookup; plan create, item update/delete; selection context. Reassigning an item is not an action (own flow) |
+| runly.projects | `routes/projects/mirai-capabilities.js` | tasks and project progress; task create/update/delete |
+| runly.notes | `routes/notes/mirai-capabilities.js` | search/get; create, rename/move, delete. No "append" (Y.Doc content has no safe merge primitive) |
+| runly.contacts | `routes/contacts/mirai-capabilities.js` | search, detail, summary, public company info; create/update/archive |
+| runly.purchases | `routes/purchases/mirai-capabilities.js` | pending, documents, approvals, spend summary, public supplier info; request create, approval decide, full receipt. No PO/quote/invoice/payment creation |
+| runly.ledger | `routes/ledger/mirai-capabilities.js` | accounts, transactions, summaries; transaction actions; statement import from a chat attachment |
+| runly.hr | `routes/hr/mirai-capabilities.js` | employees and headcount, same field restrictions as the HR routes |
+| runly.fleet | `routes/fleet/mirai-capabilities.js` | vehicles, drivers, expirations, public vehicle specs |
+
+Not covered yet: runly.files, runly.documents, runly.pos, runly.website,
+runly.growth, and RME3 custom modules (they keep `moduleContext.ai`).
+
+Core tools that stay outside modules: chat history/search/files, `describe_image`,
+`read_attachment`, `search_runly` (people/companies across modules),
+`search_module_help`, call transcripts, `web_search`, `list_modules`,
+`use_module`, `propose_action`, `cancel_proposal`.
+
+Call transcript analysis keeps its own proposal flow
+(`transcript-proposal-registry.js`); MirAI can also read a transcript and
+propose actions through capabilities.

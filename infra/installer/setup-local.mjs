@@ -747,7 +747,6 @@ async function writeLocalEnv(supabaseInput, identity) {
   const fromLocalEnv = (key) => parseEnvValue(existingEnvContent, key) || process.env[key] || "";
   // runly.chat MirAI + runly.pfm/inventory AI extras — all optional, reuse GROQ_API_KEY.
   const inventoryAiSigningSecret = fromLocalEnv("INVENTORY_AI_SIGNING_SECRET");
-  const pfmAssistantModel        = fromLocalEnv("PFM_ASSISTANT_MODEL");
   const chatMiraiModel           = fromLocalEnv("CHAT_MIRAI_MODEL");
   const chatMiraiRouterModel     = fromLocalEnv("CHAT_MIRAI_ROUTER_MODEL");
   const chatMiraiWeb             = fromLocalEnv("CHAT_MIRAI_WEB") || "true";
@@ -957,7 +956,6 @@ PFM_VISION_TIMEOUT_MS=${pfmVisionTimeout}
 # ── runly.chat MirAI assistant + runly.pfm/inventory AI extras (optional) ────
 # All reuse GROQ_API_KEY. Without it, the model overrides below are unused.
 INVENTORY_AI_SIGNING_SECRET=${inventoryAiSigningSecret}
-PFM_ASSISTANT_MODEL=${pfmAssistantModel}
 CHAT_MIRAI_MODEL=${chatMiraiModel}
 CHAT_MIRAI_ROUTER_MODEL=${chatMiraiRouterModel}
 CHAT_MIRAI_WEB=${chatMiraiWeb}
