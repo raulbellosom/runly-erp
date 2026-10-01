@@ -10,6 +10,7 @@ import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { runly } from '../../../lib/runly'
 import { HR_EMPLOYEE_DETAIL } from '../blueprints/hr-employee-detail.blueprint.js'
 import { componentRegistry } from '../../../lib/moduleComponentRegistry.js'
+import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext'
 
 const API_BASE = getApiUrl()
 
@@ -35,6 +36,12 @@ export default function HrEmployeeDetail({ employeeId }) {
     enabled: Boolean(token && employeeId),
   })
   const employee = employeeQuery.data?.data ?? null
+
+  useMiraiRecordContext({
+    recordType: 'employee',
+    recordId: employee?.id,
+    label: employee ? `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() : undefined,
+  })
 
   const toggleEnabledMutation = useMutation({
     mutationFn: (enabled) => runly.hr.setEmployeeEnabled(employeeId, enabled, token),

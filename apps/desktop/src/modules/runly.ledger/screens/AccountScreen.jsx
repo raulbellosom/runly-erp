@@ -49,6 +49,7 @@ import AccountSummary from "./AccountSummary.jsx";
 import DeletedTransactionsSheet from "../components/DeletedTransactionsSheet.jsx";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
+import { useMiraiRecordContext } from "../../runly.chat/lib/miraiPageContext";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
 import {
   useLedgerSQLite,
@@ -148,6 +149,13 @@ export default function AccountScreen() {
 
   const members = membersData?.data ?? [];
   const account = accountData?.data ?? null;
+
+  useMiraiRecordContext({
+    recordType: "account",
+    recordId: account?.id,
+    label: account?.name,
+  });
+
   // Account settings + collaborator management are owner-only, and only for
   // personal (non-group) accounts — group accounts are managed from the group.
   const canEdit =

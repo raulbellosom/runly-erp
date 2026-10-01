@@ -1,11 +1,14 @@
 import { useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { RunlyCrudView, Button, PageHeader } from "@runly/ui";
 import { Plus } from "lucide-react";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
 import { componentRegistry } from "../../../lib/moduleComponentRegistry";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
+import { runly } from "../../../lib/runly";
+import { useMiraiRecordContext } from "../../runly.chat/lib/miraiPageContext";
 import { FLEET_VEHICLE_MODEL_FORM_BLUEPRINT } from "./CatalogsScreen.jsx";
 
 const API_BASE = getApiUrl();
@@ -582,6 +585,19 @@ export default function VehiclesScreen() {
     () => parseModeAndId(wildcard),
     [wildcard],
   );
+
+  // Lightweight fetch just for the MirAI page-context label (plate); the
+  // detail blueprint below does its own, separate fetch for the full record.
+  const miraiVehicleQuery = useQuery({
+    queryKey: ["fleet-vehicle-mirai-context", recordId],
+    queryFn: () => runly.fleet.getVehicle(recordId, token),
+    enabled: Boolean(token && initialMode === "detail" && recordId),
+  });
+  useMiraiRecordContext({
+    recordType: "vehicle",
+    recordId: initialMode === "detail" ? recordId : undefined,
+    label: miraiVehicleQuery.data?.data?.plate,
+  });
 
   const handleNavigate = useCallback(
     ({ mode, recordId }) => {
