@@ -22,6 +22,7 @@ import { buildAllAttachments } from "../lib/chatUtils";
 import { MIRAI_NAME, MIRAI_TYPING_SENTINEL } from "../lib/mirai";
 import { buildMiraiPageContext, moduleKeyFromPath, useCurrentMiraiRecord } from "../lib/miraiPageContext";
 import { miraiPromptsFor } from "../lib/miraiPrompts";
+import { useChatPreferences } from "../hooks/useChatPreferences";
 
 // Same formats/limits as the backend attachment reader (spec
 // 2026-09-30-mirai-inventory-capability-design.md §2): up to 5 files, 10 MB
@@ -83,6 +84,7 @@ export function MiraiSidebarThread({ conversationId, onSent }) {
   const location = useLocation();
   const currentRecord = useCurrentMiraiRecord();
   const prompts = miraiPromptsFor(moduleKeyFromPath(location.pathname));
+  const { prefs } = useChatPreferences();
 
   const { data, isLoading } = useChatMessages(conversationId);
   const send = useSendMessage(conversationId);
@@ -253,7 +255,9 @@ export function MiraiSidebarThread({ conversationId, onSent }) {
           Suelta los archivos para adjuntarlos
         </div>
       )}
-      <div className="flex-1 min-h-0 space-y-3 overflow-y-auto p-3">
+      {/* Same wallpaper as the Chat module (chat-theme.css), behind the list. */}
+      <div className="chat-scale-target chat-wallpaper relative isolate flex-1 min-h-0 space-y-3 overflow-y-auto p-3">
+        {prefs.wallpaper && <div className="chat-wallpaper-layer" data-accent={prefs.accentColorKey} aria-hidden="true" />}
         {(isLoading || !conversationId) && (
           <div className="space-y-3">
             <Skeleton className="h-12 w-3/4 rounded-2xl" />

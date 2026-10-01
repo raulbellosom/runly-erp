@@ -196,6 +196,14 @@ export function __panelSystemPromptForTest() {
   return panelSystemPrompt();
 }
 
+// The provider's per-minute limit (Groq free tier) is the common failure once a
+// turn needs several tool rounds; say so instead of a generic error.
+function turnErrorText(err) {
+  return err?.status === 429
+    ? "Llegue al limite de uso del proveedor de IA por este minuto. Espera un momento y vuelve a preguntar."
+    : "No pude responder ahora mismo, intentalo de nuevo en un momento.";
+}
+
 export function createMiraiService({
   prisma,
   env = process.env,
@@ -510,13 +518,15 @@ export function createMiraiService({
       const history = await loadHistory(conversationId);
       const ctx = { companyId, actorProfileId, actorAuthUserId, conversationId, surface: "direct", pageContext };
       const contextLine = moduleTools ? await moduleTools.toolset.startTurn(ctx).catch(() => null) : null;
+      const modulesLine = moduleTools ? await moduleTools.toolset.modulesLine(ctx) : null;
       const llmMessages = [
         { role: "system", content: chatSystemPrompt({ actions: Boolean(moduleTools), web: webEnabled }) },
+        ...(modulesLine ? [{ role: "system", content: `Modulos disponibles (usa use_module directamente, sin list_modules): ${modulesLine}.` }] : []),
         ...(contextLine ? [{ role: "system", content: `Contexto de pantalla: ${contextLine}` }] : []),
         ...history,
       ];
       const out = await runMiraiToolLoop({
-        callModel: (messages, tools) => callGroqRaw({ task: "mirai_chat", messages, tools, toolChoice: "auto", maxTokens: 1000, timeoutMs: GROQ_TIMEOUT_MS }),
+        callModel: (messages, tools) => callGroqRaw({ task: "mirai_chat", messages, tools, toolChoice: "auto", maxTokens: 1000, timeoutMs: GROQ_TIMEOUT_MS, respectRateLimit: true }),
         getTools: () => getTools(ctx), runTool,
         messages: llmMessages, ctx, toolLog, clampToolResult,
         maxIterations: MAX_TOOL_ITERATIONS,
@@ -527,7 +537,7 @@ export function createMiraiService({
       iterations = out.iterations;
       proposalId = ctx.proposalId ?? null;
     } catch (err) {
-      finalText = "No pude responder ahora mismo, intentalo de nuevo en un momento.";
+      finalText = turnErrorText(err);
       toolLog.push({ error: String(err?.message ?? err).slice(0, 200) });
     }
     } // end route !== "live"
@@ -836,7 +846,7 @@ export function createMiraiService({
       if (moduleTools) await moduleTools.toolset.startTurn(ctx).catch(() => null);
       try {
         const out = await runMiraiToolLoop({
-          callModel: (messages, tools) => callGroqRaw({ task: "mirai_chat", messages, tools, toolChoice: "auto", maxTokens: 900, timeoutMs: GROQ_TIMEOUT_MS }),
+          callModel: (messages, tools) => callGroqRaw({ task: "mirai_chat", messages, tools, toolChoice: "auto", maxTokens: 900, timeoutMs: GROQ_TIMEOUT_MS, respectRateLimit: true }),
           getTools: () => getTools(ctx), runTool,
           messages: llmMessages, ctx, toolLog, clampToolResult,
           maxIterations: MAX_TOOL_ITERATIONS,
@@ -846,7 +856,7 @@ export function createMiraiService({
         finalText = out.text;
         proposalId = ctx.proposalId ?? null;
       } catch (err) {
-        finalText = "No pude responder ahora mismo, intentalo de nuevo en un momento.";
+        finalText = turnErrorText(err);
         toolLog.push({ error: String(err?.message ?? err).slice(0, 200) });
       }
     }

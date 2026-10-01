@@ -38,6 +38,22 @@ export const MODULE_TOOL_DEFS = [
   { type: "function", function: { name: "cancel_proposal", description: "Cancela la propuesta pendiente de esta conversacion cuando el usuario ya no la quiere.", parameters: { type: "object", properties: {} } } },
 ];
 
+// Action parameter schemas go back to the model on every later round of the
+// turn; keep names, types, enums and requiredness, and only short hints.
+export function compactSchema(schema, depth = 0) {
+  if (!schema || typeof schema !== "object" || depth > 4) return schema;
+  const out = {};
+  for (const key of ["type", "enum", "required", "minimum", "maximum", "maxItems"]) {
+    if (schema[key] !== undefined) out[key] = schema[key];
+  }
+  if (schema.description) out.description = String(schema.description).slice(0, 60);
+  if (schema.properties) {
+    out.properties = Object.fromEntries(Object.entries(schema.properties).map(([k, v]) => [k, compactSchema(v, depth + 1)]));
+  }
+  if (schema.items) out.items = compactSchema(schema.items, depth + 1);
+  return out;
+}
+
 const toolDef = (t) => ({ type: "function", function: { name: t.name, description: t.definition.description, parameters: t.definition.parameters } });
 
 export function createModuleToolset({ prisma, registry, proposalService }) {
@@ -58,6 +74,18 @@ export function createModuleToolset({ prisma, registry, proposalService }) {
     if (!ctx.pageContext?.moduleKey) return null;
     await activate(ctx, ctx.pageContext.moduleKey).catch(() => null);
     return registry.describeContext(ctx, ctx.pageContext);
+  }
+
+  // One line listing the caller's modules, so the model can call use_module
+  // directly instead of spending a round on list_modules. Never throws.
+  async function modulesLine(ctx) {
+    try {
+      const out = await registry.listModules(ctx);
+      if (out.error || !out.modules.length) return null;
+      return out.modules.map((m) => `${m.moduleKey} (${m.label})`).join(", ");
+    } catch {
+      return null;
+    }
   }
 
   function getTools(ctx) {
@@ -81,7 +109,7 @@ export function createModuleToolset({ prisma, registry, proposalService }) {
         consultas: out.module.tools.map((t) => t.name),
         acciones: out.module.actions.map((a) => ({
           actionKey: a.key, nombre: a.label, operacion: a.operation,
-          descripcion: String(a.description ?? "").slice(0, DESCRIPTION_MAX), parametros: a.parameters,
+          descripcion: String(a.description ?? "").slice(0, DESCRIPTION_MAX), parametros: compactSchema(a.parameters),
         })),
       };
     },
@@ -107,5 +135,5 @@ export function createModuleToolset({ prisma, registry, proposalService }) {
     return undefined;
   }
 
-  return { startTurn, getTools, run };
+  return { startTurn, getTools, run, modulesLine };
 }

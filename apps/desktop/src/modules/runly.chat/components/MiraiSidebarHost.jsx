@@ -18,6 +18,8 @@ import { useEnsureMiraiConversation, useMiraiStatus } from "../hooks/useMirAI";
 import { useMiraiThreads } from "../hooks/useMiraiThreads";
 import { MiraiSidebarThread } from "./MiraiSidebarThread";
 import { moduleKeyFromPath, shouldShowMiraiTab, useMiraiOpenRequest } from "../lib/miraiPageContext";
+import { useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
+import "../chat-theme.css";
 
 const LS_KEY = "mirai.sidebar.open";
 
@@ -68,6 +70,7 @@ export function MiraiSidebarHost() {
   }, [open]);
 
   const coarse = useCoarsePointer();
+  const { prefs } = useChatPreferences();
   if (!visible) return null;
 
   const panel = openedOnce && <MiraiPanel coarse={coarse} onClose={coarse ? undefined : () => setOpen(false)} />;
@@ -90,7 +93,7 @@ export function MiraiSidebarHost() {
 
       {coarse ? (
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent side="right" className="flex h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-lg">
+          <SheetContent side="right" className="chat-glass-theme flex h-[90dvh] w-full flex-col gap-0 p-0 sm:max-w-lg" style={chatPreferencesStyle(prefs)}>
             <SheetTitle className="sr-only">MirAI</SheetTitle>
             {panel}
           </SheetContent>
@@ -104,7 +107,7 @@ export function MiraiSidebarHost() {
             open ? "w-[390px] border-l border-[hsl(var(--border))]" : "w-0",
           ].join(" ")}
         >
-          <div className="flex h-full w-[390px] min-h-0 flex-col">{panel}</div>
+          <div className="chat-glass-theme flex h-full w-[390px] min-h-0 flex-col" style={chatPreferencesStyle(prefs)}>{panel}</div>
         </aside>
       )}
     </>
