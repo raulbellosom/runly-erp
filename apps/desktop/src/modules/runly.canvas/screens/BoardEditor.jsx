@@ -37,7 +37,10 @@ function MobilePanel({ open, onOpenChange, side, title, children }) {
 }
 
 export default function BoardEditor() {
-  const { boardId } = useParams(), navigate = useNavigate(), board = useBoard(boardId)
+  // ModuleOutlet mounts screens under `/app/m/:moduleKey/*`, so the board id
+  // arrives as the wildcard segment (`/app/m/runly.canvas/<boardId>`).
+  const { '*': wildcard } = useParams(), boardId = String(wildcard ?? '').split('/').filter(Boolean)[0]
+  const navigate = useNavigate(), board = useBoard(boardId)
   const isDesktop = !useIsMobile(1280)
   const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedId, setSelectedId] = useState(null), [tool, setTool] = useState('select')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })

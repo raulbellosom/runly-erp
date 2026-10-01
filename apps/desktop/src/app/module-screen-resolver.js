@@ -198,6 +198,11 @@ export function resolveScreen(screenMap, requestedModuleKey, subPath, blueprintS
     if (subPath === "/chat/templates") return screenMap["runly.chat:/chat/templates"] ?? null;
     return null;
   }
+  if (moduleKey === "runly.canvas") {
+    if (subPath === "/") return screenMap["runly.canvas:/"] ?? null;
+    if (/^\/[^/]+\/?$/.test(subPath)) return screenMap["runly.canvas:/:boardId"] ?? null;
+    return null;
+  }
   if (moduleKey === "runly.core") {
     if (subPath === "/module-builder") return screenMap["runly.core:/module-builder"] ?? null;
     if (subPath.startsWith("/module-builder/")) return screenMap["runly.core:/module-builder/:id"] ?? null;

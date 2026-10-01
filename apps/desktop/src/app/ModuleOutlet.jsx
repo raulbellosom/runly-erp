@@ -275,7 +275,7 @@ const SCREEN_MAP = {
   "runly.canvas:/": lazy(
     () => import("../modules/runly.canvas/screens/CanvasHome.jsx"),
   ),
-  "runly.canvas:/boards/:boardId": lazy(
+  "runly.canvas:/:boardId": lazy(
     () => import("../modules/runly.canvas/screens/BoardEditor.jsx"),
   ),
   // runly.chat

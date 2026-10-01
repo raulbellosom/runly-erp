@@ -17,7 +17,7 @@ export default function CanvasHome() {
     const term = query.trim().toLowerCase()
     return term ? list.filter((board) => `${board.name} ${board.description ?? ''}`.toLowerCase().includes(term)) : list
   }, [list, query])
-  const openBoard = (id) => navigate(`/app/m/runly.canvas/boards/${id}`)
+  const openBoard = (id) => navigate(`/app/m/runly.canvas/${id}`)
 
   async function submit(data) {
     try {

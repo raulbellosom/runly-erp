@@ -116,3 +116,12 @@ test('parameterized built-in screens retain route matching under Runly keys', ()
     assert.equal(resolveScreen(map, `atlas.${module}`, path), screen);
   }
 });
+
+test('runly.canvas opens a board at /:boardId, allowed by the root navigation entry', () => {
+  const screenMap = { 'runly.canvas:/': 'home', 'runly.canvas:/:boardId': 'editor' };
+  const module = { key: 'runly.canvas', navigation: [{ path: '/' }] };
+  const boardPath = '/0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+  assert.equal(resolveScreen(screenMap, 'runly.canvas', '/', null), 'home');
+  assert.equal(resolveScreen(screenMap, 'runly.canvas', boardPath, null), 'editor');
+  assert.equal(isPathAllowedByNavigation(module, boardPath), true);
+});
