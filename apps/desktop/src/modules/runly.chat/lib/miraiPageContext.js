@@ -6,7 +6,7 @@
 // the module. The server re-checks access — this is a hint, never a grant.
 import { useEffect, useSyncExternalStore } from "react";
 
-const HIDDEN_MODULES = new Set(["runly.pfm", "runly.inventory", "runly.chat"]);
+const HIDDEN_MODULES = new Set(["runly.inventory", "runly.chat"]);
 let record = null;
 const listeners = new Set();
 const emit = () => listeners.forEach((l) => l());

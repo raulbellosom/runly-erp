@@ -10,6 +10,7 @@ import { createModuleToolset } from "./mirai-module-tools.js";
 import { createMiraiProposalRoutes } from "./mirai-proposal-routes.js";
 import { createCalendarMiraiCapabilities } from "../calendar/mirai-capabilities.js";
 import { createCalendarEventEffects } from "../calendar/calendar-event-effects.js";
+import { createPfmMiraiCapabilities } from "../pfm/mirai-capabilities.js";
 
 function createActionNotePoster({ prisma, broadcaster }) {
   return async function postNote({ proposal, text }) {
@@ -51,6 +52,7 @@ export function createMiraiActionsStack({ prisma, broadcaster = null, resolveUse
       eventService: calendarEventService,
       effects: createCalendarEventEffects({ prisma, broadcaster }),
     }),
+    createPfmMiraiCapabilities({ prisma }),
   ];
   const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
   const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext, capabilities });

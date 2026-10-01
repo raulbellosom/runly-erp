@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import { shouldShowMiraiTab, moduleKeyFromPath, buildMiraiPageContext } from "../miraiPageContext.js";
 
 describe("shouldShowMiraiTab", () => {
-  it("hides the tab on runly.pfm, runly.inventory and runly.chat", () => {
-    assert.equal(shouldShowMiraiTab({ moduleKey: "runly.pfm", canUse: true, available: true }), false);
+  it("hides the tab on runly.inventory and runly.chat", () => {
     assert.equal(shouldShowMiraiTab({ moduleKey: "runly.inventory", canUse: true, available: true }), false);
     assert.equal(shouldShowMiraiTab({ moduleKey: "runly.chat", canUse: true, available: true }), false);
+  });
+
+  it("shows the tab on runly.pfm (MirAI replaces the PFM assistant there)", () => {
+    assert.equal(shouldShowMiraiTab({ moduleKey: "runly.pfm", canUse: true, available: true }), true);
   });
 
   it("hides the tab when the user cannot use MirAI or it is not available", () => {

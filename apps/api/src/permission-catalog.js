@@ -987,7 +987,7 @@ export const PERMISSION_CATALOG = {
   },
   "pfm.assistant.use": {
     displayNameEs: "Usar el asistente de finanzas",
-    descriptionEs: "Permite conversar con el asistente de IA sobre las finanzas propias.",
+    descriptionEs: "Permite conversar con el asistente de IA sobre las finanzas propias. (obsoleto: usa MirAI)",
     groupKey: "pfm",
     order: 65,
   },

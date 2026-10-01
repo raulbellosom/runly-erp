@@ -1,6 +1,6 @@
 # MirAI capability: runly.pfm (step 2 of the MirAI roadmap)
 
-- Status: Draft
+- Status: Implemented, pending manual acceptance (§5)
 - Date: 2026-09-30
 - Contract: `docs/ai-context/mirai-module-capabilities.md`, spec `2026-09-30-mirai-global-capabilities-design.md`
 

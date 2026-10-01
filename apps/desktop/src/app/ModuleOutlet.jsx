@@ -10,12 +10,6 @@ import { isModuleAvailable } from "../lib/runtimeModules";
 import { applyBrandTheme } from "../lib/brandTheme.js";
 import { useBrandingStore } from "../stores/branding.js";
 
-const PfmAssistantSidebar = lazy(() =>
-  import("../modules/runly.pfm/components/PfmAssistantSidebar.jsx").then((m) => ({
-    default: m.PfmAssistantSidebar,
-  })),
-);
-
 const InventoryAssistantHost = lazy(() => import("../modules/runly.inventory/components/InventoryAssistant.jsx").then(m => ({ default: m.InventoryAssistantHost })));
 
 const SCREEN_MAP = {
@@ -659,21 +653,6 @@ export function ModuleOutlet() {
       {Screen ? <Screen /> : <ModulePlaceholder module={module} />}
     </Suspense>
   );
-
-  if (moduleKey === "runly.pfm") {
-    // h-full (not flex-1): <main> is a plain overflow-y-auto block, not a flex
-    // container, so flex-1 here is inert and nothing below gets a resolved
-    // height. h-full resolves against <main>'s definite height and lets the
-    // screen column and the assistant sidebar own their own scroll regions.
-    return (
-      <div className="flex h-full min-h-0 overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-y-auto">{screenNode}</div>
-        <Suspense fallback={null}>
-          <PfmAssistantSidebar />
-        </Suspense>
-      </div>
-    );
-  }
 
   if (moduleKey === "runly.inventory") {
     return <Suspense fallback={<LoadingFallback />}><InventoryAssistantHost>{screenNode}</InventoryAssistantHost></Suspense>;

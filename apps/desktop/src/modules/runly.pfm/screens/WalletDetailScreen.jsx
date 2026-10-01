@@ -22,6 +22,7 @@ import {
   useSetMovementEnabled,
   usePfmCategories,
 } from "../hooks/use-pfm-queries";
+import { useMiraiRecordContext } from "../../runly.chat/lib/miraiPageContext";
 import { MovementRow } from "../components/MovementRow";
 import { ConfirmChargeDialog } from "../components/ConfirmChargeDialog";
 import { QuickAddMovementSheet } from "../components/QuickAddMovementSheet";
@@ -58,6 +59,7 @@ export default function WalletDetailScreen() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState(ALL_CATEGORIES);
   const { data: wallet, isLoading, isError, refetch } = useWallet(id);
+  useMiraiRecordContext({ recordType: "wallet", recordId: wallet?.id, label: wallet?.name });
   const query = useMemo(
     () => ({
       month,

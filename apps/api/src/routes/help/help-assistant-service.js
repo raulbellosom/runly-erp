@@ -1,9 +1,9 @@
 // apps/api/src/routes/help/help-assistant-service.js
 //
 // Single-shot Groq completion over the Phase 1 help content (help-service.js).
-// No tool-calling loop (unlike apps/api/src/routes/pfm/assistant-service.js —
-// there is nothing dynamic to fetch mid-conversation, help-service.js already
-// resolved everything deterministically) and no persistence: history is
+// No tool-calling loop (unlike MirAI's — there is nothing dynamic to fetch
+// mid-conversation, help-service.js already resolved everything
+// deterministically) and no persistence: history is
 // supplied by the caller each time, never read from or written to a table.
 // See docs/superpowers/specs/2026-09-26-module-help-assistant-phase2-design.md.
 import { createHelpService } from "../../services/help-service.js";

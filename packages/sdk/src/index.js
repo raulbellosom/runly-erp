@@ -1294,32 +1294,6 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           headers: withAuthHeaders(token),
           body: JSON.stringify({ amount }),
         }),
-      assistant: {
-        status: (token) =>
-          request("/pfm/assistant/status", { headers: withAuthHeaders(token) }),
-        listThreads: (token) =>
-          request("/pfm/assistant/threads", { headers: withAuthHeaders(token) }),
-        createThread: (token) =>
-          request("/pfm/assistant/threads", {
-            method: "POST",
-            headers: withAuthHeaders(token),
-          }),
-        getThread: (id, token) =>
-          request(`/pfm/assistant/threads/${encodeURIComponent(id)}`, {
-            headers: withAuthHeaders(token),
-          }),
-        sendMessage: (id, content, token) =>
-          request(`/pfm/assistant/threads/${encodeURIComponent(id)}/messages`, {
-            method: "POST",
-            headers: withAuthHeaders(token),
-            body: JSON.stringify({ content }),
-          }),
-        deleteThread: (id, token, { purge = false } = {}) =>
-          request(
-            `/pfm/assistant/threads/${encodeURIComponent(id)}${purge ? "?purge=1" : ""}`,
-            { method: "DELETE", headers: withAuthHeaders(token) },
-          ),
-      },
     },
     catalog: {
       // Products
