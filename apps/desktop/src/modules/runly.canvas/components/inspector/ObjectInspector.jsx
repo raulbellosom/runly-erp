@@ -39,8 +39,20 @@ function GeometryFields({ object, onPatch }) {
   )
 }
 
-function StyleFields({ object, onPatch }) {
+export const hotspotColor = (object) => object.hotspot?.color || object.style?.stroke || '#ef4444'
+
+function StyleFields({ object, onPatch, onHotspotColor }) {
   const style = object.style ?? {}, setStyle = (patch) => onPatch({ style: patch })
+  if (object.type === 'hotspot') {
+    // The pin color lives on the hotspot record (same field as its sheet),
+    // not in the shape style, so both places always show the same color.
+    return (
+      <Section title="Apariencia">
+        <ColorSwatches label="Color del pin" value={hotspotColor(object)} colors={CANVAS_COLORS} onChange={onHotspotColor} />
+        <Choice label="Opacidad" value={Number(style.opacity ?? 1)} options={OPACITY} onChange={(opacity) => setStyle({ opacity })} />
+      </Section>
+    )
+  }
   if (object.type === 'image') {
     return <Section title="Apariencia"><Choice label="Opacidad" value={Number(style.opacity ?? 1)} options={OPACITY} onChange={(opacity) => setStyle({ opacity })} /></Section>
   }
@@ -87,7 +99,7 @@ function StyleFields({ object, onPatch }) {
   )
 }
 
-export function ObjectInspector({ object, layerName, locked, onPatch, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
+export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotColor, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-2 px-0.5">
@@ -110,7 +122,7 @@ export function ObjectInspector({ object, layerName, locked, onPatch, onDelete, 
       ) : (
         <>
           <GeometryFields object={object} onPatch={onPatch} />
-          <StyleFields object={object} onPatch={onPatch} />
+          <StyleFields object={object} onPatch={onPatch} onHotspotColor={onHotspotColor} />
           <Section title="Organizar">
             <div className="grid grid-cols-3 gap-1.5">
               <Button type="button" variant="outline" size="sm" className="h-11 flex-col gap-0.5 px-1 text-[11px] sm:h-12" onClick={onDuplicate}><Copy />Duplicar</Button>

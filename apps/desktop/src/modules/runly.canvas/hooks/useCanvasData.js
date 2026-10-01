@@ -92,10 +92,15 @@ export function useUpdateHotspot(boardId, pageId) {
   const token = useToken(), client = useQueryClient(), key = objectsKey(boardId, pageId)
   return useMutation({
     mutationFn: ({ hotspotId, data }) => runly.canvas.updateHotspot(boardId, hotspotId, data, token),
+    // Pin color/title changes show immediately on the canvas.
+    onMutate: ({ hotspotId, data }) => {
+      client.setQueryData(key, (rows = []) => rows.map((row) => row.hotspot?.id === hotspotId ? { ...row, hotspot: { ...row.hotspot, ...data } } : row))
+    },
     onSuccess: (response) => {
       const hotspot = unwrap(response)
       client.setQueryData(key, (rows = []) => rows.map((row) => row.id === hotspot.objectId ? { ...row, hotspot } : row))
     },
+    onError: () => client.invalidateQueries({ queryKey: key }),
   })
 }
 

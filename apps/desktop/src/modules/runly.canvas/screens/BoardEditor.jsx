@@ -13,7 +13,8 @@ import { ZoomControls } from '../components/ZoomControls.jsx'
 import { sceneBounds } from '../engine/Canvas2DRenderer.js'
 import { measureTextHeight } from '../engine/text.js'
 import { DEFAULT_VIEWPORT, fitBounds, zoomAt } from '../engine/viewport.js'
-import { useBoard, useCanvasImages, useCanvasObjects, useEntityLinks } from '../hooks/useCanvasData.js'
+import { useBoard, useCanvasImages, useCanvasObjects, useEntityLinks, useUpdateHotspot } from '../hooks/useCanvasData.js'
+import { toast } from 'sonner'
 import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
@@ -54,7 +55,7 @@ export default function BoardEditor() {
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
-  const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId)
+  const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
   const { presence } = useCanvasRealtime(boardId)
   // Lets MirAI answer about "this Board" without the user naming it.
   useMiraiRecordContext({ recordType: 'board', recordId: board.data?.id, label: board.data?.name })
@@ -154,7 +155,11 @@ export default function BoardEditor() {
       links={links}
       presence={presence}
       actions={{
-        patch: actions.patch, remove: actions.remove, duplicate: actions.duplicate, arrange: actions.arrange,
+        patch: actions.patch, remove: actions.remove,
+        hotspotColor: (object, color) => {
+          if (!object.hotspot) return toast.info('Espera un momento: el hotspot todavía se está guardando.')
+          updateHotspot.mutate({ hotspotId: object.hotspot.id, data: { color } }, { onError: (error) => toast.error(error.message) })
+        }, duplicate: actions.duplicate, arrange: actions.arrange,
         openHotspot: (object) => setDialog({ kind: 'hotspot', id: object.id }),
         editText: (object) => setDialog({ kind: 'text', id: object.id }),
       }}

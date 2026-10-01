@@ -8,6 +8,7 @@ import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
 import { useAttachmentMutations, useAttachments, useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { CANVAS_COLORS } from '../lib/objectFactory.js'
+import { hotspotColor } from './inspector/ObjectInspector.jsx'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
 import { Choice, ColorSwatches, Section } from './inspector/fields.jsx'
 
@@ -59,13 +60,13 @@ function AttachmentsSection({ boardId, hotspotId }) {
   )
 }
 
-function HotspotForm({ boardId, pageId, hotspot, links, onClose }) {
+function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose }) {
   const update = useUpdateHotspot(boardId, pageId)
   const [form, setForm] = useState({
-    title: hotspot.title ?? '', description: hotspot.description ?? '', status: hotspot.status ?? 'ACTIVE', color: hotspot.color ?? '#ef4444',
+    title: hotspot.title ?? '', description: hotspot.description ?? '', status: hotspot.status ?? 'ACTIVE', color: initialColor,
   })
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  const dirty = form.title !== (hotspot.title ?? '') || form.description !== (hotspot.description ?? '') || form.status !== (hotspot.status ?? 'ACTIVE') || form.color !== (hotspot.color ?? '#ef4444')
+  const dirty = form.title !== (hotspot.title ?? '') || form.description !== (hotspot.description ?? '') || form.status !== (hotspot.status ?? 'ACTIVE') || form.color !== initialColor
 
   async function save(event) {
     event.preventDefault()
@@ -109,7 +110,7 @@ export function HotspotDialog({ boardId, pageId, object, links, onOpenChange }) 
     <Dialog open={Boolean(object)} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[min(92dvh,760px)] flex-col gap-0 p-0 sm:max-w-lg">
         {hotspot ? (
-          <HotspotForm key={hotspot.id} boardId={boardId} pageId={pageId} hotspot={hotspot} links={links} onClose={() => onOpenChange(false)} />
+          <HotspotForm key={hotspot.id} boardId={boardId} pageId={pageId} hotspot={hotspot} initialColor={hotspotColor(object)} links={links} onClose={() => onOpenChange(false)} />
         ) : (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <DialogTitle className="text-base">Preparando hotspot…</DialogTitle>

@@ -15,6 +15,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           layerName={layers.find((layer) => layer.id === single.layerId)?.name}
           locked={lockedLayerIds.has(single.layerId)}
           onPatch={(change) => actions.patch([single], change)}
+          onHotspotColor={(color) => actions.hotspotColor(single, color)}
           onDelete={() => actions.remove([single])}
           onDuplicate={() => actions.duplicate([single])}
           onArrange={(where) => actions.arrange([single], where)}
