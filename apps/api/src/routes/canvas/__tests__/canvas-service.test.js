@@ -143,3 +143,20 @@ describe('Runly Canvas hotspot attachments', () => {
     assert.equal(rows[0].fileAssetId, 'f1')
   })
 })
+
+describe('Runly Canvas collaborators', () => {
+  it('shares a board with a valid Prisma upsert (create + update) and refuses the owner', async () => {
+    let upsertArgs
+    const prisma = {
+      canvasBoard: { findFirst: async () => accessibleBoard() },
+      canvasCollaborator: { upsert: async (args) => { upsertArgs = args; return { id: 'c1', ...args.create } } },
+      auditLog: { create: async () => ({}) },
+    }
+    const service = createCanvasService({ prisma })
+    const row = await service.addCollaborator(COMPANY, USER, BOARD, { userId: 'friend', role: 'EDITOR' }, async () => {})
+    assert.deepEqual(Object.keys(upsertArgs).sort(), ['create', 'update', 'where'])
+    assert.equal(upsertArgs.create.role, 'EDITOR')
+    assert.equal(row.userId, 'friend')
+    await assert.rejects(() => service.addCollaborator(COMPANY, USER, BOARD, { userId: USER, role: 'VIEWER' }, async () => {}), (error) => error.status === 409)
+  })
+})

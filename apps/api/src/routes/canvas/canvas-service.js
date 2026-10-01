@@ -399,12 +399,15 @@ export function createCanvasService({ prisma, entityResolver = null }) {
   }
 
   async function addCollaborator(companyId, actorId, boardId, data, assertCandidate) {
-    await assertBoardAccess(companyId, actorId, boardId, 'OWNER')
-    if (!['EDITOR', 'COMMENTER', 'VIEWER'].includes(data.role)) throw new CanvasServiceError('Rol de colaborador no válido.', 400)
+    const { board } = await assertBoardAccess(companyId, actorId, boardId, 'OWNER')
+    if (!['EDITOR', 'COMMENTER', 'VIEWER'].includes(data?.role)) throw new CanvasServiceError('Rol de colaborador no válido.', 400)
+    if (!data?.userId) throw new CanvasServiceError('Indica a quién compartir el Board.', 400)
+    if (data.userId === board.ownerId) throw new CanvasServiceError('El propietario ya tiene acceso total al Board.', 409)
     await assertCandidate(data.userId)
     const row = await prisma.canvasCollaborator.upsert({
       where: { boardId_userId: { boardId, userId: data.userId } },
-      update: { role: data.role }, data: { boardId, userId: data.userId, role: data.role, createdBy: actorId },
+      update: { role: data.role },
+      create: { boardId, userId: data.userId, role: data.role, createdBy: actorId },
     })
     await audit(prisma, { companyId, actorId, action: 'BOARD_SHARED', entityType: 'CanvasBoard', entityId: boardId, metadata: { userId: data.userId, role: data.role } })
     return row
