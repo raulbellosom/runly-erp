@@ -1,6 +1,6 @@
 # MirAI capabilities: runly.ledger, runly.hr, runly.fleet (step 5 of the MirAI roadmap)
 
-- Status: Draft
+- Status: Implemented, pending manual acceptance (§6)
 - Date: 2026-09-30
 - Contract and definition of done: `docs/ai-context/mirai-module-capabilities.md`;
   common rules: `2026-09-30-mirai-remaining-modules-design.md` §2.

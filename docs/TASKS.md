@@ -1702,3 +1702,15 @@ Spec: `docs/superpowers/specs/2026-09-28-inventory-types-models-catalogs-design.
 
 - [ ] "Tipo" unified onto InvCategory, InvModel (type + brand + year) with item modelId, Catálogos redesign (side list, icons, counts) and fixed-column import for tipos/marcas/modelos/ubicaciones. Automated evidence 2026-09-28: migration `20260928120000_inventory_models_types` applied to dev (`prisma migrate status` up to date); `node --test` inventory/help/router/renderer suites 198/198 pass; `pnpm lint` exit 0; `pnpm build:web` built; API boots (`/health` 200). Pending before `[x]`: authenticated curl smoke test of `/inventory/models`, `/inventory/categories`, import template, and the in-app manual check (plan Task 12 Step 4).
 - [ ] runly.inventory: large catalog/asset import with column mapping (ledger-style) — separate spec
+
+## runly.chat — MirAI global: un solo asistente con capacidades por módulo (2026-09-30)
+
+Specs: `docs/superpowers/specs/2026-09-30-mirai-actions-design.md`, `2026-09-30-mirai-global-capabilities-design.md`, `2026-09-30-mirai-pfm-capability-design.md`, `2026-09-30-mirai-inventory-capability-design.md`, `2026-09-30-mirai-remaining-modules-design.md`, `2026-09-30-mirai-ledger-hr-fleet-design.md` (planes homónimos en `docs/superpowers/plans/`). Contrato y estado por módulo: `docs/ai-context/mirai-module-capabilities.md`.
+
+- [ ] Acciones confirmables (tabla `mirai_action_proposals`, migración `20261001130000_mirai_action_proposals` aplicada a dev; confirmación atómica, re-chequeo de permiso, auditoría, nota de sistema). Automatizado 2026-09-30: pruebas `node --test` verdes.
+- [ ] Pestaña lateral global de MirAI en todas las pantallas (oculta en Chat), contexto de pantalla, adjuntos (`read_attachment`), `web_search` dentro del turno, carga de herramientas por módulo (`list_modules` / `use_module`).
+- [ ] Capacidades: calendario, finanzas personales, inventario, proyectos, notas, contactos, compras, libro de cuentas (incluye importar estado de cuenta adjunto), recursos humanos y flotilla. Los asistentes propios de PFM e Inventario se eliminaron.
+- [ ] Limpieza: herramientas base `list_my_calendar`, `list_my_tasks`, `list_bank_accounts`, `search_inventory` retiradas; `PFM_ASSISTANT_MODEL` eliminado de config/instaladores; `pfm.assistant.use` marcado obsoleto.
+- Evidencia automatizada 2026-09-30: suites de chat, calendario, pfm, inventario, proyectos, notas, contactos, compras, ledger, hr, fleet, services y `miraiPageContext` verdes salvo 2 fallas preexistentes ajenas (`fallbacks do not recreate an old name...`, `createSupportReportService.sendBugReport`); `npx eslint` limpio en lo tocado; `pnpm build:web` OK.
+- **No verificado**: ningún flujo probado con el modelo real ni en la app (falta reiniciar la API y la aceptación manual de cada spec, sección "Acceptance"). Por eso nada se marca `[x]`.
+- Pendiente: módulos sin capacidad (archivos, documentos, punto de venta, sitio web, growth) y módulos RME3 personalizados; borrar con migración las tablas sin uso de los asistentes anteriores (hilos de PFM, `inventory_assistant_thread`) y el permiso `pfm.assistant.use` cuando el usuario lo confirme.
