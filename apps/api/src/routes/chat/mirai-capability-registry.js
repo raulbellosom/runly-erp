@@ -2,8 +2,10 @@
 //
 // Module capabilities MirAI can use (spec 2026-09-30-mirai-global-capabilities
 // §5): read tools, confirmable actions and page-context descriptions. A module
-// is available when it is INSTALLED + enabled and the caller holds at least one
-// of its tool/action permissions in the ACTIVE company.
+// is available when it is INSTALLED + enabled on the instance, NOT disabled for
+// the active company (CompanyModule, absence = enabled — same rule as
+// company-module-service.js), and the caller holds at least one of its
+// tool/action permissions in the ACTIVE company.
 import { hasScopedPermission } from "./mirai-scoped-context.js";
 import { buildActionContext } from "./mirai-proposal-service.js";
 
@@ -13,8 +15,9 @@ export function createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext,
   const byModule = new Map(capabilities.map((c) => [c.moduleKey, c]));
   const actionModule = new Map(capabilities.flatMap((c) => (c.actions ?? []).map((a) => [a.key, c.moduleKey])));
   let moduleCache = { at: 0, keys: new Set() };
+  const companyCache = new Map(); // companyId -> { at, disabled: Set<moduleKey> }
 
-  async function enabledModuleKeys() {
+  async function installedModuleKeys() {
     if (Date.now() - moduleCache.at < MODULE_CACHE_MS) return moduleCache.keys;
     const rows = await prisma.runlyModule.findMany({
       where: { key: { in: [...byModule.keys()] }, status: "INSTALLED", enabled: true },
@@ -22,6 +25,23 @@ export function createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext,
     });
     moduleCache = { at: Date.now(), keys: new Set(rows.map((r) => r.key)) };
     return moduleCache.keys;
+  }
+
+  async function disabledForCompany(companyId) {
+    const cached = companyCache.get(companyId);
+    if (cached && Date.now() - cached.at < MODULE_CACHE_MS) return cached.disabled;
+    const rows = await prisma.companyModule.findMany({
+      where: { companyId, enabled: false },
+      select: { module: { select: { key: true } } },
+    });
+    const disabled = new Set(rows.map((r) => r.module?.key).filter(Boolean));
+    companyCache.set(companyId, { at: Date.now(), disabled });
+    return disabled;
+  }
+
+  async function enabledModuleKeys(companyId) {
+    const [installed, disabled] = await Promise.all([installedModuleKeys(), disabledForCompany(companyId)]);
+    return new Set([...installed].filter((key) => !disabled.has(key)));
   }
 
   function allowedPart(cap, scope) {
@@ -39,7 +59,7 @@ export function createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext,
   async function listModules(ctx) {
     const scope = await resolveScopedErpContext(ctx);
     if (scope.error) return scope;
-    const enabled = await enabledModuleKeys();
+    const enabled = await enabledModuleKeys(scope.companyId);
     const modules = capabilities
       .filter((c) => enabled.has(c.moduleKey))
       .map((c) => allowedPart(c, scope))

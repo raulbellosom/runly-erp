@@ -15,6 +15,7 @@ import { useChatMessages, useSendMessage } from "../hooks/useChatMessages";
 import { useChatPresence } from "../hooks/useChatPresence";
 import { useChatUpload } from "../hooks/useChatUpload";
 import { MiraiProposalCard } from "./MiraiProposalCard";
+import { EntityReferenceCard } from "./EntityReferenceCard";
 import { AttachmentPreviewCard } from "./AttachmentPreviewCard";
 import { AttachmentsBlock } from "./MessageAttachments";
 import { ChatAttachmentViewer } from "./ChatAttachmentViewer";
@@ -70,7 +71,7 @@ function Bubble({ role, content }) {
         className={[
           "min-w-0 max-w-[85%] wrap-anywhere rounded-2xl px-3 py-2 text-sm",
           isUser
-            ? "whitespace-pre-wrap bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+            ? "whitespace-pre-wrap bg-(--brand-primary) text-(--brand-primary-foreground)"
             : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
         ].join(" ")}
       >
@@ -318,6 +319,13 @@ export function MiraiSidebarThread({ conversationId, onSent }) {
                   isOwn={m.sender_type === "user"}
                   messageId={m.id}
                 />
+              </div>
+            )}
+            {m.sender_type !== "user" && m.metadata?.entityRefs?.length > 0 && (
+              <div className="ml-9 flex max-w-[85%] flex-col gap-1">
+                {m.metadata.entityRefs.map((ref, idx) => (
+                  <EntityReferenceCard key={`${ref.entityType}:${ref.recordId}:${idx}`} reference={ref} />
+                ))}
               </div>
             )}
             {m.metadata?.miraiProposalId && (

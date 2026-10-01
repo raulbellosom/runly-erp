@@ -23,6 +23,7 @@ import { createMiraiTtsService } from "./mirai-tts-service.js";
 import { createCallTranscriptService } from "../calls/call-transcript-service.js";
 import { createMiraiRoutes } from "./mirai-routes.js";
 import { createMiraiActionsStack } from "./mirai-actions-wiring.js";
+import { createShowRecordsTool } from "./mirai-record-links.js";
 import { createVisionService } from "../../services/vision-service.js";
 import { createChatExternalInboxService } from "./chat-external-inbox-service.js";
 import { createChatModerationService, ChatModerationServiceError } from "./chat-moderation-service.js";
@@ -177,6 +178,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     calendarEventService,
     callTranscriptService,
     moduleTools: miraiActions.moduleTools,
+    showRecords: createShowRecordsTool({ resolveEntityRefs: entityReferencesService.resolveEntityRefs }),
   });
   const miraiTtsService = createMiraiTtsService();
 

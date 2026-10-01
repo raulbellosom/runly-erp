@@ -69,7 +69,9 @@ the per-turn loader the tool loop actually calls:
   `search_my_conversations`, `search_runly`, `search_module_help`,
   `list_call_transcripts`, `get_call_transcript`, ...), any module read tool
   not yet migrated to this contract, `web_search` when configured, plus
-  `list_modules`, `use_module`, `propose_action`, `cancel_proposal`.
+  `list_modules`, `use_module`, `propose_action`, `cancel_proposal`, `show_records` (record cards with links, resolved through Chat's entity-reference service so only records the user can open in the active company appear; direct conversation only).
+
+Module availability per turn: installed + enabled on the instance, not disabled for the active company (`CompanyModule`), and at least one tool/action permission in the active company.
 - `list_modules()` -> the modules available to the caller:
   `{ moduleKey, label, summary, toolCount, actionCount }`.
 - `use_module({ moduleKey })` -> activates that module's tools for the rest of

@@ -24,12 +24,13 @@ function fakeAction(over = {}) {
   };
 }
 
-function fakePrisma({ installed = ["runly.calendar"], row = null } = {}) {
+function fakePrisma({ installed = ["runly.calendar"], companyDisabled = [], row = null } = {}) {
   const state = { sql: [], audit: [], row };
   const text = (s) => s.join("?");
   return {
     state,
     runlyModule: { findMany: async () => installed.map((key) => ({ key })) },
+    companyModule: { findMany: async () => companyDisabled.map((key) => ({ module: { key } })) },
     auditLog: { create: async ({ data }) => { state.audit.push(data); } },
     $executeRaw: async (s) => { state.sql.push(text(s)); return 1; },
     $queryRaw: async (s, ...v) => {
@@ -59,6 +60,10 @@ test("registry hides modules without permission or with the module disabled", as
   assert.equal((await disabled.listModules(ctx)).modules.length, 0);
   const ok = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
   assert.equal((await ok.listModules(ctx)).modules.length, 1);
+  // Installed on the instance but switched off for the active company.
+  const companyOff = createMiraiCapabilityRegistry({ prisma: fakePrisma({ companyDisabled: ["runly.calendar"] }), resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
+  assert.equal((await companyOff.listModules(ctx)).modules.length, 0);
+  assert.ok((await companyOff.resolve(ctx, "calendar.event.create")).error);
 });
 
 test("describeContext returns null when the module is not installed, and the module line with no recordId", async () => {
