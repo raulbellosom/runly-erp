@@ -16,6 +16,14 @@ export const miraiPageContextSchema = z.object({
   recordType: z.string().max(200).optional(),
   recordId: z.string().max(200).optional(),
   label: z.string().max(200).optional(),
+  // A list screen's active selection or filters (spec 2026-09-30-mirai-
+  // inventory-capability §3): "selected" ids win over "filtered" filters.
+  // The server still verifies any id belongs to the caller's company before use.
+  selection: z.object({
+    mode: z.enum(["filtered", "selected"]),
+    ids: z.array(z.string().uuid()).max(200).default([]),
+    filters: z.record(z.string(), z.unknown()).default({}),
+  }).optional(),
 });
 
 export function parseMiraiPageContext(value) {

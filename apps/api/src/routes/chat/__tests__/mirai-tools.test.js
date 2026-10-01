@@ -23,7 +23,7 @@ test("TOOL_DEFS lists every read tool with JSON schemas", () => {
   assert.deepEqual(names, [
     "describe_image", "get_call_transcript", "get_conversation_messages", "get_recent_messages",
     "list_bank_accounts", "list_call_transcripts", "list_conversation_files",
-    "list_my_tasks", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
+    "list_my_tasks", "read_attachment", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
   ]);
   for (const t of TOOL_DEFS) assert.equal(t.type, "function");
 });
@@ -208,6 +208,30 @@ test("describe_image rejects a non-image attachment without calling vision", asy
   const out = await runners.describe_image({ attachmentId: "att1" }, ctx);
   assert.equal(visionCalled, false);
   assert.match(out.error, /no es una imagen/i);
+});
+
+test("read_attachment: not a member of the attachment's conversation -> Sin acceso, no download attempted", async () => {
+  const prisma = { $queryRaw: async () => [{ id: "att1", file_name: "factura.pdf", mime_type: "application/pdf", object_key: "k", bucket: "runly-chat", conversation_id: "conv1" }] };
+  const listMessages = async () => { throw Object.assign(new Error("No perteneces a esta conversacion."), { status: 403 }); };
+  let downloaded = false;
+  const runners = buildToolRunners({ prisma, listMessages, chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => { downloaded = true; return "http://x"; } });
+  const out = await runners.read_attachment({ attachmentId: "att1" }, ctx);
+  assert.match(out.error, /Sin acceso/i);
+  assert.equal(downloaded, false);
+});
+
+test("read_attachment: downloads the attachment, reads it and caps the result at 12000 chars", async (t) => {
+  t.mock.method(global, "fetch", async () => ({ ok: true, arrayBuffer: async () => new TextEncoder().encode("hola").buffer }));
+  const prisma = { $queryRaw: async () => [{ id: "att1", file_name: "notas.txt", mime_type: "text/plain", object_key: "k", bucket: "runly-chat", conversation_id: "conv1" }] };
+  const runners = buildToolRunners({
+    prisma, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {},
+    signAttachmentUrl: async () => "http://x",
+    attachmentReader: { read: async ({ buffer, name }) => { assert.equal(buffer.toString(), "hola"); assert.equal(name, "notas.txt"); return { text: "x".repeat(13000), truncated: false }; } },
+  });
+  const out = await runners.read_attachment({ attachmentId: "att1" }, ctx);
+  assert.equal(out.name, "notas.txt");
+  assert.equal(out.text.length, 12000);
+  assert.equal(out.truncated, true);
 });
 
 test("search_my_conversations passes the query through to chatSearchService", async () => {

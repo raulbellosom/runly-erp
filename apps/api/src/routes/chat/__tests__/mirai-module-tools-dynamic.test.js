@@ -61,6 +61,18 @@ test("parseMiraiPageContext rejects an oversized moduleKey", () => {
   assert.deepEqual(parseMiraiPageContext({ moduleKey: "runly.calendar" }), { moduleKey: "runly.calendar" });
 });
 
+test("parseMiraiPageContext accepts a valid selection", () => {
+  const uuid = "11111111-1111-1111-8111-111111111111";
+  const out = parseMiraiPageContext({ moduleKey: "runly.inventory", selection: { mode: "selected", ids: [uuid] } });
+  assert.deepEqual(out.selection, { mode: "selected", ids: [uuid], filters: {} });
+});
+
+test("parseMiraiPageContext rejects a selection with more than 200 ids", () => {
+  const uuid = "11111111-1111-1111-8111-111111111111";
+  const out = parseMiraiPageContext({ moduleKey: "runly.inventory", selection: { mode: "selected", ids: Array.from({ length: 201 }, () => uuid) } });
+  assert.equal(out, null);
+});
+
 test("createWebSearchTool: disabled errors, enabled respects the per-turn budget, snippet is capped", async () => {
   const disabled = createWebSearchTool({ search: async () => ({}), enabled: false, checkRate: () => true });
   const off = await disabled.run({ query: "precio del cafe" }, {});

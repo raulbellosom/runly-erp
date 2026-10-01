@@ -75,7 +75,7 @@ export function createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext,
     try {
       const out = await getModule(ctx, pageContext.moduleKey);
       if (out.error) return null;
-      if (!pageContext.recordId || !out.module.describeContext) return `El usuario esta en el modulo ${out.module.label}.`;
+      if ((!pageContext.recordId && !pageContext.selection) || !out.module.describeContext) return `El usuario esta en el modulo ${out.module.label}.`;
       const line = await out.module.describeContext(pageContext, buildActionContext(prisma, out.scope, ctx));
       return line ?? `El usuario esta en el modulo ${out.module.label}.`;
     } catch {

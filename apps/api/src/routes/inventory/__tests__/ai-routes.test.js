@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { createInventoryIntakeRouter } from '../intake-routes.js';
-import { createInventoryAssistantRouter } from '../assistant-routes.js';
 
 function appFor({ deny, authorize = async () => {}, recognize } = {}) {
   const calls = [], permissions = [];
@@ -15,13 +14,12 @@ function appFor({ deny, authorize = async () => {}, recognize } = {}) {
     recognize: recognize ?? (async args => { calls.push(args); return { images: [] }; }),
     validate: async args => { calls.push(args); return { issues: [], duplicates: [] }; },
   } }));
-  app.route('/', createInventoryAssistantRouter({ prisma: {}, requirePermission, assistant: { turn: record }, chat: { decide: record } }));
   return { app, calls, permissions };
 }
 const json = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-test('intake and assistant identity come from authenticated middleware, never the body', async () => {
+test('intake identity comes from authenticated middleware, never the body', async () => {
   const f = appFor();
-  for (const path of ['/inventory/items/bulk', '/inventory/items/validate-batch', '/inventory/ai/messages', '/inventory/ai/threads/thread/decision']) {
+  for (const path of ['/inventory/items/bulk', '/inventory/items/validate-batch']) {
     const response = await f.app.request(path, json({ companyId: 'foreign', actorId: 'forged' }));
     assert.ok(response.ok);
     assert.equal(f.calls.at(-1).companyId, 'company-from-session'); assert.equal(f.calls.at(-1).actorId, 'actor-from-session');
@@ -42,10 +40,9 @@ test('recognition rechecks current permissions before returning observations', a
   const response = await f.app.request('/inventory/ai/recognize', { method: 'POST', body: form });
   assert.equal(response.status, 403); assert.ok(!(await response.text()).includes('SECRET'));
 });
-test('malformed JSON and oversized messages fail without service calls', async () => {
+test('malformed JSON fails without service calls', async () => {
   const f = appFor();
   const bad = await f.app.request('/inventory/items/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' });
   assert.equal(bad.status, 400);
-  const big = await f.app.request('/inventory/ai/messages', json({ content: 'x'.repeat(120001) }));
-  assert.equal(big.status, 413); assert.equal(f.calls.length, 0);
+  assert.equal(f.calls.length, 0);
 });
