@@ -157,17 +157,6 @@ export const TOOL_DEFS = [
   {
     type: "function",
     function: {
-      name: "list_my_tasks",
-      description: "Lista las tareas asignadas al propio usuario en sus proyectos, ordenadas por fecha de vencimiento. Ej: 'que tareas tengo pendientes'.",
-      parameters: {
-        type: "object",
-        properties: { status: { type: "string", description: "Filtro opcional por id de estado." } },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "list_call_transcripts",
       description: "Lista las transcripciones de llamadas/videollamadas grabadas en una conversacion (por defecto la actual) a las que el usuario tiene acceso: id, estado, cuando se genero, duracion. Usa esto antes de get_call_transcript para saber que transcriptId pedir. Solo devuelve transcripciones en las que el usuario participo en la llamada o que el mismo solicito.",
       parameters: {
@@ -204,7 +193,7 @@ function trimMessage(m) {
 
 export function buildToolRunners({
   prisma, listMessages, chatSearchService, visionService, signAttachmentUrl, resolveUserContext,
-  inventoryService, ledgerService, projectsService, tasksService,
+  inventoryService, ledgerService,
   callTranscriptService,
   attachmentReader = createAttachmentReader({ vision: visionService }),
 }) {
@@ -440,37 +429,6 @@ export function buildToolRunners({
     }
   }
 
-  async function list_my_tasks(args, ctx) {
-    if (!projectsService?.listProjects || !tasksService?.listTasks) return { error: "El modulo de proyectos no esta disponible." };
-    const c = await erpContext(ctx, "projects.task.read");
-    if (c.error) return c;
-    try {
-      const projects = (await projectsService.listProjects(c.companyId, c.userId)) ?? [];
-      const scanned = projects.slice(0, 8);
-      const perProject = await Promise.all(
-        scanned.map(async (p) => {
-          const tasks = (await tasksService.listTasks(p.id, { assigneeId: c.userId, statusId: args?.status || undefined }).catch(() => [])) ?? [];
-          return tasks.map((t) => ({
-            titulo: t.title ?? null,
-            proyecto: p.name ?? null,
-            estado: t.status?.name ?? null,
-            prioridad: t.priority ?? null,
-            // eslint-disable-next-line no-restricted-syntax -- task.dueDate is a @db.Date (date-only); format the calendar date as UTC
-            vence: t.dueDate ? (t.dueDate instanceof Date ? t.dueDate.toISOString().slice(0, 10) : String(t.dueDate).slice(0, 10)) : null,
-          }));
-        }),
-      );
-      const tareas = perProject.flat()
-        .sort((a, b) => String(a.vence ?? "9999").localeCompare(String(b.vence ?? "9999")))
-        .slice(0, 20);
-      const out = { tareas };
-      if (projects.length > 8) out.note = "Solo revise tus primeros 8 proyectos.";
-      return out;
-    } catch (err) {
-      return { error: `No pude consultar tus tareas: ${String(err?.message ?? err).slice(0, 140)}` };
-    }
-  }
-
   async function list_call_transcripts(args, ctx) {
     if (!callTranscriptService) return { error: "Las transcripciones no estan disponibles aqui." };
     const resolved = await resolveScopedErpContext(ctx);
@@ -527,7 +485,7 @@ export function buildToolRunners({
   return {
     get_recent_messages, get_conversation_messages, search_my_conversations,
     list_conversation_files, describe_image, read_attachment, search_runly, search_module_help,
-    search_inventory, list_bank_accounts, list_my_tasks,
+    search_inventory, list_bank_accounts,
     list_call_transcripts, get_call_transcript,
   };
 }

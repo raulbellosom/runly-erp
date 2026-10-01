@@ -12,6 +12,13 @@ import { createCalendarMiraiCapabilities } from "../calendar/mirai-capabilities.
 import { createCalendarEventEffects } from "../calendar/calendar-event-effects.js";
 import { createPfmMiraiCapabilities } from "../pfm/mirai-capabilities.js";
 import { createInventoryMiraiCapabilities } from "../inventory/mirai-capabilities.js";
+import { createContactsMiraiCapabilities } from "../contacts/mirai-capabilities.js";
+import { createPurchasesMiraiCapabilities } from "../purchases/mirai-capabilities.js";
+import { createProjectsMiraiCapabilities } from "../projects/mirai-capabilities.js";
+import { createProjectsTaskEffects } from "../projects/projects-task-effects.js";
+import { createProjectsNotificationService } from "../projects/projects-notification-service.js";
+import { createProjectsCalendarBridge } from "../projects/projects-calendar-bridge.js";
+import { createNotesMiraiCapabilities } from "../notes/mirai-capabilities.js";
 
 function createActionNotePoster({ prisma, broadcaster }) {
   return async function postNote({ proposal, text }) {
@@ -46,7 +53,7 @@ function createActionNotePoster({ prisma, broadcaster }) {
   };
 }
 
-export function createMiraiActionsStack({ prisma, broadcaster = null, resolveUserContext, calendarEventService }) {
+export function createMiraiActionsStack({ prisma, broadcaster = null, notificationService = null, resolveUserContext, calendarEventService }) {
   const capabilities = [
     createCalendarMiraiCapabilities({
       prisma,
@@ -55,6 +62,18 @@ export function createMiraiActionsStack({ prisma, broadcaster = null, resolveUse
     }),
     createPfmMiraiCapabilities({ prisma }),
     createInventoryMiraiCapabilities({ prisma }),
+    createContactsMiraiCapabilities({ prisma }),
+    createPurchasesMiraiCapabilities({ prisma, broadcaster }),
+    createProjectsMiraiCapabilities({
+      prisma,
+      effects: createProjectsTaskEffects({
+        prisma,
+        notifSvc: createProjectsNotificationService({ prisma, notificationService }),
+        bridge: createProjectsCalendarBridge({ prisma }),
+        broadcaster,
+      }),
+    }),
+    createNotesMiraiCapabilities({ prisma }),
   ];
   const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
   const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext, capabilities });

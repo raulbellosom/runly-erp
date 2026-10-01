@@ -5,6 +5,7 @@ import { createDependenciesService, DependencyServiceError } from './projects-de
 import { createFieldsService, FieldServiceError } from './projects-fields-service.js'
 import { createProjectsCalendarBridge } from './projects-calendar-bridge.js'
 import { createProjectsNotificationService } from './projects-notification-service.js'
+import { createProjectsTaskEffects } from './projects-task-effects.js'
 import { publishActivityFromContext } from '../../services/activity-publisher.js'
 import { parseMentionIds } from '../../lib/mention-utils.js'
 import { createCommentsService, CommentsServiceError } from '../../services/comments-service.js'
@@ -47,6 +48,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   const fieldsSvc = createFieldsService({ prisma })
   const bridge = createProjectsCalendarBridge({ prisma })
   const notifSvc = createProjectsNotificationService({ prisma, notificationService })
+  const taskEffects = createProjectsTaskEffects({ prisma, notifSvc, bridge, broadcaster })
   const commentsSvc = createCommentsService({ prisma })
   const fileAccess = createFileAccess({ prisma })
 
@@ -329,13 +331,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     try {
       const body = await c.req.json()
       const task = await tasksSvc.createTask(c.req.param('id'), getUserId(c), body)
-      await notifSvc.notifyTaskAssigned({ companyId: getCompanyId(c), actorId: getUserId(c), taskId: task.id, assignedUserId: task.assigneeId })
-      if (task.dueDate) {
-        const project = await prisma.project.findFirst({ where: { id: task.projectId } })
-        await bridge.syncTaskEvent(task, project?.calendarId)
-        broadcastCalendarSync(c)
-      }
-      broadcastTaskEvent(task.projectId, task.id, 'created')
+      await taskEffects.afterCreate(c, task)
       return c.json(task, 201)
     } catch (err) { return handleError(c, err, 'Error al crear tarea.') }
   })
@@ -374,38 +370,9 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
     try {
       const taskId = c.req.param('tid')
       const body = await c.req.json()
-      const previous = await prisma.task.findFirst({ where: { id: taskId }, select: { id: true, statusId: true, assigneeId: true } })
-      const oldStatusId = previous?.statusId ?? null
+      const previous = await prisma.task.findFirst({ where: { id: taskId }, select: { id: true, statusId: true, assigneeId: true, projectId: true } })
       const task = await tasksSvc.updateTask(taskId, body)
-      await notifyTaskChanges(c, previous, { assigneeId: body.assigneeId })
-      if (body.dueDate !== undefined) {
-        const project = await prisma.project.findFirst({ where: { id: task.projectId } })
-        await bridge.syncTaskEvent(task, project?.calendarId)
-        broadcastCalendarSync(c)
-      }
-      if (body.statusId && oldStatusId && oldStatusId !== body.statusId) {
-        await notifSvc.notifyTaskStatusChanged({
-          companyId: getCompanyId(c),
-          actorId: getUserId(c),
-          taskId,
-          oldStatusId,
-          newStatusId: body.statusId,
-        })
-        prisma.taskStatus.findMany({
-          where: { id: { in: [oldStatusId, body.statusId] } },
-          select: { id: true, name: true },
-        }).then((statuses) => {
-          const oldS = statuses.find((s) => s.id === oldStatusId)
-          const newS = statuses.find((s) => s.id === body.statusId)
-          publishActivityFromContext(prisma, c, {
-            type: 'projects.task.status_changed',
-            summary: `${getActorName(c)} cambió estado de ${oldS?.name ?? '—'} → ${newS?.name ?? '—'}`,
-            entityType: 'Task',
-            entityId: taskId,
-          })
-        }).catch(() => {})
-      }
-      broadcastTaskEvent(task.projectId ?? c.req.param('id'), task.id, 'updated')
+      await taskEffects.afterUpdate(c, previous, task, body)
       return c.json(task)
     } catch (err) { return handleError(c, err, 'Error al actualizar tarea.') }
   })
@@ -413,11 +380,7 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.delete('/projects/:id/tasks/:tid', requirePermission('projects.task.delete'), requireProjectAccess('MEMBER'), async (c) => {
     try {
       const task = await tasksSvc.deleteTask(c.req.param('tid'))
-      if (task.calendarEventId) {
-        await bridge.deleteTaskEvent(task.calendarEventId)
-        broadcastCalendarSync(c)
-      }
-      broadcastTaskEvent(c.req.param('id'), c.req.param('tid'), 'deleted')
+      await taskEffects.afterDelete(c, task)
       return c.json({ ok: true })
     } catch (err) { return handleError(c, err, 'Error al eliminar tarea.') }
   })

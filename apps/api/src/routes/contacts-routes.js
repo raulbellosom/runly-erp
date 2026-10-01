@@ -13,6 +13,7 @@ import { formatLocalDateTime, toLocalIso } from "@runly/core";
 import { createContactsService, ContactsServiceError } from "../services/contacts-service.js";
 import { publishActivityFromContext, getActivityContext } from "../services/activity-publisher.js";
 import { registerContactsProfileRoutes } from "./contacts-profile-routes.js";
+import { createContactsEffects } from "./contacts/contacts-effects.js";
 
 function formatAddress(address) {
   if (!address) return "";
@@ -25,6 +26,7 @@ function formatAddress(address) {
 export function createContactsRouter({ prisma, requirePermission, supabaseAdmin = null, storageBucket }) {
   const app = new Hono();
   const contactsService = createContactsService({ prisma, supabaseAdmin, storageBucket });
+  const effects = createContactsEffects({ prisma });
   registerContactsProfileRoutes(app, { prisma, requirePermission, contactsService });
 
   app.get(
@@ -106,14 +108,7 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
         const authUserId = c.get("authUserId");
         const payload = await c.req.json();
         const contact = await contactsService.create({ authUserId, companyId: c.get("companyId"), payload });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: "contacts.contact.create",
-          severity: "success",
-          entityType: "Contact",
-          entityId: contact.id,
-          summary: `${actorName} creó el contacto "${contact.name ?? ""}"`.trim(),
-        });
+        await effects.afterCreate(c, contact);
         return c.json({ data: contact }, 201);
       } catch (err) {
         if (err?.name === "ZodError") {
@@ -426,15 +421,7 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
         const id = c.req.param("id");
         const payload = await c.req.json();
         const contact = await contactsService.update({ authUserId, companyId: c.get("companyId"), id, payload });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: "contacts.contact.update",
-          severity: "info",
-          entityType: "Contact",
-          entityId: id,
-          summary:
-            `${actorName} actualizó el contacto "${contact.name ?? ""}"`.trim(),
-        });
+        await effects.afterUpdate(c, contact);
         return c.json({ data: contact });
       } catch (err) {
         if (err?.name === "ZodError") {
@@ -465,17 +452,7 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
           id,
           enabled,
         });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: contact.enabled
-            ? "contacts.contact.enable"
-            : "contacts.contact.disable",
-          severity: contact.enabled ? "info" : "warning",
-          entityType: "Contact",
-          entityId: id,
-          summary:
-            `${actorName} ${contact.enabled ? "habilitó" : "deshabilitó"} el contacto "${contact.name ?? ""}"`.trim(),
-        });
+        await effects.afterSetEnabled(c, contact);
         return c.json({ data: contact });
       } catch (err) {
         if (err instanceof ContactsServiceError) {
@@ -497,14 +474,7 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
         const authUserId = c.get("authUserId");
         const id = c.req.param("id");
         await contactsService.delete({ authUserId, companyId: c.get("companyId"), id });
-        const { actorName } = getActivityContext(c);
-        await publishActivityFromContext(prisma, c, {
-          type: "contacts.contact.delete",
-          severity: "warning",
-          entityType: "Contact",
-          entityId: id,
-          summary: `${actorName} eliminó un contacto`,
-        });
+        await effects.afterDelete(c, id);
         return c.json({ ok: true });
       } catch (err) {
         if (err instanceof ContactsServiceError) {

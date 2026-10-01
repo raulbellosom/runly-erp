@@ -23,7 +23,7 @@ test("TOOL_DEFS lists every read tool with JSON schemas", () => {
   assert.deepEqual(names, [
     "describe_image", "get_call_transcript", "get_conversation_messages", "get_recent_messages",
     "list_bank_accounts", "list_call_transcripts", "list_conversation_files",
-    "list_my_tasks", "read_attachment", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
+    "read_attachment", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
   ]);
   for (const t of TOOL_DEFS) assert.equal(t.type, "function");
 });
@@ -48,25 +48,10 @@ test("search_inventory: gated by inventory.item.read; maps rows to the safe shap
   assert.match(denied.error, /acceso/i);
 });
 
-test("list_my_tasks: iterates the caller's first 8 projects, filters by assignee", async () => {
-  const withPerm = async () => ({ profile: { id: "me" }, memberships: [membership({ companyId: "co1", permissions: ["projects.task.read"] })] });
-  const projects = Array.from({ length: 10 }, (_, i) => ({ id: `pr${i}`, name: `Proyecto ${i}` }));
-  let scanned = 0;
-  const projectsService = { listProjects: async (companyId, userId) => { assert.equal(userId, "me"); return projects; } };
-  const tasksService = {
-    listTasks: async (projectId, { assigneeId }) => {
-      scanned += 1;
-      assert.equal(assigneeId, "me");
-      return projectId === "pr0" ? [{ title: "Hacer X", status: { name: "En curso" }, priority: "HIGH", dueDate: "2026-09-10" }] : [];
-    },
-  };
-  const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: withPerm, projectsService, tasksService });
-  const out = await runners.list_my_tasks({}, { actorAuthUserId: "a", companyId: "co1" });
-  assert.equal(scanned, 8, "only the first 8 projects scanned");
-  assert.equal(out.tareas[0].titulo, "Hacer X");
-  assert.equal(out.tareas[0].proyecto, "Proyecto 0");
-  assert.match(out.note, /8 proyectos/);
-});
+// list_my_tasks was removed 2026-09-30: runly.projects now exposes
+// projects_list_tasks/projects_task_summary through the MirAI capability
+// registry (routes/projects/projects-mirai-queries.js), replacing this
+// core tool. See routes/projects/__tests__/projects-mirai.test.js.
 
 test("a missing ERP service dep -> friendly error, no throw", async () => {
   const runners = buildToolRunners({ prisma: {}, listMessages: async () => ({ data: [] }), chatSearchService: {}, visionService: {}, signAttachmentUrl: async () => "x", resolveUserContext: async () => ({ profile: { id: "p" }, memberships: [{ companyId: "c" }], isAdmin: true, permissionSet: new Set() }) });
