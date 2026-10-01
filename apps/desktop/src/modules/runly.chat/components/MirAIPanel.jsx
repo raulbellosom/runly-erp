@@ -10,6 +10,7 @@ import { useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPrefer
 import { useMiraiStatus } from "../hooks/useMirAI";
 import { useTtsStatus, useSpeakText } from "../hooks/useTextToSpeech";
 import { useMiraiPanelThread, useSendMiraiPanel, useClearMiraiPanel } from "../hooks/useMirAIPanel";
+import { MiraiProposalCard } from "./MiraiProposalCard";
 import { MIRAI_NAME } from "../lib/mirai";
 import "../chat-theme.css";
 
@@ -167,9 +168,18 @@ export function MirAIPanel({ open, onOpenChange, conversationId, focusMessage })
             />
           )}
 
-          {messages.map((m, i) => (
-            <Bubble key={m.createdAt ?? i} role={m.role} content={m.content} ttsEnabled={ttsEnabled} speech={speech} />
-          ))}
+          {messages.map((m, i) => (m.role === "system" ? (
+            <p key={m.createdAt ?? i} className="text-center text-xs text-[hsl(var(--muted-foreground))]">{m.content}</p>
+          ) : (
+            <div key={m.createdAt ?? i}>
+              <Bubble role={m.role} content={m.content} ttsEnabled={ttsEnabled} speech={speech} />
+              {m.proposalId && (
+                <div className="pl-9">
+                  <MiraiProposalCard proposalId={m.proposalId} conversationId={conversationId} />
+                </div>
+              )}
+            </div>
+          )))}
 
           {send.isPending && (
             <div className="flex items-center gap-2 px-1">

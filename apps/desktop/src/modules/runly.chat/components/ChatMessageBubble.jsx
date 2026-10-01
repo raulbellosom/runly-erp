@@ -14,6 +14,7 @@ import { MessageReactions } from "./MessageReactions";
 import { MessageReactionPicker } from "./MessageReactionPicker";
 import { EntityReferenceCard } from "./EntityReferenceCard";
 import { FileReferenceGroup } from "./FileReferenceGroup";
+import { MiraiProposalCard } from "./MiraiProposalCard";
 import { AttachmentsBlock } from "./MessageAttachments";
 import { isMergeableMediaMessage } from "../lib/messageMedia";
 import { MessageQuote } from "./MessageQuote";
@@ -1023,6 +1024,10 @@ export function ChatMessageBubble({
               ))}
               {fileRefs.length > 0 && <FileReferenceGroup references={fileRefs} isOwn={false} onOpen={onAttachmentClick} />}
             </div>
+          )}
+
+          {!isDeleted && isAssistant && message.metadata?.miraiProposalId && (
+            <MiraiProposalCard proposalId={message.metadata.miraiProposalId} conversationId={message.conversation_id} />
           )}
 
           {!isDeleted && (
