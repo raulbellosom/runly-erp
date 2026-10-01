@@ -84,10 +84,14 @@ model MiraiActionProposal {
   treated as `expired` on read and cannot be confirmed.
 - `input` holds the already-validated payload `execute` will receive.
 - `preview` holds human-readable data for the card (see 7.2).
-- The MirAI reply that carries the proposal is a `chat_messages` row with
-  `message_type = 'mirai_proposal'` and `metadata.proposalId`. If the
-  `message_type` check constraint does not allow the value, the migration
-  extends it.
+- Extra columns: `surface` (`direct` = MirAI 1:1 conversation, `panel` = private
+  side panel) and `thread_id` (panel thread, null for direct).
+- Direct surface: the MirAI reply that carries the proposal is a normal
+  `chat_messages` row (`message_type = 'text'`, so the existing
+  `chat_messages_message_type_check` is untouched) with
+  `metadata.miraiProposalId`.
+- Panel surface: panel replies live in `chat_mirai_message` (no metadata
+  column); the migration adds a nullable `proposal_id` column there.
 
 ## 6. Action contract and registry
 
@@ -107,7 +111,7 @@ export function createCalendarMiraiActions({ prisma, eventService, effects }) {
       description: "...",           // shown to the LLM
       parameters: { /* JSON schema for the LLM */ },
       async prepare(args, ctx) { /* -> { input, preview, targetId? } | { error } */ },
-      async execute(input, ctx) { /* -> { result, summary, link? } */ },
+      async execute(input, ctx) { /* -> { id, summary, link? } */ },
     },
   ];
 }
@@ -157,8 +161,10 @@ New tool definitions, added to the 1:1 conversation and panel tool lists (not
      note "Propuesta creada. NO se ha ejecutado nada."
 - `cancel_proposal()` -> cancels the actor's pending proposal in this conversation.
 
-When a turn produced a proposal, the assistant message is persisted with
-`message_type = 'mirai_proposal'` and `metadata.proposalId`.
+When a turn produced a proposal, the assistant reply is linked to it
+(`chat_messages.metadata.miraiProposalId` for direct,
+`chat_mirai_message.proposal_id` for panel) and `mirai_action_proposals.message_id`
+is set (direct only).
 
 System prompt additions (chat and panel prompts):
 
@@ -176,8 +182,8 @@ System prompt additions (chat and panel prompts):
 ### 7.2 Card
 
 `apps/desktop/src/modules/runly.chat/components/MiraiProposalCard.jsx`, rendered
-for `message_type = 'mirai_proposal'` in both the conversation view and the
-MirAI panel. It loads `GET /chat/mirai/proposals/:id`.
+under any message with `metadata.miraiProposalId` (conversation view) and any
+panel message with `proposalId` (MirAI panel). It loads `GET /chat/mirai/proposals/:id`.
 
 `preview` shape (produced by `prepare`):
 
@@ -227,7 +233,10 @@ Confirm, in `mirai-proposal-service.js`:
    metadata: `proposalId`, `operation`).
 6. Post a `system` chat message in the conversation:
    "Confirmado: <summary>" or "No se pudo ejecutar: <error>". This is what MirAI
-   sees on the next turn.
+   sees on the next turn. Direct surface: a `chat_messages` row with
+   `sender_type = 'system'`, `message_type = 'system'`. Panel surface: a
+   `chat_mirai_message` row with `role = 'system'` (fed to the model as
+   `[sistema] ...`, rendered as a centered note in the panel).
 7. Emit the realtime update for the proposal message.
 
 Cancel: `pending` -> `cancelled` (same ownership check), no system message.
@@ -250,8 +259,8 @@ behavior must be unchanged (existing calendar route tests must still pass).
 | Key | Permission | prepare | execute |
 |---|---|---|---|
 | `calendar.event.create` | `calendar.events.create` | args: `title`, `start`, `end?`, `allDay?`, `calendar?` (name; default = user's default/first owned calendar), `location?`, `description?`, `attendees?` (names/emails resolved to company users), `reminderMinutes?`. Validates `start < end`, resolves ids, checks calendar is accessible. | `eventService.createEvent` + create effects |
-| `calendar.event.update` | `calendar.events.update` | args: `eventId` or `query` + `date` to locate the event (via `listEvents`; ambiguous -> error listing candidates), plus changed fields. Preview shows before/after. | `eventService.updateEvent` + update effects |
-| `calendar.event.delete` | `calendar.events.delete` | locates the event as above; destructive. | `eventService.deleteEvent` (soft delete, `enabled=false`) + delete effects |
+| `calendar.event.update` | `calendar.events.update` | args: `eventId` (from `list_my_calendar`; recurrence instance ids `<id>_YYYYMMDD` map to the base event) plus only the changed fields. Moving `start` without `end` keeps the duration. Preview shows before/after. | `eventService.updateEvent` + update effects |
+| `calendar.event.delete` | `calendar.events.delete` | `eventId` as above; destructive. | `eventService.deleteEvent` (soft delete, `enabled=false`) + delete effects |
 
 `list_my_calendar` must include `eventId` in its output so MirAI can target
 update/delete precisely.
@@ -282,7 +291,7 @@ update/delete precisely.
 - Confirm service: rejects other actor (404), expired (409), double confirm (409);
   re-checks permission; records `failed` on execute error; writes audit and system message.
 - Calendar actions: create/update/delete `prepare` + `execute` against a fake event service;
-  ambiguous event lookup returns candidates.
+  unknown event returns an error; recurrence instance ids resolve to the base event.
 - Existing calendar route tests pass after the side-effects extraction.
 
 ## 12. Documentation
