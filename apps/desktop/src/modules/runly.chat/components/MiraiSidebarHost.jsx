@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useEnsureMiraiConversation, useMiraiStatus } from "../hooks/useMirAI";
 import { useMiraiThreads } from "../hooks/useMiraiThreads";
 import { MiraiSidebarThread } from "./MiraiSidebarThread";
-import { moduleKeyFromPath, shouldShowMiraiTab, useMiraiOpenRequest } from "../lib/miraiPageContext";
+import { moduleKeyFromPath, setVisibleMiraiConversation, shouldShowMiraiTab, useMiraiOpenRequest } from "../lib/miraiPageContext";
 import { useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
 import "../chat-theme.css";
 
@@ -73,7 +73,7 @@ export function MiraiSidebarHost() {
   const { prefs } = useChatPreferences();
   if (!visible) return null;
 
-  const panel = openedOnce && <MiraiPanel coarse={coarse} onClose={coarse ? undefined : () => setOpen(false)} />;
+  const panel = openedOnce && <MiraiPanel open={open} coarse={coarse} onClose={coarse ? undefined : () => setOpen(false)} />;
 
   return (
     <>
@@ -114,7 +114,7 @@ export function MiraiSidebarHost() {
   );
 }
 
-function MiraiPanel({ coarse, onClose }) {
+function MiraiPanel({ open, coarse, onClose }) {
   const navigate = useNavigate();
   const threadsApi = useMiraiThreads();
   const { list, activeId, setActiveId, create, rename, remove, refresh, threads } = threadsApi;
@@ -127,6 +127,12 @@ function MiraiPanel({ coarse, onClose }) {
   }, [ensure.data?.conversationId]);
 
   const [view, setView] = useState("chat");
+  // Tell RealtimeProvider which MirAI conversation is on screen.
+  const visibleId = open && view === "chat" ? conversationId : null;
+  useEffect(() => {
+    setVisibleMiraiConversation(visibleId);
+    return () => setVisibleMiraiConversation(null);
+  }, [visibleId]);
   const [renaming, setRenaming] = useState(null);
   const active = list.find((t) => t.id === conversationId);
 

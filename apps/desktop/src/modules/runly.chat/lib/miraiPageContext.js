@@ -75,3 +75,16 @@ export function shouldShowMiraiTab({ moduleKey, canUse, available }) {
   if (!canUse || !available) return false;
   return !HIDDEN_MODULES.has(moduleKey);
 }
+
+// The MirAI conversation currently on screen in the sidebar (null when closed).
+// RealtimeProvider treats it like an open Chat conversation: no "Nuevo
+// mensaje" toast and it is marked read.
+let visibleMiraiConversation = null;
+
+export function setVisibleMiraiConversation(id) {
+  visibleMiraiConversation = id || null;
+}
+
+export function isMiraiConversationVisible(id) {
+  return Boolean(id) && id === visibleMiraiConversation;
+}

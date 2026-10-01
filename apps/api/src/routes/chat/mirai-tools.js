@@ -301,7 +301,7 @@ export function buildToolRunners({
 
   async function search_runly(args, ctx) {
     const q = String(args?.query ?? "").trim();
-    if (q.length < 2) return { error: "Da al menos 2 caracteres para buscar." };
+    if (q.length < 2) return { error: "search_runly necesita un nombre o dato para buscar. Para listar o contar registros usa use_module del modulo (ej: runly.contacts, runly.hr) y su herramienta de busqueda sin filtro." };
     const resolved = await resolveScopedErpContext(ctx);
     if (resolved.error) return resolved;
     const { companyId, userId, isAdmin, permissionSet } = resolved;

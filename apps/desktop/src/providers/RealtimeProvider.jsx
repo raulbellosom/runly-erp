@@ -8,6 +8,7 @@ import { isTauriRuntime, showSystemNotification } from '../lib/systemNotificatio
 import { toast } from 'sonner'
 import { playCallSound } from '../modules/runly.chat/calls/callSounds'
 import { useChatFloatStore } from '../modules/runly.chat/store/chatFloatStore'
+import { isMiraiConversationVisible } from '../modules/runly.chat/lib/miraiPageContext'
 import { useNotificationSoundStore } from '../stores/notificationSound'
 import { notificationKey, claimNotification } from '../lib/notificationDedup'
 import { trackToastHoverRead } from '../lib/toastHoverRead'
@@ -168,7 +169,8 @@ export function RealtimeProvider({ children }) {
         dispatch('chat.message.new', payload)
         const openChats = useChatFloatStore.getState().openChats
         const isOpenAndVisible = convId && openChats.some((c) => c.id === convId && !c.minimized)
-        const isOnRoute = convId && window.location.pathname.includes(`/runly.chat/chat/inbox/${convId}`)
+        const isOnRoute = (convId && window.location.pathname.includes(`/runly.chat/chat/inbox/${convId}`))
+          || isMiraiConversationVisible(convId)
         const cachedConversations = queryClient.getQueryData(['chat-conversations'])?.data ?? []
         const isMuted = convId && cachedConversations.some((c) => c.id === convId && c.is_muted)
         // unread_count is computed server-side against this user's own
