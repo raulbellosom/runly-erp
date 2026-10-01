@@ -17,6 +17,7 @@ import { stripMentionTokens } from "../../lib/mention-utils.js";
 import { ChatServiceError } from "./chat-service-error.js";
 import { TOOL_DEFS, buildToolRunners, CHANNEL_TOOL_DEFS, buildChannelToolRunners } from "./mirai-tools.js";
 import { runMiraiToolLoop } from "./mirai-tool-loop.js";
+import { createMiraiThreadsService } from "./mirai-threads-service.js";
 import { createWebSearchTool } from "./mirai-web-search.js";
 import { parseMiraiPageContext } from "./mirai-module-tools.js";
 
@@ -332,60 +333,11 @@ export function createMiraiService({
   }
 
   // -- the mirai conversation --------------------------------------
+  const threads = createMiraiThreadsService({ prisma, getOrCreateMiraiProfile });
+
+  // Latest MirAI thread of the caller (created on first use); see mirai-threads-service.js.
   async function ensureMiraiConversation({ companyId, actorProfileId }) {
-    if (!actorProfileId) throw new ChatServiceError("Se requiere un usuario autenticado.", 401);
-    if (!companyId) throw new ChatServiceError("Empresa activa requerida.", 400);
-    const resolvedCompanyId = companyId;
-
-    const existing = await prisma.$queryRaw`
-      SELECT c.id
-      FROM chat_conversations c
-      WHERE c.type = 'mirai' AND c.company_id = ${resolvedCompanyId}::uuid
-        AND c.deleted_at IS NULL
-        AND EXISTS (SELECT 1 FROM chat_conversation_members m WHERE m.conversation_id = c.id AND m.user_id = ${actorProfileId}::uuid AND m.left_at IS NULL)
-      LIMIT 1
-    `;
-    if (existing.length) return { conversationId: existing[0].id, created: false };
-
-    const botId = await getOrCreateMiraiProfile({ companyId: resolvedCompanyId });
-    // GET /chat/conversations and GET /chat/mirai both call this on first
-    // load; the partial unique index chat_conversations_one_mirai_per_user_idx
-    // turns the loser of that race into a no-op insert instead of a duplicate.
-    const convRows = await prisma.$queryRaw`
-      INSERT INTO chat_conversations (type, title, created_by_user_id, company_id, is_public)
-      VALUES ('mirai', 'MirAI', ${actorProfileId}::uuid, ${resolvedCompanyId}, false)
-      ON CONFLICT ("created_by_user_id", "company_id") WHERE type = 'mirai' AND deleted_at IS NULL DO NOTHING
-      RETURNING id
-    `;
-    if (!convRows.length) {
-      const raced = await prisma.$queryRaw`
-        SELECT c.id
-        FROM chat_conversations c
-        WHERE c.type = 'mirai' AND c.company_id = ${resolvedCompanyId}::uuid
-          AND c.deleted_at IS NULL
-          AND EXISTS (SELECT 1 FROM chat_conversation_members m WHERE m.conversation_id = c.id AND m.user_id = ${actorProfileId}::uuid AND m.left_at IS NULL)
-        LIMIT 1
-      `;
-      return { conversationId: raced[0]?.id, created: false };
-    }
-    const conversationId = convRows[0].id;
-    await prisma.$executeRaw`
-      INSERT INTO chat_conversation_members (conversation_id, user_id, role, pinned_at)
-      VALUES (${conversationId}::uuid, ${actorProfileId}::uuid, 'owner', NOW())
-      ON CONFLICT DO NOTHING
-    `;
-    await prisma.$executeRaw`
-      INSERT INTO chat_conversation_members (conversation_id, user_id, role)
-      VALUES (${conversationId}::uuid, ${botId}::uuid, 'member')
-      ON CONFLICT DO NOTHING
-    `;
-    await prisma.$executeRaw`
-      INSERT INTO chat_messages (conversation_id, sender_user_id, sender_type, body, message_type)
-      VALUES (${conversationId}::uuid, ${botId}::uuid, 'assistant',
-        'Hola, soy MirAI, tu asistente inteligente de Runly. Puedo resumir mensajes, explicarte un mensaje o un archivo, y responder preguntas sobre tus chats. Reenviame mensajes de otra conversacion y preguntame sobre ellos, o simplemente escribeme.',
-        'text')
-    `;
-    return { conversationId, created: true };
+    return threads.ensure({ companyId, actorProfileId });
   }
 
   // -- the Groq tool-calling loop (Task 7) ----------------------------
@@ -637,6 +589,7 @@ export function createMiraiService({
         : [];
       userText = String(trigger?.body ?? "").trim();
       pageContext = parseMiraiPageContext(trigger?.metadata?.miraiPageContext);
+      if (userText) threads.autoTitle({ conversationId, text: userText }).catch(() => {});
       if (userText) {
         const c = await classifyTurn({ conversationId, userText });
         route = c.route;
@@ -954,6 +907,7 @@ export function createMiraiService({
     isWebEnabled: () => webEnabled,
     getOrCreateMiraiProfile,
     ensureMiraiConversation,
+    threads,
     handleUserMessage,
     handleChannelMention,
     matchMiraiMention,

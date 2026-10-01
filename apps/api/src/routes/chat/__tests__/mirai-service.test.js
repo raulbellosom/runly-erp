@@ -25,10 +25,12 @@ function makePrismaStub() {
       if (/INSERT INTO chat_conversations/i.test(sql)) {
         const row = { id: "mconv1", type: "mirai" }; state.conversations.push(row); return [row];
       }
+      if (/INSERT INTO chat_messages/i.test(sql)) return [{ id: "msg1", created_at: new Date() }];
       return [];
     },
     $executeRaw: async () => 0,
   };
+  prisma.$transaction = async (fn) => fn(prisma);
   return prisma;
 }
 

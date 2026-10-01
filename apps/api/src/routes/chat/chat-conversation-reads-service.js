@@ -132,6 +132,16 @@ export function createChatConversationReadsService({ prisma, getUserProfileId, a
       WHERE c.deleted_at IS NULL
         AND (c.company_id = ${companyId}::uuid OR ccm.external_access)
         AND c.type != 'external_support'
+        -- Only the caller's most recent MirAI thread shows in the inbox; the
+        -- MirAI sidebar lists the rest (mirai-threads-service.js).
+        AND (c.type != 'mirai' OR NOT EXISTS (
+          SELECT 1 FROM chat_conversations newer
+          JOIN chat_conversation_members nm
+            ON nm.conversation_id = newer.id AND nm.user_id = ${profileId} AND nm.left_at IS NULL
+          WHERE newer.type = 'mirai' AND newer.deleted_at IS NULL AND newer.company_id = c.company_id
+            AND (COALESCE(newer.last_message_at, newer.created_at), newer.id)
+              > (COALESCE(c.last_message_at, c.created_at), c.id)
+        ))
         ${archiveClause}
         ${hiddenClause}
         ${cursorClause}

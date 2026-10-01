@@ -26,6 +26,38 @@ export function createMiraiRoutes({ requirePermission, miraiService, resolveProf
     } });
   });
 
+  // ---- Sidebar v2: the caller's MirAI conversations ("threads") ----------
+  async function threadCtx(c) {
+    return { companyId: c.get("companyId") ?? null, actorProfileId: await resolveProfileId(c.get("authUserId")) };
+  }
+  function threadError(c, err, fallback) {
+    if (err instanceof ChatServiceError) return c.json({ error: err.message }, err.status);
+    console.error("[runly.chat] mirai threads", err?.message ?? err);
+    return c.json({ error: fallback }, 500);
+  }
+
+  r.get("/chat/mirai/threads", requirePermission("chat.mirai.use"), async (c) => {
+    try { return c.json({ data: await miraiService.threads.list(await threadCtx(c)) }); }
+    catch (err) { return threadError(c, err, "No se pudieron cargar las conversaciones."); }
+  });
+
+  r.post("/chat/mirai/threads", requirePermission("chat.mirai.use"), async (c) => {
+    try { return c.json({ data: await miraiService.threads.create(await threadCtx(c)) }, 201); }
+    catch (err) { return threadError(c, err, "No se pudo crear la conversacion."); }
+  });
+
+  r.patch("/chat/mirai/threads/:id", requirePermission("chat.mirai.use"), async (c) => {
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      return c.json({ data: await miraiService.threads.rename(c.req.param("id"), body?.title, await threadCtx(c)) });
+    } catch (err) { return threadError(c, err, "No se pudo renombrar la conversacion."); }
+  });
+
+  r.delete("/chat/mirai/threads/:id", requirePermission("chat.mirai.use"), async (c) => {
+    try { return c.json({ data: await miraiService.threads.remove(c.req.param("id"), await threadCtx(c)) }); }
+    catch (err) { return threadError(c, err, "No se pudo eliminar la conversacion."); }
+  });
+
   // "Leer en voz alta" — deliberately NOT gated by chat.mirai.use (nor any
   // other permission): it's a generic capability now, usable on any message
   // in any conversation, not just MirAI's own replies (see

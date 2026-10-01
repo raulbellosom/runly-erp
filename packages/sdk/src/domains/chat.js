@@ -463,6 +463,16 @@ export function createChatDomain(request, withAuthHeaders, toQueryString, reques
         request(`/chat/mirai/panel/${encodeURIComponent(conversationId)}`, {
           method: "DELETE", headers: withAuthHeaders(token),
         }),
+      // Sidebar v2 — the caller's MirAI conversations.
+      threads: (token) => request("/chat/mirai/threads", { headers: withAuthHeaders(token) }),
+      createThread: (token) =>
+        request("/chat/mirai/threads", { method: "POST", headers: withAuthHeaders(token) }),
+      renameThread: (id, title, token) =>
+        request(`/chat/mirai/threads/${encodeURIComponent(id)}`, {
+          method: "PATCH", headers: withAuthHeaders(token), body: JSON.stringify({ title }),
+        }),
+      deleteThread: (id, token) =>
+        request(`/chat/mirai/threads/${encodeURIComponent(id)}`, { method: "DELETE", headers: withAuthHeaders(token) }),
       // MirAI action proposals — confirmed by the user on a card.
       proposal: (id, token) =>
         request(`/chat/mirai/proposals/${encodeURIComponent(id)}`, { headers: withAuthHeaders(token) }),
