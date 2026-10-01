@@ -43,7 +43,7 @@ export function PdfPagesDialog({ pdf, onConfirm, onCancel, busy }) {
   })
   return (
     <Dialog open={Boolean(pdf)} onOpenChange={(open) => { if (!open && !busy) onCancel() }}>
-      <DialogContent className="flex max-h-[min(92dvh,760px)] flex-col gap-0 p-0 sm:max-w-2xl">
+      <DialogContent scrollable size="xl" className="gap-0 p-0 md:p-0 md:pt-0!">
         <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
           <DialogTitle>Insertar PDF</DialogTitle>
           <DialogDescription>{pdf?.file.name} · {total} páginas. Elige cuáles colocar en el lienzo.</DialogDescription>

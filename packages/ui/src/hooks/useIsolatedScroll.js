@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
  * Keeps mouse-wheel / trackpad / touch scrolling alive inside popups that are
@@ -25,23 +25,39 @@ import { useEffect } from "react";
  * @param {boolean} [active=true] - pass the popup's open state when the portal
  *   mounts/unmounts without the host component remounting
  */
+export function isolateScroll(node) {
+  if (!node) return () => {};
+  const stop = (event) => event.stopPropagation();
+  const opts = { passive: true };
+  node.addEventListener("wheel", stop, opts);
+  node.addEventListener("touchstart", stop, opts);
+  node.addEventListener("touchmove", stop, opts);
+  return () => {
+    node.removeEventListener("wheel", stop, opts);
+    node.removeEventListener("touchstart", stop, opts);
+    node.removeEventListener("touchmove", stop, opts);
+  };
+}
+
 export function useIsolatedScroll(ref, active = true) {
   useEffect(() => {
     if (!active) return undefined;
-    const node = ref?.current;
-    if (!node) return undefined;
-
-    const stop = (event) => event.stopPropagation();
-    const opts = { passive: true };
-
-    node.addEventListener("wheel", stop, opts);
-    node.addEventListener("touchstart", stop, opts);
-    node.addEventListener("touchmove", stop, opts);
-
-    return () => {
-      node.removeEventListener("wheel", stop, opts);
-      node.removeEventListener("touchstart", stop, opts);
-      node.removeEventListener("touchmove", stop, opts);
-    };
+    return isolateScroll(ref?.current);
   }, [ref, active]);
+}
+
+/**
+ * Callback-ref variant for Radix content components (Popover, DropdownMenu,
+ * ContextMenu). Their content node only mounts while open, long after the
+ * wrapper component's first effect ran, so `useIsolatedScroll(ref)` there saw
+ * `ref.current === null` and never attached its listeners — wheel/touch
+ * scrolling stayed frozen inside dialogs and sheets. This attaches when the
+ * node mounts and detaches when it unmounts.
+ */
+export function useIsolatedScrollRef() {
+  const cleanupRef = useRef(null);
+  return useCallback((node) => {
+    cleanupRef.current?.();
+    cleanupRef.current = node ? isolateScroll(node) : null;
+  }, []);
 }

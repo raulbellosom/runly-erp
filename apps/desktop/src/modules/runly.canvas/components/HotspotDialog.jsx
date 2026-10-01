@@ -75,11 +75,11 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
 
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
-      <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
+      <DialogHeader className="mb-0 border-b border-[hsl(var(--border))] pb-4">
         <DialogTitle>Hotspot</DialogTitle>
         <DialogDescription>Describe este punto y conéctalo con registros y archivos de Runly.</DialogDescription>
       </DialogHeader>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
+      <div className="-mx-1 min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-1 py-5">
         <div className="space-y-4">
           <TextField label="Título" required value={form.title} onChange={(event) => set('title', event.target.value)} maxLength={300} placeholder="Ej. Tablero eléctrico principal" />
           <TextareaField label="Descripción" value={form.description} onChange={(event) => set('description', event.target.value)} rows={3} placeholder="Notas, ubicación exacta, instrucciones…" />
@@ -94,7 +94,7 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
         <AttachmentsSection boardId={boardId} hotspotId={hotspot.id} />
       </div>
       {/* flex-row overrides DialogFooter's stacked mobile layout: one row, shared width. */}
-      <DialogFooter className="mt-0 shrink-0 flex-row border-t border-[hsl(var(--border))] px-5 py-4">
+      <DialogFooter className="mt-0 shrink-0 flex-row border-t border-[hsl(var(--border))] pt-4">
         <Button type="button" variant="outline" onClick={onClose} className="flex-1 sm:flex-none">{dirty ? 'Cancelar' : 'Cerrar'}</Button>
         <Button type="submit" disabled={!dirty || update.isPending} className="flex-1 sm:flex-none">
           {update.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : null}Guardar
@@ -109,16 +109,16 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
 function HotspotReadOnly({ boardId, object, links, canAttach, onClose }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
+      <DialogHeader className="mb-0 border-b border-[hsl(var(--border))] pb-4">
         <DialogTitle>Hotspot</DialogTitle>
         <DialogDescription>Tienes acceso de solo lectura a este Board.</DialogDescription>
       </DialogHeader>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
+      <div className="-mx-1 min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-1 py-5">
         <HotspotViewer hotspot={object.hotspot} color={hotspotColor(object)} />
         <EntityLinksSection boardId={boardId} targetType="HOTSPOT" targetId={object.hotspot.id} links={links} readOnly />
         <AttachmentsSection boardId={boardId} hotspotId={object.hotspot.id} canUpload={canAttach} canRemove={false} />
       </div>
-      <DialogFooter className="mt-0 shrink-0 flex-row border-t border-[hsl(var(--border))] px-5 py-4">
+      <DialogFooter className="mt-0 shrink-0 flex-row border-t border-[hsl(var(--border))] pt-4">
         <Button type="button" variant="outline" onClick={onClose} className="flex-1 sm:flex-none">Cerrar</Button>
       </DialogFooter>
     </div>
@@ -129,7 +129,9 @@ export function HotspotDialog({ boardId, pageId, object, links, onOpenChange, re
   const hotspot = object?.hotspot
   return (
     <Dialog open={Boolean(object)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(92dvh,760px)] flex-col gap-0 p-0 sm:max-w-lg">
+      {/* Standard fixed header/footer layout: `scrollable` makes the surface a
+          non-scrolling flex column so only the middle region scrolls. */}
+      <DialogContent scrollable size="md" className="gap-0">
         {hotspot && readOnly ? (
           <HotspotReadOnly boardId={boardId} object={object} links={links} canAttach={canAttach} onClose={() => onOpenChange(false)} />
         ) : hotspot ? (

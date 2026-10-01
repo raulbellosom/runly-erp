@@ -260,7 +260,7 @@ export function ShareBoardDialog({ open, onOpenChange, boardId, boardName, myRol
   const isOwner = myRole === 'OWNER'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(94dvh,860px)] w-full flex-col gap-0 p-0 sm:max-w-2xl">
+      <DialogContent scrollable size="xl" className="gap-0 p-0 md:p-0 md:pt-0!">
         <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4 sm:px-6">
           <DialogTitle>Compartir Board</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">

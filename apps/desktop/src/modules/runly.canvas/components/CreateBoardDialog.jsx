@@ -19,7 +19,7 @@ export function CreateBoardDialog({ open, onOpenChange, onSubmit, pending }) {
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="flex max-h-[min(90dvh,720px)] flex-col gap-0 p-0 sm:max-w-lg">
+      <DialogContent scrollable size="md" className="gap-0 p-0 md:p-0 md:pt-0!">
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="mb-0 shrink-0 px-5 pt-4 pb-2">
             <DialogTitle>Nuevo Board</DialogTitle>

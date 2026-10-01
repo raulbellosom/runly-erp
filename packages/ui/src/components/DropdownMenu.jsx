@@ -1,8 +1,8 @@
-import { forwardRef, useRef } from 'react'
+import { forwardRef } from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronRight, Circle } from 'lucide-react'
 import { cn, mergeRefs } from '../lib/utils.js'
-import { useIsolatedScroll } from '../hooks/useIsolatedScroll.js'
+import { useIsolatedScrollRef } from '../hooks/useIsolatedScroll.js'
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
@@ -60,8 +60,8 @@ const DropdownMenuContent = forwardRef(function DropdownMenuContent(
 ) {
   // Keep wheel/touch scrolling alive for long menus opened from inside a
   // Dialog/Sheet. See useIsolatedScroll for the full explanation.
-  const scrollRef = useRef(null)
-  useIsolatedScroll(scrollRef)
+  const scrollRef = useIsolatedScrollRef()
+  // callback ref: the content node mounts only while open
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content

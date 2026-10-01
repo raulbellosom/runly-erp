@@ -1,7 +1,7 @@
-import { forwardRef, useRef } from 'react'
+import { forwardRef } from 'react'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { cn, mergeRefs } from '../lib/utils.js'
-import { useIsolatedScroll } from '../hooks/useIsolatedScroll.js'
+import { useIsolatedScrollRef } from '../hooks/useIsolatedScroll.js'
 
 const Popover = PopoverPrimitive.Root
 const PopoverTrigger = PopoverPrimitive.Trigger
@@ -14,8 +14,8 @@ const PopoverContent = forwardRef(function PopoverContent(
   // Keep wheel/touch scrolling alive when the popover is opened from inside a
   // Dialog/Sheet (react-remove-scroll would otherwise cancel it). See
   // useIsolatedScroll for the full explanation.
-  const scrollRef = useRef(null)
-  useIsolatedScroll(scrollRef)
+  const scrollRef = useIsolatedScrollRef()
+  // callback ref: the content node mounts only while open
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content

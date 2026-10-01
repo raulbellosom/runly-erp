@@ -1,8 +1,8 @@
-import { forwardRef, useRef } from 'react'
+import { forwardRef } from 'react'
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu'
 import { Check, ChevronRight, Circle } from 'lucide-react'
 import { cn, mergeRefs } from '../lib/utils.js'
-import { useIsolatedScroll } from '../hooks/useIsolatedScroll.js'
+import { useIsolatedScrollRef } from '../hooks/useIsolatedScroll.js'
 
 // Right-click / long-press context menu. Same visual language as DropdownMenu
 // (glass-strong surface, rounded-lg items, muted focus), but anchored at the
@@ -62,8 +62,8 @@ const ContextMenuContent = forwardRef(function ContextMenuContent(
 ) {
   // Keep wheel/touch scrolling alive when the menu opens from inside a
   // Dialog/Sheet (react-remove-scroll lock). See useIsolatedScroll.
-  const scrollRef = useRef(null)
-  useIsolatedScroll(scrollRef)
+  const scrollRef = useIsolatedScrollRef()
+  // callback ref: the content node mounts only while open
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
