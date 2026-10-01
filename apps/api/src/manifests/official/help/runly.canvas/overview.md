@@ -35,6 +35,15 @@ Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se 
 
 Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia.
 
+### Compartir y accesos
+
+Usa el boton **Compartir** de la barra superior del Board.
+
+- **Personas**: el propietario agrega miembros de la empresa y elige su rol. **Editor** dibuja y edita todo; **Comentarista** ve el Board, abre hotspots y adjunta archivos; **Lector** solo ve y abre hotspots. El rol se puede cambiar o quitar en cualquier momento. La persona necesita el permiso "Ver Boards" del modulo.
+- **Enlace publico**: el propietario crea enlaces de solo visualizacion para personas sin cuenta en Runly, con nombre, fecha de vencimiento y maximo de aperturas opcionales; se copian, se muestran como codigo QR y se revocan cuando quieras. Quien abre el enlace puede recorrer el Board, hacer zoom, cambiar de pagina y tocar los hotspots para ver su titulo, descripcion, estado e icono. No ve archivos adjuntos, registros vinculados, capas ocultas ni colaboradores, y no puede editar nada.
+- Lectores y comentaristas ven el Board en **modo solo lectura**: no aparecen las herramientas de dibujo y tocar un hotspot abre su ficha de consulta.
+- "Conectados ahora", en el inspector, muestra quien tiene el Board abierto en este momento; no es la lista de accesos (esa esta en Compartir).
+
 ### Con MirAI
 
 Con la pestana de MirAI abierta puedes pedirle, por ejemplo:
@@ -53,5 +62,5 @@ Si tienes un Board abierto, MirAI sabe cual es: puedes preguntar por "este Board
 ### Alcances y limites
 
 - Deshacer y rehacer (Ctrl+Z / Ctrl+Shift+Z) cubren lo que haces en el lienzo durante la sesion abierta; los cambios de la ficha del hotspot y ocultar o bloquear capas no se deshacen.
-- Solo ves los Boards que creaste o que te compartieron.
+- Solo ves los Boards que creaste o que te compartieron; en la lista, los compartidos muestran tu rol.
 - MirAI no dibuja ni mueve formas; consulta Boards y hotspots, crea Boards y actualiza hotspots.

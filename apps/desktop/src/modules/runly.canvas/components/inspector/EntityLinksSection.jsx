@@ -64,7 +64,7 @@ function RecordPicker({ boardId, targetType, targetId, onDone }) {
   )
 }
 
-export function EntityLinksSection({ boardId, targetType, targetId, links }) {
+export function EntityLinksSection({ boardId, targetType, targetId, links, readOnly = false }) {
   const navigate = useNavigate()
   const [adding, setAdding] = useState(false)
   const remove = useRemoveEntityLink(boardId)
@@ -73,7 +73,7 @@ export function EntityLinksSection({ boardId, targetType, targetId, links }) {
   return (
     <Section
       title="Registros vinculados"
-      action={!adding ? (
+      action={!adding && !readOnly ? (
         <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(true)} className="h-8 gap-1 px-2 text-xs">
           <Plus className="h-3.5 w-3.5" />Vincular
         </Button>
@@ -97,13 +97,15 @@ export function EntityLinksSection({ boardId, targetType, targetId, links }) {
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 ) : null}
-                <Button type="button" size="icon" variant="ghost" aria-label="Quitar vínculo" disabled={remove.isPending} onClick={() => remove.mutate(link.id, { onError: (error) => toast.error(error.message) })} className="h-9 w-9 hover:text-destructive sm:h-7 sm:w-7">
+                {readOnly ? null : <Button type="button" size="icon" variant="ghost" aria-label="Quitar vínculo" disabled={remove.isPending} onClick={() => remove.mutate(link.id, { onError: (error) => toast.error(error.message) })} className="h-9 w-9 hover:text-destructive sm:h-7 sm:w-7">
                   {remove.isPending && remove.variables === link.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                </Button>
+                </Button>}
               </li>
             )
           })}
         </ul>
+      ) : readOnly ? (
+        <p className="px-0.5 text-xs text-[hsl(var(--muted-foreground))]">Sin registros vinculados.</p>
       ) : !adding ? (
         <p className="px-0.5 text-xs text-[hsl(var(--muted-foreground))]">Conecta este elemento con un contacto, empleado, vehículo, artículo u otro registro de Runly.</p>
       ) : null}

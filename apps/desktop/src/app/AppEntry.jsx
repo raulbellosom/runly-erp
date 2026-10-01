@@ -44,6 +44,7 @@ import { ResetPasswordScreen } from "../auth/ResetPasswordScreen.jsx";
 import PublicNoteScreen from "../modules/runly.notes/PublicNoteScreen.jsx";
 
 const GuestCallScreen = lazy(() => import("../modules/runly.chat/calls/guest/GuestCallScreen.jsx"));
+const PublicBoardScreen = lazy(() => import("../modules/runly.canvas/screens/PublicBoardScreen.jsx"));
 import { useCallSoundUnlock } from "../modules/runly.chat/calls/useCallSoundUnlock.js";
 import "../styles.css";
 
@@ -169,6 +170,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
                     <Route path="notes/:slug" element={<PublicNoteScreen />} />
                     <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
                     <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
+                    <Route path="canvas/:token" element={<Suspense fallback={null}><PublicBoardScreen /></Suspense>} />
                   </Route>
                   <Route element={<AppRouteGuard mode="access" />}>
                     <Route path="/app/accept-invitation" element={<AcceptInvitationScreen />} />

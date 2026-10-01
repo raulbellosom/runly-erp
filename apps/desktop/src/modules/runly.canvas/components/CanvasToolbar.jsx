@@ -75,7 +75,16 @@ function ShapePicker({ tool, onToolChange }) {
   )
 }
 
-export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInsertMedia, inserting }) {
+export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInsertMedia, inserting, readOnly = false }) {
+  if (readOnly) {
+    return (
+      <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1.5 shadow-lg">
+        <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')}><MousePointer2 /></ToolButton>
+        <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')}><Hand /></ToolButton>
+        <span className="px-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">Solo lectura · toca un hotspot para verlo</span>
+      </div>
+    )
+  }
   return (
     <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-0.5 rounded-2xl p-1.5 shadow-lg sm:gap-1">
       <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')}><MousePointer2 /></ToolButton>

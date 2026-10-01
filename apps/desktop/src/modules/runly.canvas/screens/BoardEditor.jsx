@@ -10,6 +10,8 @@ import { PagesLayersPanel } from '../components/PagesLayersPanel.jsx'
 import { PdfPagesDialog } from '../components/PdfPagesDialog.jsx'
 import { TextEditDialog } from '../components/TextEditDialog.jsx'
 import { ZoomControls } from '../components/ZoomControls.jsx'
+import { ShareBoardDialog } from '../components/ShareBoardDialog.jsx'
+import { canEditBoard } from '../lib/roles.js'
 import { sceneBounds } from '../engine/Canvas2DRenderer.js'
 import { measureTextHeight } from '../engine/text.js'
 import { DEFAULT_VIEWPORT, fitBounds, zoomAt } from '../engine/viewport.js'
@@ -50,10 +52,11 @@ export default function BoardEditor() {
   const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedIds, setSelectedIds] = useState([]), [tool, setTool] = useState('select')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })
   const [desktopPanels, setDesktopPanels] = useState({ left: true, right: true }), [mobileSheet, setMobileSheet] = useState(null)
-  const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false)
+  const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false), [shareOpen, setShareOpen] = useState(false)
   const fittedPageRef = useRef(null)
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
+  const myRole = board.data?.myRole ?? 'VIEWER', readOnly = Boolean(board.data) && !canEditBoard(myRole)
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
   const { presence } = useCanvasRealtime(boardId)
@@ -73,7 +76,7 @@ export default function BoardEditor() {
   const images = useCanvasImages(allRows)
   const selectedRows = useMemo(() => rows.filter((row) => selectedIds.includes(row.id)), [rows, selectedIds])
   const selected = selectedRows.length === 1 ? selectedRows[0] : null
-  const editableSelection = selectedRows.filter((row) => !lockedLayerIds.has(row.layerId))
+  const editableSelection = readOnly ? [] : selectedRows.filter((row) => !lockedLayerIds.has(row.layerId))
   const activeLayer = layers.find((layer) => layer.id === layerId)
 
   useEffect(() => {
@@ -106,7 +109,7 @@ export default function BoardEditor() {
   }
   const openObject = (object) => {
     if (object.type === 'hotspot') setDialog({ kind: 'hotspot', id: object.id })
-    else if (object.type === 'text' && !lockedLayerIds.has(object.layerId)) setDialog({ kind: 'text', id: object.id })
+    else if (object.type === 'text' && !readOnly && !lockedLayerIds.has(object.layerId)) setDialog({ kind: 'text', id: object.id })
     else if (!isDesktop) setMobileSheet('right')
   }
   const deleteSelection = () => actions.remove(editableSelection)
@@ -117,14 +120,14 @@ export default function BoardEditor() {
 
   const { spacePan } = useCanvasShortcuts({
     enabled: Boolean(board.data),
-    onTool: actions.chooseTool,
-    onInsert: actions.openFilePicker,
+    onTool: (next) => { if (!readOnly || next === 'select' || next === 'pan') actions.chooseTool(next) },
+    onInsert: () => { if (!readOnly) actions.openFilePicker() },
     onDelete: deleteSelection,
     onDuplicate: () => actions.duplicate(editableSelection),
     onNudge: (dx, dy) => actions.nudge(editableSelection, dx, dy),
     onOpen: () => { if (selected) openObject(selected) },
-    onUndo: actions.undo,
-    onRedo: actions.redo,
+    onUndo: () => { if (!readOnly) actions.undo() },
+    onRedo: () => { if (!readOnly) actions.redo() },
     onSelectAll: () => { setTool('select'); setSelectedIds(rows.filter((row) => !lockedLayerIds.has(row.layerId)).map((row) => row.id)) },
     onEscape: () => {
       if (selectedIds.length || tool !== 'select') { setSelectedIds([]); setTool('select') } else if (zen) setZen(false)
@@ -143,7 +146,7 @@ export default function BoardEditor() {
     <PagesLayersPanel
       pages={pages} activePageId={pageId} onPageChange={changePage} activeLayerId={layerId} onLayerChange={setLayerId}
       onAddPage={async () => { const page = await actions.addPage(pages.length); if (page?.id) changePage(page.id) }}
-      addingPage={actions.createPage.isPending} onToggleLayer={actions.toggleLayer} objectCounts={objectCounts}
+      addingPage={actions.createPage.isPending} onToggleLayer={actions.toggleLayer} objectCounts={objectCounts} readOnly={readOnly}
     />
   )
   const inspectorPanel = (
@@ -154,6 +157,7 @@ export default function BoardEditor() {
       lockedLayerIds={lockedLayerIds}
       links={links}
       presence={presence}
+      readOnly={readOnly}
       actions={{
         patch: actions.patch, remove: actions.remove,
         hotspotChange: (object, data) => {
@@ -185,6 +189,7 @@ export default function BoardEditor() {
         leftOpen={leftOpen} rightOpen={rightOpen} onToggleLeft={() => togglePanel('left')} onToggleRight={() => togglePanel('right')}
         zen={zen} onToggleZen={() => setZen((value) => !value)}
         history={{ undo: actions.undo, redo: actions.redo, canUndo: actions.canUndo, canRedo: actions.canRedo, undoLabel: actions.undoLabel, redoLabel: actions.redoLabel }}
+        readOnly={readOnly} onShare={() => setShareOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
@@ -194,13 +199,14 @@ export default function BoardEditor() {
             objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={images} linkedIds={linkedIds}
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
+            readOnly={readOnly}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
               <div className="max-w-xs text-center">
                 <p className="text-sm font-medium text-[hsl(var(--foreground))]">Esta página está vacía</p>
-                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Dibuja formas, escribe textos, coloca hotspots o inserta una imagen o PDF desde la barra inferior.</p>
+                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{readOnly ? 'Todavía no hay contenido en esta página.' : 'Dibuja formas, escribe textos, coloca hotspots o inserta una imagen o PDF desde la barra inferior.'}</p>
               </div>
             </div>
           ) : null}
@@ -220,6 +226,7 @@ export default function BoardEditor() {
             <CanvasToolbar
               tool={tool} onToolChange={actions.chooseTool} canDelete={editableSelection.length > 0} onDelete={deleteSelection}
               onInsertMedia={actions.openFilePicker} inserting={actions.inserting}
+              readOnly={readOnly}
             />
           </div>
           <input
@@ -240,7 +247,8 @@ export default function BoardEditor() {
         </>
       ) : null}
 
-      <HotspotDialog boardId={boardId} pageId={pageId} object={dialog?.kind === 'hotspot' ? dialogObject : null} links={links} onOpenChange={(open) => { if (!open) setDialog(null) }} />
+      <HotspotDialog boardId={boardId} pageId={pageId} object={dialog?.kind === 'hotspot' ? dialogObject : null} links={links} readOnly={readOnly} canAttach={myRole === 'COMMENTER'} onOpenChange={(open) => { if (!open) setDialog(null) }} />
+      <ShareBoardDialog open={shareOpen} onOpenChange={setShareOpen} boardId={boardId} boardName={board.data?.name ?? 'Board'} myRole={myRole} />
       <TextEditDialog object={dialog?.kind === 'text' ? dialogObject : null} onSave={saveText} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <PdfPagesDialog key={actions.pdf?.file.name} pdf={actions.pdf} busy={actions.inserting} onConfirm={(pagesToInsert) => actions.insertPdfPages(pagesToInsert)} onCancel={actions.cancelPdf} />
     </div>

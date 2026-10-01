@@ -4,7 +4,7 @@ import { MultiInspector } from './inspector/MultiInspector.jsx'
 import { ObjectInspector } from './inspector/ObjectInspector.jsx'
 import { Section } from './inspector/fields.jsx'
 
-export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, presence, actions }) {
+export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, presence, actions, readOnly = false }) {
   const single = selectedRows.length === 1 ? selectedRows[0] : null
   const linkTarget = single && single.type !== 'hotspot' && !single.pending ? { targetType: 'OBJECT', targetId: single.id } : null
   return (
@@ -14,6 +14,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           object={single}
           layerName={layers.find((layer) => layer.id === single.layerId)?.name}
           locked={lockedLayerIds.has(single.layerId)}
+          readOnly={readOnly}
           onPatch={(change) => actions.patch([single], change)}
           onHotspotChange={(data) => actions.hotspotChange(single, data)}
           onDelete={() => actions.remove([single])}
@@ -22,8 +23,10 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           onOpenHotspot={() => actions.openHotspot(single)}
           onEditText={() => actions.editText(single)}
         >
-          {linkTarget ? <EntityLinksSection boardId={boardId} links={links} {...linkTarget} /> : null}
+          {linkTarget ? <EntityLinksSection boardId={boardId} links={links} readOnly={readOnly} {...linkTarget} /> : null}
         </ObjectInspector>
+      ) : selectedRows.length > 1 && readOnly ? (
+        <p className="px-1 text-sm text-[hsl(var(--muted-foreground))]">{selectedRows.length} elementos seleccionados.</p>
       ) : selectedRows.length > 1 ? (
         <MultiInspector
           rows={selectedRows}
@@ -43,7 +46,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
         </div>
       )}
 
-      <Section title="En este Board">
+      <Section title="Conectados ahora">
         {presence.length ? (
           <ul className="space-y-1">
             {presence.map((user) => (
@@ -54,7 +57,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
             ))}
           </ul>
         ) : (
-          <p className="flex items-center gap-2 px-1 text-sm text-[hsl(var(--muted-foreground))]"><Users className="h-4 w-4" />Solo tú por ahora.</p>
+          <p className="flex items-center gap-2 px-1 text-sm text-[hsl(var(--muted-foreground))]"><Users className="h-4 w-4 shrink-0" />Nadie más está viendo este Board en este momento.</p>
         )}
       </Section>
     </div>

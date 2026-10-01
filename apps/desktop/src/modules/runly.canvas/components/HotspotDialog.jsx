@@ -12,6 +12,7 @@ import { hotspotColor } from './inspector/ObjectInspector.jsx'
 import { HotspotIconPicker } from './HotspotIconPicker.jsx'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
 import { Choice, ColorSwatches, FieldLabel, Section } from './inspector/fields.jsx'
+import { HotspotViewer } from './HotspotViewer.jsx'
 
 export const HOTSPOT_STATUSES = [
   { value: 'ACTIVE', label: 'Activo' },
@@ -20,7 +21,7 @@ export const HOTSPOT_STATUSES = [
   { value: 'INACTIVE', label: 'Inactivo' },
 ]
 
-function AttachmentsSection({ boardId, hotspotId }) {
+function AttachmentsSection({ boardId, hotspotId, canUpload = true, canRemove = true }) {
   const { session } = useAuth()
   const attachments = useAttachments(boardId, 'HOTSPOT', hotspotId)
   const { add, remove } = useAttachmentMutations(boardId, 'HOTSPOT', hotspotId)
@@ -43,20 +44,20 @@ function AttachmentsSection({ boardId, hotspotId }) {
               <FileText className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
               <span className="min-w-0 flex-1 truncate text-sm">{attachment.label ?? 'Archivo'}</span>
               <Button type="button" size="icon" variant="ghost" aria-label="Abrir archivo" onClick={() => open(attachment)} className="h-9 w-9 sm:h-7 sm:w-7"><ExternalLink className="h-3.5 w-3.5" /></Button>
-              <Button type="button" size="icon" variant="ghost" aria-label="Quitar archivo" disabled={remove.isPending} onClick={() => remove.mutate(attachment.id, { onError: (error) => toast.error(error.message) })} className="h-9 w-9 hover:text-destructive sm:h-7 sm:w-7">
+              {canRemove ? <Button type="button" size="icon" variant="ghost" aria-label="Quitar archivo" disabled={remove.isPending} onClick={() => remove.mutate(attachment.id, { onError: (error) => toast.error(error.message) })} className="h-9 w-9 hover:text-destructive sm:h-7 sm:w-7">
                 {remove.isPending && remove.variables === attachment.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-              </Button>
+              </Button> : null}
             </li>
           ))}
         </ul>
-      ) : null}
-      <FileUploader
+      ) : !canUpload ? <p className="px-0.5 text-xs text-[hsl(var(--muted-foreground))]">Sin archivos.</p> : null}
+      {canUpload ? <FileUploader
         maxSizeMB={25}
         onUpload={(file) => add.mutateAsync(file)}
         onChange={() => toast.success('Archivo agregado')}
         hint="Fotos, fichas técnicas, manuales o cualquier documento de este punto."
         emptyLabel="Adjuntar archivo"
-      />
+      /> : null}
     </Section>
   )
 }
@@ -109,12 +110,35 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
   )
 }
 
-export function HotspotDialog({ boardId, pageId, object, links, onOpenChange }) {
+// Viewers and commenters get the read-only sheet: hotspot info, linked
+// records and files (commenters may still attach files, as the API allows).
+function HotspotReadOnly({ boardId, object, links, canAttach, onClose }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
+        <DialogTitle>Hotspot</DialogTitle>
+        <DialogDescription>Tienes acceso de solo lectura a este Board.</DialogDescription>
+      </DialogHeader>
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
+        <HotspotViewer hotspot={object.hotspot} color={hotspotColor(object)} />
+        <EntityLinksSection boardId={boardId} targetType="HOTSPOT" targetId={object.hotspot.id} links={links} readOnly />
+        <AttachmentsSection boardId={boardId} hotspotId={object.hotspot.id} canUpload={canAttach} canRemove={false} />
+      </div>
+      <DialogFooter className="shrink-0 border-t border-[hsl(var(--border))] px-5 py-4">
+        <Button type="button" variant="outline" onClick={onClose}>Cerrar</Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
+export function HotspotDialog({ boardId, pageId, object, links, onOpenChange, readOnly = false, canAttach = false }) {
   const hotspot = object?.hotspot
   return (
     <Dialog open={Boolean(object)} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[min(92dvh,760px)] flex-col gap-0 p-0 sm:max-w-lg">
-        {hotspot ? (
+        {hotspot && readOnly ? (
+          <HotspotReadOnly boardId={boardId} object={object} links={links} canAttach={canAttach} onClose={() => onOpenChange(false)} />
+        ) : hotspot ? (
           <HotspotForm key={hotspot.id} boardId={boardId} pageId={pageId} hotspot={hotspot} initialColor={hotspotColor(object)} links={links} onClose={() => onOpenChange(false)} />
         ) : (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">

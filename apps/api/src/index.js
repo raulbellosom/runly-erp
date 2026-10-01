@@ -73,7 +73,7 @@ import { createCatalogRouter } from "./routes/catalog/index.js";
 import { createPosRouter } from "./routes/pos/index.js";
 import { createCalendarRouter } from "./routes/calendar/index.js";
 import { createProjectsRouter } from "./routes/projects/index.js";
-import { createCanvasRouter } from "./routes/canvas/index.js";
+import { createCanvasRouter, createCanvasPublicRouter } from "./routes/canvas/index.js";
 import { createSettingsRouter } from "./routes/settings-routes.js";
 import { createActivityRouter } from "./routes/activity.js";
 import { createNotificationsRouter } from "./routes/notifications.js";
@@ -2081,6 +2081,13 @@ app.route("/", createModulePublicGateway({
   linksService: modulePublicLinksService,
   getPublicRouter: (moduleKey) => routeLoader.getPublicRouter(moduleKey),
   resolveLogoUrl: (fileId) => getSignedUrlByFileId(fileId, "card", { prisma, supabaseAdmin }).catch(() => null),
+}));
+
+// Canvas read-only public links: /public/canvas/:token/* (path-scoped, no auth).
+app.route("/", createCanvasPublicRouter({
+  prisma,
+  signFile: (fileId) => getSignedUrlByFileId(fileId, "full", { prisma, supabaseAdmin }),
+  resolveLogoUrl: (fileId) => getSignedUrlByFileId(fileId, "card", { prisma, supabaseAdmin }),
 }));
 
 const pwaRouter = createPwaRouter({ prisma });

@@ -84,23 +84,27 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     return { board, role }
   }
 
+  // Each board carries the caller's role (`myRole`) so the UI can switch to
+  // read-only for VIEWER/COMMENTER without another request.
   async function listBoards(companyId, actorId) {
-    return prisma.canvasBoard.findMany({
+    const rows = await prisma.canvasBoard.findMany({
       where: { companyId, archivedAt: null, OR: [{ ownerId: actorId }, { collaborators: { some: { userId: actorId } } }] },
-      include: { _count: { select: { pages: true, collaborators: true } } },
+      include: { _count: { select: { pages: true, collaborators: true } }, collaborators: { where: { userId: actorId }, select: { role: true } } },
       orderBy: { updatedAt: 'desc' },
     })
+    return rows.map(({ collaborators, ...board }) => ({ ...board, myRole: board.ownerId === actorId ? 'OWNER' : collaborators[0]?.role ?? 'VIEWER' }))
   }
 
   async function getBoard(companyId, actorId, boardId) {
-    await assertBoardAccess(companyId, actorId, boardId)
-    return prisma.canvasBoard.findFirst({
+    const { role } = await assertBoardAccess(companyId, actorId, boardId)
+    const board = await prisma.canvasBoard.findFirst({
       where: { id: boardId, companyId },
       include: {
         pages: { include: { layers: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } },
         collaborators: { orderBy: { createdAt: 'asc' } },
       },
     })
+    return board ? { ...board, myRole: role } : board
   }
 
   async function createBoard(companyId, actorId, data) {
@@ -407,8 +411,17 @@ export function createCanvasService({ prisma, entityResolver = null }) {
   }
 
   async function listCollaborators(companyId, actorId, boardId) {
-    await assertBoardAccess(companyId, actorId, boardId)
-    return prisma.canvasCollaborator.findMany({ where: { boardId }, orderBy: { createdAt: 'asc' } })
+    const { board } = await assertBoardAccess(companyId, actorId, boardId)
+    const rows = await prisma.canvasCollaborator.findMany({ where: { boardId }, orderBy: { createdAt: 'asc' } })
+    const ids = [...new Set([board.ownerId, ...rows.map((row) => row.userId)])]
+    const profiles = await prisma.userProfile.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, email: true, avatarFileId: true } })
+    const byId = new Map(profiles.map((profile) => [profile.id, profile]))
+    const people = rows.map((row) => ({ ...row, role: row.userId === board.ownerId ? 'OWNER' : row.role }))
+    if (!people.some((row) => row.userId === board.ownerId)) people.unshift({ boardId, userId: board.ownerId, role: 'OWNER' })
+    return people.map((row) => ({
+      ...row,
+      name: byId.get(row.userId)?.displayName ?? 'Usuario', email: byId.get(row.userId)?.email ?? null, avatarFileId: byId.get(row.userId)?.avatarFileId ?? null,
+    }))
   }
 
   async function removeCollaborator(companyId, actorId, boardId, userId) {

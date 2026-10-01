@@ -104,7 +104,7 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
   )
 }
 
-export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
+export function ObjectInspector({ object, layerName, locked, readOnly = false, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-2 px-0.5">
@@ -112,18 +112,18 @@ export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotC
           <p className="truncate text-sm font-semibold">{objectLabel(object)}</p>
           {layerName ? <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">Capa: {layerName}</p> : null}
         </div>
-        {locked ? <Badge variant="outline" className="shrink-0 gap-1"><Lock className="h-3 w-3" />Bloqueada</Badge> : null}
+        {locked && !readOnly ? <Badge variant="outline" className="shrink-0 gap-1"><Lock className="h-3 w-3" />Bloqueada</Badge> : null}
       </div>
 
       {object.type === 'hotspot' ? (
-        <Button type="button" className="w-full" onClick={onOpenHotspot}><MapPin />Información del hotspot</Button>
+        <Button type="button" className="w-full" onClick={onOpenHotspot}><MapPin />{readOnly ? 'Ver hotspot' : 'Información del hotspot'}</Button>
       ) : null}
-      {object.type === 'text' && !locked ? (
+      {object.type === 'text' && !locked && !readOnly ? (
         <Button type="button" variant="outline" className="w-full" onClick={onEditText}><Pencil />Editar texto</Button>
       ) : null}
 
-      {locked ? (
-        <p className="rounded-lg bg-[hsl(var(--muted)/0.6)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">Desbloquea la capa para editar este elemento.</p>
+      {locked || readOnly ? (
+        <p className="rounded-lg bg-[hsl(var(--muted)/0.6)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">{readOnly ? 'Tienes acceso de solo lectura a este Board.' : 'Desbloquea la capa para editar este elemento.'}</p>
       ) : (
         <>
           <GeometryFields object={object} onPatch={onPatch} />
@@ -140,7 +140,7 @@ export function ObjectInspector({ object, layerName, locked, onPatch, onHotspotC
 
       {children}
 
-      {!locked ? (
+      {!locked && !readOnly ? (
         <Button type="button" variant="outline" className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}>
           <Trash2 />Eliminar
         </Button>

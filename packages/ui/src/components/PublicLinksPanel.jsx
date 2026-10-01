@@ -77,7 +77,10 @@ export function QrDialog({ open, onOpenChange, url, title = "Código QR" }) {
   );
 }
 
-export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, resource, recordId = null, title = "Enlaces públicos" }) {
+// `api` lets an official module plug in its own endpoints with the same
+// { list, create, revoke } contract (links must carry `path`, the SPA path
+// of the public page); RME3 modules keep using createPublicLinksApi.
+export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, resource, recordId = null, title = "Enlaces públicos", api: customApi = null }) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,7 +90,7 @@ export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, reso
   const [revoking, setRevoking] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
-  const api = createPublicLinksApi({ apiBaseUrl, token, companyId, moduleKey });
+  const api = customApi ?? createPublicLinksApi({ apiBaseUrl, token, companyId, moduleKey });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,7 +103,7 @@ export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, reso
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBaseUrl, token, companyId, moduleKey, resource, recordId]);
+  }, [apiBaseUrl, token, companyId, moduleKey, resource, recordId, customApi]);
 
   useEffect(() => { load(); }, [load]);
 

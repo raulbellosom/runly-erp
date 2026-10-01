@@ -27,12 +27,12 @@ function RowIconButton({ label, onClick, disabled, children }) {
   )
 }
 
-export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLayerId, onLayerChange, onAddPage, addingPage, onToggleLayer, objectCounts }) {
+export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLayerId, onLayerChange, onAddPage, addingPage, onToggleLayer, objectCounts, readOnly = false }) {
   const layers = pages.find((page) => page.id === activePageId)?.layers ?? []
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-3">
       <section aria-labelledby="canvas-pages-title">
-        <SectionTitle action={(
+        <SectionTitle action={readOnly ? null : (
           <Button type="button" size="icon" variant="ghost" onClick={onAddPage} disabled={addingPage} aria-label="Nueva página" className="h-9 w-9 lg:h-7 lg:w-7">
             {addingPage ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : <Plus />}
           </Button>
@@ -93,12 +93,22 @@ export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLaye
                     <span className="truncate">{layer.name}</span>
                     {count ? <span className="ml-auto text-xs tabular-nums text-[hsl(var(--muted-foreground))]">{count}</span> : null}
                   </button>
-                  <RowIconButton label={layer.visible ? `Ocultar ${layer.name}` : `Mostrar ${layer.name}`} onClick={() => onToggleLayer(layer, { visible: !layer.visible })}>
-                    {layer.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                  </RowIconButton>
-                  <RowIconButton label={layer.locked ? `Desbloquear ${layer.name}` : `Bloquear ${layer.name}`} onClick={() => onToggleLayer(layer, { locked: !layer.locked })}>
-                    {layer.locked ? <Lock className="h-4 w-4 text-[hsl(var(--foreground))]" /> : <LockOpen className="h-4 w-4" />}
-                  </RowIconButton>
+                  {readOnly ? (
+                    // Visibility and lock are shared board settings: read-only users only see them.
+                    <span className="flex shrink-0 items-center gap-1 px-1.5 text-[hsl(var(--muted-foreground))]" aria-label={`${layer.visible ? 'Visible' : 'Oculta'}${layer.locked ? ', bloqueada' : ''}`}>
+                      {layer.visible ? null : <EyeOff className="h-4 w-4" />}
+                      {layer.locked ? <Lock className="h-4 w-4" /> : null}
+                    </span>
+                  ) : (
+                    <>
+                      <RowIconButton label={layer.visible ? `Ocultar ${layer.name}` : `Mostrar ${layer.name}`} onClick={() => onToggleLayer(layer, { visible: !layer.visible })}>
+                        {layer.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      </RowIconButton>
+                      <RowIconButton label={layer.locked ? `Desbloquear ${layer.name}` : `Bloquear ${layer.name}`} onClick={() => onToggleLayer(layer, { locked: !layer.locked })}>
+                        {layer.locked ? <Lock className="h-4 w-4 text-[hsl(var(--foreground))]" /> : <LockOpen className="h-4 w-4" />}
+                      </RowIconButton>
+                    </>
+                  )}
                 </li>
               )
             })}

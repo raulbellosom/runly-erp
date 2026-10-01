@@ -188,3 +188,39 @@ export function useCanvasImages(objects) {
   }, [urls.data])
   return images
 }
+
+// ---- Sharing ----------------------------------------------------------
+export function useCollaborators(boardId, enabled = true) {
+  const token = useToken()
+  return useQuery({
+    queryKey: ['canvas', 'boards', boardId, 'collaborators'],
+    queryFn: () => runly.canvas.listCollaborators(boardId, token),
+    enabled: Boolean(token && boardId && enabled),
+  })
+}
+export function useCollaboratorMutations(boardId) {
+  const token = useToken(), client = useQueryClient()
+  const refresh = () => client.invalidateQueries({ queryKey: ['canvas', 'boards', boardId, 'collaborators'] })
+  const save = useMutation({ mutationFn: ({ userId, role }) => runly.canvas.addCollaborator(boardId, { userId, role }, token), onSuccess: refresh })
+  const remove = useMutation({ mutationFn: (userId) => runly.canvas.removeCollaborator(boardId, userId, token), onSuccess: refresh })
+  return { save, remove }
+}
+
+// Public page path inside the SPA (honours VITE_BASE_PATH, e.g. /app/).
+export function publicBoardPath(token) {
+  const base = String(import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/')
+  return `${base}p/canvas/${token}`
+}
+
+// { list, create, revoke } in the shape @runly/ui's PublicLinksPanel expects.
+export function useCanvasPublicLinksApi(boardId) {
+  const token = useToken()
+  return useMemo(() => {
+    const withPath = (link) => ({ ...link, path: publicBoardPath(link.token) })
+    return {
+      list: async () => (unwrap(await runly.canvas.listPublicLinks(boardId, token)) ?? []).map(withPath),
+      create: async (payload) => withPath(unwrap(await runly.canvas.createPublicLink(boardId, payload, token))),
+      revoke: (linkId) => runly.canvas.revokePublicLink(boardId, linkId, token),
+    }
+  }, [boardId, token])
+}

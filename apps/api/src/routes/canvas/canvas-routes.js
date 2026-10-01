@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
+import { createCanvasPublicLinksService } from './canvas-public.js'
 
 const actorId = (c) => c.get('userContext')?.profile?.id ?? null
 const companyId = (c) => c.get('companyId') ?? null
@@ -16,6 +17,7 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver })
   const access = prisma ? createUserAccessService({ prisma }) : null
+  const publicLinks = prisma ? createCanvasPublicLinksService({ prisma, canvas }) : null
   const changed = (boardId, action, payload = {}) => broadcaster?.broadcastToChannel?.(`canvas:board:${boardId}`, 'canvas.changed', { boardId, action, ...payload }).catch(() => {})
 
   app.get('/canvas/boards', requirePermission('canvas.view'), async (c) => {
@@ -118,6 +120,19 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   app.delete('/canvas/boards/:boardId/collaborators/:userId', requirePermission('canvas.share'), async (c) => {
     try { const id = c.req.param('boardId'); await canvas.removeCollaborator(companyId(c), actorId(c), id, c.req.param('userId')); changed(id, 'collaborator.removed'); return c.body(null, 204) }
     catch (error) { return errorResponse(c, error, 'Error al eliminar al colaborador.') }
+  })
+  // Read-only public links (owner only; see canvas-public.js).
+  app.get('/canvas/boards/:boardId/public-links', requirePermission('canvas.share'), async (c) => {
+    try { return c.json(await publicLinks.list(companyId(c), actorId(c), c.req.param('boardId'))) }
+    catch (error) { return errorResponse(c, error, 'Error al listar enlaces públicos.') }
+  })
+  app.post('/canvas/boards/:boardId/public-links', requirePermission('canvas.share'), async (c) => {
+    try { return c.json(await publicLinks.create(companyId(c), actorId(c), c.req.param('boardId'), await c.req.json()), 201) }
+    catch (error) { return errorResponse(c, error, 'Error al crear el enlace público.') }
+  })
+  app.delete('/canvas/boards/:boardId/public-links/:linkId', requirePermission('canvas.share'), async (c) => {
+    try { return c.json(await publicLinks.revoke(companyId(c), actorId(c), c.req.param('boardId'), c.req.param('linkId'))) }
+    catch (error) { return errorResponse(c, error, 'Error al revocar el enlace público.') }
   })
   app.get('/canvas/boards/:boardId/versions', requirePermission('canvas.version.view'), async (c) => {
     try { return c.json(await canvas.listVersions(companyId(c), actorId(c), c.req.param('boardId'))) }

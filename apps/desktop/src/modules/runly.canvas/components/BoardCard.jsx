@@ -1,5 +1,6 @@
 import { FileText, Users } from 'lucide-react'
 import { templateMeta, timeAgo } from '../lib/boardMeta.js'
+import { roleLabel } from '../lib/roles.js'
 
 const DOT_GRID = { backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.28) 1px, transparent 1px)', backgroundSize: '16px 16px' }
 
@@ -19,6 +20,11 @@ export function BoardCard({ board, onOpen }) {
         <span className="absolute left-3 top-3 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))] backdrop-blur">
           {template.label}
         </span>
+        {board.myRole && board.myRole !== 'OWNER' ? (
+          <span className="absolute right-3 top-3 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--foreground))] backdrop-blur">
+            Compartido · {roleLabel(board.myRole)}
+          </span>
+        ) : null}
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         <h3 className="line-clamp-2 font-semibold leading-snug text-[hsl(var(--foreground))]" title={board.name}>{board.name}</h3>
