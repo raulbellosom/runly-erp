@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { findModuleByKey, getLegacyModuleKey } from '@runly/core';
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react";
 import { useIsFetching, useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ModuleSidebar, BrandFooter } from "@runly/ui";
 import { OfflineProvider } from "@runly/offline";
@@ -25,6 +25,10 @@ import { MODULE_SIDEBAR_SLOTS } from './sidebar-slots.js'
 import { useModuleNavBadges } from './useModuleNavBadges.js'
 import { useServiceWorkerNotifications } from './useServiceWorkerNotifications.js'
 import { useHelpTip } from './useHelpTip.js'
+
+const MiraiSidebarHost = lazy(() =>
+  import("../modules/runly.chat/components/MiraiSidebarHost.jsx").then((m) => ({ default: m.MiraiSidebarHost })),
+);
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "atlas:v1:sidebar-collapsed";
 
@@ -285,6 +289,9 @@ export function RunlyApp() {
             <main className="flex-1 min-h-0 overflow-y-auto overflow-x-clip scrollbar-gutter-stable">
               <Outlet />
             </main>
+            <Suspense fallback={null}>
+              <MiraiSidebarHost />
+            </Suspense>
             {!(getLegacyModuleKey(activeModule?.key ?? moduleKeyFromPath) === "runly.chat" && isFullscreen) && (
               <BrandFooter
                 className="hidden lg:flex"

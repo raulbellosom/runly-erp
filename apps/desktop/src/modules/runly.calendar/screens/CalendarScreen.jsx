@@ -21,6 +21,7 @@ import EventFormModal from "../components/EventFormModal";
 import CalendarFormModal from "../components/CalendarFormModal";
 import CalendarShareModal from "../components/CalendarShareModal";
 import { useDeleteCalendar, useCalendarEvent } from "../hooks/useCalendarData";
+import { useMiraiRecordContext } from "../../runly.chat/lib/miraiPageContext";
 
 function useNarrow(breakpoint = 640) {
   const [narrow, setNarrow] = useState(
@@ -118,6 +119,11 @@ export default function CalendarScreen() {
   }, []);
 
   const [detailEvent, setDetailEvent] = useState(null);
+  useMiraiRecordContext({
+    recordType: "event",
+    recordId: detailEvent?._isLoading ? undefined : detailEvent?.id,
+    label: detailEvent?.title,
+  });
   const [formState, setFormState] = useState(null);
   const [calendarForm, setCalendarForm] = useState(null);
   const [shareCalendar, setShareCalendar] = useState(null);
