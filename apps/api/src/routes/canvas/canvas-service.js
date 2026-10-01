@@ -297,6 +297,15 @@ export function createCanvasService({ prisma, entityResolver = null }) {
           })
           if (changed.count !== 1) throw new CanvasServiceError('El objeto no existe o cambió en otra sesión.', 409, 'REVISION_CONFLICT')
           results.push({ op: 'delete', id: operation.id })
+        } else if (operation.op === 'restore') {
+          // Undo of a delete (or redo of a create) brings back the same row, so
+          // its hotspot, entity links, attachments and comments survive.
+          const changed = await tx.canvasObject.updateMany({
+            where: { id: operation.id, companyId, boardId, deletedAt: { not: null } },
+            data: { deletedAt: null, updatedById: actorId, revision: { increment: 1 } },
+          })
+          if (changed.count !== 1) throw new CanvasServiceError('El objeto ya no se puede restaurar.', 409, 'REVISION_CONFLICT')
+          results.push({ op: 'restore', object: await tx.canvasObject.findFirst({ where: { id: operation.id, companyId, boardId }, include: { hotspot: true } }) })
         } else {
           throw new CanvasServiceError('Operación de objeto no soportada.', 400)
         }

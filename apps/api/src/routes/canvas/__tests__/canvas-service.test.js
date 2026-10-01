@@ -68,6 +68,22 @@ describe('Runly Canvas service', () => {
     )
   })
 
+  it('restores a soft-deleted object only when it is actually deleted', async () => {
+    const calls = []
+    const tx = {
+      canvasObject: {
+        updateMany: async (args) => { calls.push(args); return { count: 1 } },
+        findFirst: async () => ({ id: 'object-1', deletedAt: null, revision: 3 }),
+      },
+      canvasBoard: { update: async () => ({}) },
+    }
+    const prisma = { canvasBoard: { findFirst: async () => accessibleBoard() }, $transaction: (fn) => fn(tx) }
+    const [result] = await createCanvasService({ prisma }).batchObjects(COMPANY, USER, BOARD, [{ op: 'restore', id: 'object-1' }])
+    assert.deepEqual(calls[0].where.deletedAt, { not: null })
+    assert.equal(calls[0].data.deletedAt, null)
+    assert.equal(result.object.id, 'object-1')
+  })
+
   it('rejects an entity link when the tenant-aware resolver cannot see the record', async () => {
     const prisma = {
       canvasBoard: { findFirst: async () => accessibleBoard() },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ConfirmDialog, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
+import { ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
 import { BoardInspector } from '../components/BoardInspector.jsx'
 import { CanvasToolbar, SHAPES } from '../components/CanvasToolbar.jsx'
 import { CanvasViewport } from '../components/CanvasViewport.jsx'
@@ -45,10 +45,10 @@ export default function BoardEditor() {
   // arrives as the wildcard segment (`/app/m/runly.canvas/<boardId>`).
   const { '*': wildcard } = useParams(), boardId = String(wildcard ?? '').split('/').filter(Boolean)[0]
   const navigate = useNavigate(), board = useBoard(boardId), isDesktop = !useIsMobile(1280)
-  const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedId, setSelectedId] = useState(null), [tool, setTool] = useState('select')
+  const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedIds, setSelectedIds] = useState([]), [tool, setTool] = useState('select')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })
   const [desktopPanels, setDesktopPanels] = useState({ left: true, right: true }), [mobileSheet, setMobileSheet] = useState(null)
-  const [dialog, setDialog] = useState(null), [confirmDelete, setConfirmDelete] = useState(false), [zen, setZen] = useState(false)
+  const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false)
   const fittedPageRef = useRef(null)
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
@@ -67,8 +67,9 @@ export default function BoardEditor() {
   const links = useMemo(() => linksQuery.data ?? [], [linksQuery.data])
   const linkedIds = useMemo(() => new Set(links.map((link) => link.targetId)), [links])
   const images = useCanvasImages(allRows)
-  const selected = rows.find((row) => row.id === selectedId) ?? null
-  const selectedLocked = Boolean(selected && lockedLayerIds.has(selected.layerId))
+  const selectedRows = useMemo(() => rows.filter((row) => selectedIds.includes(row.id)), [rows, selectedIds])
+  const selected = selectedRows.length === 1 ? selectedRows[0] : null
+  const editableSelection = selectedRows.filter((row) => !lockedLayerIds.has(row.layerId))
   const activeLayer = layers.find((layer) => layer.id === layerId)
 
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function BoardEditor() {
   }, [pages, pageId])
 
   const openDialog = useCallback((next) => setDialog(next), [])
-  const actions = useBoardEditorActions({ boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedId, setTool, viewport, size, openDialog })
+  const actions = useBoardEditorActions({ boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog })
 
   const fit = useCallback(() => setViewport(fitBounds(sceneBounds(rows), size)), [rows, size])
   useEffect(() => {
@@ -88,14 +89,14 @@ export default function BoardEditor() {
 
   const zoomBy = (factor) => setViewport((current) => zoomAt(current, { x: size.width / 2, y: size.height / 2 }, current.zoom * factor))
   const resetZoom = () => setViewport((current) => zoomAt(current, { x: size.width / 2, y: size.height / 2 }, 1))
-  const select = (id) => {
-    setSelectedId(id)
-    const row = allRows.find((item) => item.id === id)
+  const select = (ids) => {
+    setSelectedIds(ids)
+    const row = ids.length === 1 ? allRows.find((item) => item.id === ids[0]) : null
     if (row && row.layerId !== layerId) setLayerId(row.layerId)
   }
   const changePage = (id) => {
     const page = pages.find((item) => item.id === id)
-    setPageId(id); setSelectedId(null)
+    setPageId(id); setSelectedIds([])
     setLayerId(page?.layers?.find((layer) => layer.type === 'vector')?.id ?? page?.layers?.[0]?.id)
     if (!isDesktop) setMobileSheet(null)
   }
@@ -104,22 +105,25 @@ export default function BoardEditor() {
     else if (object.type === 'text' && !lockedLayerIds.has(object.layerId)) setDialog({ kind: 'text', id: object.id })
     else if (!isDesktop) setMobileSheet('right')
   }
-  const requestDelete = () => { if (selected && !selectedLocked) setConfirmDelete(true) }
+  const deleteSelection = () => actions.remove(editableSelection)
   const saveText = (object, text) => {
     const row = allRows.find((item) => item.id === object.id)
-    if (row) actions.patch(row, { properties: { text }, geometry: { height: measureTextHeight(text, row.style, row.geometry?.width ?? 220) } })
+    if (row) actions.patch([row], { properties: { text }, geometry: { height: measureTextHeight(text, row.style, row.geometry?.width ?? 220) } }, 'Editar texto')
   }
 
   const { spacePan } = useCanvasShortcuts({
     enabled: Boolean(board.data),
     onTool: actions.chooseTool,
     onInsert: actions.openFilePicker,
-    onDelete: requestDelete,
-    onDuplicate: () => { if (selected && !selectedLocked) actions.duplicate(selected) },
-    onNudge: (dx, dy) => actions.nudge(selected, dx, dy),
+    onDelete: deleteSelection,
+    onDuplicate: () => actions.duplicate(editableSelection),
+    onNudge: (dx, dy) => actions.nudge(editableSelection, dx, dy),
     onOpen: () => { if (selected) openObject(selected) },
+    onUndo: actions.undo,
+    onRedo: actions.redo,
+    onSelectAll: () => { setTool('select'); setSelectedIds(rows.filter((row) => !lockedLayerIds.has(row.layerId)).map((row) => row.id)) },
     onEscape: () => {
-      if (selectedId || tool !== 'select') { setSelectedId(null); setTool('select') } else if (zen) setZen(false)
+      if (selectedIds.length || tool !== 'select') { setSelectedIds([]); setTool('select') } else if (zen) setZen(false)
     },
     onZoomIn: () => zoomBy(1.2), onZoomOut: () => zoomBy(1 / 1.2), onReset: resetZoom, onFit: fit,
   })
@@ -141,18 +145,15 @@ export default function BoardEditor() {
   const inspectorPanel = (
     <BoardInspector
       boardId={boardId}
-      selected={selected}
-      layerName={layers.find((layer) => layer.id === selected?.layerId)?.name}
-      locked={selectedLocked}
+      selectedRows={selectedRows}
+      layers={layers}
+      lockedLayerIds={lockedLayerIds}
       links={links}
       presence={presence}
       actions={{
-        patch: (change) => actions.patch(selected, change),
-        remove: requestDelete,
-        duplicate: () => actions.duplicate(selected),
-        arrange: (where) => actions.arrange(selected, where),
-        openHotspot: () => setDialog({ kind: 'hotspot', id: selected.id }),
-        editText: () => setDialog({ kind: 'text', id: selected.id }),
+        patch: actions.patch, remove: actions.remove, duplicate: actions.duplicate, arrange: actions.arrange,
+        openHotspot: (object) => setDialog({ kind: 'hotspot', id: object.id }),
+        editText: (object) => setDialog({ kind: 'text', id: object.id }),
       }}
     />
   )
@@ -175,13 +176,14 @@ export default function BoardEditor() {
         presence={presence} onBack={() => navigate('/app/m/runly.canvas')}
         leftOpen={leftOpen} rightOpen={rightOpen} onToggleLeft={() => togglePanel('left')} onToggleRight={() => togglePanel('right')}
         zen={zen} onToggleZen={() => setZen((value) => !value)}
+        history={{ undo: actions.undo, redo: actions.redo, canUndo: actions.canUndo, canRedo: actions.canRedo, undoLabel: actions.undoLabel, redoLabel: actions.redoLabel }}
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
         <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]">
           {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
           <CanvasViewport
-            objects={rows} lockedLayerIds={lockedLayerIds} selectedId={selectedId} images={images} linkedIds={linkedIds}
+            objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={images} linkedIds={linkedIds}
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
           />
@@ -208,7 +210,7 @@ export default function BoardEditor() {
               <ZoomControls zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit} />
             </div>
             <CanvasToolbar
-              tool={tool} onToolChange={actions.chooseTool} canDelete={Boolean(selected) && !selectedLocked} onDelete={requestDelete}
+              tool={tool} onToolChange={actions.chooseTool} canDelete={editableSelection.length > 0} onDelete={deleteSelection}
               onInsertMedia={actions.openFilePicker} inserting={actions.inserting}
             />
           </div>
@@ -233,15 +235,6 @@ export default function BoardEditor() {
       <HotspotDialog boardId={boardId} pageId={pageId} object={dialog?.kind === 'hotspot' ? dialogObject : null} links={links} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <TextEditDialog object={dialog?.kind === 'text' ? dialogObject : null} onSave={saveText} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <PdfPagesDialog key={actions.pdf?.file.name} pdf={actions.pdf} busy={actions.inserting} onConfirm={(pagesToInsert) => actions.insertPdfPages(pagesToInsert)} onCancel={actions.cancelPdf} />
-      <ConfirmDialog
-        open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title={selected?.type === 'hotspot' ? 'Eliminar hotspot' : 'Eliminar elemento'}
-        description="Se eliminará de esta página. Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        loading={actions.batch.isPending}
-        onConfirm={async () => { await actions.remove(selected); setConfirmDelete(false) }}
-      />
     </div>
   )
 }

@@ -21,7 +21,12 @@ export function useCanvasShortcuts({ enabled, ...handlers }) {
     function keyDown(event) {
       if (isEditableTarget(event.target) || document.querySelector('[role="dialog"], [role="menu"]')) return
       const h = handlersRef.current, key = event.key.toLowerCase()
-      if ((event.ctrlKey || event.metaKey) && key === 'd') { event.preventDefault(); h.onDuplicate(); return }
+      if (event.ctrlKey || event.metaKey) {
+        if (key === 'z') { event.preventDefault(); if (event.shiftKey) h.onRedo(); else h.onUndo(); return }
+        if (key === 'y') { event.preventDefault(); h.onRedo(); return }
+        if (key === 'd') { event.preventDefault(); h.onDuplicate(); return }
+        if (key === 'a') { event.preventDefault(); h.onSelectAll(); return }
+      }
       if (event.ctrlKey || event.metaKey || event.altKey) return
       if (key === ' ') { event.preventDefault(); setSpacePan(true); return }
       if (ARROWS[key]) { event.preventDefault(); const [dx, dy] = ARROWS[key], step = event.shiftKey ? 10 : 1; h.onNudge(dx * step, dy * step); return }

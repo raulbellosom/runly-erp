@@ -11,9 +11,17 @@ export function applyOperations(rows = [], operations = []) {
       next = next.map((row) => row.id === op.id ? { ...row, ...op.data, revision: (row.revision ?? 1) + 1 } : row)
     } else if (op.op === 'delete') {
       next = next.filter((row) => row.id !== op.id)
+    } else if (op.op === 'restore' && op.snapshot && !next.some((row) => row.id === op.id)) {
+      // Delete and restore each bump the revision on the server.
+      next = [...next, { ...op.snapshot, id: op.id, revision: (op.snapshot.revision ?? 1) + 2 }]
     }
   }
   return next
+}
+
+// Batch payload without client-only fields (restore snapshots).
+export function toServerOperations(operations) {
+  return operations.map(({ snapshot: _snapshot, ...op }) => op)
 }
 
 // Replaces optimistic rows with the authoritative ones returned by the batch.
@@ -24,6 +32,10 @@ export function mergeBatchResults(rows = [], results = []) {
       next = next.some((row) => row.id === result.clientId)
         ? next.map((row) => row.id === result.clientId ? result.object : row)
         : [...next, result.object]
+    } else if (result.op === 'restore' && result.object) {
+      const existing = next.find((row) => row.id === result.object.id)
+      const restored = { ...result.object, hotspot: result.object.hotspot ?? existing?.hotspot }
+      next = existing ? next.map((row) => row.id === restored.id ? restored : row) : [...next, restored]
     } else if (result.op === 'update' && result.object) {
       next = next.map((row) => row.id === result.object.id ? { ...result.object, hotspot: row.hotspot } : row)
     }

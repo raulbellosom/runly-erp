@@ -41,22 +41,26 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedId, images, linkedIds, overlay, interactive = true } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
     this.drawGrid(ctx, viewport)
     ctx.save()
     ctx.translate(viewport.x, viewport.y); ctx.scale(viewport.zoom, viewport.zoom)
-    let selected = null
+    const selected = []
     for (const object of objects) {
       this.drawObject(ctx, object, viewport.zoom, images)
       if (linkedIds?.has(object.id) || (object.hotspot && linkedIds?.has(object.hotspot.id))) this.drawLinkBadge(ctx, object, viewport.zoom)
-      if (object.id === selectedId) selected = object
+      if (selectedIds?.has(object.id)) selected.push(object)
     }
-    if (selected) this.drawSelection(ctx, selected, viewport.zoom, interactive)
+    // Handles only make sense for a single object; a group gets outlines
+    // plus one dashed box around everything.
+    for (const object of selected) this.drawSelection(ctx, object, viewport.zoom, interactive && selected.length === 1)
+    if (selected.length > 1) this.drawGroupBox(ctx, selected, viewport.zoom)
     ctx.restore()
     if (overlay?.object && overlay.text) this.drawOverlayLabel(ctx, overlay, viewport)
+    if (marquee) this.drawMarquee(ctx, marquee)
   }
 
   drawGrid(ctx, viewport) {
@@ -203,6 +207,23 @@ export class Canvas2DRenderer {
         ctx.fill(); ctx.stroke()
       }
     }
+    ctx.restore()
+  }
+
+  drawGroupBox(ctx, objects, zoom) {
+    const b = sceneBounds(objects), pad = 6 / zoom
+    ctx.save()
+    ctx.setLineDash([6 / zoom, 4 / zoom]); ctx.lineWidth = 1 / zoom; ctx.strokeStyle = this.theme.primary
+    ctx.strokeRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2)
+    ctx.restore()
+  }
+
+  drawMarquee(ctx, rect) {
+    ctx.save()
+    ctx.fillStyle = this.theme.primary; ctx.globalAlpha = 0.08
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
+    ctx.globalAlpha = 1; ctx.strokeStyle = this.theme.primary; ctx.lineWidth = 1
+    ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width, rect.height)
     ctx.restore()
   }
 

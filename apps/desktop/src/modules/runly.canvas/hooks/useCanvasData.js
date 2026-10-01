@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
-import { applyOperations, mergeBatchResults } from '../lib/optimistic.js'
+import { applyOperations, mergeBatchResults, toServerOperations } from '../lib/optimistic.js'
 
 function useToken() { return useAuth().session?.access_token }
 const unwrap = (response) => response?.data ?? response
@@ -40,17 +40,42 @@ export function useUpdateLayer(boardId) {
 
 // Object batches are optimistic: the cache reflects the change immediately,
 // is reconciled with the server rows on success and refetched on failure.
-export function useObjectBatch(boardId, pageId) {
+// Edits to an object whose create is still in flight are queued and sent as
+// a follow-up update once the server id exists (`patchPending`).
+export function useObjectBatch(boardId, pageId, { onCreated } = {}) {
   const token = useToken(), client = useQueryClient(), key = objectsKey(boardId, pageId)
-  return useMutation({
-    mutationFn: (operations) => runly.canvas.batchObjects(boardId, operations, token),
+  const queuedRef = useRef(new Map()), selfRef = useRef(null), onCreatedRef = useRef(onCreated)
+  useEffect(() => { onCreatedRef.current = onCreated })
+  const mutation = useMutation({
+    mutationFn: (operations) => runly.canvas.batchObjects(boardId, toServerOperations(operations), token),
     onMutate: (operations) => {
       client.cancelQueries({ queryKey: key })
       client.setQueryData(key, (rows) => applyOperations(rows, operations))
     },
-    onSuccess: (response) => client.setQueryData(key, (rows) => mergeBatchResults(rows, unwrap(response) ?? [])),
+    onSuccess: (response) => {
+      const followUps = []
+      const results = (unwrap(response) ?? []).map((result) => {
+        if (result.op !== 'create' || !result.object) return result
+        onCreatedRef.current?.(result.clientId, result.object)
+        const queued = queuedRef.current.get(result.clientId)
+        if (!queued) return result
+        queuedRef.current.delete(result.clientId)
+        followUps.push({ op: 'update', id: result.object.id, expectedRevision: result.object.revision, data: queued })
+        return { ...result, object: { ...result.object, ...queued } }
+      })
+      client.setQueryData(key, (rows) => mergeBatchResults(rows, results))
+      if (followUps.length) selfRef.current?.mutate(followUps)
+    },
     onError: () => client.invalidateQueries({ queryKey: key }),
   })
+  useEffect(() => { selfRef.current = mutation })
+  const patchPending = useCallback((clientId, data) => {
+    queuedRef.current.set(clientId, { ...(queuedRef.current.get(clientId) ?? {}), ...data })
+    client.setQueryData(key, (rows = []) => rows.map((row) => row.id === clientId ? { ...row, ...data } : row))
+    // key is derived from boardId/pageId, both in deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, boardId, pageId])
+  return { mutation, patchPending }
 }
 
 export function useCreateHotspot(boardId, pageId) {

@@ -26,3 +26,12 @@ describe('Canvas optimistic batch', () => {
     assert.deepEqual(merged[0].hotspot, { id: 'h' })
   })
 })
+
+describe('Canvas optimistic restore', () => {
+  it('re-inserts restored rows locally and strips snapshots from the payload', async () => {
+    const { applyOperations, toServerOperations } = await import('./optimistic.js')
+    const ops = [{ op: 'restore', id: 'a', snapshot: { id: 'a', type: 'rectangle', revision: 2 } }]
+    assert.equal(applyOperations([], ops)[0].revision, 4)
+    assert.deepEqual(toServerOperations(ops), [{ op: 'restore', id: 'a' }])
+  })
+})

@@ -1,5 +1,5 @@
 import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn } from '@runly/ui'
-import { ArrowLeft, Check, Loader2, Maximize2, Minimize2, PanelLeft, PanelRight } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, Maximize2, Minimize2, PanelLeft, PanelRight, Redo2, Undo2 } from 'lucide-react'
 import { ToolButton } from './CanvasToolbar.jsx'
 
 function initials(name = '') {
@@ -36,7 +36,7 @@ function SaveStatus({ saving }) {
   )
 }
 
-export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight, zen, onToggleZen }) {
+export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight, zen, onToggleZen, history }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 sm:px-3">
       <Button type="button" variant="ghost" onClick={onBack} aria-label="Volver a Boards" className="h-11 shrink-0 gap-1.5 px-2.5 sm:h-9">
@@ -53,6 +53,10 @@ export function EditorTopBar({ title, subtitle, loading, saving, presence, onBac
             <p className="truncate text-xs leading-tight text-[hsl(var(--muted-foreground))]">{subtitle}</p>
           </>
         )}
+      </div>
+      <div className="flex items-center gap-0.5" role="group" aria-label="Historial">
+        <ToolButton label={history.undoLabel ? `Deshacer: ${history.undoLabel}` : 'Deshacer'} shortcut="Ctrl+Z" disabled={!history.canUndo} onClick={history.undo}><Undo2 /></ToolButton>
+        <ToolButton label={history.redoLabel ? `Rehacer: ${history.redoLabel}` : 'Rehacer'} shortcut="Ctrl+Shift+Z" disabled={!history.canRedo} onClick={history.redo}><Redo2 /></ToolButton>
       </div>
       <SaveStatus saving={saving} />
       <PresenceStack users={presence} />

@@ -1,46 +1,52 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { Canvas2DRenderer } from '../engine/Canvas2DRenderer.js'
-import { boxFromDrag, boxOf, hitHandle, isLinear, moveObject, resizeObject, rotateObject } from '../engine/geometry.js'
+import { boxFromDrag, boxOf, hitHandle, isLinear, moveObject, objectBounds, resizeObject, rotateObject } from '../engine/geometry.js'
 import { observeThemeChanges, readCanvasTheme } from '../engine/theme.js'
 import { screenToWorld, zoomAt } from '../engine/viewport.js'
 import { CREATION_TOOLS, draftObject } from '../lib/objectFactory.js'
 
 const DRAG_THRESHOLD = 4
+const LONG_PRESS_MS = 450
 const HANDLE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', rotate: 'grab', start: 'move', end: 'move' }
 
 function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) }
 function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
+function rectFrom(a, b) { return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) } }
+function intersects(a, b) { return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y }
 function overlayText(mode, object) {
   if (mode === 'rotate') return `${Math.round(object.transform?.rotation ?? 0)}°`
   const b = boxOf(object)
   if (isLinear(object)) return `${Math.round(Math.hypot(b.width, b.height))} px`
   return `${Math.round(b.width)} × ${Math.round(b.height)}`
 }
-
 function baseCursor(tool, spacePan) {
   if (tool === 'pan' || spacePan) return 'grab'
   if (CREATION_TOOLS.has(tool)) return tool === 'text' ? 'text' : 'crosshair'
   return 'default'
 }
 
-// Pointer interaction is imperative: the in-flight object lives in a ref and
-// is painted on the next animation frame, so dragging never waits on a React
+// Pointer interaction is imperative: in-flight objects live in a ref and are
+// painted on the next animation frame, so dragging never waits on a React
 // render. React state only changes when a gesture commits.
 export function CanvasViewport(props) {
   const { tool, spacePan, onViewportChange, onResize } = props
   const canvasRef = useRef(null), rendererRef = useRef(null), dragRef = useRef(null), pointersRef = useRef(new Map())
-  const liveRef = useRef(null), propsRef = useRef(props), frameRef = useRef(0)
+  const liveRef = useRef(null), propsRef = useRef(props), frameRef = useRef(0), pressTimerRef = useRef(0)
 
   function draw() {
     const renderer = rendererRef.current, p = propsRef.current
     if (!renderer) return
     const live = liveRef.current
     let objects = p.objects
-    if (live?.object) objects = live.draft ? [...objects, live.object] : objects.map((row) => row.id === live.object.id ? live.object : row)
+    if (live?.draft) objects = [...objects, live.draft]
+    else if (live?.objects) objects = objects.map((row) => live.objects.get(row.id) ?? row)
+    const single = live?.objects?.size === 1 ? [...live.objects.values()][0] : null
     renderer.render({
-      objects, viewport: p.viewport, selectedId: live?.draft ? null : p.selectedId, images: p.images, linkedIds: p.linkedIds,
-      overlay: live?.object && live.mode !== 'move' ? { object: live.object, text: overlayText(live.mode, live.object) } : null,
-      interactive: !p.lockedLayerIds?.has(p.objects.find((row) => row.id === p.selectedId)?.layerId),
+      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds,
+      selectedIds: live?.draft ? new Set() : new Set(p.selectedIds),
+      overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft) } : null,
+      marquee: live?.marquee ?? null,
+      interactive: p.selectedIds.length === 1 && !p.lockedLayerIds?.has(p.objects.find((row) => row.id === p.selectedIds[0])?.layerId),
     })
   }
   function schedule() {
@@ -51,7 +57,7 @@ export function CanvasViewport(props) {
   useLayoutEffect(() => {
     propsRef.current = props
     // A committed gesture keeps its preview until the optimistic cache update
-    // reaches `objects`, so a shape never flashes back to its old position.
+    // reaches `objects`, so shapes never flash back to their old position.
     if (liveRef.current?.committed && props.objects !== liveRef.current.objectsAtCommit) liveRef.current = null
     draw()
   })
@@ -77,7 +83,7 @@ export function CanvasViewport(props) {
     canvas.addEventListener('wheel', wheel, { passive: false })
     return () => {
       observer.disconnect(); stopTheme(); canvas.removeEventListener('wheel', wheel)
-      cancelAnimationFrame(frameRef.current); rendererRef.current = null
+      cancelAnimationFrame(frameRef.current); clearTimeout(pressTimerRef.current); rendererRef.current = null
     }
     // Created once; the callbacks are stable state setters from the editor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,6 +97,22 @@ export function CanvasViewport(props) {
     return lockedLayerIds?.size ? objects.filter((row) => !lockedLayerIds.has(row.layerId)) : objects
   }
   const setCursor = (value) => { if (canvasRef.current) canvasRef.current.style.cursor = value }
+  const toggle = (ids, id) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]
+
+  // Touch has no Shift key: holding a finger still turns the gesture into an
+  // area selection (empty space) or adds/removes the object under it.
+  function armLongPress(drag, hit) {
+    clearTimeout(pressTimerRef.current)
+    pressTimerRef.current = setTimeout(() => {
+      if (dragRef.current !== drag || drag.moved) return
+      navigator.vibrate?.(12)
+      const p = propsRef.current
+      if (hit) { p.onSelect(toggle(p.selectedIds, hit.id)); dragRef.current = { mode: 'idle' }; return }
+      dragRef.current = { mode: 'marquee', screen: drag.screen, additive: true, base: p.selectedIds, moved: true }
+      liveRef.current = { marquee: rectFrom(drag.screen, drag.screen) }
+      schedule()
+    }, LONG_PRESS_MS)
+  }
 
   function pointerDown(event) {
     if (event.button === 2) return
@@ -98,8 +120,10 @@ export function CanvasViewport(props) {
     event.currentTarget.setPointerCapture(event.pointerId)
     event.currentTarget.focus({ preventScroll: true })
     const screen = pointOf(event), world = screenToWorld(screen, p.viewport), touch = event.pointerType === 'touch'
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey
     pointersRef.current.set(event.pointerId, screen)
     if (pointersRef.current.size === 2) {
+      clearTimeout(pressTimerRef.current)
       const [a, b] = [...pointersRef.current.values()]
       liveRef.current = null
       dragRef.current = { mode: 'pinch', distance: distance(a, b) || 1, mid: midpoint(a, b), viewport: p.viewport }
@@ -109,13 +133,23 @@ export function CanvasViewport(props) {
     if (tool === 'pan' || spacePan || event.button === 1) { dragRef.current = { mode: 'pan', screen, viewport: p.viewport }; setCursor('grabbing'); return }
     if (CREATION_TOOLS.has(tool)) { dragRef.current = { mode: 'create', screen, world }; return }
 
-    const selected = selectable().find((row) => row.id === p.selectedId)
-    const handle = selected && hitHandle(world, selected, p.viewport.zoom, touch ? 16 : 9)
-    if (handle) { dragRef.current = { mode: handle === 'rotate' ? 'rotate' : 'resize', handle, screen, object: selected, moved: false }; return }
-    const hit = rendererRef.current?.hitTest(screen, selectable(), p.viewport, touch ? 14 : 6)
-    p.onSelect(hit?.id ?? null)
-    if (hit) dragRef.current = { mode: 'move', screen, world, object: hit, moved: false }
-    else if (touch) dragRef.current = { mode: 'pan', screen, viewport: p.viewport }
+    const rows = selectable()
+    const single = p.selectedIds.length === 1 ? rows.find((row) => row.id === p.selectedIds[0]) : null
+    const handle = single && !additive && hitHandle(world, single, p.viewport.zoom, touch ? 16 : 9)
+    if (handle) { dragRef.current = { mode: handle === 'rotate' ? 'rotate' : 'resize', handle, screen, objects: [single], moved: false }; return }
+
+    const hit = rendererRef.current?.hitTest(screen, rows, p.viewport, touch ? 14 : 6)
+    if (hit && additive) { p.onSelect(toggle(p.selectedIds, hit.id)); return }
+    if (hit) {
+      const group = p.selectedIds.includes(hit.id) ? rows.filter((row) => p.selectedIds.includes(row.id)) : [hit]
+      if (!p.selectedIds.includes(hit.id)) p.onSelect([hit.id])
+      dragRef.current = { mode: 'move', screen, world, objects: group, hitId: hit.id, moved: false }
+      if (touch) armLongPress(dragRef.current, hit)
+      return
+    }
+    if (!additive) p.onSelect([])
+    if (touch) { dragRef.current = { mode: 'pan', screen, viewport: p.viewport }; armLongPress(dragRef.current, null); return }
+    dragRef.current = { mode: 'marquee', screen, additive, base: additive ? p.selectedIds : [], moved: false }
   }
 
   function pointerMove(event) {
@@ -124,8 +158,9 @@ export function CanvasViewport(props) {
     const drag = dragRef.current
     if (!drag) {
       if (event.pointerType !== 'mouse' || tool !== 'select' || spacePan) return
-      const world = screenToWorld(screen, p.viewport), selected = selectable().find((row) => row.id === p.selectedId)
-      const handle = selected && hitHandle(world, selected, p.viewport.zoom, 9)
+      const world = screenToWorld(screen, p.viewport)
+      const single = p.selectedIds.length === 1 ? selectable().find((row) => row.id === p.selectedIds[0]) : null
+      const handle = single && hitHandle(world, single, p.viewport.zoom, 9)
       setCursor(handle ? HANDLE_CURSORS[handle] : rendererRef.current?.hitTest(screen, selectable(), p.viewport) ? 'move' : 'default')
       return
     }
@@ -136,28 +171,33 @@ export function CanvasViewport(props) {
       onViewportChange({ ...next, x: next.x + mid.x - drag.mid.x, y: next.y + mid.y - drag.mid.y })
       return
     }
-    if (drag.mode === 'pan') { onViewportChange({ ...drag.viewport, x: drag.viewport.x + screen.x - drag.screen.x, y: drag.viewport.y + screen.y - drag.screen.y }); return }
     if (drag.mode === 'idle') return
     if (!drag.moved && distance(screen, drag.screen) < DRAG_THRESHOLD) return
+    if (!drag.moved) clearTimeout(pressTimerRef.current)
     drag.moved = true
+    if (drag.mode === 'pan') { onViewportChange({ ...drag.viewport, x: drag.viewport.x + screen.x - drag.screen.x, y: drag.viewport.y + screen.y - drag.screen.y }); return }
+    if (drag.mode === 'marquee') { liveRef.current = { marquee: rectFrom(drag.screen, screen) }; schedule(); return }
     const world = screenToWorld(screen, p.viewport)
     if (drag.mode === 'create') {
       if (tool === 'hotspot' || tool === 'text') return
-      const object = draftObject(tool, boxFromDrag(tool === 'line' || tool === 'arrow' ? tool : 'rectangle', drag.world, world, { constrain: event.shiftKey }))
-      liveRef.current = { mode: 'create', draft: true, object }
+      liveRef.current = { draft: draftObject(tool, boxFromDrag(tool === 'line' || tool === 'arrow' ? tool : 'rectangle', drag.world, world, { constrain: event.shiftKey })) }
     } else if (drag.mode === 'move') {
-      liveRef.current = { mode: 'move', object: moveObject(drag.object, world.x - drag.world.x, world.y - drag.world.y) }
-      setCursor('grabbing')
-    } else if (drag.mode === 'rotate') {
-      liveRef.current = { mode: 'rotate', object: rotateObject(drag.object, world, { snap: event.shiftKey }) }
+      const dx = world.x - drag.world.x, dy = world.y - drag.world.y
+      liveRef.current = { mode: 'move', objects: new Map(drag.objects.map((object) => [object.id, moveObject(object, dx, dy)])) }
       setCursor('grabbing')
     } else {
-      liveRef.current = { mode: 'resize', object: resizeObject(drag.object, drag.handle, world, { keepRatio: event.shiftKey || drag.object.type === 'image' }) }
+      const [object] = drag.objects
+      const next = drag.mode === 'rotate'
+        ? rotateObject(object, world, { snap: event.shiftKey })
+        : resizeObject(object, drag.handle, world, { keepRatio: event.shiftKey || object.type === 'image' })
+      liveRef.current = { mode: drag.mode, objects: new Map([[object.id, next]]) }
+      if (drag.mode === 'rotate') setCursor('grabbing')
     }
     schedule()
   }
 
   function pointerUp(event) {
+    clearTimeout(pressTimerRef.current)
     const p = propsRef.current
     pointersRef.current.delete(event.pointerId)
     const drag = dragRef.current
@@ -170,13 +210,26 @@ export function CanvasViewport(props) {
       liveRef.current = null
       // Text and hotspots are placed with a tap; shapes use the dragged box
       // when there is one and fall back to a default size otherwise.
-      if (live?.object && drag.moved) p.onCreate({ tool, box: boxOf(live.object) })
+      if (live?.draft && drag.moved) p.onCreate({ tool, box: boxOf(live.draft) })
       else p.onCreate({ tool, point: drag.world })
       schedule(); return
     }
-    if (live?.object && drag.moved && drag.object) {
+    if (drag.mode === 'marquee') {
+      liveRef.current = null
+      if (live?.marquee && drag.moved) {
+        const a = screenToWorld({ x: live.marquee.x, y: live.marquee.y }, p.viewport)
+        const b = screenToWorld({ x: live.marquee.x + live.marquee.width, y: live.marquee.y + live.marquee.height }, p.viewport)
+        const area = rectFrom(a, b)
+        const hits = selectable().filter((row) => intersects(objectBounds(row), area)).map((row) => row.id)
+        p.onSelect([...new Set([...drag.base, ...hits])])
+      }
+      schedule(); return
+    }
+    // A plain click on one member of a group narrows the selection to it.
+    if (drag.mode === 'move' && !drag.moved && drag.objects.length > 1) { p.onSelect([drag.hitId]); return }
+    if (live?.objects && drag.moved && drag.objects) {
       liveRef.current = { ...live, committed: true, objectsAtCommit: p.objects }
-      p.onCommit(live.object, drag.object)
+      p.onCommit(drag.objects.map((prev) => ({ prev, next: live.objects.get(prev.id) })).filter((change) => change.next), live.mode)
       // Safety net: drop the preview if the update never reaches `objects`.
       setTimeout(() => { if (liveRef.current?.committed) { liveRef.current = null; schedule() } }, 1500)
     }
@@ -192,7 +245,7 @@ export function CanvasViewport(props) {
     <canvas
       ref={canvasRef}
       role="application"
-      aria-label="Lienzo del Board. V seleccionar, H mover vista, R rectángulo, O elipse, L línea, A flecha, T texto, P hotspot. Suprimir elimina la selección; las flechas la desplazan; + y - para el zoom."
+      aria-label="Lienzo del Board. V seleccionar, H mover vista, R rectángulo, O elipse, L línea, A flecha, T texto, P hotspot. Ctrl+Z deshacer, Ctrl+Shift+Z rehacer, Ctrl+A seleccionar todo, Suprimir elimina la selección, las flechas la desplazan."
       tabIndex={0}
       className="block h-full w-full touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
       onPointerDown={pointerDown}
