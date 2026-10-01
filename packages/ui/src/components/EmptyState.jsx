@@ -1,3 +1,4 @@
+import { isValidElement } from 'react'
 import { cn } from '../lib/utils.js'
 import { Button } from './Button.jsx'
 
@@ -15,7 +16,7 @@ export function EmptyState({
       <div className={cn('flex items-center gap-3 rounded-lg border border-dashed border-[hsl(var(--border))] px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]', className)}>
         {Icon && <Icon className="h-4 w-4 shrink-0" />}
         <span>{title}</span>
-        {action && (
+        {isValidElement(action) ? <div className="ml-auto">{action}</div> : action && (
           <Button size="sm" variant="ghost" onClick={action.onClick} className="ml-auto">
             {action.label}
           </Button>
@@ -37,7 +38,10 @@ export function EmptyState({
           <p className="max-w-xs text-sm text-[hsl(var(--muted-foreground))] leading-relaxed">{description}</p>
         )}
       </div>
-      {action && (
+      {/* `action` accepts either { label, onClick } or a ready-made element
+          (e.g. a <Button>); rendering an element as action.label produced an
+          empty button that showed up as a lone colored dot. */}
+      {isValidElement(action) ? action : action && (
         <Button size="sm" onClick={action.onClick}>
           {action.label}
         </Button>
