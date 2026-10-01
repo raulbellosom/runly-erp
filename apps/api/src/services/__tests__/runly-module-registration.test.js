@@ -1,12 +1,12 @@
 import { syncDiscoveredModuleDependencies } from '../../routes/modules.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OFFICIAL_MODULE_KEY_PAIRS } from '@runly/core';
+import { CURRENT_ONLY_OFFICIAL_MODULE_KEYS, OFFICIAL_MODULE_KEY_PAIRS } from '@runly/core';
 import { listOfficialModuleManifests, listOfficialFallbackManifests, isOfficialCoreModuleKey } from '../module-manifests-service.js';
 import { getModuleHandler, listRegisteredHandlers, registerModuleHandler } from '../module-cleanup-registry.js';
 import { createModuleLifecycleService } from '../module-lifecycle-service.js';
 
-test('core policy follows the manifest catalog for all 21 pairs and rejects custom impersonation', () => {
+test('core policy follows the manifest catalog and rejects custom impersonation', () => {
   const manifests = listOfficialModuleManifests();
   for (const { legacy, current } of OFFICIAL_MODULE_KEY_PAIRS) {
     const expected = manifests.find(manifest => manifest.key === current)?.core === true;
@@ -17,11 +17,12 @@ test('core policy follows the manifest catalog for all 21 pairs and rejects cust
 });
 
 test('fallbacks do not recreate an old name when its Runly counterpart was discovered', () => {
-  assert.equal(listOfficialFallbackManifests(new Set(OFFICIAL_MODULE_KEY_PAIRS.map(pair => pair.current))).length, 0);
+  const officialCurrentKeys = [...OFFICIAL_MODULE_KEY_PAIRS.map(pair => pair.current), ...CURRENT_ONLY_OFFICIAL_MODULE_KEYS];
+  assert.equal(listOfficialFallbackManifests(new Set(officialCurrentKeys)).length, 0);
   const fallback = listOfficialFallbackManifests(new Set(['runly.core', 'custom.fleet']));
   assert.equal(fallback.some(manifest => manifest.key === 'runly.core'), false);
   assert.equal(fallback.some(manifest => manifest.key === 'runly.fleet'), true);
-  assert.equal(listOfficialModuleManifests().length, 21);
+  assert.equal(listOfficialModuleManifests().length, officialCurrentKeys.length);
 });
 
 test('cleanup aliases share implementations and preserve exact registrations', () => {
@@ -48,10 +49,10 @@ test('lifecycle sync preserves Runly core protection and UUIDs without trusting 
     $transaction: async callback => callback(prisma),
   };
   const service = createModuleLifecycleService({ prisma });
-  const manifests = OFFICIAL_MODULE_KEY_PAIRS.map(({ current }) => ({ key: current, name: current, version: '1.0.0', permissions: [], blueprints: [] }));
+  const manifests = [...OFFICIAL_MODULE_KEY_PAIRS.map(pair => pair.current), ...CURRENT_ONLY_OFFICIAL_MODULE_KEYS].map(current => ({ key: current, name: current, version: '1.0.0', permissions: [], blueprints: [] }));
   manifests.push({ key: 'custom.core', name: 'Custom', version: '1.0.0', core: true });
   const result = await service.syncModules({ manifests });
-  assert.equal(result.added, 22);
+  assert.equal(result.added, manifests.length);
   for (const { current } of OFFICIAL_MODULE_KEY_PAIRS) {
     const row = rows.get(current);
     assert.equal(row.core, true);

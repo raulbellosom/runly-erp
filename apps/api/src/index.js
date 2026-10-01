@@ -73,6 +73,7 @@ import { createCatalogRouter } from "./routes/catalog/index.js";
 import { createPosRouter } from "./routes/pos/index.js";
 import { createCalendarRouter } from "./routes/calendar/index.js";
 import { createProjectsRouter } from "./routes/projects/index.js";
+import { createCanvasRouter } from "./routes/canvas/index.js";
 import { createSettingsRouter } from "./routes/settings-routes.js";
 import { createActivityRouter } from "./routes/activity.js";
 import { createNotificationsRouter } from "./routes/notifications.js";
@@ -744,6 +745,24 @@ function serializeModulesForResponse(modules, context, options = {}) {
 
 // Relations from Builder modules to system entities (Flotilla, Inventario...).
 const relationTargets = createRelationTargetsService({ prisma, supabaseAdmin });
+const CANVAS_ENTITY_TARGETS = new Map([
+  ['runly.contacts:contact', 'contact'],
+  ['runly.hr:hr_employee', 'hr_employee'],
+  ['runly.fleet:vehicle', 'vehicle'],
+  ['runly.inventory:inventory_item', 'inventory_item'],
+  ['runly.inventory:inventory.asset', 'inventory_item'],
+  ['runly.projects:project', 'project'],
+  ['runly.projects:task', 'task'],
+  ['runly.calendar:calendar_event', 'calendar_event'],
+  ['runly.ledger:ledger_account', 'ledger_account'],
+  ['runly.files:file', 'file'],
+]);
+async function resolveCanvasEntityLink({ authUserId, companyId, moduleKey, entityType, entityId }) {
+  const target = CANVAS_ENTITY_TARGETS.get(`${moduleKey}:${entityType}`);
+  if (!target) return null;
+  const resolved = await relationTargets.resolve({ authUserId, companyId, type: target, ids: [entityId] });
+  return resolved.get(String(entityId)) ?? null;
+}
 
 const routeLoader = createRouteLoaderService({
   prisma,
@@ -2342,6 +2361,7 @@ mountWithAuth(app, createCatalogRouter({ prisma, requirePermission, requireAnyPe
 mountWithAuth(app, createPosRouter({ prisma, requirePermission, broadcaster }));
 mountWithAuth(app, createCalendarRouter({ prisma, requirePermission, broadcaster }));
 mountWithAuth(app, createProjectsRouter({ prisma, requirePermission, notificationService, enrichFileAssets: filesService.enrichFileAssets.bind(filesService), broadcaster }));
+mountWithAuth(app, createCanvasRouter({ prisma, requirePermission, broadcaster, entityResolver: resolveCanvasEntityLink }));
 mountWithAuth(app, createActivityRouter({ prisma, requirePermission }));
 mountWithAuth(app, createNotificationsRouter({ prisma, requirePermission }));
 mountWithAuth(app, createGrowthRouter({ prisma, requirePermission, notificationService, enrichFileAssets: filesService.enrichFileAssets.bind(filesService) }));

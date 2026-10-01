@@ -12,6 +12,7 @@ import {
   activityMap,
   notificationsMap,
   projectsMap,
+  canvasMap,
   chatMap,
 } from "./feature-modules.js";
 
@@ -1654,6 +1655,7 @@ export const coreModules = [
   runlyCatalogManifest,
   runlyPosManifest,
   projectsMap,
+  canvasMap,
   inventoryMap,
   purchasesMap,
   chatMap,

@@ -14,6 +14,11 @@ export function createRealtimeAccessService({ prisma, broadcaster }) {
       return row?.allowed === true;
     }
     if (!userId) return false;
+    const canvas = topic.match(/^canvas:board:([0-9a-f-]{36})$/i);
+    if (canvas) {
+      const [row] = await prisma.$queryRaw`SELECT public.runly_canvas_user_access(${canvas[1]}::uuid, ${userId}::uuid, ${edit}) AS allowed`;
+      return row?.allowed === true;
+    }
     const chat = topic.match(/^chat:(presence|conv):([0-9a-f-]{36})$/i);
     if (chat) {
       const [row] = await prisma.$queryRaw`SELECT public.runly_chat_user_access(${chat[2]}::uuid, ${userId}::uuid) AS allowed`;
@@ -31,14 +36,15 @@ export function createRealtimeAccessService({ prisma, broadcaster }) {
     // Arbitrary company/user events and guest messages can only be emitted by
     // their module service. This relay serves document edits and chat typing.
     const note = /^note:(ydoc|canvas):[0-9a-f-]{36}$/i.test(topic ?? '');
+    const canvas = /^canvas:board:[0-9a-f-]{36}$/i.test(topic ?? '');
     const typing = /^chat:presence:[0-9a-f-]{36}$/i.test(topic ?? '') && event === 'typing';
-    if ((!note && !typing) || !actorId || typeof event !== 'string' || event.length > 80) return false;
+    if ((!note && !canvas && !typing) || !actorId || typeof event !== 'string' || event.length > 80) return false;
     if (JSON.stringify(payload ?? {}).length > 2_000_000) return false;
-    if (!(await allowed(topic, actorId, note))) return false;
+    if (!(await allowed(topic, actorId, note || canvas))) return false;
     const user = await prisma.userProfile.findFirst({ where: { id: actorId, enabled: true }, select: { displayName: true } });
     if (!user) return false;
     await broadcaster.broadcastToChannel(topic, event, typing ? { isTyping: Boolean(payload?.isTyping), userId: actorId, displayName: user.displayName } : payload,
-      { authorize: () => allowed(topic, actorId, note) });
+      { authorize: () => allowed(topic, actorId, note || canvas) });
     return true;
   }
 

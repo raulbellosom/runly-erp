@@ -830,6 +830,57 @@ export const projectsMap = createModuleManifest({
   ],
 });
 
+export const canvasMap = createModuleManifest({
+  key: 'runly.canvas',
+  name: 'Canvas',
+  description: 'Boards visuales técnicos, colaborativos y conectados con datos de Runly.',
+  version: '0.1.0',
+  kind: MODULE_KINDS.CORE,
+  core: true,
+  uninstallable: false,
+  icon: 'Map',
+  color: '#2563eb',
+  pwa: { shortName: 'Canvas', startPath: '/' },
+  category: 'productividad',
+  summary: 'Planos, PDFs, diagramas y mapas técnicos con datos conectados',
+  dependencies: [
+    { key: 'runly.identity' },
+    { key: 'runly.company' },
+    { key: 'runly.files' },
+  ],
+  lifecycle: {
+    installable: true,
+    uninstallable: false,
+    resettable: false,
+    supportsDataPurge: true,
+    defaultUninstallPolicy: 'purge-owned-tables',
+    ownedEntities: ['CanvasBoard', 'CanvasPage', 'CanvasLayer', 'CanvasObject', 'CanvasHotspot', 'CanvasEntityLink', 'CanvasAttachment', 'CanvasVersion', 'CanvasCollaborator'],
+    sharedEntities: ['Company', 'UserProfile', 'FileAsset', 'EntityComment', 'AuditLog'],
+  },
+  fullscreenPaths: ['/boards/:boardId'],
+  navigation: [{ label: 'Canvas', path: '/', icon: 'Map', layout: 'main', permissionKey: 'canvas.access' }],
+  acl: {
+    module: 'canvas.access',
+    actions: { read: 'canvas.view', create: 'canvas.create', update: 'canvas.edit', delete: 'canvas.delete' },
+    models: {},
+  },
+  permissions: [
+    { key: 'canvas.access', name: 'Acceder a Canvas' },
+    { key: 'canvas.view', name: 'Ver Boards' },
+    { key: 'canvas.create', name: 'Crear Boards' },
+    { key: 'canvas.edit', name: 'Editar Boards' },
+    { key: 'canvas.delete', name: 'Archivar Boards' },
+    { key: 'canvas.share', name: 'Compartir Boards' },
+    { key: 'canvas.comment', name: 'Comentar en Boards' },
+    { key: 'canvas.manage', name: 'Administrar Canvas' },
+    { key: 'canvas.version.view', name: 'Ver versiones de Boards' },
+    { key: 'canvas.version.create', name: 'Crear versiones de Boards' },
+    { key: 'canvas.version.restore', name: 'Restaurar versiones de Boards' },
+  ],
+  exposes: { openBoard: 'route', createHotspot: 'function', linkEntity: 'function' },
+  blueprints: [...loadHelpBlueprints('runly.canvas', path.join(HELP_DIR, 'runly.canvas'))],
+});
+
 export const chatMap = createModuleManifest({
   key: 'runly.chat',
   name: 'Chat',

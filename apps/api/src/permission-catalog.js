@@ -1370,6 +1370,40 @@ export const PERMISSION_CATALOG = {
     order: 260,
   },
 
+  "canvas.access": {
+    displayNameEs: "Acceder a Canvas", descriptionEs: "Permite abrir el módulo Runly Canvas.", groupKey: "canvas", order: 10,
+  },
+  "canvas.view": {
+    displayNameEs: "Ver Boards", descriptionEs: "Permite ver Boards donde el usuario participa.", groupKey: "canvas", order: 20,
+  },
+  "canvas.create": {
+    displayNameEs: "Crear Boards", descriptionEs: "Permite crear nuevos Boards.", groupKey: "canvas", order: 30,
+  },
+  "canvas.edit": {
+    displayNameEs: "Editar Boards", descriptionEs: "Permite editar Boards con rol suficiente.", groupKey: "canvas", order: 40,
+  },
+  "canvas.delete": {
+    displayNameEs: "Archivar Boards", descriptionEs: "Permite archivar Boards propios.", groupKey: "canvas", order: 50,
+  },
+  "canvas.share": {
+    displayNameEs: "Compartir Boards", descriptionEs: "Permite administrar colaboradores de un Board.", groupKey: "canvas", order: 60,
+  },
+  "canvas.comment": {
+    displayNameEs: "Comentar en Boards", descriptionEs: "Permite añadir comentarios en Canvas.", groupKey: "canvas", order: 70,
+  },
+  "canvas.manage": {
+    displayNameEs: "Administrar Canvas", descriptionEs: "Permite administrar configuración de Canvas.", groupKey: "canvas", order: 80,
+  },
+  "canvas.version.view": {
+    displayNameEs: "Ver versiones de Boards", descriptionEs: "Permite consultar snapshots de Boards.", groupKey: "canvas", order: 90,
+  },
+  "canvas.version.create": {
+    displayNameEs: "Crear versiones de Boards", descriptionEs: "Permite crear snapshots explícitos.", groupKey: "canvas", order: 100,
+  },
+  "canvas.version.restore": {
+    displayNameEs: "Restaurar versiones de Boards", descriptionEs: "Permite restaurar snapshots de Boards.", groupKey: "canvas", order: 110,
+  },
+
   "projects.access": {
     displayNameEs: "Acceder a Proyectos",
     descriptionEs: "Permite ver el modulo de proyectos en la navegacion.",

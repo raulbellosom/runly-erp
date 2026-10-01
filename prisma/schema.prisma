@@ -4344,6 +4344,216 @@ model ChatMiraiMessage {
   @@map("chat_mirai_message")
 }
 
+// Runly Canvas keeps editable scene state relational while geometry and style
+// remain extensible JSON documents. Background sources live on CanvasPage and
+// are intentionally not CanvasObject rows.
+model CanvasBoard {
+  id               String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  ownerId          String    @map("owner_id") @db.Uuid
+  createdById      String    @map("created_by_id") @db.Uuid
+  updatedById      String    @map("updated_by_id") @db.Uuid
+  name             String
+  description      String?
+  templateType     String    @default("blank") @map("template_type")
+  thumbnailFileId  String?   @map("thumbnail_file_id") @db.Uuid
+  settings         Json?
+  metadata         Json?
+  currentVersionId String?   @map("current_version_id") @db.Uuid
+  archivedAt       DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  pages         CanvasPage[]
+  collaborators CanvasCollaborator[]
+  hotspots      CanvasHotspot[]
+  entityLinks   CanvasEntityLink[]
+  attachments   CanvasAttachment[]
+  versions      CanvasVersion[]
+
+  @@index([companyId, archivedAt, updatedAt(sort: Desc)])
+  @@index([ownerId, updatedAt(sort: Desc)])
+  @@map("canvas_board")
+}
+
+model CanvasCollaborator {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  boardId   String   @map("board_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String   @default("VIEWER")
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board CanvasBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+  @@index([userId, role])
+  @@map("canvas_collaborator")
+}
+
+model CanvasPage {
+  id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  boardId          String   @map("board_id") @db.Uuid
+  name             String
+  position         Int
+  width            Float?
+  height           Float?
+  infinite         Boolean  @default(true)
+  background       Json?
+  coordinateSystem Json?    @map("coordinate_system")
+  calibration      Json?
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board   CanvasBoard    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  layers  CanvasLayer[]
+  objects CanvasObject[]
+
+  @@unique([boardId, position])
+  @@index([boardId, updatedAt(sort: Desc)])
+  @@map("canvas_page")
+}
+
+model CanvasLayer {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  pageId    String   @map("page_id") @db.Uuid
+  name      String
+  type      String   @default("vector")
+  position  Int
+  visible   Boolean  @default(true)
+  locked    Boolean  @default(false)
+  opacity   Float    @default(1)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  page    CanvasPage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  objects CanvasObject[]
+
+  @@unique([pageId, position])
+  @@index([pageId, type, visible])
+  @@map("canvas_layer")
+}
+
+model CanvasObject {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  boardId     String    @map("board_id") @db.Uuid
+  pageId      String    @map("page_id") @db.Uuid
+  layerId     String    @map("layer_id") @db.Uuid
+  type        String
+  position    Int       @default(0)
+  transform   Json
+  geometry    Json
+  style       Json?
+  properties  Json?
+  metadata    Json?
+  revision    Int       @default(1)
+  createdById String    @map("created_by_id") @db.Uuid
+  updatedById String    @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  page    CanvasPage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  layer   CanvasLayer    @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  hotspot CanvasHotspot?
+
+  @@index([companyId, boardId, pageId, deletedAt])
+  @@index([pageId, layerId, position])
+  @@index([boardId, updatedAt(sort: Desc)])
+  @@map("canvas_object")
+}
+
+model CanvasHotspot {
+  id           String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  boardId      String    @map("board_id") @db.Uuid
+  objectId     String    @unique @map("object_id") @db.Uuid
+  title        String
+  description  String?
+  icon         String?
+  color        String?
+  status       String    @default("ACTIVE")
+  tags         Json?
+  customFields Json?     @map("custom_fields")
+  metadata     Json?
+  createdById  String    @map("created_by_id") @db.Uuid
+  updatedById  String    @map("updated_by_id") @db.Uuid
+  archivedAt   DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board  CanvasBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  object CanvasObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, boardId, status])
+  @@map("canvas_hotspot")
+}
+
+model CanvasEntityLink {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  boardId      String   @map("board_id") @db.Uuid
+  targetType   String   @map("target_type")
+  targetId     String   @map("target_id") @db.Uuid
+  moduleKey    String   @map("module_key")
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id") @db.Uuid
+  relationType String   @default("related") @map("relation_type")
+  metadata     Json?
+  createdById  String   @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  board CanvasBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, targetType, targetId, moduleKey, entityType, entityId, relationType])
+  @@index([companyId, moduleKey, entityType, entityId])
+  @@index([boardId, targetType, targetId])
+  @@map("canvas_entity_link")
+}
+
+model CanvasAttachment {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  boardId     String   @map("board_id") @db.Uuid
+  targetType  String   @map("target_type")
+  targetId    String   @map("target_id") @db.Uuid
+  fileAssetId String   @map("file_asset_id") @db.Uuid
+  label       String?
+  position    Int      @default(0)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  board CanvasBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, targetType, targetId, fileAssetId])
+  @@index([companyId, fileAssetId])
+  @@index([boardId, targetType, targetId, position])
+  @@map("canvas_attachment")
+}
+
+model CanvasVersion {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  boardId     String    @map("board_id") @db.Uuid
+  number      Int
+  name        String?
+  description String?
+  snapshot    Json
+  objectCount Int       @default(0) @map("object_count")
+  createdById String    @map("created_by_id") @db.Uuid
+  restoredAt  DateTime? @map("restored_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  board CanvasBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, number])
+  @@index([boardId, createdAt(sort: Desc)])
+  @@map("canvas_version")
+}
+
 // Public links to RME3 module resources (spec:
 // docs/superpowers/specs/2026-09-28-module-public-links-design.md).
 model ModulePublicLink {

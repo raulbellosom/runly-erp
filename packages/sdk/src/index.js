@@ -5,6 +5,7 @@ import { createChatDomain } from "./domains/chat.js";
 import { createCallsDomain } from "./domains/calls.js";
 import { createSettingsDomain } from "./domains/settings.js";
 import { createBuilderDomain } from "./domains/builder.js";
+import { createCanvasDomain } from "./domains/canvas.js";
 export { createCompanyFetch } from "./company-fetch.js";
 
 export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
@@ -2049,6 +2050,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           headers: withAuthHeaders(token),
         }),
     },
+    canvas: createCanvasDomain({ request, withAuthHeaders, toQueryString }),
     projects: {
       listProjects: (token) =>
         request("/projects", { headers: withAuthHeaders(token) }),

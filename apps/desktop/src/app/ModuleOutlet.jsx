@@ -272,6 +272,12 @@ const SCREEN_MAP = {
   "runly.projects:/": lazy(
     () => import("../modules/runly.projects/screens/ProjectsScreen.jsx"),
   ),
+  "runly.canvas:/": lazy(
+    () => import("../modules/runly.canvas/screens/CanvasHome.jsx"),
+  ),
+  "runly.canvas:/boards/:boardId": lazy(
+    () => import("../modules/runly.canvas/screens/BoardEditor.jsx"),
+  ),
   // runly.chat
   "runly.chat:/": lazy(
     () => import("../modules/runly.chat/screens/ChatScreen.jsx").then((m) => ({ default: m.ChatScreen })),

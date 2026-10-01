@@ -1,0 +1,69 @@
+import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn } from '@runly/ui'
+import { ArrowLeft, Check, Loader2, PanelLeft, PanelRight } from 'lucide-react'
+import { ToolButton } from './CanvasToolbar.jsx'
+
+function initials(name = '') {
+  const parts = name.replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean)
+  return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase()
+}
+
+function PresenceStack({ users }) {
+  if (!users.length) return null
+  const visible = users.slice(0, 3), extra = users.length - visible.length
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex -space-x-2" aria-label={`${users.length} colaborador(es) conectados`} role="img">
+          {visible.map((user) => (
+            <span key={user.id} className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[hsl(var(--card))] bg-[hsl(var(--muted))] text-[11px] font-semibold text-[hsl(var(--foreground))]">
+              {initials(user.name)}
+            </span>
+          ))}
+          {extra > 0 ? <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[hsl(var(--card))] bg-[hsl(var(--muted))] text-[11px] font-semibold tabular-nums">+{extra}</span> : null}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{users.map((user) => user.name).join(', ')}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function SaveStatus({ saving }) {
+  return (
+    <span role="status" aria-live="polite" className="hidden items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground))] sm:inline-flex">
+      {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+      {saving ? 'Guardando…' : 'Guardado'}
+    </span>
+  )
+}
+
+export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight }) {
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 sm:px-3">
+      <Button type="button" variant="ghost" onClick={onBack} aria-label="Volver a Boards" className="h-11 shrink-0 gap-1.5 px-2.5 sm:h-9">
+        <ArrowLeft className="h-4 w-4" />
+        <span className="hidden sm:inline">Boards</span>
+      </Button>
+      <span aria-hidden className="hidden h-6 w-px bg-[hsl(var(--border))] sm:block" />
+      <div className="min-w-0 flex-1 px-1">
+        {loading ? (
+          <div className="space-y-1"><Skeleton className="h-4 w-36" /><Skeleton className="h-3 w-20" /></div>
+        ) : (
+          <>
+            <h1 className="truncate text-sm font-semibold leading-tight text-[hsl(var(--foreground))]" title={title}>{title}</h1>
+            <p className="truncate text-xs leading-tight text-[hsl(var(--muted-foreground))]">{subtitle}</p>
+          </>
+        )}
+      </div>
+      <SaveStatus saving={saving} />
+      <PresenceStack users={presence} />
+      <div className="flex items-center gap-0.5">
+        <ToolButton label={leftOpen ? 'Ocultar páginas y capas' : 'Páginas y capas'} active={leftOpen} onClick={onToggleLeft} className={cn(leftOpen && 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]')}>
+          <PanelLeft />
+        </ToolButton>
+        <ToolButton label={rightOpen ? 'Ocultar inspector' : 'Inspector'} active={rightOpen} onClick={onToggleRight} className={cn(rightOpen && 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]')}>
+          <PanelRight />
+        </ToolButton>
+      </div>
+    </header>
+  )
+}

@@ -1,6 +1,6 @@
 import { getApiUrl } from './runtimeConfig.js'
 
-const protectedTopic = /^(?:note:(?:ydoc|canvas):|chat:(?:presence|conv|company):|company:|user:)/
+const protectedTopic = /^(?:note:(?:ydoc|canvas):|canvas:board:|chat:(?:presence|conv|company):|company:|user:)/
 const installed = new WeakSet()
 
 // Keep the Supabase channel API used by existing modules. Broadcasts still use

@@ -3,8 +3,13 @@
 export const OFFICIAL_MODULE_KEY_PAIRS = Object.freeze([
   'core', 'identity', 'files', 'company', 'contacts', 'hr', 'fleet',
   'ledger', 'pfm', 'website', 'growth', 'documents', 'calendar', 'activity',
-  'notifications', 'catalog', 'pos', 'projects', 'inventory', 'chat', 'notes',
+  'notifications', 'catalog', 'pos', 'projects', 'inventory', 'purchases', 'chat', 'notes',
 ].map(name => Object.freeze({ legacy: `atlas.${name}`, current: `runly.${name}` })));
+
+// Modules born after the Runly rename intentionally have no invented
+// `atlas.*` identity. Keep them explicit so catalog completeness can be
+// checked without creating aliases that never existed in stored data.
+export const CURRENT_ONLY_OFFICIAL_MODULE_KEYS = Object.freeze(['runly.canvas']);
 
 const counterparts = new Map(OFFICIAL_MODULE_KEY_PAIRS.flatMap(({ legacy, current }) => [[legacy, current], [current, legacy]]));
 
