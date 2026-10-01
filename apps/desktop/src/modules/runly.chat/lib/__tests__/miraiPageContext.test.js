@@ -1,15 +1,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { shouldShowMiraiTab, moduleKeyFromPath, buildMiraiPageContext } from "../miraiPageContext.js";
+import { shouldShowMiraiTab, moduleKeyFromPath, buildMiraiPageContext, openMiraiSidebar } from "../miraiPageContext.js";
 
 describe("shouldShowMiraiTab", () => {
-  it("hides the tab on runly.inventory and runly.chat", () => {
-    assert.equal(shouldShowMiraiTab({ moduleKey: "runly.inventory", canUse: true, available: true }), false);
+  it("hides the tab on runly.chat", () => {
     assert.equal(shouldShowMiraiTab({ moduleKey: "runly.chat", canUse: true, available: true }), false);
   });
 
   it("shows the tab on runly.pfm (MirAI replaces the PFM assistant there)", () => {
     assert.equal(shouldShowMiraiTab({ moduleKey: "runly.pfm", canUse: true, available: true }), true);
+  });
+
+  it("shows the tab on runly.inventory (MirAI replaces the inventory assistant there)", () => {
+    assert.equal(shouldShowMiraiTab({ moduleKey: "runly.inventory", canUse: true, available: true }), true);
   });
 
   it("hides the tab when the user cannot use MirAI or it is not available", () => {
@@ -46,5 +49,18 @@ describe("buildMiraiPageContext", () => {
     assert.equal(ctx.path, "/app/m/runly.calendar/x");
     assert.equal(ctx.recordType, "event");
     assert.equal(ctx.recordId, "e1");
+  });
+
+  it("merges a selection (inventory list filters/selected rows) into the page context", () => {
+    const selection = { mode: "selected", ids: ["a", "b"], filters: {} };
+    const ctx = buildMiraiPageContext("/app/m/runly.inventory/inventory", { selection });
+    assert.equal(ctx.moduleKey, "runly.inventory");
+    assert.deepEqual(ctx.selection, selection);
+  });
+});
+
+describe("openMiraiSidebar", () => {
+  it("is callable with no subscribers (MiraiSidebarHost may not be mounted yet)", () => {
+    assert.doesNotThrow(() => openMiraiSidebar());
   });
 });

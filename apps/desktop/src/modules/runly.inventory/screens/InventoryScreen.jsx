@@ -11,7 +11,7 @@ import { runly } from '../../../lib/runly.js'
 import { useInventoryCategories, useInventoryBrands, useInventoryLocations } from '../hooks/useInventoryCatalogs.js'
 import { useInventoryModels } from '../hooks/useInventoryModels.js'
 import { ITEM_STATUSES } from '../lib/inventory-constants.js'
-import { useInventoryAssistant } from '../lib/assistant-context.js'
+import { useMiraiRecordContext, openMiraiSidebar } from '../../runly.chat/lib/miraiPageContext.js'
 import { InventoryItemImportDialog } from '../components/InventoryItemImportDialog.jsx'
 import { InventoryAdminKpis } from '../components/InventoryAdminKpis.jsx'
 import { InventoryAdminTransitionDialog } from '../components/InventoryAdminTransitionDialog.jsx'
@@ -42,16 +42,20 @@ export default function InventoryScreen() {
   const [bulk, setBulk] = useState(null)
   const can = useInventoryCan()
   const summary = useInventorySummary()
-  const assistant = useInventoryAssistant()
-  const setPageContext = assistant?.setPageContext
-  const [assistantContext, setAssistantContext] = useState({ mode: 'all', ids: [], filters: {} })
-  const updateAssistantContext = useCallback(({ selectedIds, search, filters }) => {
-    // 'all' is a list-only value the assistant filters do not accept.
+  // Published to the global MirAI sidebar (shared contract: selection =
+  // { mode: "filtered" | "selected", ids, filters }) — null when the list has
+  // neither a selection nor active filters, so no selection is published.
+  const [miraiSelection, setMiraiSelection] = useState(null)
+  const updateMiraiSelection = useCallback(({ selectedIds, search, filters }) => {
     const activeFilters = Object.fromEntries(Object.entries({ ...filters, search }).filter(([, value]) => value !== '' && value != null && value !== 'all'))
-    const next = selectedIds.length ? { mode: 'selected', ids: selectedIds, filters: {} } : Object.keys(activeFilters).length ? { mode: 'filtered', ids: [], filters: activeFilters } : { mode: 'all', ids: [], filters: {} }
-    setAssistantContext(current => JSON.stringify(current) === JSON.stringify(next) ? current : next)
-    setPageContext?.(next)
-  }, [setPageContext])
+    const next = selectedIds.length
+      ? { mode: 'selected', ids: selectedIds, filters: {} }
+      : Object.keys(activeFilters).length
+        ? { mode: 'filtered', ids: [], filters: activeFilters }
+        : null
+    setMiraiSelection(current => JSON.stringify(current) === JSON.stringify(next) ? current : next)
+  }, [])
+  useMiraiRecordContext({ selection: miraiSelection })
 
   const { data: categoriesData } = useInventoryCategories()
   const { data: brandsData } = useInventoryBrands()
@@ -158,7 +162,7 @@ export default function InventoryScreen() {
         description="Gestiona y rastrea todos los activos de la empresa"
         actions={
           <>
-          <Button variant="ghost" onClick={() => assistant?.openAssistant(assistantContext)}><Sparkles className="mr-2 h-4 w-4" />Consultar con IA</Button>
+          <Button variant="ghost" onClick={() => openMiraiSidebar()}><Sparkles className="mr-2 h-4 w-4" />Consultar con IA</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Importar</Button>
           <Button variant="outline" onClick={() => navigate('/app/m/runly.inventory/inventory/intake')}><Sparkles className="mr-2 h-4 w-4" />Registro con IA</Button>
           <Button onClick={() => navigate('/app/m/runly.inventory/inventory/new')}>
@@ -185,7 +189,7 @@ export default function InventoryScreen() {
         key={`${activeCompanyId}:${filterKey}`}
         bulkActions={bulkActions}
         initialFilters={initialFilters}
-        onContextChange={updateAssistantContext}
+        onContextChange={updateMiraiSelection}
         blueprint={blueprint}
         token={token}
         companyId={activeCompanyId}

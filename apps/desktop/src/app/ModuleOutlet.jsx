@@ -10,8 +10,6 @@ import { isModuleAvailable } from "../lib/runtimeModules";
 import { applyBrandTheme } from "../lib/brandTheme.js";
 import { useBrandingStore } from "../stores/branding.js";
 
-const InventoryAssistantHost = lazy(() => import("../modules/runly.inventory/components/InventoryAssistant.jsx").then(m => ({ default: m.InventoryAssistantHost })));
-
 const SCREEN_MAP = {
   "runly.core:/modules": lazy(
     () => import("../modules/runly.core/screens/ModuleCatalog.jsx"),
@@ -648,14 +646,9 @@ export function ModuleOutlet() {
   }
 
   const Screen = resolveScreen(SCREEN_MAP, moduleKey, subPath, BlueprintCrudScreen);
-  const screenNode = (
+  return (
     <Suspense fallback={<LoadingFallback />}>
       {Screen ? <Screen /> : <ModulePlaceholder module={module} />}
     </Suspense>
   );
-
-  if (moduleKey === "runly.inventory") {
-    return <Suspense fallback={<LoadingFallback />}><InventoryAssistantHost>{screenNode}</InventoryAssistantHost></Suspense>;
-  }
-  return screenNode;
 }

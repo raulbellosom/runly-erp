@@ -6,12 +6,12 @@
 // state survives navigation between modules. Hidden on runly.pfm/
 // runly.inventory/runly.chat (they already have their own MirAI surface)
 // and whenever MirAI isn't available for this user.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { useMiraiStatus } from "../hooks/useMirAI";
 import { MiraiSidebarThread } from "./MiraiSidebarThread";
-import { moduleKeyFromPath, shouldShowMiraiTab } from "../lib/miraiPageContext";
+import { moduleKeyFromPath, shouldShowMiraiTab, useMiraiOpenRequest } from "../lib/miraiPageContext";
 
 const LS_KEY = "mirai.sidebar.open";
 
@@ -39,6 +39,18 @@ export function MiraiSidebarHost() {
 
   const [open, setOpen] = useState(readOpen);
   useEffect(() => writeOpen(open), [open]);
+
+  // Module screens (e.g. inventory's "Consultar con IA" button) call
+  // openMiraiSidebar() to open this host from anywhere; each call bumps a
+  // counter this effect reacts to, regardless of the host's current state.
+  const openRequest = useMiraiOpenRequest();
+  const seenOpenRequest = useRef(openRequest);
+  useEffect(() => {
+    if (openRequest !== seenOpenRequest.current) {
+      seenOpenRequest.current = openRequest;
+      setOpen(true);
+    }
+  }, [openRequest]);
 
   useEffect(() => {
     if (!open) return undefined;
