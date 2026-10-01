@@ -1,6 +1,6 @@
 # MirAI Actions — confirmable write actions from the chat assistant
 
-- Status: Draft (pending user review)
+- Status: Implemented (foundation + calendar), pending manual acceptance (§13)
 - Date: 2026-09-30
 - Scope: Spec 1 of the "MirAI write actions" initiative — shared foundation + `runly.calendar` as the first consumer.
 

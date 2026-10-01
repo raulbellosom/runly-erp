@@ -7,6 +7,7 @@ Runly Chat es la mensajeria interna de la empresa: conversaciones uno a uno, gru
 Tambien incluye:
 
 - **MirAI**: el asistente de IA integrado al chat. Puede responder preguntas generales, buscar informacion dentro de tus propias conversaciones y (si esta configurado) consultar datos en vivo de internet. Requiere que la instancia tenga un motor de IA configurado; si no, la conversacion con MirAI sigue apareciendo en tu lista pero el cuadro de escritura muestra "no configurado".
+- **Acciones de MirAI con confirmacion**: MirAI puede preparar acciones en el ERP cuando se lo pides, por ejemplo "agenda una reunion con Ana manana a las 10", "mueve esa reunion a las 12" o "borra el evento del viernes". Nunca guarda nada por su cuenta: te muestra una tarjeta con los datos y solo se ejecuta cuando pulsas Confirmar; las eliminaciones piden una segunda confirmacion. Disponible hoy en Calendario (crear, editar y eliminar eventos). Solo veras acciones de modulos activos para los que tienes permiso, y las propuestas vencen a las 24 horas.
 - **Bandeja externa**: mensajes que llegan de visitantes del sitio web publico, gestionados por el equipo de soporte.
 - **Plantillas**: respuestas rapidas predefinidas para agilizar la atencion.
 
