@@ -11,14 +11,7 @@
 // per provider by the caller's own permissions.
 import { SEARCH_PROVIDERS } from "../../services/search-providers.js";
 import { createHelpService } from "../../services/help-service.js";
-import {
-  resolveActiveMembership,
-  computeScopedPermissions,
-  isSystemAdminMembership,
-  createPermissionKeysCache,
-  COMPANY_ADMIN_ROLE_KEYS,
-} from "../../lib/tenant-context.js";
-import { get as cacheGet, set as cacheSet, TTL } from "../../lib/cache.js";
+import { createScopedErpContextResolver } from "./mirai-scoped-context.js";
 
 const RECENT_MAX = 50;
 const SEARCH_MAX = 30;
@@ -209,54 +202,8 @@ export function buildToolRunners({
   inventoryService, ledgerService, calendarEventService, projectsService, tasksService,
   callTranscriptService,
 }) {
-  const getAllActivePermissionKeys = createPermissionKeysCache({
-    prisma,
-    cacheGet,
-    cacheSet,
-    ttlSeconds: TTL.PERMISSIONS,
-  });
   const helpService = createHelpService({ prisma });
-
-  // Resolve the caller's RBAC context, SCOPED TO ctx.companyId (the caller's
-  // validated active company, sourced from c.get("companyId") upstream in
-  // mirai-routes.js — never from resolveUserContext's own raw,
-  // union-across-every-company isAdmin/permissionSet, which would let a
-  // user's admin role in Company A leak into a MirAI tool call made while
-  // Company B is active). See
-  // docs/superpowers/specs/2026-09-10-multi-tenant-architecture-design.md §16
-  // ("MirAI nunca debe obtener contexto de empresas diferentes").
-  // Returns { uctx, companyId, userId, isAdmin, permissionSet } or { error }.
-  async function resolveScopedErpContext(ctx) {
-    if (typeof resolveUserContext !== "function") return { error: "Esa consulta no esta disponible aqui." };
-    let uctx;
-    try { uctx = await resolveUserContext(ctx.actorAuthUserId); } catch { uctx = null; }
-    if (!uctx?.profile) return { error: "No pude verificar tus permisos." };
-
-    const membershipResult = resolveActiveMembership({
-      memberships: uctx.memberships,
-      requestedCompanyId: ctx.companyId ?? null,
-      strict: false,
-    });
-    const activeMembership = membershipResult.ok ? membershipResult.membership : null;
-    const companyId = activeMembership?.companyId ?? null;
-    if (!companyId) return { error: "Sin empresa activa." };
-
-    const isSystemAdmin = isSystemAdminMembership(uctx.memberships);
-    const grantSet = uctx.grantsByCompany?.get?.(companyId);
-    const roleKey = activeMembership?.role?.key ?? null;
-    const isCompanyAdminRole = Boolean(roleKey && COMPANY_ADMIN_ROLE_KEYS.has(roleKey));
-    const allPermissionKeys =
-      isSystemAdmin || isCompanyAdminRole ? await getAllActivePermissionKeys() : [];
-    const { permissionSet, isCompanyAdmin } = computeScopedPermissions({
-      activeMembership,
-      grantKeysForCompany: grantSet ? [...grantSet] : [],
-      allPermissionKeys,
-      basePermissionKeys: [],
-      isSystemAdmin,
-    });
-
-    return { uctx, companyId, userId: uctx.profile.id, isAdmin: isCompanyAdmin || isSystemAdmin, permissionSet };
-  }
+  const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
 
   // Assert a single module read permission on top of the scoped context.
   // Returns { uctx, companyId, userId } on success or { error } for the runner to return.
@@ -472,6 +419,7 @@ export function buildToolRunners({
       const events = await calendarEventService.listEvents({ userId: c.userId, companyId: c.companyId, start, end });
       return {
         eventos: (events ?? []).slice(0, 25).map((e) => ({
+          eventId: e.id,
           titulo: e.title ?? null,
           inicio: e.startAt instanceof Date ? e.startAt.toISOString() : String(e.startAt ?? ""),
           fin: e.endAt instanceof Date ? e.endAt.toISOString() : String(e.endAt ?? ""),

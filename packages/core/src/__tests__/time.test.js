@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { nowLocalParts, toLocalIso, toLocalMonth } from "../time.js";
+import { nowLocalParts, toLocalIso, toLocalMonth, zonedLocalToDate } from "../time.js";
 
 // 2026-08-31T02:03:00Z is still 2026-08-30 20:03 in America/Mexico_City (UTC-6).
 const LATE_NIGHT = new Date("2026-08-31T02:03:00.000Z");
@@ -38,4 +38,11 @@ test("falls back to UTC when no zone is configured", () => {
 test("toLocalIso() with no arg returns a YYYY-MM-DD string", () => {
   assert.match(toLocalIso(), /^\d{4}-\d{2}-\d{2}$/);
   assert.match(toLocalMonth(), /^\d{4}-\d{2}$/);
+});
+
+test("zonedLocalToDate converts wall-clock time in a zone to UTC", () => {
+  assert.equal(zonedLocalToDate("2026-10-01T10:00", "America/Mexico_City").toISOString(), "2026-10-01T16:00:00.000Z");
+  assert.equal(zonedLocalToDate("2026-07-01T10:00", "Europe/Madrid").toISOString(), "2026-07-01T08:00:00.000Z");
+  assert.equal(zonedLocalToDate("2026-10-01", "UTC").toISOString(), "2026-10-01T00:00:00.000Z");
+  assert.equal(zonedLocalToDate("manana a las 10", "UTC"), null);
 });

@@ -22,6 +22,7 @@ import { createMiraiService } from "./mirai-service.js";
 import { createMiraiTtsService } from "./mirai-tts-service.js";
 import { createCallTranscriptService } from "../calls/call-transcript-service.js";
 import { createMiraiRoutes } from "./mirai-routes.js";
+import { createMiraiActionsStack } from "./mirai-actions-wiring.js";
 import { createVisionService } from "../../services/vision-service.js";
 import { createChatExternalInboxService } from "./chat-external-inbox-service.js";
 import { createChatModerationService, ChatModerationServiceError } from "./chat-moderation-service.js";
@@ -107,7 +108,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     if (error || !data?.signedUrl) throw new Error("no se pudo firmar el adjunto");
     return data.signedUrl;
   }
-  async function insertMiraiReply({ conversationId, body, replyToMessageId = null }) {
+  async function insertMiraiReply({ conversationId, body, replyToMessageId = null, metadata = null }) {
     // The bot is a member of the `mirai` direct chat, but NOT of channels it
     // is only @mentioned in — fall back to the company's bot profile there.
     const [botRow] = await prisma.$queryRaw`
@@ -133,8 +134,9 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       console.warn("[runly.chat] MirAI reply: no bot profile found for conversation", conversationId);
     }
     const [msg] = await prisma.$queryRaw`
-      INSERT INTO chat_messages (conversation_id, sender_user_id, sender_type, body, message_type, reply_to_message_id)
-      VALUES (${conversationId}::uuid, ${botId}, 'assistant', ${String(body).slice(0, 4000)}, 'text', ${replyToMessageId})
+      INSERT INTO chat_messages (conversation_id, sender_user_id, sender_type, body, message_type, reply_to_message_id, metadata)
+      VALUES (${conversationId}::uuid, ${botId}, 'assistant', ${String(body).slice(0, 4000)}, 'text', ${replyToMessageId},
+        COALESCE(${metadata ? JSON.stringify(metadata) : null}::jsonb, '{}'::jsonb))
       RETURNING id, created_at
     `;
     await prisma.$executeRaw`
@@ -160,6 +162,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   // it) is unchanged — MirAI never gets broader read access than the user
   // asking it would get calling the REST endpoint directly.
   const callTranscriptService = createCallTranscriptService({ prisma });
+  const miraiActions = createMiraiActionsStack({ prisma, broadcaster, resolveUserContext, calendarEventService });
   const miraiService = createMiraiService({
     prisma,
     visionService,
@@ -175,6 +178,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     projectsService,
     tasksService,
     callTranscriptService,
+    actionTools: miraiActions.actionTools,
   });
   const miraiTtsService = createMiraiTtsService();
 
@@ -960,6 +964,10 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
       try { await chatService.listMessages({ conversationId, authUserId, limit: 1 }); return true; }
       catch { return false; }
     },
+  }));
+  mirai.route("", miraiActions.createRoutes({
+    requirePermission,
+    resolveProfileId: (authUserId) => resolveUserProfileId(prisma, authUserId),
   }));
 
   // Mount sub-routers

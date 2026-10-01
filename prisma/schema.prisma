@@ -4287,6 +4287,35 @@ model ChatMiraiRun {
   @@map("chat_mirai_run")
 }
 
+/// MirAI confirmable write actions (spec 2026-09-30-mirai-actions-design.md).
+/// Written with prisma.$queryRaw from apps/api/src/routes/chat/mirai-proposal-service.js;
+/// this model exists for `pnpm db:studio` and typed reads.
+model MiraiActionProposal {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  surface        String    @default("direct")
+  threadId       String?   @map("thread_id") @db.Uuid
+  messageId      String?   @map("message_id") @db.Uuid
+  actorProfileId String    @map("actor_profile_id") @db.Uuid
+  actionKey      String    @map("action_key")
+  operation      String
+  targetId       String?   @map("target_id")
+  input          Json
+  preview        Json
+  destructive    Boolean   @default(false)
+  status         String    @default("pending")
+  result         Json?
+  error          String?
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  decidedAt      DateTime? @map("decided_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([conversationId, status], map: "mirai_action_proposals_conversation_status_idx")
+  @@index([actorProfileId, status], map: "mirai_action_proposals_actor_status_idx")
+  @@map("mirai_action_proposals")
+}
+
 /// MirAI assistant panel (Spec 2): one private thread per (owner, host
 /// conversation). Written with $queryRaw like the rest of atlas.chat.
 model ChatMiraiThread {
