@@ -80,7 +80,10 @@ export function createCanvasPublicRouter({
   const app = new Hono()
   const unavailable = (c, status = 404, reason = null) => c.json({ error: 'Enlace no disponible', ...(reason ? { reason } : {}) }, status)
 
-  async function resolve(c) {
+  // `allowExhausted`: max opens only limits NEW opens; a visitor who already
+  // opened the board keeps loading its pages/objects (revoked or expired
+  // links stop everything).
+  async function resolve(c, { allowExhausted = false } = {}) {
     const token = c.req.param('token')
     const rate = limiter.consume(`${clientIp(c)}:${token}`)
     if (!rate.allowed) { c.header('Retry-After', String(rate.retryAfter)); return { response: c.json({ error: 'Demasiadas solicitudes. Intenta más tarde.' }, 429) } }
@@ -88,11 +91,24 @@ export function createCanvasPublicRouter({
     const link = await prisma.modulePublicLink.findUnique({ where: { token } })
     if (!link || link.moduleKey !== CANVAS_MODULE_KEY || link.resourceKey !== BOARD_RESOURCE || !link.recordId) return { response: unavailable(c) }
     const status = linkStatus(link)
-    if (status !== 'activo') return { response: unavailable(c, 410, status) }
+    if (status !== 'activo' && !(allowExhausted && status === 'agotado')) return { response: unavailable(c, 410, status) }
     const board = await prisma.canvasBoard.findFirst({ where: { id: link.recordId, companyId: link.companyId, archivedAt: null } })
     if (!board) return { response: unavailable(c, 410, 'archivado') }
     return { link, board }
   }
+
+  const listPages = (boardId) => prisma.canvasPage.findMany({
+    where: { boardId }, orderBy: { position: 'asc' },
+    select: { id: true, name: true, layers: { where: { visible: true }, orderBy: { position: 'asc' }, select: { id: true, name: true, type: true } } },
+  })
+
+  // Lightweight refresh for an already-open public page (pages added,
+  // renamed or layers hidden). Not counted as an open.
+  app.get('/public/canvas/:token/pages', async (c) => {
+    const { response, board } = await resolve(c, { allowExhausted: true })
+    if (response) return response
+    return c.json({ data: { pages: await listPages(board.id), name: board.name } })
+  })
 
   app.get('/public/canvas/:token', async (c) => {
     const { response, link, board } = await resolve(c)
@@ -104,10 +120,7 @@ export function createCanvasPublicRouter({
       RETURNING id`
     if (!counted.length) return unavailable(c, 410, 'agotado')
     const [pages, company] = await Promise.all([
-      prisma.canvasPage.findMany({
-        where: { boardId: board.id }, orderBy: { position: 'asc' },
-        select: { id: true, name: true, layers: { where: { visible: true }, orderBy: { position: 'asc' }, select: { id: true, name: true, type: true } } },
-      }),
+      listPages(board.id),
       prisma.company.findUnique({ where: { id: link.companyId }, select: { name: true, brandingConfig: { select: { logoFileId: true } } } }),
     ])
     return c.json({
@@ -120,7 +133,7 @@ export function createCanvasPublicRouter({
   })
 
   app.get('/public/canvas/:token/pages/:pageId/objects', async (c) => {
-    const { response, board, link } = await resolve(c)
+    const { response, board, link } = await resolve(c, { allowExhausted: true })
     if (response) return response
     const page = await prisma.canvasPage.findFirst({ where: { id: c.req.param('pageId'), boardId: board.id }, select: { id: true } })
     if (!page) return c.json({ error: 'Página no encontrada.' }, 404)

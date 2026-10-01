@@ -62,3 +62,21 @@ test('public objects: hotspots expose presentation fields only and images are si
   assert.equal(body.imageUrls.f1, 'https://signed/f1')
   assert.equal(fileWhere.entityId, 'co1')
 })
+
+test('public refreshes are not counted and keep working after the last allowed open', async () => {
+  let counted = false
+  const prisma = {
+    modulePublicLink: { findUnique: async () => link({ maxUses: 1, useCount: 1 }) },
+    canvasBoard: { findFirst: async () => ({ id: 'b1', name: 'Planta' }) },
+    canvasPage: { findMany: async () => [{ id: 'p1', name: 'Pagina 1', layers: [] }] },
+    $queryRaw: async () => { counted = true; return [] },
+  }
+  const router = createCanvasPublicRouter({ prisma, limiter: noLimit })
+  const body = await (await router.request(`/public/canvas/${TOKEN}/pages`)).json()
+  assert.equal(body.data.pages.length, 1)
+  assert.equal(counted, false)
+  // A new open of the same exhausted link is still refused.
+  assert.equal((await router.request(`/public/canvas/${TOKEN}`)).status, 410)
+  const revoked = createCanvasPublicRouter({ prisma: { ...prisma, modulePublicLink: { findUnique: async () => link({ revokedAt: new Date() }) } }, limiter: noLimit })
+  assert.equal((await revoked.request(`/public/canvas/${TOKEN}/pages`)).status, 410)
+})

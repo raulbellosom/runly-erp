@@ -30,14 +30,22 @@ async function publicFetch(path) {
   return json.data
 }
 
+const OBJECTS_REFRESH_MS = 8_000
+const PAGES_REFRESH_MS = 30_000
+
+// Each refresh returns freshly signed URLs; images already loaded are kept
+// instead of being downloaded again.
 function usePublicImages(imageUrls) {
   const [images, setImages] = useState(() => new Map())
+  const requestedRef = useRef(new Set())
   useEffect(() => {
     let cancelled = false
     for (const [fileId, url] of Object.entries(imageUrls ?? {})) {
-      if (!url) continue
+      if (!url || requestedRef.current.has(fileId)) continue
+      requestedRef.current.add(fileId)
       const image = new Image()
       image.onload = () => { if (!cancelled) setImages((current) => new Map(current).set(fileId, image)) }
+      image.onerror = () => requestedRef.current.delete(fileId)
       image.src = url
     }
     return () => { cancelled = true }
@@ -49,18 +57,28 @@ function usePublicImages(imageUrls) {
 export default function PublicBoardScreen() {
   const { token } = useParams()
   const board = useQuery({ queryKey: ['public-canvas', token], queryFn: () => publicFetch(`/public/canvas/${encodeURIComponent(token)}`), retry: false, staleTime: Infinity })
-  const pages = useMemo(() => board.data?.pages ?? [], [board.data])
+  // Public visitors cannot join the board's private realtime channel, so the
+  // page polls: objects often, the page list rarely, only while visible.
+  const pagesRefresh = useQuery({
+    queryKey: ['public-canvas', token, 'pages'],
+    queryFn: () => publicFetch(`/public/canvas/${encodeURIComponent(token)}/pages`),
+    enabled: Boolean(board.data), retry: false, refetchInterval: PAGES_REFRESH_MS, refetchOnWindowFocus: true,
+  })
+  const pages = useMemo(() => pagesRefresh.data?.pages ?? board.data?.pages ?? [], [board.data, pagesRefresh.data])
   const [pageId, setPageId] = useState(null)
-  const activePageId = pageId ?? pages[0]?.id ?? null
+  const activePageId = (pageId && pages.some((page) => page.id === pageId) ? pageId : null) ?? pages[0]?.id ?? null
   const objects = useQuery({
     queryKey: ['public-canvas', token, 'objects', activePageId],
     queryFn: () => publicFetch(`/public/canvas/${encodeURIComponent(token)}/pages/${encodeURIComponent(activePageId)}/objects`),
     enabled: Boolean(activePageId), retry: false,
+    refetchInterval: OBJECTS_REFRESH_MS, refetchOnWindowFocus: true, placeholderData: (previous) => previous,
   })
   const rows = useMemo(() => objects.data?.objects ?? [], [objects.data])
   const images = usePublicImages(objects.data?.imageUrls)
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })
-  const [selectedIds, setSelectedIds] = useState([]), [openHotspot, setOpenHotspot] = useState(null)
+  const [selectedIds, setSelectedIds] = useState([]), [openHotspotId, setOpenHotspotId] = useState(null)
+  // Keeps an open hotspot in sync with the latest refresh.
+  const openHotspot = openHotspotId ? rows.find((row) => row.id === openHotspotId) ?? null : null
   const fittedRef = useRef(null)
 
   const fit = useCallback(() => setViewport(fitBounds(sceneBounds(rows), size)), [rows, size])
@@ -73,10 +91,12 @@ export default function PublicBoardScreen() {
 
   const zoomBy = (factor) => setViewport((current) => zoomAt(current, { x: size.width / 2, y: size.height / 2 }, current.zoom * factor))
 
-  if (board.isError) {
+  // A link revoked or expired while someone is viewing ends the session too.
+  const fatal = board.error ?? [pagesRefresh.error, objects.error].find((error) => error?.status === 410 || error?.status === 404)
+  if (fatal) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <EmptyState icon={LinkIcon} title="Enlace no disponible" description={UNAVAILABLE[board.error?.reason] ?? 'Este enlace no existe o ya no está activo. Pide uno nuevo a quien te lo compartió.'} />
+        <EmptyState icon={LinkIcon} title="Enlace no disponible" description={UNAVAILABLE[fatal.reason] ?? 'Este enlace no existe o ya no está activo. Pide uno nuevo a quien te lo compartió.'} />
       </div>
     )
   }
@@ -89,7 +109,7 @@ export default function PublicBoardScreen() {
         <div className="min-w-0 flex-1">
           {board.isLoading ? <Skeleton className="h-4 w-40" /> : (
             <>
-              <h1 className="truncate text-sm font-semibold leading-tight" title={data?.board?.name}>{data?.board?.name}</h1>
+              <h1 className="truncate text-sm font-semibold leading-tight" title={data?.board?.name}>{pagesRefresh.data?.name ?? data?.board?.name}</h1>
               <p className="truncate text-xs leading-tight text-[hsl(var(--muted-foreground))]">{data?.company?.name}</p>
             </>
           )}
@@ -106,13 +126,20 @@ export default function PublicBoardScreen() {
         <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-3 text-xs font-medium text-[hsl(var(--muted-foreground))]">
           <Eye className="h-3.5 w-3.5" />Solo lectura
         </span>
+        <span className="inline-flex h-8 items-center gap-1.5 rounded-full px-2 text-xs text-[hsl(var(--muted-foreground))]" title="La vista se actualiza sola cada pocos segundos">
+          <span className="relative flex h-2 w-2" aria-hidden>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:animate-none" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          </span>
+          <span className="hidden sm:inline">Se actualiza sola</span>
+        </span>
       </header>
 
       <main className="@container relative min-h-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]">
         {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
         <CanvasViewport
           objects={rows} lockedLayerIds={NO_LOCKS} selectedIds={selectedIds} images={images} linkedIds={NO_LOCKS}
-          onSelect={setSelectedIds} onCreate={() => {}} onCommit={() => {}} onOpen={(object) => { if (object.hotspot) setOpenHotspot(object) }}
+          onSelect={setSelectedIds} onCreate={() => {}} onCommit={() => {}} onOpen={(object) => { if (object.hotspot) setOpenHotspotId(object.id) }}
           tool="select" spacePan={false} viewport={viewport} onViewportChange={setViewport} onResize={setSize} readOnly
         />
         {!objects.isLoading && activePageId && !rows.length ? (
@@ -126,7 +153,7 @@ export default function PublicBoardScreen() {
         </div>
       </main>
 
-      <Dialog open={Boolean(openHotspot)} onOpenChange={(open) => { if (!open) setOpenHotspot(null) }}>
+      <Dialog open={Boolean(openHotspot)} onOpenChange={(open) => { if (!open) setOpenHotspotId(null) }}>
         <DialogContent className="max-h-[min(90dvh,640px)] overflow-y-auto sm:max-w-md">
           <DialogHeader><DialogTitle className="sr-only">Hotspot</DialogTitle></DialogHeader>
           {openHotspot ? <HotspotViewer hotspot={openHotspot.hotspot} color={openHotspot.hotspot?.color || openHotspot.style?.stroke} /> : null}
