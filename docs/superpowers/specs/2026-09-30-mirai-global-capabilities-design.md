@@ -129,9 +129,10 @@ Frontend sends, with each message written from the global sidebar:
 { "moduleKey": "runly.calendar", "path": "/app/m/runly.calendar", "recordType": "event", "recordId": "<uuid>", "label": "Reunion con Ana" }
 ```
 
-- Stored on the user's chat message as `metadata.miraiPageContext` (the send route
-  accepts this field only for messages in the caller's own MirAI conversation;
-  validated with Zod, strings capped at 200 chars).
+- Stored on the user's chat message as `metadata.miraiPageContext` (the send
+  route already accepts free-form `metadata`). It is read and validated with Zod
+  (strings capped at 200 chars) only inside the MirAI turn of the caller's own
+  MirAI conversation; anywhere else it is inert.
 - `runTurn` reads it from the trigger message, activates the page module's tools,
   and adds a system message: `Contexto de pantalla: <describeContext line>` or
   `El usuario esta en el modulo <label>.` when there is no record.
@@ -166,8 +167,9 @@ questions route to `chat`; the router prompt says so.
 ## 9. Global sidebar (frontend)
 
 - `apps/desktop/src/modules/runly.chat/components/MiraiSidebarHost.jsx`, mounted
-  once inside `RunlyApp` (wraps the routed content like the PFM layout: content
-  column + docked `aside` 380px on desktop, `Sheet` on coarse/mobile).
+  once inside `RunlyApp` next to `<main>`. The panel is a non-modal fixed overlay
+  on the right edge (380px on desktop, full width on mobile) so the user can keep
+  using the screen; it does not change `<main>`'s scroll container.
 - Edge tab: fixed, right edge, vertically centered, MirAI wordmark/icon, same
   visual language as the current PFM tab. Open state persisted in `localStorage`
   (`mirai.sidebar.open`, try/catch).
@@ -238,8 +240,8 @@ as the reference for future module specs.
   `use_module` loads tools on the next iteration; max 3 modules per turn.
 - Tool loop: `getTools()` re-evaluated per iteration.
 - `web_search`: disabled config, budget exhaustion, tool log records the query.
-- Page context: send route rejects `miraiPageContext` outside the caller's MirAI
-  conversation; `runTurn` adds the context line and activates the module.
+- Page context: invalid `miraiPageContext` is ignored; `runTurn` adds the context
+  line and activates the module.
 - Calendar: `calendar_summary` totals, `calendar_free_slots` against fixed events,
   `describeContext` returns null for inaccessible events.
 - Frontend: `shouldShowMiraiTab` rules; `pnpm build:web`.
