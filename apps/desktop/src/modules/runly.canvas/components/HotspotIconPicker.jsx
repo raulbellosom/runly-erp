@@ -5,7 +5,7 @@ import {
 } from '@runly/ui'
 import { ChevronDown, ListFilter, X } from 'lucide-react'
 import { allIconNames } from '../engine/icons.js'
-import { CURATED_ICONS, ICON_CATEGORIES, iconLabel, searchCurated } from '../lib/iconLibrary.js'
+import { ICON_CATEGORIES, iconLabel, searchCurated } from '../lib/iconLibrary.js'
 import { IconGlyph } from './IconGlyph.jsx'
 
 const PAGE = 120
@@ -150,19 +150,21 @@ export function HotspotIconPicker({ value, color = '#ef4444', onChange, defaultO
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm sm:h-10 sm:w-10" style={{ backgroundColor: color }} aria-hidden>
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm sm:h-10 sm:w-10"
+          style={{ backgroundColor: color }}
+          title={value ? iconLabel(value) : 'Sin icono'}
+          role="img"
+          aria-label={value ? `Icono actual: ${iconLabel(value)}` : 'Sin icono'}
+        >
           {value ? <IconGlyph name={value} className="h-5 w-5" strokeWidth={2.25} /> : <span className="h-3 w-3 rounded-full bg-white" />}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{value ? iconLabel(value) : 'Sin icono (punto)'}</p>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">{CURATED_ICONS.length} recomendados · {allNames.length} en total</p>
-        </div>
-        {value ? (
-          <Button type="button" size="icon" variant="ghost" aria-label="Quitar icono" onClick={() => onChange(null)} className="h-11 w-11 sm:h-9 sm:w-9"><X /></Button>
-        ) : null}
-        <Button type="button" variant="outline" size="sm" onClick={() => setOpen((current) => !current)} aria-expanded={open} className="h-11 sm:h-9">
-          {open ? 'Cerrar' : 'Elegir'}<ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen((current) => !current)} aria-expanded={open} className="h-11 flex-1 justify-between sm:h-9">
+          {open ? 'Cerrar' : value ? 'Cambiar icono' : 'Elegir icono'}<ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
         </Button>
+        {value ? (
+          <Button type="button" size="icon" variant="ghost" aria-label="Quitar icono" title="Quitar icono" onClick={() => onChange(null)} className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"><X /></Button>
+        ) : null}
       </div>
 
       {open ? (
