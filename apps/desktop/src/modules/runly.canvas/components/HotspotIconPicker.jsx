@@ -1,7 +1,7 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import {
-  Button, DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-  SearchInput, cn,
+  Button, Dialog, DialogContent, DialogHeader, DialogTitle, DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger, SearchInput, cn, useIsMobile,
 } from '@runly/ui'
 import { ChevronDown, ListFilter, X } from 'lucide-react'
 import { allIconNames } from '../engine/icons.js'
@@ -9,6 +9,8 @@ import { ICON_CATEGORIES, iconLabel, searchCurated } from '../lib/iconLibrary.js
 import { IconGlyph } from './IconGlyph.jsx'
 
 const PAGE = 120
+// Same look as @runly/ui text fields (FIELD_BASE + FIELD_NORMAL).
+const FIELD = 'w-full rounded-lg border border-input bg-card px-3.5 text-foreground glass-subtle outline-none transition-all duration-150 hover:border-muted-foreground/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20'
 const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1.5'
 
 function IconButton({ name, label, active, color, onSelect }) {
@@ -124,10 +126,9 @@ function useIconResults({ term, selected, showAll, allNames }) {
   }, [term, selected, showAll, allNames])
 }
 
-// Inline icon library for hotspot pins: Spanish search over the curated
-// catalog, a checkable category filter and the full lucide set.
-export function HotspotIconPicker({ value, color = '#ef4444', onChange, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen)
+// Search + checkable category filter + icon grid. Shared by the desktop
+// popover and the mobile bottom sheet.
+function IconLibraryPanel({ value, color, onChoose, gridClassName }) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(() => new Set())
   const [showAll, setShowAll] = useState(false)
@@ -145,66 +146,98 @@ export function HotspotIconPicker({ value, color = '#ef4444', onChange, defaultO
     })
   }
   const clearFilter = () => { setSelected(new Set()); setShowAll(false); setLimit(PAGE) }
-  const choose = (name) => { onChange(name); setOpen(false); setQuery('') }
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm sm:h-10 sm:w-10"
-          style={{ backgroundColor: color }}
-          title={value ? iconLabel(value) : 'Sin icono'}
-          role="img"
-          aria-label={value ? `Icono actual: ${iconLabel(value)}` : 'Sin icono'}
-        >
-          {value ? <IconGlyph name={value} className="h-5 w-5" strokeWidth={2.25} /> : <span className="h-3 w-3 rounded-full bg-white" />}
-        </span>
-        <Button type="button" variant="outline" size="sm" onClick={() => setOpen((current) => !current)} aria-expanded={open} className="h-11 flex-1 justify-between sm:h-9">
-          {open ? 'Cerrar' : value ? 'Cambiar icono' : 'Elegir icono'}<ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
-        </Button>
-        {value ? (
-          <Button type="button" size="icon" variant="ghost" aria-label="Quitar icono" title="Quitar icono" onClick={() => onChange(null)} className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"><X /></Button>
+      <SearchInput value={query} onChange={(event) => { setQuery(event.target.value); setLimit(PAGE) }} onClear={() => setQuery('')} placeholder="Buscar: extintor, camara, agua, wifi…" />
+      <CategoryFilter
+        selected={selected}
+        showAll={showAll}
+        total={allNames.length}
+        onToggle={toggleCategory}
+        onShowAll={(checked) => { setShowAll(checked); setSelected(new Set()); setLimit(PAGE) }}
+        onClear={clearFilter}
+      />
+      <div className={cn('overflow-y-auto overscroll-contain pr-0.5', gridClassName)} role="radiogroup" aria-label="Iconos">
+        {groups.map((group) => (
+          <Group key={group.title ?? 'results'} title={group.title}>
+            <div className={GRID}>
+              {group.items.map((item) => <IconButton key={item.name} name={item.name} label={item.label} active={value === item.name} color={color} onSelect={onChoose} />)}
+            </div>
+          </Group>
+        ))}
+        {extra.length ? (
+          <Group title={groups.length ? 'Mas iconos (nombres en ingles)' : null}>
+            <div className={GRID}>
+              {extra.slice(0, limit).map((name) => <IconButton key={name} name={name} label={name.replace(/-/g, ' ')} active={value === name} color={color} onSelect={onChoose} />)}
+            </div>
+            {extra.length > limit ? (
+              <Button type="button" variant="ghost" size="sm" className="mt-2 w-full" onClick={() => setLimit((current) => current + PAGE)}>
+                Mostrar mas ({extra.length - limit} restantes)
+              </Button>
+            ) : null}
+          </Group>
+        ) : null}
+        {!groups.length && !extra.length ? (
+          <p className="px-1 py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+            Sin iconos para «{term}»{selected.size ? ' en las categorias elegidas' : ''}. Prueba otra palabra (luz, puerta, caja), el nombre en ingles o quita el filtro.
+          </p>
         ) : null}
       </div>
+    </div>
+  )
+}
 
-      {open ? (
-        <div className="space-y-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2.5">
-          <SearchInput value={query} onChange={(event) => { setQuery(event.target.value); setLimit(PAGE) }} onClear={() => setQuery('')} placeholder="Buscar: extintor, camara, agua, wifi…" />
-          <CategoryFilter
-            selected={selected}
-            showAll={showAll}
-            total={allNames.length}
-            onToggle={toggleCategory}
-            onShowAll={(checked) => { setShowAll(checked); setSelected(new Set()); setLimit(PAGE) }}
-            onClear={clearFilter}
-          />
-          <div className="max-h-72 overflow-y-auto overscroll-contain pr-0.5" role="radiogroup" aria-label="Iconos">
-            {groups.map((group) => (
-              <Group key={group.title ?? 'results'} title={group.title}>
-                <div className={GRID}>
-                  {group.items.map((item) => <IconButton key={item.name} name={item.name} label={item.label} active={value === item.name} color={color} onSelect={choose} />)}
-                </div>
-              </Group>
-            ))}
-            {extra.length ? (
-              <Group title={groups.length ? 'Mas iconos (nombres en ingles)' : null}>
-                <div className={GRID}>
-                  {extra.slice(0, limit).map((name) => <IconButton key={name} name={name} label={name.replace(/-/g, ' ')} active={value === name} color={color} onSelect={choose} />)}
-                </div>
-                {extra.length > limit ? (
-                  <Button type="button" variant="ghost" size="sm" className="mt-2 w-full" onClick={() => setLimit((current) => current + PAGE)}>
-                    Mostrar mas ({extra.length - limit} restantes)
-                  </Button>
-                ) : null}
-              </Group>
-            ) : null}
-            {!groups.length && !extra.length ? (
-              <p className="px-1 py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-                Sin iconos para «{term}»{selected.size ? ' en las categorias elegidas' : ''}. Prueba otra palabra (luz, puerta, caja), el nombre en ingles o quita el filtro.
-              </p>
-            ) : null}
-          </div>
-        </div>
+// Combobox-style field: the trigger looks like a select (pin preview, icon
+// name, chevron); the library opens in a popover on desktop and in a bottom
+// sheet on phones, so the surrounding form never shifts.
+export function HotspotIconPicker({ value, color = '#ef4444', onChange }) {
+  const [open, setOpen] = useState(false)
+  const isMobile = useIsMobile()
+  const choose = (name) => { onChange(name); setOpen(false) }
+  const label = value ? iconLabel(value) : 'Sin icono'
+
+  const trigger = (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label={`Icono del pin: ${label}. Cambiar`}
+      onClick={isMobile ? () => setOpen(true) : undefined}
+      className={cn(FIELD, 'flex min-h-11 cursor-pointer items-center gap-2.5 pl-1.5 text-left sm:min-h-10')}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm" style={{ backgroundColor: color }} aria-hidden>
+        {value ? <IconGlyph name={value} className="h-4 w-4" strokeWidth={2.25} /> : <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+      </span>
+      <span className={cn('min-w-0 flex-1 truncate text-sm', !value && 'text-[hsl(var(--muted-foreground))]')}>{value ? label : 'Elegir icono…'}</span>
+      <ChevronDown className={cn('h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform', open && 'rotate-180')} aria-hidden />
+    </button>
+  )
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="min-w-0 flex-1">
+        {isMobile ? (
+          <>
+            {trigger}
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogContent className="gap-3 p-4">
+                <DialogHeader><DialogTitle>Icono del pin</DialogTitle></DialogHeader>
+                <IconLibraryPanel value={value} color={color} onChoose={choose} gridClassName="max-h-[45dvh]" />
+              </DialogContent>
+            </Dialog>
+          </>
+        ) : (
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent align="start" sideOffset={6} className="w-[min(24rem,calc(100vw-2rem))] border border-[hsl(var(--border))] p-3" style={{ background: 'hsl(var(--card))' }}>
+              <IconLibraryPanel value={value} color={color} onChoose={choose} gridClassName="max-h-72" />
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+      {value ? (
+        <Button type="button" size="icon" variant="ghost" aria-label="Quitar icono" title="Quitar icono" onClick={() => onChange(null)} className="h-11 w-11 shrink-0 sm:h-10 sm:w-10"><X /></Button>
       ) : null}
     </div>
   )
