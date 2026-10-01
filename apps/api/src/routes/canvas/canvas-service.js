@@ -248,6 +248,9 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     await assertBoardAccess(companyId, actorId, boardId)
     return prisma.canvasObject.findMany({
       where: { companyId, boardId, deletedAt: null, ...(pageId ? { pageId } : {}), ...(layerId ? { layerId } : {}) },
+      // Hotspot metadata travels with its object so the editor can label pins
+      // and open the hotspot sheet without an extra round trip per pin.
+      include: { hotspot: true },
       orderBy: [{ layerId: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
     })
   }

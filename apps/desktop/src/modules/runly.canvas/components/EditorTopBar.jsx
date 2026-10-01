@@ -1,5 +1,5 @@
 import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn } from '@runly/ui'
-import { ArrowLeft, Check, Loader2, PanelLeft, PanelRight } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, Maximize2, Minimize2, PanelLeft, PanelRight } from 'lucide-react'
 import { ToolButton } from './CanvasToolbar.jsx'
 
 function initials(name = '') {
@@ -36,7 +36,7 @@ function SaveStatus({ saving }) {
   )
 }
 
-export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight }) {
+export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight, zen, onToggleZen }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 sm:px-3">
       <Button type="button" variant="ghost" onClick={onBack} aria-label="Volver a Boards" className="h-11 shrink-0 gap-1.5 px-2.5 sm:h-9">
@@ -62,6 +62,9 @@ export function EditorTopBar({ title, subtitle, loading, saving, presence, onBac
         </ToolButton>
         <ToolButton label={rightOpen ? 'Ocultar inspector' : 'Inspector'} active={rightOpen} onClick={onToggleRight} className={cn(rightOpen && 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]')}>
           <PanelRight />
+        </ToolButton>
+        <ToolButton label={zen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'} active={false} onClick={onToggleZen} className="max-sm:hidden">
+          {zen ? <Minimize2 /> : <Maximize2 />}
         </ToolButton>
       </div>
     </header>

@@ -857,7 +857,7 @@ export const canvasMap = createModuleManifest({
     ownedEntities: ['CanvasBoard', 'CanvasPage', 'CanvasLayer', 'CanvasObject', 'CanvasHotspot', 'CanvasEntityLink', 'CanvasAttachment', 'CanvasVersion', 'CanvasCollaborator'],
     sharedEntities: ['Company', 'UserProfile', 'FileAsset', 'EntityComment', 'AuditLog'],
   },
-  fullscreenPaths: ['/boards/:boardId'],
+  fullscreenPaths: ['/', '/:boardId'],
   navigation: [{ label: 'Canvas', path: '/', icon: 'Map', layout: 'main', permissionKey: 'canvas.access' }],
   acl: {
     module: 'canvas.access',

@@ -107,6 +107,12 @@ export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLaye
           <p className="px-1 text-xs text-[hsl(var(--muted-foreground))]">Esta página no tiene capas.</p>
         )}
       </section>
+
+      <section aria-label="Ayuda de capas" className="mt-auto space-y-1.5 rounded-xl bg-[hsl(var(--muted)/0.5)] p-3 text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
+        <p><strong className="font-semibold text-[hsl(var(--foreground))]">Vectores:</strong> formas, textos, imágenes y PDF.</p>
+        <p><strong className="font-semibold text-[hsl(var(--foreground))]">Hotspots:</strong> puntos con información, archivos y registros vinculados (doble clic para abrir).</p>
+        <p><strong className="font-semibold text-[hsl(var(--foreground))]">Datos Runly:</strong> dibuja aquí lo que representa registros del ERP y vincúlalos desde el inspector.</p>
+      </section>
     </div>
   )
 }

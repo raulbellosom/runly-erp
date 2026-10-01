@@ -38,5 +38,8 @@ export function createCanvasDomain({ request, withAuthHeaders, toQueryString }) 
     removeAttachment: (boardId, attachmentId, token) => send('DELETE', `/canvas/boards/${id(boardId)}/attachments/${id(attachmentId)}`, undefined, token),
     listComments: (boardId, query, token) => send('GET', `/canvas/boards/${id(boardId)}/comments${toQueryString(query)}`, undefined, token),
     createComment: (boardId, data, token) => send('POST', `/canvas/boards/${id(boardId)}/comments`, data, token),
+    // ERP records a board object or hotspot can be linked to (same catalog the
+    // Module Builder relation fields use).
+    searchRecords: (type, search, token) => send('GET', `/relation-targets/${id(type)}/search${toQueryString({ search, pageSize: 20 })}`, undefined, token),
   }
 }
