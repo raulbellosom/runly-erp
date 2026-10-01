@@ -585,46 +585,49 @@ export function createMiraiService({
       return;
     }
 
-    // Spec 4: classify the turn (cheap Groq call) using the just-sent message,
-    // before "escribiendo..." so the router latency isn't perceived. Any failure
-    // falls back to route "chat" (Spec 1 behavior).
-    let route = "chat";
-    let routerMs = 0;
-    let routerError = null;
-    let userText = "";
-    let pageContext = null;
-    try {
-      const [trigger] = triggerMessageId
-        ? await prisma.$queryRaw`SELECT body, metadata FROM chat_messages WHERE id = ${triggerMessageId}::uuid LIMIT 1`
-        : [];
-      userText = String(trigger?.body ?? "").trim();
-      pageContext = parseMiraiPageContext(trigger?.metadata?.miraiPageContext);
-      if (userText) threads.autoTitle({ conversationId, text: userText }).catch(() => {});
-      if (userText) {
-        const c = await classifyTurn({ conversationId, userText });
-        route = c.route;
-        routerMs = c.ms;
-        routerError = c.routerError ?? null;
-      }
-    } catch (e) {
-      console.error("[runly.chat] mirai classify", e?.message ?? e);
-    }
-
-    // Serialize per conversation so replies stay in order.
-    const waitStart = Date.now();
-    while (inFlight.has(conversationId) && Date.now() - waitStart < 30_000) {
-      await new Promise((r) => setTimeout(r, 150));
-    }
-    inFlight.add(conversationId);
-    // 3s, not longer: the chat client's presence hook auto-clears a typing
-    // flag after 4s of silence (useChatPresence). A slower refresh flickers.
+    // "escribiendo..." starts right away: the classifier call below and a
+    // provider rate-limit wait can take seconds. 3s refresh, not longer: the
+    // chat client's presence hook auto-clears a typing flag after 4s of
+    // silence (useChatPresence). A slower refresh flickers.
+    emitTyping(conversationId, true);
     const keepAlive = setInterval(() => { emitTyping(conversationId, true); }, 3_000);
+    let joined = false;
     try {
-      await emitTyping(conversationId, true);
+      // Spec 4: classify the turn (cheap Groq call) using the just-sent message.
+      // Any failure falls back to route "chat" (Spec 1 behavior).
+      let route = "chat";
+      let routerMs = 0;
+      let routerError = null;
+      let userText = "";
+      let pageContext = null;
+      try {
+        const [trigger] = triggerMessageId
+          ? await prisma.$queryRaw`SELECT body, metadata FROM chat_messages WHERE id = ${triggerMessageId}::uuid LIMIT 1`
+          : [];
+        userText = String(trigger?.body ?? "").trim();
+        pageContext = parseMiraiPageContext(trigger?.metadata?.miraiPageContext);
+        if (userText) threads.autoTitle({ conversationId, text: userText }).catch(() => {});
+        if (userText) {
+          const c = await classifyTurn({ conversationId, userText });
+          route = c.route;
+          routerMs = c.ms;
+          routerError = c.routerError ?? null;
+        }
+      } catch (e) {
+        console.error("[runly.chat] mirai classify", e?.message ?? e);
+      }
+
+      // Serialize per conversation so replies stay in order.
+      const waitStart = Date.now();
+      while (inFlight.has(conversationId) && Date.now() - waitStart < 30_000) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      inFlight.add(conversationId);
+      joined = true;
       await runTurn({ companyId, conversationId, actorProfileId, actorAuthUserId, triggerMessageId, route, routerMs, routerError, userText, pageContext });
     } finally {
       clearInterval(keepAlive);
-      inFlight.delete(conversationId);
+      if (joined) inFlight.delete(conversationId);
       await emitTyping(conversationId, false);
     }
   }

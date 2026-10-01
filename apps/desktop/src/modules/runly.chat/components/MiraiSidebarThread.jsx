@@ -90,9 +90,24 @@ export function MiraiSidebarThread({ conversationId, onSent }) {
   const send = useSendMessage(conversationId);
   const { uploadFile, deleteUpload } = useChatUpload(conversationId);
   const { typingUsersList } = useChatPresence(conversationId);
-  const miraiTyping = typingUsersList.includes(MIRAI_TYPING_SENTINEL);
+  // Optimistic "escribiendo": shown from the moment the message is sent until
+  // MirAI's reply (or a system note) lands, so the wait never looks idle.
+  // Holds the id of the last non-user message seen at send time.
+  const [awaitingAfter, setAwaitingAfter] = useState(null);
+  const miraiTyping = typingUsersList.includes(MIRAI_TYPING_SENTINEL) || awaitingAfter !== null;
 
   const messages = data?.data ?? [];
+  const lastReply = [...messages].reverse().find((m) => m.sender_type !== "user");
+  const lastReplyId = lastReply?.id ?? "none";
+  useEffect(() => {
+    if (awaitingAfter === null) return undefined;
+    if (lastReplyId !== awaitingAfter) {
+      setAwaitingAfter(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => setAwaitingAfter(null), 120_000);
+    return () => clearTimeout(timer);
+  }, [awaitingAfter, lastReplyId]);
   const allAttachments = useMemo(() => buildAllAttachments(messages), [messages]);
   const [viewer, setViewer] = useState({ open: false, activeIndex: 0 });
   const [dragging, setDragging] = useState(false);
@@ -237,6 +252,7 @@ export function MiraiSidebarThread({ conversationId, onSent }) {
         delete uploadingRef.current[entry.localId];
       }
       setPendingFiles([]);
+      setAwaitingAfter(lastReplyId);
       onSent?.();
     } catch (err) {
       toast.error(err?.message ?? "No se pudo enviar el mensaje.");
