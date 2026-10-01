@@ -139,7 +139,7 @@ export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, reso
           <Link2 className="mr-1 h-4 w-4" /> Crear enlace
         </Button>
       </div>
-      {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {loading ? (
         <p className="text-sm text-[hsl(var(--muted-foreground))]">Cargando enlaces...</p>
       ) : links.length === 0 ? (

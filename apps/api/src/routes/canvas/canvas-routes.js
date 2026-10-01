@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { createUserAccessService } from '../../services/user-access-service.js'
+import { UserAccessError, createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
 import { createCanvasPublicLinksService } from './canvas-public.js'
 
@@ -8,6 +8,10 @@ const companyId = (c) => c.get('companyId') ?? null
 
 function errorResponse(c, error, fallback) {
   if (error instanceof CanvasServiceError) return c.json({ error: error.message, code: error.code }, error.status)
+  // Sharing with someone who is not an active member or lacks canvas.view.
+  if (error instanceof UserAccessError) {
+    return c.json({ error: 'Esta persona no puede recibir el Board: necesita ser miembro activo de la empresa y tener el permiso "Ver Boards" de Canvas en su rol. Un administrador puede asignarlo en Identidad > Roles.', code: 'CANDIDATE_NOT_ELIGIBLE' }, 422)
+  }
   if (Number.isInteger(error?.status)) return c.json({ error: error.message ?? fallback }, error.status)
   if (process.env.NODE_ENV !== 'production') console.error('[runly.canvas]', error)
   return c.json({ error: fallback }, 500)

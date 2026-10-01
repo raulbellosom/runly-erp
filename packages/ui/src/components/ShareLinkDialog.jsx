@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy } from "lucide-react";
+import { Copy, Hash, Link2, Tag } from "lucide-react";
 import { Button } from "./Button.jsx";
 import { TextField } from "./FormFieldsInput.jsx";
 import { DatePickerField } from "./DatePickerField.jsx";
@@ -59,7 +59,7 @@ export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="md:max-w-md">
+      <DialogContent className="md:max-w-lg">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -69,19 +69,30 @@ export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title
         <div className="space-y-4 p-4">
           {created ? (
             <div className="space-y-2">
-              <TextField label="Enlace" value={url} readOnly onFocus={(e) => e.target.select()} />
+              <TextField label="Enlace" icon={Link2} value={url} readOnly onFocus={(e) => e.target.select()} />
               <Button size="sm" variant="outline" onClick={copy}>
                 <Copy className="mr-1 h-4 w-4" /> {copied ? "Copiado" : "Copiar enlace"}
               </Button>
             </div>
           ) : (
             <>
-              <TextField label="Nombre (opcional)" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej. Clientes de octubre" />
+              <TextField label="Nombre (opcional)" icon={Tag} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} placeholder="Ej. Clientes de octubre" />
               <DatePickerField label="Vence (opcional)" value={expiresOn} onChange={setExpiresOn} />
-              <TextField label="Máximo de usos (opcional)" inputMode="numeric" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="Sin límite" />
+              <TextField
+                label="Máximo de usos (opcional)"
+                icon={Hash}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={7}
+                value={maxUses}
+                // Digits only: letters and symbols never reach the field.
+                onChange={(e) => setMaxUses(e.target.value.replace(/\D+/g, "").replace(/^0+/, ""))}
+                placeholder="Sin límite"
+                hint="Solo números. Déjalo vacío para no limitarlo."
+              />
             </>
           )}
-          {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
         <DialogFooter>
           {created ? (

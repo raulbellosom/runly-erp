@@ -106,7 +106,7 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
         companyId: c.get("tenantContext").companyId,
         actorId: c.get("userContext").profile.id,
         search: c.req.query("search"), limit: c.req.query("pageSize"),
-        permission: ({ chat: 'chat.conversations.read', notes: 'notes.notes.read', projects: 'projects.project.read', calendar: 'calendar.calendars.read', growth: 'growth.leads.read', inventory: 'inventory.item.read' })[c.req.query('action')] ?? null,
+        permission: ({ chat: 'chat.conversations.read', notes: 'notes.notes.read', projects: 'projects.project.read', calendar: 'calendar.calendars.read', growth: 'growth.leads.read', inventory: 'inventory.item.read', canvas: 'canvas.view' })[c.req.query('action')] ?? null,
         projectId: c.req.query('projectId') ?? null,
       });
       const avatars = await buildAvatarUrlMapByFileIds(data.map((u) => u.avatarFileId).filter(Boolean), "thumb", { prisma, supabaseAdmin });
