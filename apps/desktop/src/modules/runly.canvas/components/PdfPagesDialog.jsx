@@ -55,13 +55,13 @@ export function PdfPagesDialog({ pdf, onConfirm, onCancel, busy }) {
             )) : null}
           </div>
         </div>
-        <DialogFooter className="shrink-0 items-center border-t border-[hsl(var(--border))] px-5 py-4 sm:justify-between">
+        <DialogFooter className="mt-0 shrink-0 items-center border-t border-[hsl(var(--border))] px-5 py-4 sm:justify-between">
           <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(selected.size === total ? new Set() : new Set(Array.from({ length: total }, (_, i) => i + 1)))}>
             {selected.size === total ? 'Quitar selección' : 'Seleccionar todas'}
           </Button>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>Cancelar</Button>
-            <Button type="button" disabled={!selected.size || busy} onClick={() => onConfirm([...selected].sort((a, b) => a - b))}>
+          <div className="flex w-full flex-row gap-2 sm:w-auto">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={busy} className="flex-1 sm:flex-none">Cancelar</Button>
+            <Button type="button" disabled={!selected.size || busy} onClick={() => onConfirm([...selected].sort((a, b) => a - b))} className="flex-1 sm:flex-none">
               {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : null}
               Insertar {selected.size} {selected.size === 1 ? 'página' : 'páginas'}
             </Button>

@@ -21,9 +21,9 @@ function TextForm({ initial, onSave, onClose }) {
         />
         <p className="mt-1.5 text-xs text-[hsl(var(--muted-foreground))]">Ctrl + Enter para guardar.</p>
       </div>
-      <DialogFooter className="border-t border-[hsl(var(--border))] px-5 py-4">
-        <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" disabled={text === initial}>Guardar</Button>
+      <DialogFooter className="mt-0 flex-row border-t border-[hsl(var(--border))] px-5 py-4">
+        <Button type="button" variant="outline" onClick={onClose} className="flex-1 sm:flex-none">Cancelar</Button>
+        <Button type="submit" disabled={text === initial} className="flex-1 sm:flex-none">Guardar</Button>
       </DialogFooter>
     </form>
   )

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Button, FileUploader, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, TextareaField, TextField,
+  Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, FileUploader, TextareaField, TextField,
 } from '@runly/ui'
 import { ExternalLink, FileText, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -82,10 +82,10 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
 
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
-      <SheetHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 pb-3 pr-12 pt-1 md:pt-0">
-        <SheetTitle>Hotspot</SheetTitle>
-        <SheetDescription>Describe este punto y conéctalo con registros y archivos de Runly.</SheetDescription>
-      </SheetHeader>
+      <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
+        <DialogTitle>Hotspot</DialogTitle>
+        <DialogDescription>Describe este punto y conéctalo con registros y archivos de Runly.</DialogDescription>
+      </DialogHeader>
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
         <div className="space-y-4">
           <TextField label="Título" required value={form.title} onChange={(event) => set('title', event.target.value)} maxLength={300} placeholder="Ej. Tablero eléctrico principal" />
@@ -100,13 +100,13 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
         <EntityLinksSection boardId={boardId} targetType="HOTSPOT" targetId={hotspot.id} links={links} />
         <AttachmentsSection boardId={boardId} hotspotId={hotspot.id} />
       </div>
-      {/* One row on every width; buttons share the space on phones. */}
-      <div className="flex shrink-0 flex-row gap-2 border-t border-[hsl(var(--border))] px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end md:pb-0">
+      {/* flex-row overrides DialogFooter's stacked mobile layout: one row, shared width. */}
+      <DialogFooter className="mt-0 shrink-0 flex-row border-t border-[hsl(var(--border))] px-5 py-4">
         <Button type="button" variant="outline" onClick={onClose} className="flex-1 sm:flex-none">{dirty ? 'Cancelar' : 'Cerrar'}</Button>
         <Button type="submit" disabled={!dirty || update.isPending} className="flex-1 sm:flex-none">
           {update.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : null}Guardar
         </Button>
-      </div>
+      </DialogFooter>
     </form>
   )
 }
@@ -116,18 +116,18 @@ function HotspotForm({ boardId, pageId, hotspot, initialColor, links, onClose })
 function HotspotReadOnly({ boardId, object, links, canAttach, onClose }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SheetHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 pb-3 pr-12 pt-1 md:pt-0">
-        <SheetTitle>Hotspot</SheetTitle>
-        <SheetDescription>Tienes acceso de solo lectura a este Board.</SheetDescription>
-      </SheetHeader>
+      <DialogHeader className="shrink-0 border-b border-[hsl(var(--border))] px-5 py-4">
+        <DialogTitle>Hotspot</DialogTitle>
+        <DialogDescription>Tienes acceso de solo lectura a este Board.</DialogDescription>
+      </DialogHeader>
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
         <HotspotViewer hotspot={object.hotspot} color={hotspotColor(object)} />
         <EntityLinksSection boardId={boardId} targetType="HOTSPOT" targetId={object.hotspot.id} links={links} readOnly />
         <AttachmentsSection boardId={boardId} hotspotId={object.hotspot.id} canUpload={canAttach} canRemove={false} />
       </div>
-      <div className="flex shrink-0 flex-row border-t border-[hsl(var(--border))] px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end md:pb-0">
+      <DialogFooter className="mt-0 shrink-0 flex-row border-t border-[hsl(var(--border))] px-5 py-4">
         <Button type="button" variant="outline" onClick={onClose} className="flex-1 sm:flex-none">Cerrar</Button>
-      </div>
+      </DialogFooter>
     </div>
   )
 }
@@ -135,20 +135,19 @@ function HotspotReadOnly({ boardId, object, links, canAttach, onClose }) {
 export function HotspotDialog({ boardId, pageId, object, links, onOpenChange, readOnly = false, canAttach = false }) {
   const hotspot = object?.hotspot
   return (
-    <Sheet open={Boolean(object)} onOpenChange={onOpenChange}>
-      {/* Bottom sheet with drag handle on phones, side panel on larger screens. */}
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg md:max-w-lg">
+    <Dialog open={Boolean(object)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[min(92dvh,760px)] flex-col gap-0 p-0 sm:max-w-lg">
         {hotspot && readOnly ? (
           <HotspotReadOnly boardId={boardId} object={object} links={links} canAttach={canAttach} onClose={() => onOpenChange(false)} />
         ) : hotspot ? (
           <HotspotForm key={hotspot.id} boardId={boardId} pageId={pageId} hotspot={hotspot} initialColor={hotspotColor(object)} links={links} onClose={() => onOpenChange(false)} />
         ) : (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-            <SheetTitle className="text-base">Preparando hotspot…</SheetTitle>
+            <DialogTitle className="text-base">Preparando hotspot…</DialogTitle>
             <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
