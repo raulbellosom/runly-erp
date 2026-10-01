@@ -1,5 +1,5 @@
-import { memo } from 'react'
-import { Excalidraw } from '@excalidraw/excalidraw'
+import { memo, useCallback, useState } from 'react'
+import { Excalidraw, useHandleLibrary } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 
 // Thin wrapper so CanvasEditor / PublicCanvasView never statically import the
@@ -13,24 +13,24 @@ import '@excalidraw/excalidraw/index.css'
 // referentially stable for the life of the note.
 
 // Scoped tweaks for the embed:
-//  - hide Excalidraw's own shape "Library" (sidebar + its trigger button) —
-//    not part of the Atlas UX, renders with broken theming here, and on the
-//    public read-only view "Explorar bibliotecas" lets a visitor pull in and
-//    render third-party content on a page that's supposed to be inert. The
-//    selectors below are the real classes @excalidraw/excalidraw emits
-//    (verified against the installed 0.18.1 bundle — the previous selectors,
-//    `.library-button` / `[data-testid="library-button"]` /
-//    `[aria-label="Library"]`, matched nothing in that version and silently
-//    hid nothing). This only hides the UI; onDropCapture below (viewModeEnabled
-//    only) is what actually blocks importing a dropped .excalidrawlib file,
-//    since Excalidraw's own drop handler has no read-only guard.
+//  - on read-only canvases (public link, shared-resource view) hide
+//    Excalidraw's default sidebar (shape Library + element search) and its
+//    trigger: "Explorar bibliotecas" there would let a visitor pull in and
+//    render third-party content on a page that's supposed to be inert. Editors
+//    (inside Runly or via an edit invitation) keep the full sidebar. The
+//    selectors are the real classes @excalidraw/excalidraw 0.18.1 emits. This
+//    only hides the UI; onDropCapture below (viewModeEnabled only) is what
+//    actually blocks importing a dropped .excalidrawlib file, since
+//    Excalidraw's own drop handler has no read-only guard.
 //  - on small screens Excalidraw reserves a big top inset assuming it owns the
 //    viewport top; our 44px toolbar sits above it, so pull its UI up.
-const EXCALIDRAW_TWEAKS_CSS = `
+const READ_ONLY_SIDEBAR_CSS = `
 .excalidraw .sidebar-trigger,
 .excalidraw .default-sidebar,
 .excalidraw .sidebar.default-sidebar { display: none !important; }
+`
 
+const EXCALIDRAW_TWEAKS_CSS = `
 /* We are embedded below the app chrome, never at the true viewport edge, so
    Excalidraw must NOT add the device safe-area inset to its top toolbar (that
    was the big empty gap above the toolbar on iPhone; Android reports ~0). */
@@ -44,6 +44,15 @@ const EXCALIDRAW_TWEAKS_CSS = `
 }
 `
 
+// Main-menu actions. Kept off on purpose:
+//  - loadScene / clearCanvas: wipe the whole scene in one click, bypassing the
+//    Runly layer model (locked/hidden layers); dropping a .excalidraw file and
+//    select-all + delete (with undo) still cover those cases while editing.
+//  - saveToActiveFile: there is no local file — the server is the store.
+//  - saveAsImage: superseded by Runly's "Exportar" (PNG/SVG/PDF, layer-aware).
+//  - toggleTheme: follows the Runly theme.
+// "Guardar en..." (download the editable .excalidraw) is offered to editors
+// only, as a personal backup; read-only visitors get no source download.
 const CANVAS_ACTIONS = {
   loadScene: false,
   saveToActiveFile: false,
@@ -52,6 +61,30 @@ const CANVAS_ACTIONS = {
   clearCanvas: false,
   changeViewBackgroundColor: true,
   toggleTheme: false,
+}
+const UI_OPTIONS_READ_ONLY = { canvasActions: CANVAS_ACTIONS }
+const UI_OPTIONS_EDIT = { canvasActions: { ...CANVAS_ACTIONS, export: { saveFileToDisk: true } } }
+
+// The user's shape library lives in this browser (per device), shared by every
+// canvas they edit. useHandleLibrary also installs libraries coming back from
+// libraries.excalidraw.com ("Explorar bibliotecas" -> #addLibrary=... hash).
+const LIBRARY_STORAGE_KEY = 'runly.notes.excalidrawLibrary'
+const libraryAdapter = {
+  load() {
+    try {
+      const raw = window.localStorage.getItem(LIBRARY_STORAGE_KEY)
+      return raw ? { libraryItems: JSON.parse(raw) } : null
+    } catch {
+      return null
+    }
+  },
+  save({ libraryItems }) {
+    try {
+      window.localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(libraryItems))
+    } catch {
+      // storage full / blocked: the library just won't survive a reload
+    }
+  },
 }
 
 // Excalidraw's own onDrop handler (handleAppOnDrop) never checks
@@ -72,21 +105,32 @@ function CanvasStage({
   onPointerUpdate,
   langCode = 'es-ES',
 }) {
+  const [api, setApi] = useState(null)
+  const handleExcalidrawAPI = useCallback(
+    (instance) => {
+      setApi(instance)
+      onExcalidrawAPI?.(instance)
+    },
+    [onExcalidrawAPI],
+  )
+  // null API on read-only canvases = no library loading/installing there.
+  useHandleLibrary({ excalidrawAPI: viewModeEnabled ? null : api, adapter: libraryAdapter })
+
   const dropGuardProps = viewModeEnabled
     ? { onDropCapture: blockDropWhenReadOnly, onDragOverCapture: blockDropWhenReadOnly }
     : {}
   return (
     <div className="h-full w-full" {...dropGuardProps}>
-      <style>{EXCALIDRAW_TWEAKS_CSS}</style>
+      <style>{viewModeEnabled ? EXCALIDRAW_TWEAKS_CSS + READ_ONLY_SIDEBAR_CSS : EXCALIDRAW_TWEAKS_CSS}</style>
       <Excalidraw
-        excalidrawAPI={onExcalidrawAPI}
+        excalidrawAPI={handleExcalidrawAPI}
         initialData={initialData}
         viewModeEnabled={viewModeEnabled}
         theme={theme}
         onChange={onChange}
         onPointerUpdate={onPointerUpdate}
         langCode={langCode}
-        UIOptions={{ canvasActions: CANVAS_ACTIONS }}
+        UIOptions={viewModeEnabled ? UI_OPTIONS_READ_ONLY : UI_OPTIONS_EDIT}
       />
     </div>
   )
