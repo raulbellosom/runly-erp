@@ -9,7 +9,7 @@ import { ChatServiceError } from "./chat-service-error.js";
 const TTL_MS = 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
-function actionContext(prisma, scope, ctx) {
+export function buildActionContext(prisma, scope, ctx) {
   return {
     prisma,
     companyId: scope.companyId,
@@ -46,7 +46,7 @@ export function createMiraiProposalService({ prisma, registry, postNote = null }
 
     let prepared;
     try {
-      prepared = await action.prepare(args && typeof args === "object" ? args : {}, actionContext(prisma, scope, ctx));
+      prepared = await action.prepare(args && typeof args === "object" ? args : {}, buildActionContext(prisma, scope, ctx));
     } catch (err) {
       return { error: String(err?.message ?? err).slice(0, 200) };
     }
@@ -112,7 +112,7 @@ export function createMiraiProposalService({ prisma, registry, postNote = null }
       error = "Ya no tienes permiso para esta accion.";
     } else {
       try {
-        result = await resolved.action.execute(claimed.input, actionContext(prisma, resolved.scope, ctx));
+        result = await resolved.action.execute(claimed.input, buildActionContext(prisma, resolved.scope, ctx));
         status = "executed";
       } catch (err) {
         error = String(err?.message ?? err).slice(0, 300);

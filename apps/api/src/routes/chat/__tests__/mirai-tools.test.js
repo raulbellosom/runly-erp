@@ -22,7 +22,7 @@ test("TOOL_DEFS lists every read tool with JSON schemas", () => {
   const names = TOOL_DEFS.map((t) => t.function.name).sort();
   assert.deepEqual(names, [
     "describe_image", "get_call_transcript", "get_conversation_messages", "get_recent_messages",
-    "list_bank_accounts", "list_call_transcripts", "list_conversation_files", "list_my_calendar",
+    "list_bank_accounts", "list_call_transcripts", "list_conversation_files",
     "list_my_tasks", "search_inventory", "search_module_help", "search_my_conversations", "search_runly",
   ]);
   for (const t of TOOL_DEFS) assert.equal(t.type, "function");

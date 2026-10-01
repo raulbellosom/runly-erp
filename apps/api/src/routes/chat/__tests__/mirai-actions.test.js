@@ -1,12 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMiraiActionRegistry } from "../mirai-action-registry.js";
+import { createMiraiCapabilityRegistry } from "../mirai-capability-registry.js";
 import { createMiraiProposalService } from "../mirai-proposal-service.js";
-import { buildActionToolRunners } from "../mirai-action-tools.js";
 
 const PID = "11111111-1111-1111-1111-111111111111";
 const scopeWith = (perms) => async () => ({ companyId: "co1", userId: "prof1", isAdmin: false, permissionSet: new Set(perms), uctx: { profile: { id: "prof1" } } });
 const ctx = { companyId: "co1", actorProfileId: "prof1", actorAuthUserId: "auth1", conversationId: "conv1", surface: "direct" };
+
+// Wraps a single action into the capability shape createMiraiCapabilityRegistry expects.
+const calendarCapability = (action, over = {}) => ({
+  moduleKey: "runly.calendar", label: "Calendario", summary: "s", tools: [], actions: [action], ...over,
+});
 
 function fakeAction(over = {}) {
   const calls = { prepare: 0, execute: 0 };
@@ -46,21 +50,30 @@ const pendingRow = (over = {}) => ({
   expires_at: new Date(Date.now() + 60_000), created_at: new Date(), ...over,
 });
 
-test("registry hides actions without permission or with the module disabled", async () => {
+test("registry hides modules without permission or with the module disabled", async () => {
   const action = fakeAction();
   const prisma = fakePrisma();
-  const noPerm = createMiraiActionRegistry({ prisma, resolveScopedErpContext: scopeWith([]), actions: [action] });
-  assert.equal((await noPerm.listAvailable(ctx)).actions.length, 0);
-  const disabled = createMiraiActionRegistry({ prisma: fakePrisma({ installed: [] }), resolveScopedErpContext: scopeWith(["calendar.events.create"]), actions: [action] });
-  assert.equal((await disabled.listAvailable(ctx)).actions.length, 0);
-  const ok = createMiraiActionRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), actions: [action] });
-  assert.equal((await ok.listAvailable(ctx)).actions.length, 1);
+  const noPerm = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith([]), capabilities: [calendarCapability(action)] });
+  assert.equal((await noPerm.listModules(ctx)).modules.length, 0);
+  const disabled = createMiraiCapabilityRegistry({ prisma: fakePrisma({ installed: [] }), resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
+  assert.equal((await disabled.listModules(ctx)).modules.length, 0);
+  const ok = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
+  assert.equal((await ok.listModules(ctx)).modules.length, 1);
+});
+
+test("describeContext returns null when the module is not installed, and the module line with no recordId", async () => {
+  const action = fakeAction();
+  const notInstalled = createMiraiCapabilityRegistry({ prisma: fakePrisma({ installed: [] }), resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
+  assert.equal(await notInstalled.describeContext(ctx, { moduleKey: "runly.calendar" }), null);
+  const prisma = fakePrisma();
+  const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
+  assert.equal(await registry.describeContext(ctx, { moduleKey: "runly.calendar" }), "El usuario esta en el modulo Calendario.");
 });
 
 test("propose runs prepare only, supersedes the previous pending one and stores the proposal", async () => {
   const action = fakeAction();
   const prisma = fakePrisma();
-  const registry = createMiraiActionRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), actions: [action] });
+  const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
   const svc = createMiraiProposalService({ prisma, registry });
   const out = await svc.propose(ctx, { actionKey: "calendar.event.create", args: {} });
   assert.equal(out.proposalId, PID);
@@ -70,7 +83,7 @@ test("propose runs prepare only, supersedes the previous pending one and stores 
 
 test("confirm rejects another actor with 404 and a non-pending proposal with 409", async () => {
   const prisma = fakePrisma({ row: pendingRow({ actor_profile_id: "other" }) });
-  const registry = createMiraiActionRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), actions: [fakeAction()] });
+  const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(fakeAction())] });
   const svc = createMiraiProposalService({ prisma, registry });
   await assert.rejects(svc.confirm(PID, ctx), (e) => e.status === 404);
   prisma.state.row = pendingRow({ status: "executed" });
@@ -80,7 +93,7 @@ test("confirm rejects another actor with 404 and a non-pending proposal with 409
 test("confirm re-checks permission: lost permission fails without executing", async () => {
   const action = fakeAction();
   const prisma = fakePrisma({ row: pendingRow() });
-  const registry = createMiraiActionRegistry({ prisma, resolveScopedErpContext: scopeWith([]), actions: [action] });
+  const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith([]), capabilities: [calendarCapability(action)] });
   const notes = [];
   const svc = createMiraiProposalService({ prisma, registry, postNote: async (n) => notes.push(n.text) });
   const out = await svc.confirm(PID, ctx);
@@ -92,7 +105,7 @@ test("confirm re-checks permission: lost permission fails without executing", as
 test("confirm executes, audits and posts the confirmation note", async () => {
   const action = fakeAction();
   const prisma = fakePrisma({ row: pendingRow() });
-  const registry = createMiraiActionRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), actions: [action] });
+  const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext: scopeWith(["calendar.events.create"]), capabilities: [calendarCapability(action)] });
   const notes = [];
   const svc = createMiraiProposalService({ prisma, registry, postNote: async (n) => notes.push(n.text) });
   const out = await svc.confirm(PID, ctx);
@@ -102,15 +115,20 @@ test("confirm executes, audits and posts the confirmation note", async () => {
   assert.equal(notes[0], "Confirmado: Evento creado");
 });
 
-test("propose_action stores the proposal id on the turn ctx; list_actions filters by module", async () => {
-  const registry = { listAvailable: async () => ({ scope: {}, actions: [fakeAction(), fakeAction({ key: "x.y", moduleKey: "runly.x" })] }) };
+test("propose_action stores the proposal id on the turn ctx; use_module returns actions for that module only", async () => {
+  const registry = {
+    getModule: async (_ctx, moduleKey) => (moduleKey === "runly.calendar"
+      ? { scope: {}, module: { label: "Calendario", tools: [], actions: [fakeAction()] } }
+      : { error: "no" }),
+  };
   const proposalService = { propose: async () => ({ status: "pending_confirmation", proposalId: PID }), cancelPending: async () => ({ cancelled: 1 }) };
-  const r = buildActionToolRunners({ registry, proposalService });
-  const listed = await r.list_actions({ module: "runly.calendar" }, {});
-  assert.deepEqual(listed.acciones.map((a) => a.actionKey), ["calendar.event.create"]);
+  const { createModuleToolset } = await import("../mirai-module-tools.js");
+  const toolset = createModuleToolset({ prisma: {}, registry, proposalService });
   const turn = {};
-  await r.propose_action({ actionKey: "calendar.event.create", args: {} }, turn);
+  const used = await toolset.run("use_module", { moduleKey: "runly.calendar" }, turn);
+  assert.deepEqual(used.acciones.map((a) => a.actionKey), ["calendar.event.create"]);
+  await toolset.run("propose_action", { actionKey: "calendar.event.create", args: {} }, turn);
   assert.equal(turn.proposalId, PID);
-  await r.cancel_proposal({}, turn);
+  await toolset.run("cancel_proposal", {}, turn);
   assert.equal(turn.proposalId, null);
 });

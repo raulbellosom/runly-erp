@@ -1,14 +1,14 @@
 // apps/api/src/routes/chat/mirai-actions-wiring.js
 //
-// Builds the MirAI action stack (registry + proposals + tools + routes) from
-// each module's mirai-actions.js. A new module adds one spread line to
-// `actions`. Also owns the confirmation note posted back to the chat.
+// Builds the MirAI capability stack (registry + proposals + module tools +
+// routes) from each module's mirai-capabilities.js. A new module adds one
+// line to `capabilities`. Also owns the confirmation note posted back to chat.
 import { createScopedErpContextResolver } from "./mirai-scoped-context.js";
-import { createMiraiActionRegistry } from "./mirai-action-registry.js";
+import { createMiraiCapabilityRegistry } from "./mirai-capability-registry.js";
 import { createMiraiProposalService } from "./mirai-proposal-service.js";
-import { ACTION_TOOL_DEFS, buildActionToolRunners } from "./mirai-action-tools.js";
+import { createModuleToolset } from "./mirai-module-tools.js";
 import { createMiraiProposalRoutes } from "./mirai-proposal-routes.js";
-import { createCalendarMiraiActions } from "../calendar/mirai-actions.js";
+import { createCalendarMiraiCapabilities } from "../calendar/mirai-capabilities.js";
 import { createCalendarEventEffects } from "../calendar/calendar-event-effects.js";
 
 function createActionNotePoster({ prisma, broadcaster }) {
@@ -45,22 +45,22 @@ function createActionNotePoster({ prisma, broadcaster }) {
 }
 
 export function createMiraiActionsStack({ prisma, broadcaster = null, resolveUserContext, calendarEventService }) {
-  const actions = [
-    ...createCalendarMiraiActions({
+  const capabilities = [
+    createCalendarMiraiCapabilities({
       prisma,
       eventService: calendarEventService,
       effects: createCalendarEventEffects({ prisma, broadcaster }),
     }),
   ];
   const resolveScopedErpContext = createScopedErpContextResolver({ prisma, resolveUserContext });
-  const registry = createMiraiActionRegistry({ prisma, resolveScopedErpContext, actions });
+  const registry = createMiraiCapabilityRegistry({ prisma, resolveScopedErpContext, capabilities });
   const proposalService = createMiraiProposalService({
     prisma, registry, postNote: createActionNotePoster({ prisma, broadcaster }),
   });
+  const toolset = createModuleToolset({ prisma, registry, proposalService });
   return {
-    actionTools: {
-      defs: ACTION_TOOL_DEFS,
-      runners: buildActionToolRunners({ registry, proposalService }),
+    moduleTools: {
+      toolset,
       attachMessage: proposalService.attachMessage,
     },
     createRoutes: ({ requirePermission, resolveProfileId }) =>

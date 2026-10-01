@@ -2,15 +2,16 @@
 //
 // The tool-calling loop shared by MirAI's direct turn and private panel.
 // Stops one iteration early: a last model round could only request tools
-// whose output no later iteration could act on.
+// whose output no later iteration could act on. `getTools` is re-evaluated
+// every round so `use_module` can widen the toolset mid-turn.
 export async function runMiraiToolLoop({
-  callModel, messages, runners, ctx, toolLog, clampToolResult,
+  callModel, getTools, runTool, messages, ctx, toolLog, clampToolResult,
   maxIterations, tooManyStepsText, emptyText,
 }) {
   for (let iter = 0; iter < maxIterations; iter += 1) {
     const iterations = iter + 1;
     if (iter === maxIterations - 1) return { text: tooManyStepsText, iterations };
-    const msg = await callModel(messages);
+    const msg = await callModel(messages, getTools());
     const toolCalls = msg?.tool_calls ?? [];
     if (!toolCalls.length) {
       const answer = String(msg?.content ?? "").trim();
@@ -23,15 +24,17 @@ export async function runMiraiToolLoop({
       const name = call.function?.name;
       let args = {};
       try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
-      const runner = runners[name];
       const t0 = Date.now();
       let result;
       try {
-        result = runner ? await runner(args, ctx) : { error: `Herramienta desconocida: ${name}` };
+        result = await runTool(name, args, ctx);
       } catch (err) {
         result = { error: `La herramienta fallo: ${String(err?.message ?? err).slice(0, 160)}` };
       }
-      toolLog.push({ name, ms: Date.now() - t0, ok: !result?.error });
+      toolLog.push({
+        name, ms: Date.now() - t0, ok: !result?.error,
+        ...(name === "web_search" ? { query: String(args?.query ?? "").slice(0, 200) } : {}),
+      });
       messages.push({ role: "tool", tool_call_id: call.id, content: clampToolResult(result) });
     }
   }

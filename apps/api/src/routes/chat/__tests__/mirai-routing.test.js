@@ -29,7 +29,7 @@ function svcForRoute({ fetchImpl, env = { GROQ_API_KEY: "k" }, listMessages, his
     $queryRaw: async (strings) => {
       const sql = strings.join("?");
       // the just-sent user message the classifier reads
-      if (/SELECT\s+body\s+FROM chat_messages WHERE id/i.test(sql)) return [{ body: "una pregunta" }];
+      if (/SELECT\s+body,\s*metadata\s+FROM chat_messages WHERE id/i.test(sql)) return [{ body: "una pregunta", metadata: null }];
       if (/FROM chat_messages/i.test(sql)) return historyRows ?? [];   // loadHistory / router history / web history
       if (/FROM chat_conversations/i.test(sql)) return [{ id: "mconv1", type: "mirai", company_id: "co1" }];
       return [];

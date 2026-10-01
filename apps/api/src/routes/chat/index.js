@@ -178,7 +178,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
     projectsService,
     tasksService,
     callTranscriptService,
-    actionTools: miraiActions.actionTools,
+    moduleTools: miraiActions.moduleTools,
   });
   const miraiTtsService = createMiraiTtsService();
 

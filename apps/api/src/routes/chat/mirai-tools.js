@@ -141,17 +141,6 @@ export const TOOL_DEFS = [
   {
     type: "function",
     function: {
-      name: "list_my_calendar",
-      description: "Lista los proximos eventos de la agenda del propio usuario. Ej: 'que tengo esta semana', 'mi agenda de manana'.",
-      parameters: {
-        type: "object",
-        properties: { days: { type: "integer", description: "Cuantos dias hacia adelante (max 30, por defecto 7)." } },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "list_my_tasks",
       description: "Lista las tareas asignadas al propio usuario en sus proyectos, ordenadas por fecha de vencimiento. Ej: 'que tareas tengo pendientes'.",
       parameters: {
@@ -199,7 +188,7 @@ function trimMessage(m) {
 
 export function buildToolRunners({
   prisma, listMessages, chatSearchService, visionService, signAttachmentUrl, resolveUserContext,
-  inventoryService, ledgerService, calendarEventService, projectsService, tasksService,
+  inventoryService, ledgerService, projectsService, tasksService,
   callTranscriptService,
 }) {
   const helpService = createHelpService({ prisma });
@@ -408,29 +397,6 @@ export function buildToolRunners({
     }
   }
 
-  async function list_my_calendar(args, ctx) {
-    if (!calendarEventService?.listEvents) return { error: "El modulo de calendario no esta disponible." };
-    const c = await erpContext(ctx, "calendar.events.read");
-    if (c.error) return c;
-    const days = Math.min(Math.max(parseInt(args?.days, 10) || 7, 1), 30);
-    const start = new Date();
-    const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
-    try {
-      const events = await calendarEventService.listEvents({ userId: c.userId, companyId: c.companyId, start, end });
-      return {
-        eventos: (events ?? []).slice(0, 25).map((e) => ({
-          eventId: e.id,
-          titulo: e.title ?? null,
-          inicio: e.startAt instanceof Date ? e.startAt.toISOString() : String(e.startAt ?? ""),
-          fin: e.endAt instanceof Date ? e.endAt.toISOString() : String(e.endAt ?? ""),
-          calendario: e.calendar?.name ?? null,
-        })),
-      };
-    } catch (err) {
-      return { error: `No pude consultar tu agenda: ${String(err?.message ?? err).slice(0, 140)}` };
-    }
-  }
-
   async function list_my_tasks(args, ctx) {
     if (!projectsService?.listProjects || !tasksService?.listTasks) return { error: "El modulo de proyectos no esta disponible." };
     const c = await erpContext(ctx, "projects.task.read");
@@ -518,7 +484,7 @@ export function buildToolRunners({
   return {
     get_recent_messages, get_conversation_messages, search_my_conversations,
     list_conversation_files, describe_image, search_runly, search_module_help,
-    search_inventory, list_bank_accounts, list_my_calendar, list_my_tasks,
+    search_inventory, list_bank_accounts, list_my_tasks,
     list_call_transcripts, get_call_transcript,
   };
 }
