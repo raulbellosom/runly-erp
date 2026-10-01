@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, FileUploader, TextareaField, TextField,
+  AttachmentsPanel, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, TextareaField, TextField,
 } from '@runly/ui'
-import { ExternalLink, FileText, Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
-import { runly } from '../../../lib/runly.js'
-import { useAttachmentMutations, useAttachments, useUpdateHotspot } from '../hooks/useCanvasData.js'
+import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
+import { getApiUrl } from '../../../lib/runtimeConfig.js'
+import { useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { CANVAS_COLORS } from '../lib/objectFactory.js'
 import { hotspotColor } from './inspector/ObjectInspector.jsx'
 import { HotspotIconPicker } from './HotspotIconPicker.jsx'
@@ -21,43 +22,35 @@ export const HOTSPOT_STATUSES = [
   { value: 'INACTIVE', label: 'Inactivo' },
 ]
 
+// Standard attachments panel (multi-upload, lazy thumbnails, file-type
+// icons, advanced viewer) wired to the hotspot's own attachment routes.
 function AttachmentsSection({ boardId, hotspotId, canUpload = true, canRemove = true }) {
   const { session } = useAuth()
-  const attachments = useAttachments(boardId, 'HOTSPOT', hotspotId)
-  const { add, remove } = useAttachmentMutations(boardId, 'HOTSPOT', hotspotId)
-  const rows = attachments.data ?? []
-
-  async function open(attachment) {
-    try {
-      const response = await runly.files.getSignedUrl(attachment.fileAssetId, session?.access_token)
-      const url = response?.data?.signedUrl ?? response?.signedUrl
-      if (url) window.open(url, '_blank', 'noopener')
-    } catch (error) { toast.error(error.message) }
-  }
-
+  const { activeCompanyId } = useActiveCompany()
+  const config = useMemo(() => ({
+    label: 'Archivos',
+    listPath: `/canvas/boards/${boardId}/hotspots/:id/attachments`,
+    addPath: `/canvas/boards/${boardId}/hotspots/:id/attachments`,
+    removePath: `/canvas/boards/${boardId}/hotspots/:id/attachments/:docId`,
+    upload: { endpoint: '/files/upload', moduleKey: 'runly.canvas', entityType: 'CanvasHotspot' },
+    fields: { fileAssetId: 'fileAssetId', fileAsset: 'fileAsset', createdAt: 'createdAt' },
+    signedUrl: { endpointTemplate: '/files/:fileId/signed-url' },
+  }), [boardId])
   return (
     <Section title="Archivos">
-      {rows.length ? (
-        <ul className="space-y-1">
-          {rows.map((attachment) => (
-            <li key={attachment.id} className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1.5 pl-2.5 pr-1">
-              <FileText className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
-              <span className="min-w-0 flex-1 truncate text-sm">{attachment.label ?? 'Archivo'}</span>
-              <Button type="button" size="icon" variant="ghost" aria-label="Abrir archivo" onClick={() => open(attachment)} className="h-9 w-9 sm:h-7 sm:w-7"><ExternalLink className="h-3.5 w-3.5" /></Button>
-              {canRemove ? <Button type="button" size="icon" variant="ghost" aria-label="Quitar archivo" disabled={remove.isPending} onClick={() => remove.mutate(attachment.id, { onError: (error) => toast.error(error.message) })} className="h-9 w-9 hover:text-destructive sm:h-7 sm:w-7">
-                {remove.isPending && remove.variables === attachment.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-              </Button> : null}
-            </li>
-          ))}
-        </ul>
-      ) : !canUpload ? <p className="px-0.5 text-xs text-[hsl(var(--muted-foreground))]">Sin archivos.</p> : null}
-      {canUpload ? <FileUploader
-        maxSizeMB={25}
-        onUpload={(file) => add.mutateAsync(file)}
-        onChange={() => toast.success('Archivo agregado')}
-        hint="Fotos, fichas técnicas, manuales o cualquier documento de este punto."
-        emptyLabel="Adjuntar archivo"
-      /> : null}
+      <AttachmentsPanel
+        apiBaseUrl={getApiUrl()}
+        token={session?.access_token}
+        companyId={activeCompanyId}
+        recordId={hotspotId}
+        config={config}
+        context="detail"
+        readOnly={!canUpload}
+        showHeading={false}
+        showViewToggle
+        canRemoveItem={() => canRemove}
+        onError={(message) => message && toast.error(message)}
+      />
     </Section>
   )
 }

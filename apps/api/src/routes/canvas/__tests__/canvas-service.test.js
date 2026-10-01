@@ -128,3 +128,18 @@ describe('Runly Canvas service', () => {
     await assert.rejects(() => service.deletePage(COMPANY, USER, BOARD, 'page-1'), (error) => error.status === 409)
   })
 })
+
+describe('Runly Canvas hotspot attachments', () => {
+  it('lists hotspot files with their FileAsset metadata and skips disabled files', async () => {
+    const prisma = {
+      canvasBoard: { findFirst: async () => accessibleBoard() },
+      canvasHotspot: { findFirst: async () => ({ id: 'h1' }) },
+      canvasAttachment: { findMany: async () => [{ id: 'a1', fileAssetId: 'f1', label: 'foto.jpg' }, { id: 'a2', fileAssetId: 'f2', label: 'borrado.pdf' }] },
+      fileAsset: { findMany: async ({ where }) => { assert.equal(where.entityId, COMPANY); assert.equal(where.enabled, true); return [{ id: 'f1', originalName: 'foto.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] } },
+    }
+    const rows = await createCanvasService({ prisma }).listHotspotAttachments(COMPANY, USER, BOARD, 'h1')
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].fileAsset.mimeType, 'image/jpeg')
+    assert.equal(rows[0].fileAssetId, 'f1')
+  })
+})

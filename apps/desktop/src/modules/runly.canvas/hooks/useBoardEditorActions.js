@@ -41,7 +41,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   }, [setSelectedIds])
   const { mutation: batch, patchPending } = useObjectBatch(boardId, pageId, { onCreated })
   const hotspot = useCreateHotspot(boardId, pageId)
-  const createPage = useCreatePage(boardId), updateLayer = useUpdateLayer(boardId), upload = useUploadFile()
+  const createPage = useCreatePage(boardId), updateLayer = useUpdateLayer(boardId), upload = useUploadFile(boardId)
 
   const fail = (error) => toast.error(error?.message ?? 'No se pudo guardar el cambio.')
   const layerById = (id) => layers.find((layer) => layer.id === id)

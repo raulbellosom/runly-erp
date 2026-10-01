@@ -33,6 +33,9 @@ const ALLOWED_FILE_ENTITY_TYPES = [
   "purchase_receipt",
   "purchase_quote",
   "purchase_request",
+  // runly.canvas: hotspot attachments and images/PDF pages placed on boards.
+  "CanvasHotspot",
+  "CanvasBoard",
 ];
 const ALLOWED_EXACT_MIME_TYPES = new Set([
   ...Object.values(OFFICE_FORMATS).map(format => format.mimeType),

@@ -138,6 +138,22 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
     try { return c.json(await publicLinks.revoke(companyId(c), actorId(c), c.req.param('boardId'), c.req.param('linkId'))) }
     catch (error) { return errorResponse(c, error, 'Error al revocar el enlace público.') }
   })
+  // Hotspot files for AttachmentsPanel (list / associate / remove).
+  app.get('/canvas/boards/:boardId/hotspots/:hotspotId/attachments', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await canvas.listHotspotAttachments(companyId(c), actorId(c), c.req.param('boardId'), c.req.param('hotspotId')) }) }
+    catch (error) { return errorResponse(c, error, 'Error al listar archivos.') }
+  })
+  app.post('/canvas/boards/:boardId/hotspots/:hotspotId/attachments', requirePermission('canvas.comment'), async (c) => {
+    try {
+      const id = c.req.param('boardId'), body = await c.req.json()
+      const row = await canvas.addAttachment(companyId(c), actorId(c), id, { targetType: 'HOTSPOT', targetId: c.req.param('hotspotId'), fileAssetId: body.file_asset_id ?? body.fileAssetId, label: body.label })
+      changed(id, 'attachment.created', { attachmentId: row.id }); return c.json({ data: row }, 201)
+    } catch (error) { return errorResponse(c, error, 'Error al adjuntar el archivo.') }
+  })
+  app.delete('/canvas/boards/:boardId/hotspots/:hotspotId/attachments/:attachmentId', requirePermission('canvas.comment'), async (c) => {
+    try { const id = c.req.param('boardId'); await canvas.removeAttachment(companyId(c), actorId(c), id, c.req.param('attachmentId')); changed(id, 'attachment.removed'); return c.body(null, 204) }
+    catch (error) { return errorResponse(c, error, 'Error al quitar el archivo.') }
+  })
   app.get('/canvas/boards/:boardId/versions', requirePermission('canvas.version.view'), async (c) => {
     try { return c.json(await canvas.listVersions(companyId(c), actorId(c), c.req.param('boardId'))) }
     catch (error) { return errorResponse(c, error, 'Error al listar versiones.') }

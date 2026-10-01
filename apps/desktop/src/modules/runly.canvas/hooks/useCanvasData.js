@@ -117,30 +117,6 @@ export function useRemoveEntityLink(boardId) {
   return useMutation({ mutationFn: (linkId) => runly.canvas.removeEntityLink(boardId, linkId, token), onSuccess: () => client.invalidateQueries({ queryKey: linksKey(boardId) }) })
 }
 
-export function useAttachments(boardId, targetType, targetId) {
-  const token = useToken()
-  return useQuery({
-    queryKey: ['canvas', 'boards', boardId, 'attachments', targetType, targetId],
-    queryFn: () => runly.canvas.listAttachments(boardId, { targetType, targetId }, token),
-    enabled: Boolean(token && boardId && targetId),
-  })
-}
-export function useAttachmentMutations(boardId, targetType, targetId) {
-  const token = useToken(), client = useQueryClient()
-  const refresh = () => client.invalidateQueries({ queryKey: ['canvas', 'boards', boardId, 'attachments', targetType, targetId] })
-  const add = useMutation({
-    mutationFn: async (file) => {
-      const form = new FormData()
-      form.append('file', file)
-      const asset = unwrap(await runly.files.upload(form, token))
-      return runly.canvas.addAttachment(boardId, { targetType, targetId, fileAssetId: asset.id, label: file.name }, token)
-    },
-    onSuccess: refresh,
-  })
-  const remove = useMutation({ mutationFn: (attachmentId) => runly.canvas.removeAttachment(boardId, attachmentId, token), onSuccess: refresh })
-  return { add, remove }
-}
-
 export function useRecordSearch(type, search) {
   const token = useToken()
   return useQuery({
@@ -152,12 +128,17 @@ export function useRecordSearch(type, search) {
   })
 }
 
-export function useUploadFile() {
+// Images and PDF pages placed on a board are tagged runly.canvas/CanvasBoard
+// so Files can trace them back and signed URLs are allowed for them.
+export function useUploadFile(boardId) {
   const token = useToken()
   return useMutation({
     mutationFn: async (file) => {
       const form = new FormData()
       form.append('file', file)
+      form.append('moduleKey', 'runly.canvas')
+      form.append('entityType', 'CanvasBoard')
+      if (boardId) form.append('entityId', boardId)
       return unwrap(await runly.files.upload(form, token))
     },
   })

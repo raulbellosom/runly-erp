@@ -533,6 +533,23 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     } })
   }
 
+  // Hotspot files in the shape @runly/ui AttachmentsPanel expects: one row
+  // per association with its FileAsset (name, type, size) inlined.
+  async function listHotspotAttachments(companyId, actorId, boardId, hotspotId) {
+    await assertBoardAccess(companyId, actorId, boardId)
+    await assertCanvasTarget(boardId, 'HOTSPOT', hotspotId)
+    const rows = await prisma.canvasAttachment.findMany({ where: { companyId, boardId, targetType: 'HOTSPOT', targetId: hotspotId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] })
+    if (!rows.length) return []
+    const files = await prisma.fileAsset.findMany({
+      where: { id: { in: rows.map((row) => row.fileAssetId) }, entityId: companyId, enabled: true },
+      select: { id: true, originalName: true, mimeType: true, sizeBytes: true, createdAt: true },
+    })
+    const byId = new Map(files.map((file) => [file.id, file]))
+    return rows.filter((row) => byId.has(row.fileAssetId)).map((row) => ({
+      id: row.id, fileAssetId: row.fileAssetId, label: row.label, createdAt: row.createdAt, createdById: row.createdById, fileAsset: byId.get(row.fileAssetId),
+    }))
+  }
+
   async function removeAttachment(companyId, actorId, boardId, attachmentId) {
     await assertBoardAccess(companyId, actorId, boardId, 'COMMENTER')
     const attachment = await prisma.canvasAttachment.findFirst({ where: { id: attachmentId, companyId, boardId } })
@@ -566,6 +583,6 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     createPage, updatePage, deletePage, createLayer, updateLayer, deleteLayer, reorderLayers, listObjects, batchObjects,
     createHotspot, updateHotspot, deleteHotspot, createEntityLink, listEntityLinks, removeEntityLink,
     addCollaborator, listCollaborators, removeCollaborator, createVersion, listVersions, restoreVersion,
-    listAttachments, addAttachment, removeAttachment, listComments, createComment,
+    listAttachments, listHotspotAttachments, addAttachment, removeAttachment, listComments, createComment,
   }
 }
