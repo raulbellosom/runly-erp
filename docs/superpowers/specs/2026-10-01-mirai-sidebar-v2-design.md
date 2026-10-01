@@ -1,6 +1,6 @@
 # MirAI sidebar v2: conversations, docked layout, parity with the old assistants
 
-- Status: Draft
+- Status: Implemented, pending manual acceptance (§4)
 - Date: 2026-10-01
 - Fixes user feedback on `2026-09-30-mirai-global-capabilities-design.md` §9.
 

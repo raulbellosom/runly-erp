@@ -286,12 +286,16 @@ export function RunlyApp() {
                 resolves against a too-tall <main> and a strip of shell
                 background shows below the content (e.g. under the chat
                 composer). */}
-            <main className="flex-1 min-h-0 overflow-y-auto overflow-x-clip scrollbar-gutter-stable">
-              <Outlet />
-            </main>
-            <Suspense fallback={null}>
-              <MiraiSidebarHost />
-            </Suspense>
+            {/* MirAI docks next to <main> (below the top bar); <main> stays the
+                page scroll container. */}
+            <div className="flex flex-1 min-h-0 min-w-0">
+              <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-clip scrollbar-gutter-stable">
+                <Outlet />
+              </main>
+              <Suspense fallback={null}>
+                <MiraiSidebarHost />
+              </Suspense>
+            </div>
             {!(getLegacyModuleKey(activeModule?.key ?? moduleKeyFromPath) === "runly.chat" && isFullscreen) && (
               <BrandFooter
                 className="hidden lg:flex"

@@ -1,29 +1,27 @@
 // apps/desktop/src/modules/runly.chat/components/MiraiSidebarThread.jsx
 //
-// Message thread for the global MirAI sidebar (spec
-// 2026-09-30-mirai-global-capabilities §7). Reuses the user's single MirAI
-// conversation — the same one used by full Chat and the "ask about this
-// conversation" panel — and tags outgoing messages with the current screen's
-// page context so MirAI's module tools know what the user is looking at.
-import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Button, Textarea, EmptyState, AssistantWordmark, renderRichText } from "@runly/ui";
-import { Sparkles, Send, X, ExternalLink, Paperclip } from "lucide-react";
+// One MirAI conversation inside the global sidebar (spec
+// 2026-10-01-mirai-sidebar-v2 §3): messages with the Chat module's attachment
+// rendering and viewer, proposal cards, typing dots and a composer with
+// paste / drag-and-drop attachments. Outgoing messages carry the current
+// screen's page context. The header (back, title, close) is drawn by
+// ModuleAssistantPanel in MiraiSidebarHost.
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Button, Textarea, EmptyState, Skeleton, renderRichText } from "@runly/ui";
+import { Sparkles, Send, Paperclip } from "lucide-react";
 import { toast } from "sonner";
-import { useEnsureMiraiConversation } from "../hooks/useMirAI";
 import { useChatMessages, useSendMessage } from "../hooks/useChatMessages";
 import { useChatPresence } from "../hooks/useChatPresence";
 import { useChatUpload } from "../hooks/useChatUpload";
 import { MiraiProposalCard } from "./MiraiProposalCard";
 import { AttachmentPreviewCard } from "./AttachmentPreviewCard";
+import { AttachmentsBlock } from "./MessageAttachments";
+import { ChatAttachmentViewer } from "./ChatAttachmentViewer";
+import { buildAllAttachments } from "../lib/chatUtils";
 import { MIRAI_NAME, MIRAI_TYPING_SENTINEL } from "../lib/mirai";
-import { buildMiraiPageContext, useCurrentMiraiRecord } from "../lib/miraiPageContext";
-
-const EXAMPLE_PROMPTS = [
-  "Qué huecos libres tengo mañana",
-  "Cuántas horas de reuniones tuve esta semana",
-  "Agenda una reunión mañana a las 10",
-];
+import { buildMiraiPageContext, moduleKeyFromPath, useCurrentMiraiRecord } from "../lib/miraiPageContext";
+import { miraiPromptsFor } from "../lib/miraiPrompts";
 
 // Same formats/limits as the backend attachment reader (spec
 // 2026-09-30-mirai-inventory-capability-design.md §2): up to 5 files, 10 MB
@@ -33,10 +31,40 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
 const ALLOWED_FILE_RE = /\.(png|jpe?g|webp|heic|pdf|txt|csv|md|docx|xlsx)$/i;
 
+function BotAvatar() {
+  return (
+    <div
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+      style={{ backgroundColor: "var(--brand-primary)", color: "var(--brand-primary-foreground)" }}
+    >
+      <Sparkles className="h-3.5 w-3.5" />
+    </div>
+  );
+}
+
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-2" aria-live="polite">
+      <BotAvatar />
+      <div className="flex gap-1 rounded-2xl bg-[hsl(var(--muted))] px-3 py-2.5" aria-label={`${MIRAI_NAME} está escribiendo`}>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block h-1.5 w-1.5 rounded-full bg-[hsl(var(--muted-foreground))] motion-safe:animate-bounce"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Bubble({ role, content }) {
   const isUser = role === "user";
+  if (!content) return null;
   return (
-    <div className={["flex", isUser ? "justify-end" : "justify-start"].join(" ")}>
+    <div className={["flex items-end gap-2", isUser ? "justify-end" : "justify-start"].join(" ")}>
+      {!isUser && <BotAvatar />}
       <div
         className={[
           "min-w-0 max-w-[85%] wrap-anywhere rounded-2xl px-3 py-2 text-sm",
@@ -51,13 +79,10 @@ function Bubble({ role, content }) {
   );
 }
 
-export function MiraiSidebarThread({ onClose }) {
+export function MiraiSidebarThread({ conversationId, onSent }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const currentRecord = useCurrentMiraiRecord();
-
-  const { data: ensureData } = useEnsureMiraiConversation();
-  const conversationId = ensureData?.conversationId ?? null;
+  const prompts = miraiPromptsFor(moduleKeyFromPath(location.pathname));
 
   const { data, isLoading } = useChatMessages(conversationId);
   const send = useSendMessage(conversationId);
@@ -66,6 +91,9 @@ export function MiraiSidebarThread({ onClose }) {
   const miraiTyping = typingUsersList.includes(MIRAI_TYPING_SENTINEL);
 
   const messages = data?.data ?? [];
+  const allAttachments = useMemo(() => buildAllAttachments(messages), [messages]);
+  const [viewer, setViewer] = useState({ open: false, activeIndex: 0 });
+  const [dragging, setDragging] = useState(false);
   const [draft, setDraft] = useState("");
   const [pendingFiles, setPendingFiles] = useState([]);
   const listEndRef = useRef(null);
@@ -94,10 +122,26 @@ export function MiraiSidebarThread({ onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function openInChat() {
-    if (!conversationId) return;
-    navigate(`/app/m/runly.chat/chat/inbox/${conversationId}`);
-    onClose?.();
+  function openAttachment(list, index) {
+    const clickedId = list?.[index]?.id;
+    const globalIdx = allAttachments.findIndex((f) => f.id === clickedId);
+    setViewer({ open: true, activeIndex: globalIdx >= 0 ? globalIdx : 0 });
+  }
+
+  // Clipboard images arrive as "image.png"; give them unique names.
+  function handlePaste(e) {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (!files.length) return;
+    e.preventDefault();
+    addFilesToQueue(files.map((f, i) => (f.name && f.name !== "image.png"
+      ? f
+      : new File([f], `imagen-pegada-${Date.now()}-${i}.${(f.type.split("/")[1] || "png").replace("jpeg", "jpg")}`, { type: f.type }))));
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer?.files?.length) addFilesToQueue(e.dataTransfer.files);
   }
 
   function startUpload(entry) {
@@ -191,84 +235,80 @@ export function MiraiSidebarThread({ onClose }) {
         delete uploadingRef.current[entry.localId];
       }
       setPendingFiles([]);
+      onSent?.();
     } catch (err) {
       toast.error(err?.message ?? "No se pudo enviar el mensaje.");
     }
   }
 
   return (
-    <>
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[hsl(var(--border))] p-3">
-        <span className="flex items-center gap-1.5 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-[hsl(var(--primary))]" />
-          <AssistantWordmark />
-        </span>
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={!conversationId} onClick={openInChat}>
-            <ExternalLink className="mr-1 h-3.5 w-3.5" />
-            Abrir en Chat
-          </Button>
-          <Button size="icon" variant="ghost" aria-label="Cerrar" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragOver={(e) => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false); }}
+      onDrop={handleDrop}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[hsl(var(--primary))] bg-[hsl(var(--background))]/85 text-sm font-medium text-[hsl(var(--primary))]">
+          Suelta los archivos para adjuntarlos
         </div>
-      </div>
-
+      )}
       <div className="flex-1 min-h-0 space-y-3 overflow-y-auto p-3">
-        {isLoading && (
-          <p className="text-center text-xs text-[hsl(var(--muted-foreground))]">Cargando…</p>
+        {(isLoading || !conversationId) && (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-3/4 rounded-2xl" />
+            <Skeleton className="ml-auto h-10 w-1/2 rounded-2xl" />
+          </div>
         )}
 
-        {!isLoading && !messages.length && (
+        {!isLoading && conversationId && messages.length <= 1 && (
           <EmptyState
+            variant="compact"
             icon={Sparkles}
             title={`Pregúntale a ${MIRAI_NAME}`}
-            description="Puedo consultar tus módulos, analizar datos y proponer acciones."
+            description="Consulto y analizo tus módulos, busco en internet, leo tus archivos y preparo acciones que tú confirmas."
           >
             <div className="mt-3 w-full space-y-2">
-              {EXAMPLE_PROMPTS.map((prompt) => (
-                <button
+              {prompts.map((prompt) => (
+                <Button
                   key={prompt}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setDraft(prompt)}
-                  className="block w-full rounded-lg border border-[hsl(var(--border))] px-3 py-2 text-left text-xs text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+                  className="h-auto w-full justify-start whitespace-normal py-2 text-left text-xs font-normal"
                 >
                   {prompt}
-                </button>
+                </Button>
               ))}
             </div>
           </EmptyState>
         )}
 
         {messages.map((m, i) => (m.sender_type === "system" ? (
-          <p key={m.id ?? i} className="text-center text-xs text-[hsl(var(--muted-foreground))]">{m.body}</p>
+          <p key={m.id ?? i} className="mx-auto max-w-[90%] rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-center text-xs text-[hsl(var(--muted-foreground))]">{m.body}</p>
         ) : (
-          <div key={m.id ?? i}>
+          <div key={m.id ?? i} className="space-y-1">
             <Bubble role={m.sender_type === "user" ? "user" : "assistant"} content={m.body ?? ""} />
             {m.attachments?.length > 0 && (
-              <div className={["mt-1 flex flex-wrap gap-1", m.sender_type === "user" ? "justify-end" : "justify-start"].join(" ")}>
-                {m.attachments.map((att) => (
-                  <span
-                    key={att.id}
-                    className="inline-flex max-w-[85%] items-center gap-1 truncate rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[10px] text-[hsl(var(--muted-foreground))]"
-                  >
-                    <Paperclip className="h-2.5 w-2.5 shrink-0" />
-                    <span className="truncate">{att.fileName}</span>
-                  </span>
-                ))}
+              <div className={["max-w-[85%]", m.sender_type === "user" ? "ml-auto" : "ml-9"].join(" ")}>
+                <AttachmentsBlock
+                  attachments={m.attachments}
+                  onOpen={openAttachment}
+                  isOwn={m.sender_type === "user"}
+                  messageId={m.id}
+                />
               </div>
             )}
             {m.metadata?.miraiProposalId && (
-              <div className="pl-1">
+              <div className="pl-9">
                 <MiraiProposalCard proposalId={m.metadata.miraiProposalId} conversationId={conversationId} />
               </div>
             )}
           </div>
         )))}
 
-        {miraiTyping && (
-          <p className="px-1 text-xs italic text-[hsl(var(--muted-foreground))]">{MIRAI_NAME} está escribiendo…</p>
-        )}
+        {miraiTyping && <TypingDots />}
 
         <div ref={listEndRef} />
       </div>
@@ -307,6 +347,7 @@ export function MiraiSidebarThread({ onClose }) {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
+            onPaste={handlePaste}
             rows={2}
             disabled={!conversationId || send.isPending}
             placeholder={`Escribe a ${MIRAI_NAME}...`}
@@ -321,8 +362,16 @@ export function MiraiSidebarThread({ onClose }) {
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Enter para enviar · Shift+Enter para nueva línea</p>
+        <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Enter para enviar · Shift+Enter para nueva línea · Pega o arrastra archivos</p>
       </div>
-    </>
+
+      <ChatAttachmentViewer
+        open={viewer.open}
+        onOpenChange={(open) => setViewer((v) => ({ ...v, open }))}
+        attachments={allAttachments}
+        activeIndex={viewer.activeIndex}
+        onIndexChange={(i) => setViewer((v) => ({ ...v, activeIndex: i }))}
+      />
+    </div>
   );
 }
