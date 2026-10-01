@@ -1,6 +1,6 @@
 # MirAI capabilities: projects, notes, contacts, purchases (step 4 of the MirAI roadmap)
 
-- Status: Draft
+- Status: Implemented, pending manual acceptance (§5)
 - Date: 2026-09-30
 - Contract and definition of done: `docs/ai-context/mirai-module-capabilities.md`.
   Templates: `routes/calendar|pfm|inventory/mirai-capabilities.js`.

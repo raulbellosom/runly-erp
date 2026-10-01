@@ -12,3 +12,14 @@ Runly Contactos es el directorio central de personas y empresas con las que tu c
 
 - Desactivar un contacto lo oculta de las listas normales pero no borra su historial en otros modulos que lo referencian (documentos, ordenes, conversaciones de chat, etc.).
 - Contactos no gestiona cuentas de usuario ni acceso al sistema — eso es responsabilidad del modulo de Identidad. Un contacto y un usuario son conceptos distintos, aunque puedan compartir el mismo correo.
+
+### Con MirAI
+
+Con la pestaña de MirAI abierta puedes pedirle, por ejemplo:
+
+- "Cuantos clientes dimos de alta este mes"
+- "Busca al proveedor Acero del Norte"
+- "Crea un contacto cliente para Panaderia La Espiga con correo contacto@laespiga.mx"
+- "Actualiza el telefono de este contacto"
+
+Si tienes un contacto abierto, MirAI sabe cual es: puedes pedirle "actualiza el telefono de este contacto a 55 1234 5678" sin repetir el nombre. Como con cualquier accion, te muestra una tarjeta para confirmar antes de guardar algo.

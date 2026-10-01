@@ -38,6 +38,13 @@ Runly Compras registra cómo adquiere tu empresa lo que necesita: qué se pidió
 - Las órdenes no se envían por correo al proveedor desde Runly.
 - Ocultar una pantalla o botón es solo visual: el servidor valida siempre permisos, etapas activas y empresa.
 
-### Integración con MirAI
+### Con MirAI
 
-Compras prepara consultas de solo lectura (acciones pendientes, búsqueda de documentos, gasto por proveedor e historial de compra de un activo) para que MirAI pueda responder preguntas como "¿qué facturas vencen esta semana?" o "¿cuándo se compró esta laptop?". En esta versión todavía no están conectadas a MirAI.
+Con la pestaña de MirAI abierta puedes pedirle, por ejemplo:
+
+- "Que tengo pendiente en compras"
+- "Busca las ordenes abiertas con el proveedor Acero del Norte"
+- "Cuanto le compramos a Acero del Norte este trimestre vs el anterior"
+- "Crea una solicitud de compra para laptops del equipo"
+
+Si tienes un documento de compras abierto, MirAI sabe cual es. Decidir una aprobacion o registrar una recepcion require el id exacto (te lo da si le pides antes la lista de aprobaciones pendientes o buscas la orden); como con cualquier accion, te muestra una tarjeta para confirmar antes de guardar algo.
