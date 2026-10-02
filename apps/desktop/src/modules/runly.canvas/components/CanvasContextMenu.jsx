@@ -1,6 +1,6 @@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal,
-  DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, useIsMobile,
 } from '@runly/ui'
 import {
   ArrowDownToLine, ArrowUpToLine, CheckSquare, Clipboard, ClipboardPaste, Copy, Database, Eye, EyeOff,
@@ -42,6 +42,9 @@ export function CanvasContextMenu({
   onFocus, onEditText, onOpenHotspot, onDuplicate, onCopy, onPaste, onConvert, onMoveToLayer,
   onArrange, onToggleHidden, onToggleLocked, onConnectData, onDelete, onSelectAll, onFit, onAddToSelection, onSaveToLibrary,
 }) {
+  // Phones: nested sub-menus open off-screen, so their options are listed
+  // inline under a heading and the menu scrolls.
+  const flat = useIsMobile()
   const target = menu?.target ?? null
   const selection = menu?.selection ?? []
   const single = selection.length === 1 ? (target ?? selection[0]) : null
@@ -63,7 +66,7 @@ export function CanvasContextMenu({
         <span aria-hidden className="pointer-events-none absolute h-px w-px" style={{ left: menu?.x ?? 0, top: menu?.y ?? 0 }} />
       </DropdownMenuTrigger>
       {menu ? (
-        <DropdownMenuContent align="start">
+        <DropdownMenuContent align="start" className={flat ? 'max-h-[70vh] overflow-y-auto overscroll-contain' : undefined}>
           {readOnly ? (
             <>
               {target ? <DropdownMenuItem onSelect={() => onFocus(target)}><LocateFixed />Enfocar</DropdownMenuItem> : null}
@@ -81,7 +84,18 @@ export function CanvasContextMenu({
               <DropdownMenuItem disabled={!anyEditable} onSelect={() => onDuplicate(selection)}><Copy />Duplicar</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onCopy(selection)}><Clipboard />Copiar</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onSaveToLibrary(selection)}><Library />Guardar en biblioteca</DropdownMenuItem>
-              {shapeFamily ? (
+              {shapeFamily && flat ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-[hsl(var(--muted-foreground))]">Cambiar forma</DropdownMenuLabel>
+                  {SHAPE_OPTIONS[shapeFamily].map((option) => (
+                    <DropdownMenuItem key={option.value} disabled={!anyEditable || option.value === shapeKindOf(single)} onSelect={() => onConvert([single], option.value)} className="pl-8">
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              ) : null}
+              {shapeFamily && !flat ? (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger disabled={!anyEditable}><Shapes />Cambiar forma</DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
@@ -95,17 +109,28 @@ export function CanvasContextMenu({
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
               ) : null}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={!anyEditable || !moveTargets.length}><FolderInput />Mover a capa</DropdownMenuSubTrigger>
-                <DropdownMenuPortal>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuLabel>Mover a</DropdownMenuLabel>
-                    {moveTargets.length
-                      ? moveTargets.map((layer) => <DropdownMenuItem key={layer.id} onSelect={() => onMoveToLayer(selection, layer.id)}>{layer.name}</DropdownMenuItem>)
-                      : <DropdownMenuItem disabled>No hay otra capa disponible</DropdownMenuItem>}
-                  </DropdownMenuSubContent>
-                </DropdownMenuPortal>
-              </DropdownMenuSub>
+              {flat ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-[hsl(var(--muted-foreground))]">Mover a capa</DropdownMenuLabel>
+                  {moveTargets.length && anyEditable
+                    ? moveTargets.map((layer) => <DropdownMenuItem key={layer.id} onSelect={() => onMoveToLayer(selection, layer.id)} className="pl-8">{layer.name}</DropdownMenuItem>)
+                    : <DropdownMenuItem disabled className="pl-8">No hay otra capa disponible</DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                </>
+              ) : (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={!anyEditable || !moveTargets.length}><FolderInput />Mover a capa</DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuLabel>Mover a</DropdownMenuLabel>
+                      {moveTargets.length
+                        ? moveTargets.map((layer) => <DropdownMenuItem key={layer.id} onSelect={() => onMoveToLayer(selection, layer.id)}>{layer.name}</DropdownMenuItem>)
+                        : <DropdownMenuItem disabled>No hay otra capa disponible</DropdownMenuItem>}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+              )}
               <DropdownMenuItem disabled={!anyEditable} onSelect={() => onArrange(selection, 'front')}><ArrowUpToLine />Traer al frente</DropdownMenuItem>
               <DropdownMenuItem disabled={!anyEditable} onSelect={() => onArrange(selection, 'back')}><ArrowDownToLine />Enviar al fondo</DropdownMenuItem>
               <DropdownMenuItem disabled={!anyUnlockable} onSelect={() => onToggleHidden(selection, !hidden)}>

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import {
-  Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
-  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, cn,
+  Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, cn,
 } from '@runly/ui'
 import { Download, History, MoreHorizontal, PanelLeft, PanelRight, Pencil, Share2, Trash2 } from 'lucide-react'
 import { canEditBoard } from '../lib/roles.js'
 
+// Flat items: nested sub-menus open off-screen on phones.
 const EXPORT_FORMATS = [
-  { format: 'png', label: 'Imagen PNG' },
-  { format: 'pdf', label: 'PDF' },
+  { format: 'png', label: 'Exportar imagen PNG' },
+  { format: 'pdf', label: 'Exportar PDF' },
 ]
 
 // Phone top bar (see EditorTopBar) has no room for nine separate buttons, so
@@ -46,14 +46,11 @@ export function MobileEditorMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onShare} className="gap-2.5"><Share2 className="h-4 w-4" />Compartir</DropdownMenuItem>
         <DropdownMenuItem onSelect={onVersions} className="gap-2.5"><History className="h-4 w-4" />Versiones</DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2.5"><Download className="h-4 w-4" />Exportar</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {EXPORT_FORMATS.map(({ format, label }) => (
-              <DropdownMenuItem key={format} disabled={exportDisabled || exporting} onSelect={() => runExport(format)}>{label}</DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        {EXPORT_FORMATS.map(({ format, label }) => (
+          <DropdownMenuItem key={format} disabled={exportDisabled || exporting} onSelect={() => runExport(format)} className="gap-2.5">
+            <Download className="h-4 w-4" />{label}
+          </DropdownMenuItem>
+        ))}
         {showRename || showDelete ? <DropdownMenuSeparator /> : null}
         {showRename ? <DropdownMenuItem onSelect={onRenameBoard} className="gap-2.5"><Pencil className="h-4 w-4" />Renombrar Board</DropdownMenuItem> : null}
         {showDelete ? (

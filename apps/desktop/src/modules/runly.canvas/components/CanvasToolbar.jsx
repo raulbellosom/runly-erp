@@ -161,7 +161,7 @@ export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInser
     return (
       <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1.5 shadow-lg">
         <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')} className={compact ? COMPACT_SIZE : undefined}><MousePointer2 /></ToolButton>
-        {!compact ? <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')} className="max-sm:hidden"><Hand /></ToolButton> : null}
+        <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')} className={compact ? COMPACT_SIZE : 'max-sm:hidden'}><Hand /></ToolButton>
         <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')} className={compact ? COMPACT_SIZE : undefined}><RulerDimensionLine /></ToolButton>
         <span className="px-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">
           {compact ? 'Solo lectura' : 'Solo lectura · toca un hotspot para verlo'}
@@ -173,6 +173,8 @@ export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInser
     return (
       <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-0.5 rounded-2xl p-1.5 shadow-lg">
         <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')} className={COMPACT_SIZE}><MousePointer2 /></ToolButton>
+        {/* Pan with one finger without risking moving elements. */}
+        <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')} className={COMPACT_SIZE}><Hand /></ToolButton>
         <CompactShapePicker tool={tool} onToolChange={onToolChange} />
         <ToolButton label="Hotspot" shortcut="P" active={tool === 'hotspot'} onClick={() => onToolChange('hotspot')} className={COMPACT_SIZE}><MapPin /></ToolButton>
         <CompactInsertMenu
