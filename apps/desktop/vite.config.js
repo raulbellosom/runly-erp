@@ -154,7 +154,10 @@ export default defineConfig({
     // that list react in devDependencies). Without this, Rollup's auto-splitting
     // can place React in a cross-chunk reference cycle where e.useRef is accessed
     // before the React module finishes initializing (null reference crash).
-    dedupe: ["react", "react-dom"],
+    // React Query must be a single copy too: packages/ui and the app can
+    // resolve different versions ("latest" ranges), and two copies mean two
+    // QueryClient contexts ("No QueryClient set" at startup).
+    dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/react-query-persist-client"],
     alias: {
       "node:crypto": resolve(__dirname, "src/shims/node-crypto.js"),
       "@atlas/core/native-runtime": resolve(__dirname, "../../packages/core/src/native-runtime.js"),
