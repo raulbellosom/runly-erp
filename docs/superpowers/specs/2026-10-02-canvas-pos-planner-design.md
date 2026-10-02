@@ -6,7 +6,7 @@ Canvas Fase 6b — rediseño del "Diseñador de planos" de POS con el motor de C
 
 ## 2. Status
 
-Approved (pedido explícito del usuario, 2026-10-02: "quitar esas reglas y tener un mejor canvas como en el otro módulo").
+Complete — Verified: 2026-10-02 (node --test desktop canvas+pos 85/85 y API 58/58, eslint de archivos tocados, build:web; PosFloorPlannerScreen.jsx 576 líneas). Smoke manual pendiente.
 
 ## 3. Context
 
