@@ -280,7 +280,7 @@ export function CanvasViewport(props) {
       if (drag.mode === 'rotate') {
         next = rotateObject(object, world, { snap: event.shiftKey })
       } else {
-        next = resizeObject(object, drag.handle, target, { keepRatio: event.shiftKey || object.type === 'image' })
+        next = resizeObject(object, drag.handle, target, { keepRatio: event.shiftKey || object.type === 'image' || object.type === 'hotspot' })
         // Dragging a connected endpoint off its shape or onto another one
         // updates which shape it will snap to; the other end can't be
         // re-targeted at the same shape.

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { absolutePoints, boxFromDrag, canEditVertices, centerOf, boxOf, editVertex, hitHandle, hitObject, polygonFromAbsolute, polygonHandles, resizeObject, ROTATE_HANDLE_OFFSET, rotateObject, rotatePoint } from './geometry.js'
+import { absolutePoints, boxFromDrag, canEditVertices, canResize, canRotate, centerOf, boxOf, editVertex, handlesOf, hitHandle, hitObject, polygonFromAbsolute, polygonHandles, resizeObject, ROTATE_HANDLE_OFFSET, rotateObject, rotatePoint } from './geometry.js'
 
 const rect = (rotation = 0) => ({ type: 'rectangle', transform: { x: 0, y: 0, rotation }, geometry: { width: 100, height: 50 } })
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`)
+const hotspot = (pin) => ({ id: 'h', type: 'hotspot', transform: { x: 100, y: 100, rotation: 0 }, geometry: { width: 36, height: 36 }, style: pin ? { pin } : {} })
 
 describe('Canvas geometry', () => {
   it('resizes from a corner keeping the opposite corner fixed', () => {
@@ -36,6 +37,34 @@ describe('Canvas geometry', () => {
   it('normalizes dragged boxes and keeps line direction', () => {
     assert.deepEqual(boxFromDrag('rectangle', { x: 50, y: 50 }, { x: 10, y: 20 }), { x: 10, y: 20, width: 40, height: 30 })
     assert.deepEqual(boxFromDrag('line', { x: 50, y: 50 }, { x: 10, y: 20 }), { x: 50, y: 50, width: -40, height: -30 })
+  })
+})
+
+describe('hotspot pin geometry', () => {
+  it('allows resize only for plan-mode hotspots, and never allows hotspot rotation', () => {
+    assert.equal(canResize(hotspot()), false)
+    assert.equal(canResize(hotspot({ scale: 'plan' })), true)
+    assert.equal(canRotate(hotspot({ scale: 'plan' })), false)
+  })
+
+  it('gives plan-mode hotspots only the four corner handles and screen-mode hotspots none', () => {
+    assert.deepEqual(handlesOf(hotspot()).map((h) => h.id), [])
+    assert.deepEqual(handlesOf(hotspot({ scale: 'plan' })).map((h) => h.id), ['nw', 'ne', 'se', 'sw'])
+  })
+
+  it('hit-tests a screen-mode pin by screen distance from its tip when zoom is given, and by its stored box otherwise', () => {
+    const pin = hotspot()
+    // Anchor (box centre) is (118, 118); 10px above the tip hits, 40px does not.
+    assert.equal(hitObject({ x: 118, y: 108 }, pin, 0, 1), true)
+    assert.equal(hitObject({ x: 118, y: 78 }, pin, 0, 1), false)
+    assert.equal(hitObject({ x: 100, y: 100 }, pin), true)
+    assert.equal(hitObject({ x: 200, y: 200 }, pin), false)
+  })
+
+  it('hit-tests a plan-mode pin by its stored box, same as a plain shape', () => {
+    const pin = hotspot({ scale: 'plan' })
+    assert.equal(hitObject({ x: 118, y: 118 }, pin, 0, 1), true)
+    assert.equal(hitObject({ x: 200, y: 200 }, pin, 0, 1), false)
   })
 })
 

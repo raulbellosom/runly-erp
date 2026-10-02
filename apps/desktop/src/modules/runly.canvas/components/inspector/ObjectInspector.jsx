@@ -6,6 +6,8 @@ import { measureTextHeight } from '../../engine/text.js'
 import { Choice, ColorSwatches, FieldLabel, NumberInput, Section } from './fields.jsx'
 import { HotspotIconPicker } from '../HotspotIconPicker.jsx'
 
+const PIN_SIZE_OPTIONS = [{ value: 'sm', label: 'Pequeño' }, { value: 'md', label: 'Mediano' }, { value: 'lg', label: 'Grande' }]
+const PIN_SCALE_OPTIONS = [{ value: 'screen', label: 'Fijo en pantalla' }, { value: 'plan', label: 'Crece con el plano' }]
 const STROKE_WIDTHS = [0, 1, 2, 4, 8].map((value) => ({ value, label: value === 0 ? '—' : String(value), ariaLabel: value === 0 ? 'Sin borde' : `${value} px` }))
 const DASHES = [{ value: 'solid', label: '———', ariaLabel: 'Continua' }, { value: 'dashed', label: '– – –', ariaLabel: 'Discontinua' }, { value: 'dotted', label: '· · ·', ariaLabel: 'Punteada' }]
 const FILL_OPACITY = [{ value: 0.12, label: 'Suave' }, { value: 0.5, label: 'Media' }, { value: 1, label: 'Sólido' }]
@@ -47,6 +49,22 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
   if (object.type === 'hotspot') {
     // The pin color lives on the hotspot record (same field as its sheet),
     // not in the shape style, so both places always show the same color.
+    const pin = style.pin ?? {}
+    const setPin = (patch) => {
+      const next = { ...pin, ...patch }
+      const patchObject = { style: { pin: next } }
+      // Switching from fixed to plan-scaled on a pin still at its tiny
+      // screen-pin box gives it room to actually show it grows with the plan.
+      if (patch.scale === 'plan' && pin.scale !== 'plan') {
+        const box = boxOf(object)
+        if (Math.min(box.width, box.height) < 24) {
+          const center = centerOf(box)
+          patchObject.transform = { x: center.x - 18, y: center.y - 18 }
+          patchObject.geometry = { width: 36, height: 36 }
+        }
+      }
+      onPatch(patchObject)
+    }
     return (
       <Section title="Apariencia">
         <div>
@@ -54,6 +72,8 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
           <HotspotIconPicker value={object.hotspot?.icon ?? null} color={hotspotColor(object)} onChange={(icon) => onHotspotChange({ icon })} />
         </div>
         <ColorSwatches label="Color del pin" value={hotspotColor(object)} colors={CANVAS_COLORS} onChange={(color) => onHotspotChange({ color })} />
+        <Choice label="Tamaño del pin" value={pin.size ?? 'md'} options={PIN_SIZE_OPTIONS} onChange={(size) => setPin({ size })} />
+        <Choice label="Escala" value={pin.scale === 'plan' ? 'plan' : 'screen'} options={PIN_SCALE_OPTIONS} onChange={(scale) => setPin({ scale })} />
         <Choice label="Opacidad" value={Number(style.opacity ?? 1)} options={OPACITY} onChange={(opacity) => setStyle({ opacity })} />
       </Section>
     )

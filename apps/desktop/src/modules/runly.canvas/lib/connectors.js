@@ -1,10 +1,17 @@
 import { boxOf, centerOf, hitObject, isLinear, rotatePoint } from '../engine/geometry.js'
+import { pinOf } from '../engine/pins.js'
 
 const CONNECTABLE = new Set(['rectangle', 'ellipse', 'polygon', 'text', 'image', 'hotspot'])
 export const isConnectable = (object) => CONNECTABLE.has(object?.type)
 
-// Point where the ray from the shape's centre towards `toward` leaves it.
+// Point where the ray from the shape's centre towards `toward` leaves it. A
+// screen-fixed hotspot pin has no world-space border: connectors end on its
+// anchor (the tip), the one point that stays put at any zoom.
 export function borderPoint(object, toward) {
+  if (object.type === 'hotspot') {
+    const pin = pinOf(object)
+    if (pin.scale === 'screen') return pin.anchor
+  }
   const b = boxOf(object), c = centerOf(b)
   const local = rotatePoint(toward, c, -b.rotation)
   const dx = local.x - c.x, dy = local.y - c.y

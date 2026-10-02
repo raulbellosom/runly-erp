@@ -18,6 +18,11 @@ describe('Canvas connectors', () => {
     const nx = (p.x - 50) / 50, ny = (p.y - 25) / 25
     assert.ok(Math.abs(nx * nx + ny * ny - 1) < 0.01)
   })
+  it('ends on the anchor of a screen-mode hotspot pin, not a border point', () => {
+    const pin = { id: 'h', type: 'hotspot', transform: { x: 100, y: 100, rotation: 0 }, geometry: { width: 36, height: 36 } }
+    assert.deepEqual(borderPoint(pin, { x: 1000, y: 1000 }), { x: 118, y: 118 })
+    assert.deepEqual(borderPoint(pin, { x: -1000, y: -1000 }), { x: 118, y: 118 })
+  })
   it('keeps stored geometry when the target is missing and returns the same array without connectors', () => {
     const objects = [arrow({ start: null, end: 'gone' }, 5, 5, 20, 0)]
     assert.deepEqual(resolveConnectors(objects)[0].geometry, { x2: 20, y2: 0 })

@@ -41,6 +41,8 @@ Los poligonos muestran un punto en cada vertice cuando estan seleccionados: arra
 
 Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se abre con doble clic, con Enter o con el boton del inspector. En la ficha puedes poner titulo, descripcion, estado (Activo, En revision, Resuelto, Inactivo), color, **icono del pin** (mas de 200 iconos recomendados por categoria —seguridad, electricidad, agua, redes, oficina, almacen, mantenimiento, vehiculos, personas, lugares y estados— con busqueda en espanol, y la libreria completa de mas de 1800 iconos), **vincular registros de Runly** y **adjuntar archivos** (fotos, fichas tecnicas, manuales). Cualquier forma tambien puede tener registros vinculados desde el inspector; los elementos vinculados muestran un pequeno distintivo en el lienzo.
 
+Los pines se ven del mismo tamano con cualquier zoom, como en un mapa, y su punta marca el lugar exacto. En el inspector puedes elegir su tamano (pequeno, mediano o grande) o la escala "Crece con el plano" para que el pin cubra un elemento del plano y se pueda redimensionar.
+
 ### Imagenes y PDF
 
 Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia. Al acercarte a una pagina de PDF, Canvas la vuelve a dibujar desde el PDF original con mas resolucion para que se lean los detalles.

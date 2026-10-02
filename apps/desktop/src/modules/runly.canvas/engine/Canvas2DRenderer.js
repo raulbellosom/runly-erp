@@ -1,6 +1,7 @@
 import { boxOf, canEditVertices, centerOf, handlesOf, hitObject, isLinear, objectBounds, polygonHandles, ROTATE_HANDLE_OFFSET, rotatePoint } from './geometry.js'
 import { readCanvasTheme } from './theme.js'
-import { drawIconNode, getIconNode } from './icons.js'
+import { drawPin, pinGeometry } from './drawPin.js'
+import { labelsOverlap, pinOf } from './pins.js'
 import { TEXT_LINE_HEIGHT, textFont, wrapLines } from './text.js'
 import { screenToWorld, worldToScreen } from './viewport.js'
 import { bindingKey } from '../lib/dataBindings.js'
@@ -55,9 +56,9 @@ export class Canvas2DRenderer {
     if (grid.enabled) this.drawGrid(ctx, viewport, grid.size)
     ctx.save()
     ctx.translate(viewport.x, viewport.y); ctx.scale(viewport.zoom, viewport.zoom)
-    const selected = []
+    const selected = [], pinLabels = []
     for (const object of objects) {
-      this.drawObject(ctx, object, viewport.zoom, images, bindings, drawers)
+      this.drawObject(ctx, object, viewport, images, bindings, drawers, pinLabels)
       if (linkedIds?.has(object.id) || (object.hotspot && linkedIds?.has(object.hotspot.id))) this.drawLinkBadge(ctx, object, viewport.zoom)
       if (selectedIds?.has(object.id)) selected.push(object)
     }
@@ -71,6 +72,10 @@ export class Canvas2DRenderer {
       for (const object of objects) if (cursor.selectedIds?.includes(object.id)) this.drawRemoteSelection(ctx, object, viewport.zoom, cursor.color)
     }
     ctx.restore()
+    // Pin labels are collected (not drawn) during the object loop above so
+    // they can be placed in screen space, after every pin's shape is known,
+    // skipping any that would overlap one already placed.
+    this.drawPinLabels(ctx, pinLabels)
     if (measure) this.drawMeasure(ctx, measure, viewport)
     if (overlay?.object && overlay.text) this.drawOverlayLabel(ctx, overlay, viewport)
     if (marquee) this.drawMarquee(ctx, marquee)
@@ -113,7 +118,8 @@ export class Canvas2DRenderer {
     ctx.setLineDash([])
   }
 
-  drawObject(ctx, object, zoom, images, bindings = {}, drawers = {}) {
+  drawObject(ctx, object, viewport, images, bindings = {}, drawers = {}, pinLabels = []) {
+    const zoom = viewport.zoom
     const b = boxOf(object), style = object.style ?? {}
     const key = bindingKey(object.properties?.binding)
     const data = key ? bindings[key] : null
@@ -124,6 +130,11 @@ export class Canvas2DRenderer {
     ctx.globalAlpha = Number(style.opacity ?? 1)
     ctx.lineJoin = 'round'; ctx.lineCap = 'round'
     if (isLinear(object)) { this.drawLine(ctx, object, b, stroke); ctx.restore(); return }
+    // Hotspot pins draw in world coordinates around their anchor, not inside
+    // the rotate/translate-to-centre transform every other shape uses below
+    // (hotspots never rotate, and screen pins need their own zoom-independent
+    // sizing — see drawPin.js).
+    if (object.type === 'hotspot') { drawPin(ctx, object, viewport, stroke, this.theme, pinLabels); ctx.restore(); return }
     const c = centerOf(b)
     ctx.translate(c.x, c.y); ctx.rotate((b.rotation * Math.PI) / 180)
     const x = -b.width / 2, y = -b.height / 2, w = b.width, h = b.height
@@ -132,16 +143,15 @@ export class Canvas2DRenderer {
     if (drawers[object.type]) { drawers[object.type](ctx, object, { x, y, w, h, zoom, theme: this.theme }); ctx.restore(); return }
     const drawn = tint ? { ...object, style: { ...style, fill: tint, fillOpacity: 0.14 } } : object
     switch (object.type) {
-      case 'hotspot': this.drawHotspot(ctx, object, w, h, stroke, zoom); break
       case 'ellipse': ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); this.applyFill(ctx, drawn, stroke); this.applyStroke(ctx, drawn, stroke); break
       case 'polygon': this.polygonPath(ctx, object, x, y, w, h); this.applyFill(ctx, drawn, stroke); this.applyStroke(ctx, drawn, stroke); break
       case 'text': this.drawText(ctx, object, x, y, w, tint); break
       case 'image': this.drawImage(ctx, object, x, y, w, h, images); break
       default: ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(Number(style.radius ?? 8), w / 2, h / 2)); this.applyFill(ctx, drawn, stroke); this.applyStroke(ctx, drawn, stroke)
     }
-    // Hotspots keep their pin (tint only) and text keeps its own glyph (tinted
-    // colour); other bound shapes get the title/summary label and data badge.
-    if (data && object.type !== 'hotspot' && object.type !== 'text' && object.type !== 'image') {
+    // Text keeps its own glyph (tinted colour) and hotspots already returned
+    // above; other bound shapes get the title/summary label and data badge.
+    if (data && object.type !== 'text' && object.type !== 'image') {
       const badgeColor = tint ?? this.theme.tones.neutral
       this.drawDataLabel(ctx, data, x, y, w, h, zoom, badgeColor)
       this.drawDataBadge(ctx, x + w, y, zoom, badgeColor)
@@ -223,34 +233,36 @@ export class Canvas2DRenderer {
     ctx.strokeStyle = this.theme.muted; ctx.lineWidth = 1; ctx.setLineDash([6, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([])
   }
 
-  drawHotspot(ctx, object, w, h, color, zoom) {
-    const r = Math.min(w, h) / 2, iconNode = getIconNode(object.hotspot?.icon)
-    if (iconNode) {
-      // Solid pin with a white glyph; a thin light ring keeps it readable on
-      // dark plans and photos.
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
-      ctx.lineWidth = 2 / Math.max(zoom, 0.5); ctx.strokeStyle = '#ffffff'; ctx.stroke()
-      drawIconNode(ctx, iconNode, 0, 0, r * 1.15, '#ffffff', 2.25)
-    } else {
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
-      ctx.globalAlpha *= 0.18; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha /= 0.18
-      ctx.lineWidth = 2 / Math.max(zoom, 0.5); ctx.strokeStyle = color; ctx.stroke()
-      ctx.beginPath(); ctx.arc(0, 0, r * 0.38, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
+  // Labels are collected while drawing pins (see drawObject -> drawPin) and
+  // placed here, after every pin is known, in screen space: a pill under the
+  // tip (screen pins) or under the box (plan pins), skipping any that would
+  // overlap one already placed (earlier-drawn pins win).
+  drawPinLabels(ctx, pinLabels) {
+    if (!pinLabels.length) return
+    const placed = []
+    ctx.save()
+    ctx.font = `600 12px ${this.theme.font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    for (const { text, rect } of pinLabels) {
+      if (labelsOverlap(rect, placed)) continue
+      placed.push(rect)
+      ctx.globalAlpha = 0.9; ctx.fillStyle = this.theme.surface
+      ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.width, rect.height, 6); ctx.fill()
+      ctx.globalAlpha = 1; ctx.fillStyle = this.theme.foreground
+      ctx.fillText(text, rect.x + rect.width / 2, rect.y + rect.height / 2)
     }
-    const title = object.hotspot?.title
-    if (title && zoom >= 0.5) {
-      const size = 12 / zoom
-      ctx.font = `600 ${size}px ${this.theme.font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-      const label = title.length > 32 ? `${title.slice(0, 31)}…` : title, width = ctx.measureText(label).width
-      ctx.fillStyle = this.theme.surface; ctx.globalAlpha = 0.9
-      ctx.beginPath(); ctx.roundRect(-width / 2 - 6 / zoom, r + 4 / zoom, width + 12 / zoom, size + 8 / zoom, 6 / zoom); ctx.fill()
-      ctx.globalAlpha = 1; ctx.fillStyle = this.theme.foreground; ctx.fillText(label, 0, r + 8 / zoom)
-    }
+    ctx.restore()
   }
 
   drawLinkBadge(ctx, object, zoom) {
-    const bounds = objectBounds(object), r = 8 / zoom
-    const cx = bounds.x + bounds.width + 2 / zoom, cy = bounds.y - 2 / zoom
+    const r = 8 / zoom
+    let cx, cy
+    if (object.type === 'hotspot' && pinOf(object).scale === 'screen') {
+      const { head, r: headR } = pinGeometry(object, zoom)
+      cx = head.x + headR * 0.75; cy = head.y - headR * 0.75
+    } else {
+      const bounds = objectBounds(object)
+      cx = bounds.x + bounds.width + 2 / zoom; cy = bounds.y - 2 / zoom
+    }
     ctx.save()
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = this.theme.primary; ctx.fill()
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4 / zoom
@@ -272,8 +284,16 @@ export class Canvas2DRenderer {
 
   drawSelection(ctx, object, zoom, interactive, editVertices = true) {
     const b = boxOf(object), primary = this.theme.primary
+    const screenPin = object.type === 'hotspot' && pinOf(object).scale === 'screen'
     ctx.save()
     ctx.lineWidth = 1.5 / zoom; ctx.strokeStyle = primary; ctx.fillStyle = this.theme.surface
+    if (screenPin) {
+      // A ring around the pin's head instead of a box: screen pins have no
+      // resize/rotate handles, so there is nothing else to draw here.
+      const { head, r } = pinGeometry(object, zoom)
+      ctx.beginPath(); ctx.arc(head.x, head.y, r + 3 / zoom, 0, Math.PI * 2); ctx.lineWidth = 2 / zoom; ctx.stroke()
+      ctx.restore(); return
+    }
     if (!isLinear(object)) {
       const c = centerOf(b), pad = object.type === 'hotspot' ? 4 / zoom : 0
       ctx.save(); ctx.translate(c.x, c.y); ctx.rotate((b.rotation * Math.PI) / 180)
@@ -414,7 +434,7 @@ export class Canvas2DRenderer {
   hitTest(screenPoint, objects, viewport, tolerance = 6) {
     const point = screenToWorld(screenPoint, viewport), slop = tolerance / viewport.zoom
     for (let index = objects.length - 1; index >= 0; index -= 1) {
-      if (hitObject(point, objects[index], slop)) return objects[index]
+      if (hitObject(point, objects[index], slop, viewport.zoom)) return objects[index]
     }
     return null
   }

@@ -4,14 +4,19 @@
 // the API stores their signed end offset as geometry.x2/y2 and rejects
 // negative width/height — and never rotate (the endpoints carry direction).
 
+import { hitPin, pinOf } from './pins.js'
+
 export const MIN_SIZE = 4
 export const ROTATE_HANDLE_OFFSET = 28
 const LINEAR = new Set(['line', 'arrow'])
 const BOX_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const CORNER_HANDLES = ['nw', 'ne', 'se', 'sw']
 
 export function isLinear(object) { return LINEAR.has(object?.type) }
 export function canRotate(object) { return !isLinear(object) && object?.type !== 'hotspot' }
-export function canResize(object) { return object?.type !== 'hotspot' }
+// Screen-fixed hotspot pins have a constant on-screen size and cannot be
+// resized; plan-mode hotspots live inside their world box like any shape.
+export function canResize(object) { return object?.type !== 'hotspot' || pinOf(object).scale === 'plan' }
 
 const num = (value, fallback = 0) => { const n = Number(value); return Number.isFinite(n) ? n : fallback }
 
@@ -62,11 +67,18 @@ function distanceToSegment(p, a, b) {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
 }
 
-export function hitObject(point, object, slop = 0) {
+// `zoom` lets screen-fixed hotspot pins hit-test against their constant
+// on-screen shape instead of their (zoom-dependent) stored box; without it,
+// hit-testing falls back to the stored box as before.
+export function hitObject(point, object, slop = 0, zoom = null) {
   const b = boxOf(object)
   if (isLinear(object)) {
     const width = num(object.style?.strokeWidth, 2)
     return distanceToSegment(point, { x: b.x, y: b.y }, { x: b.x + b.width, y: b.y + b.height }) <= slop + width / 2 + 2
+  }
+  if (object?.type === 'hotspot' && zoom) {
+    const pin = pinOf(object)
+    if (pin.scale === 'screen') return hitPin(point, pin, zoom, slop * zoom)
   }
   const local = rotatePoint(point, centerOf(b), -b.rotation)
   return local.x >= b.x - slop && local.x <= b.x + b.width + slop && local.y >= b.y - slop && local.y <= b.y + b.height + slop
@@ -83,7 +95,7 @@ export function handlesOf(object, zoom = 1) {
       nw: [b.x, b.y], n: [c.x, b.y], ne: [b.x + b.width, b.y], e: [b.x + b.width, c.y],
       se: [b.x + b.width, b.y + b.height], s: [c.x, b.y + b.height], sw: [b.x, b.y + b.height], w: [b.x, c.y],
     }
-    for (const id of BOX_HANDLES) handles.push({ id, ...rotatePoint({ x: local[id][0], y: local[id][1] }, c, b.rotation) })
+    for (const id of object.type === 'hotspot' ? CORNER_HANDLES : BOX_HANDLES) handles.push({ id, ...rotatePoint({ x: local[id][0], y: local[id][1] }, c, b.rotation) })
   }
   if (canRotate(object)) handles.push(rotateHandlePoint(object, zoom))
   return handles
