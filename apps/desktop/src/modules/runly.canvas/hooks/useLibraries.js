@@ -5,6 +5,7 @@ import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
 import { chunk } from '../lib/dataBindings.js'
 import { parseExcalidrawLibrary } from '../lib/libraryImport/excalidraw.js'
+import { libraryBaseName, librarySourceKind } from '../lib/libraryImport/formats.js'
 import { normalizeObjects } from '../lib/libraryImport/normalize.js'
 import { sanitizeSvgText, svgSize } from '../lib/libraryImport/svg.js'
 
@@ -54,18 +55,6 @@ export function useLibraryItemMutations(libraryId) {
   return { addItems, renameItem, removeItem }
 }
 
-// Classifies a file by extension for the "source by type" rule: a brand new
-// library created during import is named after the first file and tagged
-// 'excalidraw'/'svg' (a zip of icons counts as 'svg'), or 'mixed' when the
-// batch mixes both kinds.
-function sourceKindOf(name) {
-  const lower = String(name ?? '').toLowerCase()
-  if (lower.endsWith('.svg') || lower.endsWith('.zip')) return 'svg'
-  if (lower.endsWith('.excalidrawlib') || lower.endsWith('.json')) return 'excalidraw'
-  return null
-}
-const baseName = (name) => String(name ?? '').replace(/\.[^./\\]+$/, '') || String(name ?? '')
-
 export function useLibraryImport() {
   const token = useToken(), client = useQueryClient()
   const [importing, setImporting] = useState(false)
@@ -82,7 +71,7 @@ export function useLibraryImport() {
   async function importExcalidrawFile(file, counts) {
     let json
     try { json = JSON.parse(await file.text()) } catch { counts.skipped += 1; return [] }
-    const { items, skipped } = parseExcalidrawLibrary(json)
+    const { items, skipped } = parseExcalidrawLibrary(json, libraryBaseName(file.name))
     counts.skipped += skipped
     const built = []
     for (const item of items) {
@@ -102,7 +91,7 @@ export function useLibraryImport() {
 
   async function importSvgFile(file, libraryId, counts) {
     try {
-      return [await svgItemFrom(await file.text(), baseName(file.name), libraryId)]
+      return [await svgItemFrom(await file.text(), libraryBaseName(file.name), libraryId)]
     } catch {
       counts.skipped += 1
       return []
@@ -123,7 +112,7 @@ export function useLibraryImport() {
       try {
         const blob = await entry.async('blob')
         if (blob.size > MAX_SVG_BYTES) { counts.skipped += 1; continue }
-        const name = baseName(entry.name.split('/').pop())
+        const name = libraryBaseName(entry.name.split('/').pop())
         built.push(await svgItemFrom(await blob.text(), name, libraryId))
       } catch { counts.skipped += 1 }
     }
@@ -141,21 +130,24 @@ export function useLibraryImport() {
     let libraryId = targetLibraryId
     const counts = { imported: 0, skipped: 0 }
     const touched = new Set()
-    const kinds = new Set(list.map((file) => sourceKindOf(file.name)).filter(Boolean))
+    const kinds = new Set(list.map((file) => librarySourceKind(file.name)).filter(Boolean))
     const newLibrarySource = kinds.size === 1 ? [...kinds][0] : kinds.size > 1 ? 'mixed' : 'custom'
     try {
       for (const file of list) {
-        const kind = sourceKindOf(file.name)
+        const kind = librarySourceKind(file.name)
         if (!kind) { counts.skipped += 1; continue }
         try {
+          let items
+          if (kind === 'excalidraw') {
+            items = await importExcalidrawFile(file, counts)
+            if (!items.length) continue
+          }
           if (!libraryId) {
-            const created = unwrap(await runly.canvas.createLibrary({ name: baseName(file.name), scope: 'PERSONAL', source: newLibrarySource }, token))
+            const created = unwrap(await runly.canvas.createLibrary({ name: libraryBaseName(file.name), scope: 'PERSONAL', source: newLibrarySource }, token))
             libraryId = created.id
           }
           touched.add(libraryId)
-          const items = kind === 'excalidraw'
-            ? await importExcalidrawFile(file, counts)
-            : file.name.toLowerCase().endsWith('.zip')
+          items ??= file.name.toLowerCase().endsWith('.zip')
               ? await importZipFile(file, libraryId, counts)
               : await importSvgFile(file, libraryId, counts)
           for (const batch of chunk(items, 200)) {
@@ -172,7 +164,8 @@ export function useLibraryImport() {
       client.invalidateQueries({ queryKey: librariesKey })
       for (const id of touched) client.invalidateQueries({ queryKey: libraryItemsKey(id) })
     }
-    toast.success(`Se importaron ${counts.imported} elementos (${counts.skipped} omitidos)`)
+    if (counts.imported) toast.success(`Se importaron ${counts.imported} elementos (${counts.skipped} omitidos)`)
+    else toast.error('No se encontraron elementos compatibles. Usa .excalidrawlib, .excalidraw, SVG o ZIP con SVG.')
     return counts
   }
 

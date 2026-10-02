@@ -146,7 +146,7 @@ function mapElement(element) {
   return mapper ? mapper(element) : null
 }
 
-function libraryGroups(json) {
+function libraryGroups(json, fallbackName) {
   if (Array.isArray(json?.libraryItems)) {
     return json.libraryItems.map((item, index) => ({
       name: (typeof item?.name === 'string' && item.name.trim()) || `Elemento ${index + 1}`,
@@ -156,15 +156,18 @@ function libraryGroups(json) {
   if (Array.isArray(json?.library)) {
     return json.library.map((elements, index) => ({ name: `Elemento ${index + 1}`, elements: Array.isArray(elements) ? elements : [] }))
   }
+  if (Array.isArray(json?.elements)) {
+    return [{ name: fallbackName || 'Elemento 1', elements: json.elements }]
+  }
   return []
 }
 
-// Parses an .excalidrawlib JSON document (v1 or v2) into
+// Parses an .excalidrawlib document (v1 or v2) or a regular .excalidraw scene into
 // `{ items: [{ name, objects }], skipped }`. `skipped` counts individual
 // elements omitted for being deleted or of an unsupported type.
-export function parseExcalidrawLibrary(json) {
+export function parseExcalidrawLibrary(json, fallbackName = null) {
   let skipped = 0
-  const items = libraryGroups(json).map((group) => {
+  const items = libraryGroups(json, fallbackName).map((group) => {
     const objects = []
     for (const element of group.elements) {
       if (!element || element.isDeleted) { skipped += 1; continue }

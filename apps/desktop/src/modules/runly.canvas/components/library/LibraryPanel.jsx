@@ -11,9 +11,8 @@ import { Building2, FolderUp, Library as LibraryIcon, Loader2, MoreVertical, Pen
 import { useAuth } from '../../../../auth/AuthProvider.jsx'
 import { runly } from '../../../../lib/runly.js'
 import { libraryItemsKey, useLibraries, useLibraryImport, useLibraryItemMutations, useLibraryMutations } from '../../hooks/useLibraries.js'
+import { LIBRARY_IMPORT_ACCEPT } from '../../lib/libraryImport/formats.js'
 import { LibraryItemTile } from './LibraryItemTile.jsx'
-
-const ACCEPT = '.excalidrawlib,.json,.svg,.zip'
 
 function LibraryFormDialog({ open, onOpenChange, library, canManage, onSubmit, pending }) {
   const [name, setName] = useState('')
@@ -245,7 +244,7 @@ export function LibraryPanel({ open, onOpenChange, onInsert }) {
             )}
           </div>
           <input
-            ref={fileInputRef} type="file" accept={ACCEPT} multiple className="hidden"
+            ref={fileInputRef} type="file" accept={LIBRARY_IMPORT_ACCEPT} multiple className="hidden"
             onChange={async (event) => {
               const files = event.target.files
               const targetLibraryId = importTargetRef.current

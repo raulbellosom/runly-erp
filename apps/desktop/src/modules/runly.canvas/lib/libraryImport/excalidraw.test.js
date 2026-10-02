@@ -99,4 +99,16 @@ describe('Excalidraw library import', () => {
     assert.deepEqual(parseExcalidrawLibrary({}), { items: [], skipped: 0 })
     assert.deepEqual(parseExcalidrawLibrary(null), { items: [], skipped: 0 })
   })
+
+  it('imports a regular .excalidraw scene as one reusable item', () => {
+    const json = { type: 'excalidraw', version: 2, elements: [
+      { type: 'rectangle', x: 10, y: 20, width: 100, height: 50, strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: 1, opacity: 100 },
+    ] }
+    const { items, skipped } = parseExcalidrawLibrary(json, 'Diagrama de red')
+    assert.equal(skipped, 0)
+    assert.equal(items.length, 1)
+    assert.equal(items[0].name, 'Diagrama de red')
+    assert.equal(items[0].objects[0].type, 'rectangle')
+    assertAllValid(items[0].objects)
+  })
 })
