@@ -12,6 +12,9 @@ export const DrawingBlock = Node.create({
   addAttributes() {
     return {
       strokes: { default: '[]' },
+      // Ids of strokes removed by "Deshacer"/"Limpiar" — kept so collaborators
+      // merging their copies don't resurrect them (see lib/drawingStrokes.js).
+      erased: { default: '[]' },
       canvasWidth: { default: 700 },
       canvasHeight: { default: 300 },
       backgroundColor: { default: '#ffffff' },

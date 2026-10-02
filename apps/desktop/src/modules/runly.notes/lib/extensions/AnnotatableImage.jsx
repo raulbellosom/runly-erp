@@ -18,6 +18,9 @@ export const AnnotatableImage = Node.create({
       alt: { default: null },
       title: { default: null },
       annotations: { default: '[]' },
+      // Ids of removed annotations, so collaborators merging their copies
+      // don't resurrect them (see lib/drawingStrokes.js).
+      erasedAnnotations: { default: '[]' },
       // Percentage (0..100) of the content column. null = full width, for
       // backward compatibility with images inserted before this attribute
       // existed — new inserts get an explicit default (see noteImageUpload.js).

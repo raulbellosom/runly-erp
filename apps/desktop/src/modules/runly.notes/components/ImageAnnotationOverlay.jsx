@@ -9,6 +9,7 @@ import { withImageVariant } from '../../../lib/imageVariants.js'
 import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
 import { useImageAnnotationDrawing } from '../hooks/useImageAnnotationDrawing.jsx'
 import { isInsideTableCell } from '../lib/tableContext.js'
+import { parseErased } from '../lib/drawingStrokes.js'
 import {
   cropToViewBox, effectiveNaturalSize,
   normalizeRotation, rotateAnnotations,
@@ -65,6 +66,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
   const [transformFailedSrc, setTransformFailedSrc] = useState(null)
 
   const annotations = JSON.parse(node.attrs.annotations || '[]')
+  const erasedAnnotations = parseErased(node.attrs.erasedAnnotations)
   const crop = parseCrop(node.attrs.crop)
   const rotation = normalizeRotation(node.attrs.rotation)
   // Context already combines permission and view mode. editor.isEditable
@@ -95,8 +97,10 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
 
   const {
     draft, textInput, onDrawPointerDown, onDrawPointerMove, onDrawPointerUp,
-    commitTextInput, cancelTextInput, cancelDraft, removeAnnotation, renderAnnotation, renderDraft,
-  } = useImageAnnotationDrawing({ svgRef, crop, annotations, tool, color, lineWidth, isEditing, updateAttributes })
+    commitTextInput, cancelTextInput, cancelDraft, removeAnnotation, clearAnnotations, renderAnnotation, renderDraft,
+  } = useImageAnnotationDrawing({
+    svgRef, crop, annotations, erased: erasedAnnotations, tool, color, lineWidth, isEditing, updateAttributes,
+  })
 
   // Toggling the whole note from edit to view mode (the note-level Ver/Editar
   // button, not this image's own mode) never runs exitEditMode — the note can
@@ -398,7 +402,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
                     <div className="my-1 border-t border-[hsl(var(--border))]" />
                     <button
                       onPointerDown={(e) => e.preventDefault()}
-                      onClick={() => updateAttributes({ annotations: '[]' })}
+                      onClick={clearAnnotations}
                       className="w-full text-left text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-2.5 py-1.5 rounded"
                     >
                       Limpiar
@@ -608,6 +612,7 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
           src={src}
           alt={node.attrs.alt}
           annotations={annotations}
+          erased={erasedAnnotations}
           crop={crop}
           rotation={rotation}
           updateAttributes={updateAttributes}

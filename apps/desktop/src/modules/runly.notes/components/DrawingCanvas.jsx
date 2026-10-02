@@ -6,29 +6,56 @@ import { ConfirmDialog } from '@runly/ui'
 import { NoteBlockDragHandle } from './NoteBlockDragHandle.jsx'
 import { useBlockDragReorder } from '../hooks/useBlockDragReorder.js'
 import { isInsideTableCell } from '../lib/tableContext.js'
+import {
+  parseStrokes, parseErased, newStrokeId, mergeDrawing, createKnownDrawing, addToDrawing, eraseFromDrawing,
+} from '../lib/drawingStrokes.js'
 
 const COLORS = ['#1a1a1a', '#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ffffff']
 const BACKGROUNDS = ['#ffffff', '#f3f4f6', '#fef9c3', '#dbeafe', '#dcfce7', '#1a1a1a']
 const SIZES = [2, 4, 8, 14, 20]
 
+// S Pen / stylus barrel button reported while the tip is down (W3C "eraser" bit).
+const PEN_ERASER_BUTTONS = 32
+
 export function DrawingCanvas({ node, updateAttributes, editor, deleteNode, getPos: getNodePos }) {
   const { viewing } = useContext(NoteInteractionContext)
   const canvasRef = useRef(null)
   const blockRef = useRef(null)
-  const isDrawing = useRef(false)
-  const currentStroke = useRef([])
-  const strokesRef = useRef(JSON.parse(node.attrs.strokes || '[]'))
+  // The one pointer currently drawing. Any other pointer (a resting palm, a
+  // second finger) is ignored instead of hijacking the stroke in progress.
+  const activePointer = useRef(null)
+  const currentStroke = useRef(null)
+  const strokesRef = useRef(parseStrokes(node.attrs.strokes))
+  const knownRef = useRef(createKnownDrawing())
+  // Ids of strokes this user drew, newest last — "Deshacer" only removes your own.
+  const myStrokeIds = useRef([])
   const [tool, setTool] = useState('pen')
   const [color, setColor] = useState('#1a1a1a')
   const [size, setSize] = useState(4)
   const [strokeCount, setStrokeCount] = useState(strokesRef.current.length)
   const [confirmClose, setConfirmClose] = useState(false)
+  // Once a stylus is used here, fingers scroll the note and only the pen draws
+  // (palm rejection, like Samsung Notes).
+  const [penMode, setPenMode] = useState(false)
 
+  const editable = !viewing
+
+  function publish(strokes, erased) {
+    updateAttributes({ strokes: JSON.stringify(strokes), erased: JSON.stringify(erased) })
+  }
+
+  // Every attribute change (ours or a collaborator's) is merged with what this
+  // client already knows, so a concurrent write can't drop anyone's strokes.
   useEffect(() => {
-    strokesRef.current = JSON.parse(node.attrs.strokes || '[]')
+    const remote = parseStrokes(node.attrs.strokes)
+    const remoteErased = parseErased(node.attrs.erased)
+    const merged = mergeDrawing(knownRef.current, remote, remoteErased)
+    strokesRef.current = merged.strokes
+    setStrokeCount(merged.strokes.length)
     redraw()
-    setStrokeCount(strokesRef.current.length)
-  }, [node.attrs.strokes])
+    if (merged.changed && editable) publish(merged.strokes, merged.erased)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.attrs.strokes, node.attrs.erased])
 
   function redraw() {
     const canvas = canvasRef.current
@@ -36,77 +63,121 @@ export function DrawingCanvas({ node, updateAttributes, editor, deleteNode, getP
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     strokesRef.current.forEach(s => paintStroke(ctx, s))
+    // A collaborator's update can land mid-stroke; keep the stroke in progress.
+    if (currentStroke.current) paintStroke(ctx, currentStroke.current)
   }
 
-  function paintStroke(ctx, stroke) {
-    if (!stroke.points || stroke.points.length < 2) return
+  function segmentWidth(stroke, a, b) {
+    if (a.p == null || b.p == null) return stroke.size
+    // Pressure 0..1 (0.5 = "normal"): thinner when light, thicker when firm.
+    return Math.max(0.5, stroke.size * (0.35 + (a.p + b.p) * 0.65))
+  }
+
+  function paintSegments(ctx, stroke, from) {
+    const pts = stroke.points
     ctx.save()
-    ctx.beginPath()
     ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over'
     ctx.strokeStyle = stroke.tool === 'eraser' ? 'rgba(0,0,0,1)' : stroke.color
-    ctx.lineWidth = stroke.size
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y)
-    stroke.points.forEach(p => ctx.lineTo(p.x, p.y))
-    ctx.stroke()
+    for (let i = Math.max(1, from); i < pts.length; i++) {
+      ctx.beginPath()
+      ctx.lineWidth = segmentWidth(stroke, pts[i - 1], pts[i])
+      ctx.moveTo(pts[i - 1].x, pts[i - 1].y)
+      ctx.lineTo(pts[i].x, pts[i].y)
+      ctx.stroke()
+    }
     ctx.restore()
   }
 
-  function getPos(e) {
+  function paintStroke(ctx, stroke) {
+    if (!stroke.points?.length) return
+    if (stroke.points.length === 1) {
+      // A tap is a dot, not nothing.
+      paintSegments(ctx, { ...stroke, points: [stroke.points[0], stroke.points[0]] }, 1)
+      return
+    }
+    paintSegments(ctx, stroke, 1)
+  }
+
+  function pointFrom(e) {
     const rect = canvasRef.current.getBoundingClientRect()
     const scaleX = canvasRef.current.width / rect.width
     const scaleY = canvasRef.current.height / rect.height
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY }
+    const point = {
+      x: Math.round((e.clientX - rect.left) * scaleX * 10) / 10,
+      y: Math.round((e.clientY - rect.top) * scaleY * 10) / 10,
+    }
+    if (e.pointerType === 'pen' && e.pressure > 0) point.p = Math.round(e.pressure * 100) / 100
+    return point
   }
 
   function onPointerDown(e) {
+    if (e.pointerType === 'pen' && !penMode) setPenMode(true)
+    // Palm rejection: with a stylus in use, touches never draw.
+    if (e.pointerType === 'touch' && penMode) return
+    if (activePointer.current !== null) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
     e.preventDefault()
-    isDrawing.current = true
-    currentStroke.current = [getPos(e)]
+    activePointer.current = e.pointerId
+    try { canvasRef.current.setPointerCapture(e.pointerId) } catch { /* pointer already gone */ }
+    const erasing = tool === 'eraser' || (e.pointerType === 'pen' && (e.buttons & PEN_ERASER_BUTTONS))
+    currentStroke.current = {
+      id: newStrokeId(),
+      tool: erasing ? 'eraser' : 'pen',
+      color,
+      size: erasing ? Math.max(size, 14) : size,
+      points: [pointFrom(e)],
+    }
+    paintStroke(canvasRef.current.getContext('2d'), currentStroke.current)
   }
 
   function onPointerMove(e) {
+    if (e.pointerId !== activePointer.current || !currentStroke.current) return
     e.preventDefault()
-    if (!isDrawing.current) return
-    const pos = getPos(e)
-    currentStroke.current.push(pos)
-    const ctx = canvasRef.current.getContext('2d')
-    const pts = currentStroke.current
-    if (pts.length < 2) return
-    paintStroke(ctx, { tool, color, size, points: [pts[pts.length - 2], pts[pts.length - 1]] })
+    const stroke = currentStroke.current
+    const from = stroke.points.length
+    // Coalesced events carry the intermediate stylus samples the browser
+    // batched into this frame — without them fast handwriting turns jagged.
+    const events = typeof e.nativeEvent.getCoalescedEvents === 'function'
+      ? e.nativeEvent.getCoalescedEvents()
+      : []
+    for (const ev of events.length ? events : [e]) stroke.points.push(pointFrom(ev))
+    paintSegments(canvasRef.current.getContext('2d'), stroke, from)
   }
 
-  function onPointerUp(e) {
-    e.preventDefault()
-    if (!isDrawing.current || !currentStroke.current.length) return
-    isDrawing.current = false
-    const newStroke = { tool, color, size, points: currentStroke.current }
-    currentStroke.current = []
-    const updated = [...strokesRef.current, newStroke]
-    strokesRef.current = updated
-    setStrokeCount(updated.length)
-    updateAttributes({ strokes: JSON.stringify(updated) })
+  function onPointerEnd(e) {
+    if (e.pointerId !== activePointer.current) return
+    activePointer.current = null
+    const stroke = currentStroke.current
+    currentStroke.current = null
+    if (!stroke) return
+    myStrokeIds.current.push(stroke.id)
+    const next = addToDrawing(knownRef.current, strokesRef.current, stroke)
+    strokesRef.current = next.strokes
+    setStrokeCount(next.strokes.length)
+    publish(next.strokes, next.erased)
+  }
+
+  function eraseIds(ids) {
+    const next = eraseFromDrawing(knownRef.current, strokesRef.current, ids)
+    strokesRef.current = next.strokes
+    setStrokeCount(next.strokes.length)
+    redraw()
+    publish(next.strokes, next.erased)
   }
 
   function undoLast() {
-    const updated = strokesRef.current.slice(0, -1)
-    strokesRef.current = updated
-    setStrokeCount(updated.length)
-    updateAttributes({ strokes: JSON.stringify(updated) })
+    const live = new Set(strokesRef.current.map(s => s.id))
+    while (myStrokeIds.current.length && !live.has(myStrokeIds.current.at(-1))) myStrokeIds.current.pop()
+    const id = myStrokeIds.current.pop()
+    if (id) eraseIds([id])
   }
 
   function clearAll() {
-    strokesRef.current = []
-    setStrokeCount(0)
-    updateAttributes({ strokes: '[]' })
-    const ctx = canvasRef.current?.getContext('2d')
-    ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+    eraseIds(strokesRef.current.map(s => s.id))
   }
 
-  const editable = !viewing
   const inTableCell = typeof getNodePos === 'function' && isInsideTableCell(editor.state, getNodePos())
   const drag = useBlockDragReorder({
     editor,
@@ -167,10 +238,12 @@ export function DrawingCanvas({ node, updateAttributes, editor, deleteNode, getP
           height={node.attrs.canvasHeight}
           onPointerDown={editable ? onPointerDown : undefined}
           onPointerMove={editable ? onPointerMove : undefined}
-          onPointerUp={editable ? onPointerUp : undefined}
-          onPointerLeave={editable ? onPointerUp : undefined}
+          onPointerUp={editable ? onPointerEnd : undefined}
+          onPointerCancel={editable ? onPointerEnd : undefined}
+          onLostPointerCapture={editable ? onPointerEnd : undefined}
           style={{
-            touchAction: 'none',
+            // In pen mode fingers pan the note; the stylus still draws.
+            touchAction: editable && !penMode ? 'none' : 'pan-x pan-y',
             display: 'block',
             width: '100%',
             cursor: editable ? (tool === 'eraser' ? 'cell' : 'crosshair') : 'default',

@@ -1,5 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { elementFracToImageSpace } from '../lib/imageCrop.js'
+import {
+  createKnownDrawing, mergeDrawing, addToDrawing, eraseFromDrawing, newStrokeId,
+} from '../lib/drawingStrokes.js'
 
 const W = 1000
 const H = 1000
@@ -9,10 +12,45 @@ const H = 1000
 // table-cell modal (ImageEditModal.jsx) so the drawing math and SVG
 // rendering aren't duplicated between them. See
 // docs/superpowers/specs/2026-09-17-notes-table-cell-image-modal-design.md.
-export function useImageAnnotationDrawing({ svgRef, crop, annotations, tool, color, lineWidth, isEditing, updateAttributes }) {
+//
+// Annotations are merged by id with what this client has already seen (see
+// lib/drawingStrokes.js): the attribute is last-writer-wins in Y.js, so two
+// people annotating at once used to overwrite each other's strokes.
+export function useImageAnnotationDrawing({
+  svgRef, crop, annotations, erased = [], tool, color, lineWidth, isEditing, updateAttributes,
+}) {
   const drawRef = useRef(null) // { pointerId }
   const [draft, setDraft] = useState(null)
   const [textInput, setTextInput] = useState(null) // { screenX, screenY, svgX, svgY }
+  const knownRef = useRef(createKnownDrawing())
+  const currentRef = useRef(annotations)
+  // Palm rejection: once a stylus is used, touches no longer draw.
+  const penSeenRef = useRef(false)
+
+  const annotationsKey = JSON.stringify(annotations)
+  const erasedKey = JSON.stringify(erased)
+  useEffect(() => {
+    const merged = mergeDrawing(knownRef.current, annotations, erased)
+    currentRef.current = merged.strokes
+    if (merged.changed && isEditing) publish(merged)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotationsKey, erasedKey])
+
+  function publish({ strokes, erased: tombstones }) {
+    currentRef.current = strokes
+    updateAttributes({
+      annotations: JSON.stringify(strokes),
+      erasedAnnotations: JSON.stringify(tombstones),
+    })
+  }
+
+  function addAnnotation(ann) {
+    publish(addToDrawing(knownRef.current, currentRef.current, ann))
+  }
+
+  function clearAnnotations() {
+    publish(eraseFromDrawing(knownRef.current, currentRef.current, currentRef.current.map(a => a.id)))
+  }
 
   function getPoint(e) {
     const rect = svgRef.current.getBoundingClientRect()
@@ -25,6 +63,11 @@ export function useImageAnnotationDrawing({ svgRef, crop, annotations, tool, col
 
   function onDrawPointerDown(e) {
     if (!isEditing || textInput) return
+    if (e.pointerType === 'pen') penSeenRef.current = true
+    if (e.pointerType === 'touch' && penSeenRef.current) return
+    // A second pointer (resting palm, another finger) must not replace the
+    // stroke in progress.
+    if (drawRef.current) return
     e.preventDefault()
     const p = getPoint(e)
     if (tool === 'text') {
@@ -64,23 +107,21 @@ export function useImageAnnotationDrawing({ svgRef, crop, annotations, tool, col
     setDraft(null)
     if (!d) return
     if (d.type === 'path' && d.points.length < 2) return
-    updateAttributes({
-      annotations: JSON.stringify([...annotations, { ...d, id: Date.now() }]),
-    })
+    addAnnotation({ ...d, id: newStrokeId() })
   }
 
   function commitTextInput(text) {
     if (text?.trim()) {
       const ann = {
         type: 'text',
-        id: Date.now(),
+        id: newStrokeId(),
         color,
         lineWidth,
         text: text.trim(),
         svgX: textInput.svgX,
         svgY: textInput.svgY,
       }
-      updateAttributes({ annotations: JSON.stringify([...annotations, ann]) })
+      addAnnotation(ann)
     }
     setTextInput(null)
   }
@@ -95,9 +136,7 @@ export function useImageAnnotationDrawing({ svgRef, crop, annotations, tool, col
   }
 
   function removeAnnotation(id) {
-    updateAttributes({
-      annotations: JSON.stringify(annotations.filter((a) => a.id !== id)),
-    })
+    publish(eraseFromDrawing(knownRef.current, currentRef.current, [id]))
   }
 
   function renderAnnotation(ann) {
@@ -241,6 +280,6 @@ export function useImageAnnotationDrawing({ svgRef, crop, annotations, tool, col
 
   return {
     draft, textInput, onDrawPointerDown, onDrawPointerMove, onDrawPointerUp,
-    commitTextInput, cancelTextInput, cancelDraft, removeAnnotation, renderAnnotation, renderDraft,
+    commitTextInput, cancelTextInput, cancelDraft, removeAnnotation, clearAnnotations, renderAnnotation, renderDraft,
   }
 }

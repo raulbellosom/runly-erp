@@ -26,7 +26,7 @@ const TOOLS = [
 // useImageAnnotationDrawing hook, just laid out with room to breathe
 // instead of squeezed into a table cell's width. See
 // docs/superpowers/specs/2026-09-17-notes-table-cell-image-modal-design.md.
-export function ImageEditModal({ open, onOpenChange, src, alt, annotations, crop, rotation, updateAttributes }) {
+export function ImageEditModal({ open, onOpenChange, src, alt, annotations, erased = [], crop, rotation, updateAttributes }) {
   const svgRef = useRef(null)
   const [tool, setTool] = useState('pen')
   const [color, setColor] = useState('#ef4444')
@@ -35,9 +35,9 @@ export function ImageEditModal({ open, onOpenChange, src, alt, annotations, crop
 
   const {
     draft, textInput, onDrawPointerDown, onDrawPointerMove, onDrawPointerUp,
-    commitTextInput, cancelTextInput, removeAnnotation, renderAnnotation, renderDraft,
+    commitTextInput, cancelTextInput, removeAnnotation, clearAnnotations, renderAnnotation, renderDraft,
   } = useImageAnnotationDrawing({
-    svgRef, crop, annotations, tool, color, lineWidth, isEditing: true, updateAttributes,
+    svgRef, crop, annotations, erased, tool, color, lineWidth, isEditing: true, updateAttributes,
   })
 
   const ActiveToolIcon = TOOLS.find((t) => t.id === tool)?.icon ?? PenLine
@@ -121,7 +121,7 @@ export function ImageEditModal({ open, onOpenChange, src, alt, annotations, crop
 
           {annotations.length > 0 && (
             <button
-              onClick={() => updateAttributes({ annotations: '[]' })}
+              onClick={clearAnnotations}
               className="flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border border-[hsl(var(--border))] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
             >
               <MoreHorizontal className="w-3.5 h-3.5" /> Limpiar
