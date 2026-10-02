@@ -1,5 +1,6 @@
 import { effectiveBoardSettings, normalizeBoardSettings, templateFor, templateLayerRows } from './canvas-templates.js'
 import { isDataSource } from './canvas-data-sources.js'
+import { normalizeCalibration } from './canvas-calibration.js'
 
 const ROLE_RANK = { VIEWER: 1, COMMENTER: 2, EDITOR: 3, OWNER: 4 }
 const LAYER_TYPES = new Set(['vector', 'hotspot', 'data'])
@@ -31,6 +32,10 @@ function finite(value) { return typeof value === 'number' && Number.isFinite(val
 // Settings errors from the catalog surface as regular 400 service errors.
 function boardSettings(input, base) {
   try { return normalizeBoardSettings(input, base) } catch (error) { throw new CanvasServiceError(error.message, 400) }
+}
+
+function calibrationOrError(input) {
+  try { return normalizeCalibration(input) } catch (error) { throw new CanvasServiceError(error.message, 400) }
 }
 
 export function validateCanvasObject(data, { partial = false } = {}) {
@@ -188,7 +193,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
         width: data?.width ?? null, height: data?.height ?? null, infinite: data?.infinite !== false,
         background: data?.background ?? null,
         coordinateSystem: data?.coordinateSystem ?? { unit: 'px', origin: { x: 0, y: 0 }, axis: 'screen' },
-        calibration: data?.calibration ?? null, metadata: data?.metadata ?? {},
+        calibration: data?.calibration == null ? null : calibrationOrError(data.calibration), metadata: data?.metadata ?? {},
       } })
       await tx.canvasLayer.createMany({ data: templateLayerRows(templateFor(board.templateType), page.id) })
       return page
@@ -200,9 +205,10 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     const page = await prisma.canvasPage.findFirst({ where: { id: pageId, boardId } })
     if (!page) throw new CanvasServiceError('Página no encontrada.', 404)
     const patch = {}
-    for (const key of ['name', 'width', 'height', 'infinite', 'background', 'coordinateSystem', 'calibration', 'metadata']) {
+    for (const key of ['name', 'width', 'height', 'infinite', 'background', 'coordinateSystem', 'metadata']) {
       if (data[key] !== undefined) patch[key] = key === 'name' ? cleanText(data[key], 200) : data[key]
     }
+    if (data.calibration !== undefined) patch.calibration = calibrationOrError(data.calibration)
     return prisma.canvasPage.update({ where: { id: pageId }, data: patch })
   }
 
