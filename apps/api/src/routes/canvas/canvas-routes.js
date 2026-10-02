@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { UserAccessError, createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
 import { createCanvasPublicLinksService } from './canvas-public.js'
+import { createGeocoder } from './canvas-geocoder.js'
 import { CANVAS_TEMPLATES } from './canvas-templates.js'
 
 const actorId = (c) => c.get('userContext')?.profile?.id ?? null
@@ -32,7 +33,7 @@ export function objectsDelta(results) {
   return JSON.stringify(delta).length <= DELTA_MAX_CHARS ? delta : { refetch: true }
 }
 
-export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null }) {
+export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder() }) {
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver })
   const access = prisma ? createUserAccessService({ prisma }) : null
@@ -40,6 +41,11 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   const changed = (boardId, action, payload = {}) => broadcaster?.broadcastToChannel?.(`canvas:board:${boardId}`, 'canvas.changed', { boardId, action, ...payload }).catch(() => {})
 
   app.get('/canvas/templates', requirePermission('canvas.view'), (c) => c.json({ data: CANVAS_TEMPLATES }))
+  app.get('/canvas/map-config', requirePermission('canvas.view'), (c) => c.json({ data: geocoder.mapConfig() }))
+  app.get('/canvas/geocode', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await geocoder.search(c.req.query('q')) }) }
+    catch (error) { return errorResponse(c, error, 'Error al buscar la dirección.') }
+  })
 
   app.get('/canvas/data-sources', requirePermission('canvas.view'), async (c) => {
     try { return c.json({ data: await dataSources.catalog({ authUserId: c.get('authUserId'), companyId: companyId(c) }) }) }

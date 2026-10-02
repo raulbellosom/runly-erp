@@ -73,6 +73,16 @@ export const CANVAS_TEMPLATES = [
     layers: [{ name: 'Documento', type: 'vector', metadata: { ...MEDIA, lockAfterInsert: true } }, { name: 'Anotaciones', type: 'vector' }, { name: 'Hotspots', type: 'hotspot' }],
     emptyState: { title: 'Inserta el PDF a revisar', description: 'Las páginas quedan en la capa Documento, bloqueada para que no se muevan mientras anotas.', action: { label: 'Insertar PDF', kind: 'insert-media' } },
   },
+  {
+    key: 'site-map', label: 'Mapa de sitio', icon: 'globe', preview: 'site-map',
+    description: 'Sobre un mapa real',
+    useWhen: 'Quieres marcar sucursales, terrenos, obras o rutas sobre un mapa con medidas en metros.',
+    includes: ['Fondo de mapa de OpenStreetMap', 'Medidas en metros sin calibrar', 'Capas: Zonas, Puntos y Datos Runly'],
+    namePlaceholder: 'Ej. Sucursales zona norte',
+    settings: settings(false, 24, false),
+    layers: [{ name: 'Zonas', type: 'vector' }, { name: 'Puntos', type: 'hotspot' }, { name: 'Datos Runly', type: 'data' }],
+    emptyState: { title: 'Ubica tu sitio en el mapa', description: 'Busca una dirección o lugar para usar el mapa como fondo de esta página.', action: { label: 'Ubicar en el mapa', kind: 'map' } },
+  },
 ]
 
 export function templateFor(key) {

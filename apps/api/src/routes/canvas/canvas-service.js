@@ -2,6 +2,7 @@ import { effectiveBoardSettings, normalizeBoardSettings, templateFor, templateLa
 import { isDataSource } from './canvas-data-sources.js'
 import { normalizeCalibration } from './canvas-calibration.js'
 import { isValidConnect } from './canvas-connect.js'
+import { pageGeoPatch } from './canvas-background.js'
 
 const ROLE_RANK = { VIEWER: 1, COMMENTER: 2, EDITOR: 3, OWNER: 4 }
 const LAYER_TYPES = new Set(['vector', 'hotspot', 'data'])
@@ -37,6 +38,12 @@ function boardSettings(input, base) {
 
 function calibrationOrError(input) {
   try { return normalizeCalibration(input) } catch (error) { throw new CanvasServiceError(error.message, 400) }
+}
+
+// pageGeoPatch's own errors already carry a status (400); anything else
+// surfaces as a generic bad request.
+function backgroundPatch(background, page) {
+  try { return pageGeoPatch(background, page) } catch (error) { throw new CanvasServiceError(error.message, error.status ?? 400) }
 }
 
 export function validateCanvasObject(data, { partial = false } = {}) {
@@ -188,6 +195,9 @@ export function createCanvasService({ prisma, entityResolver = null }) {
 
   async function createPage(companyId, actorId, boardId, data) {
     const { board } = await assertBoardAccess(companyId, actorId, boardId, 'EDITOR')
+    // A map background fixes calibration/coordinateSystem too, so it is
+    // computed once and merged last, overriding any plain defaults above.
+    const geoPatch = data?.background ? backgroundPatch(data.background, null) : {}
     return prisma.$transaction(async (tx) => {
       const last = await tx.canvasPage.findFirst({ where: { boardId }, orderBy: { position: 'desc' }, select: { position: true } })
       const page = await tx.canvasPage.create({ data: {
@@ -196,6 +206,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
         background: data?.background ?? null,
         coordinateSystem: data?.coordinateSystem ?? { unit: 'px', origin: { x: 0, y: 0 }, axis: 'screen' },
         calibration: data?.calibration == null ? null : calibrationOrError(data.calibration), metadata: data?.metadata ?? {},
+        ...geoPatch,
       } })
       await tx.canvasLayer.createMany({ data: templateLayerRows(templateFor(board.templateType), page.id) })
       return page
@@ -207,9 +218,12 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     const page = await prisma.canvasPage.findFirst({ where: { id: pageId, boardId } })
     if (!page) throw new CanvasServiceError('Página no encontrada.', 404)
     const patch = {}
-    for (const key of ['name', 'width', 'height', 'infinite', 'background', 'coordinateSystem', 'metadata']) {
+    for (const key of ['name', 'width', 'height', 'infinite', 'metadata']) {
       if (data[key] !== undefined) patch[key] = key === 'name' ? cleanText(data[key], 200) : data[key]
     }
+    // A map background also drives calibration/coordinateSystem; an explicit
+    // calibration sent in the same request still wins over the automatic one.
+    if (data.background !== undefined) Object.assign(patch, backgroundPatch(data.background, page))
     if (data.calibration !== undefined) patch.calibration = calibrationOrError(data.calibration)
     return prisma.canvasPage.update({ where: { id: pageId }, data: patch })
   }

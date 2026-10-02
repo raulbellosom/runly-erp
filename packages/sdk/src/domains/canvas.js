@@ -8,6 +8,8 @@ export function createCanvasDomain({ request, withAuthHeaders, toQueryString }) 
   })
   return {
     listTemplates: (token) => send('GET', '/canvas/templates', undefined, token),
+    getMapConfig: (token) => send('GET', '/canvas/map-config', undefined, token),
+    geocode: (q, token) => send('GET', `/canvas/geocode${toQueryString({ q })}`, undefined, token),
     listBoards: (token) => send('GET', '/canvas/boards', undefined, token),
     createBoard: (data, token) => send('POST', '/canvas/boards', data, token),
     getBoard: (boardId, token) => send('GET', `/canvas/boards/${id(boardId)}`, undefined, token),

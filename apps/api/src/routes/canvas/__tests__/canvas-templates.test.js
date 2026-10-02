@@ -5,8 +5,8 @@ import {
 } from '../canvas-templates.js'
 
 describe('Canvas templates catalog', () => {
-  it('declares six templates with complete, self-consistent definitions', () => {
-    assert.deepEqual(CANVAS_TEMPLATES.map((t) => t.key), ['blank', 'plan', 'technical-map', 'diagram', 'layout', 'pdf-review'])
+  it('declares seven templates with complete, self-consistent definitions', () => {
+    assert.deepEqual(CANVAS_TEMPLATES.map((t) => t.key), ['blank', 'plan', 'technical-map', 'diagram', 'layout', 'pdf-review', 'site-map'])
     for (const template of CANVAS_TEMPLATES) {
       assert.ok(template.label && template.description && template.useWhen && template.namePlaceholder, template.key)
       assert.ok(template.includes.length >= 2, template.key)

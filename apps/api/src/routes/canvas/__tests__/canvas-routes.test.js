@@ -62,7 +62,7 @@ describe('Runly Canvas routes', () => {
     const response = await app.request('http://localhost/canvas/templates')
     assert.equal(response.status, 200)
     const body = await response.json()
-    assert.equal(body.data.length, 6)
+    assert.equal(body.data.length, 7)
     assert.equal(body.data[1].key, 'plan')
     assert.ok(permissions.includes('canvas.view'))
   })
