@@ -66,6 +66,35 @@ export function useUpdateLayer(boardId) {
   })
 }
 
+// `layerIds` is already in API order (bottom-first ascending position) —
+// callers convert the Layers panel's visual order (top-first) with
+// lib/layerTree.js's reorderedLayerIds() before calling this. Optimistic so
+// a drag-and-drop reorder repaints instantly.
+export function useReorderLayers(boardId) {
+  const token = useToken(), client = useQueryClient(), key = boardKey(boardId)
+  return useMutation({
+    mutationFn: ({ pageId, layerIds }) => runly.canvas.reorderLayers(boardId, pageId, layerIds, token),
+    onMutate: ({ pageId, layerIds }) => {
+      client.cancelQueries({ queryKey: key, exact: true })
+      const previous = client.getQueryData(key)
+      const order = new Map(layerIds.map((id, index) => [id, index]))
+      client.setQueryData(key, (board) => {
+        if (!board) return board
+        return {
+          ...board,
+          pages: board.pages.map((page) => page.id !== pageId ? page : {
+            ...page,
+            layers: [...page.layers].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)).map((layer, index) => ({ ...layer, position: index })),
+          }),
+        }
+      })
+      return { previous }
+    },
+    onError: (_error, _vars, context) => { if (context) client.setQueryData(key, context.previous) },
+    onSettled: () => client.invalidateQueries({ queryKey: key, exact: true }),
+  })
+}
+
 // Object batches are optimistic: the cache reflects the change immediately,
 // is reconciled with the server rows on success and refetched on failure.
 // Edits to an object whose create is still in flight are queued and sent as

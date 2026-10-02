@@ -9,9 +9,9 @@ import { CanvasViewport } from '../components/CanvasViewport.jsx'
 import { DataBindingDialog } from '../components/DataBindingDialog.jsx'
 import { EditorTopBar } from '../components/EditorTopBar.jsx'
 import { HotspotDialog } from '../components/HotspotDialog.jsx'
+import { LayersPanel } from '../components/layers/LayersPanel.jsx'
 import { MapBackdrop } from '../components/MapBackdrop.jsx'
 import { MapLocationDialog } from '../components/MapLocationDialog.jsx'
-import { PagesLayersPanel } from '../components/PagesLayersPanel.jsx'
 import { PdfPagesDialog } from '../components/PdfPagesDialog.jsx'
 import { ScaleControl } from '../components/ScaleControl.jsx'
 import { TextEditDialog } from '../components/TextEditDialog.jsx'
@@ -100,7 +100,6 @@ export default function BoardEditor() {
   // Only visible objects resolve against the ERP; a bound shape in a hidden layer stays unresolved.
   const bindings = useBindings(boardId, rows)
   const exportPage = useExportPage({ board: board.data, activePage, rows, bindings: bindings.data, scale: pageScale.scale })
-  const objectCounts = useMemo(() => allRows.reduce((acc, row) => ({ ...acc, [row.layerId]: (acc[row.layerId] ?? 0) + 1 }), {}), [allRows])
   const links = useMemo(() => linksQuery.data ?? [], [linksQuery.data])
   const linkedIds = useMemo(() => new Set(links.map((link) => link.targetId)), [links])
   const images = useCanvasImages(allRows)
@@ -194,11 +193,14 @@ export default function BoardEditor() {
   }
 
   const pagesPanel = (
-    <PagesLayersPanel
+    <LayersPanel
       pages={pages} activePageId={pageId} onPageChange={changePage} activeLayerId={layerId} onLayerChange={setLayerId}
       onAddPage={async () => { const page = await actions.addPage(pages.length); if (page?.id) changePage(page.id) }}
-      addingPage={actions.createPage.isPending} onToggleLayer={actions.toggleLayer} objectCounts={objectCounts} readOnly={readOnly}
+      addingPage={actions.createPage.isPending} onToggleLayer={actions.toggleLayer} readOnly={readOnly}
       onAddDataLayer={actions.addDataLayer} addingLayer={actions.addingLayer}
+      layers={layers} allRows={allRows} selectedIds={selectedIds} onSelect={select} onFocus={focusOn}
+      onSetHidden={actions.setHidden} onSetLocked={actions.setLocked}
+      onReorderLayers={actions.reorderLayers} onReorderElements={actions.reorderElements}
     />
   )
   const inspectorPanel = (

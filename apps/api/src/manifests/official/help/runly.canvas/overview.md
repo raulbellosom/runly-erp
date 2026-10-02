@@ -17,13 +17,19 @@ Al crear un Board eliges una plantilla. Cada plantilla **prepara el Board para s
 - **Distribucion**: acomodo de espacios y mobiliario (mesas, estantes, puestos de trabajo), por ejemplo para un evento o una reubicacion.
 - **Revision de PDF**: inserta las paginas de un PDF y marca observaciones con hotspots, formas y textos encima.
 
-### Capas
+### Capas y elementos
 
 Cada pagina trae las capas de su plantilla (por ejemplo, un Plano trae **Plano base**, **Mobiliario** y **Hotspots**; una Revision de PDF trae **Documento**, **Anotaciones** y **Hotspots**). Las imagenes y PDF que insertes van a la capa de fondo de la plantilla (Plano base, Instalaciones, Espacios o Documento); en Revision de PDF esa capa se bloquea al insertar para que las paginas no se muevan mientras anotas. Los hotspots siempre van a su capa de hotspots.
 
-Puedes ocultar una capa (icono de ojo) o bloquearla (candado) para no moverla por accidente. Al elegir una herramienta, Canvas cambia solo a la capa correcta.
+El panel izquierdo muestra **Paginas** (plegable; la cabecera siempre indica la pagina activa) y **Capas**: cada capa se despliega con la flecha para ver sus elementos, de arriba hacia abajo en el mismo orden en que se dibujan. Capa y elemento tienen su propio icono de ojo (ocultar) y candado (bloquear) para no moverlos por accidente, y cada elemento tiene un boton **Enfocar** que centra y resalta un momento ese elemento en el lienzo. Arrastra desde el asa (el icono de puntos a la derecha de la fila) para reordenar capas o elementos, o para mover un elemento a otra capa; en pantalla tactil, mantén presionada el asa un momento antes de arrastrar. Al elegir una herramienta de dibujo, Canvas cambia solo a la capa correcta. La ayuda "¿Que es cada capa?", al final del panel, explica el tipo de cada una y esta plegada por defecto.
 
 - **Datos Runly**: aqui van los objetos **conectados a datos**. Selecciona una forma y usa "Conectar a datos" en el inspector (o el boton "Insertar datos" de la barra inferior) para ligarla a una ubicacion o articulo de inventario, un vehiculo, un colaborador, un proyecto, una mesa de POS (se ve libre, ocupada o con cuenta pedida) u otro registro. El objeto muestra el nombre del registro, un resumen y un color segun su estado (por ejemplo, una ubicacion con equipos en mantenimiento se ve en ambar) y se actualiza solo cada minuto. Ocultar esta capa oculta todos los datos de la pagina.
+
+### Acciones rapidas y cambiar forma
+
+Clic derecho sobre el lienzo (o pulsacion larga sobre un elemento en pantalla tactil) abre un menu en ese punto: Enfocar, Editar texto o Abrir hotspot segun el tipo, Duplicar, Copiar, Cambiar forma, Mover a capa, Traer al frente, Enviar al fondo, Ocultar, Bloquear y Eliminar; sobre el lienzo vacio ofrece Pegar, Seleccionar todo y Ajustar vista. Tambien se abre con Shift+F10 o la tecla de menu del teclado, centrado en la seleccion. Copiar y pegar tambien funcionan con Ctrl+C / Ctrl+V.
+
+Cualquier rectangulo, elipse, triangulo o rombo puede **cambiar de forma** a otro de ese mismo grupo, y una linea puede volverse flecha (o al reves), desde el inspector ("Forma") o desde el menu de acciones rapidas; conserva posicion, tamano, color, vinculos y conexiones, y Ctrl+Z lo revierte.
 
 ### Donde aparece un registro
 
@@ -113,6 +119,6 @@ Si tienes un Board abierto, MirAI sabe cual es: puedes preguntar por "este Board
 
 ### Alcances y limites
 
-- Deshacer y rehacer (Ctrl+Z / Ctrl+Shift+Z) cubren lo que haces en el lienzo durante la sesion abierta; los cambios de la ficha del hotspot y ocultar o bloquear capas no se deshacen.
+- Deshacer y rehacer (Ctrl+Z / Ctrl+Shift+Z) cubren lo que haces en el lienzo durante la sesion abierta, incluido ocultar, bloquear o cambiar de forma un elemento; los cambios de la ficha del hotspot y ocultar o bloquear una capa completa no se deshacen.
 - Solo ves los Boards que creaste o que te compartieron; en la lista, los compartidos muestran tu rol.
 - MirAI no dibuja ni mueve formas; consulta Boards y hotspots, crea Boards y actualiza hotspots.
