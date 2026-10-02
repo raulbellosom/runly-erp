@@ -26,12 +26,15 @@ export function useCanvasShortcuts({ enabled, ...handlers }) {
         if (key === 'y') { event.preventDefault(); h.onRedo(); return }
         if (key === 'd') { event.preventDefault(); h.onDuplicate(); return }
         if (key === 'a') { event.preventDefault(); h.onSelectAll(); return }
+        if (key === 'c') { event.preventDefault(); h.onCopy(); return }
+        if (key === 'v') { event.preventDefault(); h.onPaste(); return }
       }
       if (event.ctrlKey || event.metaKey || event.altKey) return
       if (key === ' ') { event.preventDefault(); setSpacePan(true); return }
       if (ARROWS[key]) { event.preventDefault(); const [dx, dy] = ARROWS[key], step = event.shiftKey ? 10 : 1; h.onNudge(dx * step, dy * step); return }
       if (TOOL_KEYS[key]) { h.onTool(TOOL_KEYS[key]); return }
       if (key === 'i') { h.onInsert(); return }
+      if (key === 'f') { h.onFocus(); return }
       if (key === 'delete' || key === 'backspace') { event.preventDefault(); h.onDelete(); return }
       if (key === 'enter') { h.onOpen(); return }
       if (key === 'escape') { h.onEscape(); return }

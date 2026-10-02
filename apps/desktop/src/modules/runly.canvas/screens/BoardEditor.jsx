@@ -29,6 +29,7 @@ import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
+import { useFocusAnimation } from '../hooks/useFocusAnimation.js'
 import { useExportPage } from '../hooks/useExportPage.js'
 import { usePageMap } from '../hooks/usePageMap.js'
 import { usePageScale } from '../hooks/usePageScale.js'
@@ -89,8 +90,11 @@ export default function BoardEditor() {
   const lockedLayerIds = useMemo(() => new Set(layers.filter((layer) => layer.locked).map((layer) => layer.id)), [layers])
   const allRows = useMemo(() => objects.data ?? [], [objects.data])
   // Paint order: layer stack first, then each object's position in its layer.
-  const rows = useMemo(() => allRows.filter((row) => !hiddenLayerIds.has(row.layerId)).sort((a, b) =>
+  // A hidden element (its own flag, not just a hidden layer) is neither
+  // drawn nor selectable from the canvas — it still shows in the Layers tree.
+  const rows = useMemo(() => allRows.filter((row) => !hiddenLayerIds.has(row.layerId) && !row.properties?.hidden).sort((a, b) =>
     (layerOrder.get(a.layerId) ?? 0) - (layerOrder.get(b.layerId) ?? 0) || (a.position ?? 0) - (b.position ?? 0)), [allRows, hiddenLayerIds, layerOrder])
+  const { flash, focusOn } = useFocusAnimation({ viewport, setViewport, size, hiddenLayerIds })
   // Only visible objects resolve against the ERP; a bound shape in a hidden layer stays unresolved.
   const bindings = useBindings(boardId, rows)
   const exportPage = useExportPage({ board: board.data, activePage, rows, bindings: bindings.data, scale: pageScale.scale })
@@ -104,7 +108,7 @@ export default function BoardEditor() {
   const sharpImages = useSharpPdfImages({ rows, viewport, size, images })
   const selectedRows = useMemo(() => rows.filter((row) => selectedIds.includes(row.id)), [rows, selectedIds])
   const selected = selectedRows.length === 1 ? selectedRows[0] : null
-  const editableSelection = readOnly ? [] : selectedRows.filter((row) => !lockedLayerIds.has(row.layerId))
+  const editableSelection = readOnly ? [] : selectedRows.filter((row) => !lockedLayerIds.has(row.layerId) && !row.properties?.locked)
   const activeLayer = layers.find((layer) => layer.id === layerId)
 
   useEffect(() => {
@@ -165,6 +169,9 @@ export default function BoardEditor() {
     onDelete: deleteSelection,
     onDuplicate: () => actions.duplicate(editableSelection),
     onNudge: (dx, dy) => actions.nudge(editableSelection, dx, dy),
+    onCopy: () => { if (!readOnly) actions.copy(editableSelection) },
+    onPaste: () => { if (!readOnly) actions.paste() },
+    onFocus: () => { if (selected) focusOn(selected) },
     onOpen: () => { if (selected) openObject(selected) },
     onUndo: () => { if (!readOnly) actions.undo() },
     onRedo: () => { if (!readOnly) actions.redo() },
@@ -208,7 +215,7 @@ export default function BoardEditor() {
         hotspotChange: (object, data) => {
           if (!object.hotspot) return toast.info('Espera un momento: el hotspot todavía se está guardando.')
           updateHotspot.mutate({ hotspotId: object.hotspot.id, data }, { onError: (error) => toast.error(error.message) })
-        }, duplicate: actions.duplicate, arrange: actions.arrange,
+        }, duplicate: actions.duplicate, arrange: actions.arrange, convertShapes: actions.convertShapes,
         openHotspot: (object) => setDialog({ kind: 'hotspot', id: object.id }),
         editText: (object) => setDialog({ kind: 'text', id: object.id }),
         openDataDialog: (object) => setDialog({ kind: 'data', mode: 'connect', id: object.id }),
@@ -257,7 +264,7 @@ export default function BoardEditor() {
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
             readOnly={readOnly} grid={pageMap.hasMap ? { ...(settings?.grid ?? {}), enabled: false } : settings?.grid} snapSize={snapSizeFor(settings)}
-            remote={cursors} onPointerWorld={broadcastPointer} bindings={bindings.data ?? {}}
+            remote={cursors} onPointerWorld={broadcastPointer} bindings={bindings.data ?? {}} flash={flash}
             scale={pageScale.scale} onCalibrate={pageScale.onViewportCalibrate}
           />
 

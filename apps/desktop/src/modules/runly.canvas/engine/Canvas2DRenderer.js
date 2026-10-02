@@ -44,7 +44,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null, drawers = {}, editVertices = true, polygonDraft = null } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null, drawers = {}, editVertices = true, polygonDraft = null, flash = null } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -70,6 +70,10 @@ export class Canvas2DRenderer {
     if (selected.length > 1) this.drawGroupBox(ctx, selected, viewport.zoom)
     for (const cursor of remote) {
       for (const object of objects) if (cursor.selectedIds?.includes(object.id)) this.drawRemoteSelection(ctx, object, viewport.zoom, cursor.color)
+    }
+    if (flash && Date.now() < flash.until) {
+      const target = objects.find((object) => object.id === flash.id)
+      if (target) this.drawFlash(ctx, target, viewport.zoom, flash)
     }
     ctx.restore()
     // Pin labels are collected (not drawn) during the object loop above so
@@ -368,6 +372,22 @@ export class Canvas2DRenderer {
     ctx.save()
     ctx.setLineDash([6 / zoom, 4 / zoom]); ctx.lineWidth = 1 / zoom; ctx.strokeStyle = this.theme.primary
     ctx.strokeRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2)
+    ctx.restore()
+  }
+
+  // Pulsing ring around a just-focused element (~1s window, see
+  // hooks/useFocusAnimation.js); alpha oscillates from the remaining time so
+  // it fades out rather than cutting off.
+  drawFlash(ctx, object, zoom, flash) {
+    const b = objectBounds(object), pad = 8 / zoom
+    const remaining = Math.max(0, flash.until - Date.now())
+    const pulse = 0.35 + 0.35 * Math.abs(Math.sin((remaining / 220) * Math.PI))
+    ctx.save()
+    ctx.globalAlpha = pulse * Math.min(1, remaining / 250)
+    ctx.lineWidth = 3 / zoom
+    ctx.strokeStyle = this.theme.primary
+    ctx.beginPath(); ctx.roundRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2, 8 / zoom)
+    ctx.stroke()
     ctx.restore()
   }
 

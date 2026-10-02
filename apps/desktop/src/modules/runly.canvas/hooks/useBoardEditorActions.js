@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { buildObjectData, defaultBox } from '../lib/objectFactory.js'
 import { buildOperations, createHistory, snapshot } from '../lib/history.js'
 import { alignDeltas, distributeDeltas } from '../lib/arrange.js'
+import { convertShape } from '../lib/shapeConvert.js'
 import { screenToWorld } from '../engine/viewport.js'
 import { useCreateHotspot, useCreateLayer, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
@@ -27,6 +28,9 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   // latest rows instead of the ones captured when the callback was created.
   const rowsRef = useRef(rows)
   useLayoutEffect(() => { rowsRef.current = rows })
+  // Session-only clipboard: plain snapshots, not row references, so copy
+  // survives the source row being edited, deleted or even undone.
+  const clipboardRef = useRef(null)
   const historiesRef = useRef(new Map())
   const [, setHistoryVersion] = useState(0)
   const historyFor = (id) => {
@@ -48,7 +52,11 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   const fail = (error) => toast.error(error?.message ?? 'No se pudo guardar el cambio.')
   const layerById = (id) => layers.find((layer) => layer.id === id)
   const current = (id) => rowsRef.current.find((row) => row.id === id)
-  const editable = (objects) => objects.map((object) => current(object?.id)).filter((row) => row && !layerById(row.layerId)?.locked)
+  // An element can be excluded from editing by its own `properties.locked`
+  // or by its layer's lock; the latter is the only one `setHidden`/`setLocked`
+  // keep enforcing, since unlocking an element is how a user reverses the former.
+  const onLockedLayer = (objects) => objects.map((object) => current(object?.id)).filter((row) => row && !layerById(row.layerId)?.locked)
+  const editable = (objects) => onLockedLayer(objects).filter((row) => !row.properties?.locked)
   const topPosition = (targetLayerId) => Math.max(0, ...rows.filter((row) => row.layerId === targetLayerId).map((row) => row.position ?? 0)) + 1
 
   function drawableLayer() {
@@ -132,15 +140,15 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     toast(targets.length === 1 ? 'Elemento eliminado' : `${targets.length} elementos eliminados`, { action: { label: 'Deshacer', onClick: () => undo() } })
   }
 
-  async function duplicate(objects) {
-    const sources = editable(objects).filter((row) => !row.pending)
-    if (!sources.length) return
+  // Shared by duplicate() and paste(): creates copies of `sources` offset by
+  // (dx, dy), re-attaching a hotspot record to each one that needs it.
+  async function cloneRows(sources, offset, label) {
     try {
       const created = await createRows(sources.map((row) => ({
         pageId, layerId: row.layerId, type: row.type, position: topPosition(row.layerId),
-        transform: { ...row.transform, x: (row.transform?.x ?? 0) + 24, y: (row.transform?.y ?? 0) + 24 },
+        transform: { ...row.transform, x: (row.transform?.x ?? 0) + offset, y: (row.transform?.y ?? 0) + offset },
         geometry: row.geometry, style: row.style, properties: row.properties,
-      })), 'Duplicar')
+      })), label)
       await Promise.all(created.map((object, index) => {
         const source = sources[index]
         if (source.type !== 'hotspot') return null
@@ -148,6 +156,46 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
       }))
     } catch (error) { fail(error) }
   }
+
+  function duplicate(objects) {
+    const sources = editable(objects).filter((row) => !row.pending)
+    if (!sources.length) return
+    return cloneRows(sources, 24, 'Duplicar')
+  }
+
+  // Hides/shows or locks/unlocks elements without going through `editable`:
+  // an element's own `properties.locked` must not block unlocking it (its
+  // layer's lock still does — see onLockedLayer above).
+  function setHidden(objects, hidden) {
+    const targets = onLockedLayer(objects)
+    if (!targets.length) return
+    applyUpdates(targets.map((row) => ({ row, data: { properties: { ...(row.properties ?? {}), hidden } } })), hidden ? 'Ocultar' : 'Mostrar')
+  }
+  function setLocked(objects, locked) {
+    const targets = onLockedLayer(objects)
+    if (!targets.length) return
+    applyUpdates(targets.map((row) => ({ row, data: { properties: { ...(row.properties ?? {}), locked } } })), locked ? 'Bloquear' : 'Desbloquear')
+  }
+
+  // convertShape() is a no-op (same reference) when the kind is unchanged.
+  function convertShapes(objects, kind) {
+    const entries = editable(objects).map((row) => {
+      const next = convertShape(row, kind)
+      return next === row ? null : { row, data: { type: next.type, geometry: next.geometry, properties: next.properties } }
+    }).filter(Boolean)
+    applyUpdates(entries, 'Cambiar forma')
+  }
+
+  function copy(objects) {
+    const sources = editable(objects).filter((row) => !row.pending).map((row) => snapshot(row))
+    if (sources.length) clipboardRef.current = sources
+  }
+  function paste() {
+    const sources = clipboardRef.current
+    if (!sources?.length) return
+    return cloneRows(sources, 24, 'Pegar')
+  }
+  const canPaste = () => Boolean(clipboardRef.current?.length)
 
   function arrange(objects, where) {
     const entries = editable(objects).map((row) => {
@@ -241,6 +289,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     batch, hotspot, createPage, updateLayer, ...media,
     chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, addDataLayer, addingLayer: createLayer.isPending, undo, redo,
     connectData, disconnectData, insertData,
+    setHidden, setLocked, convertShapes, copy, paste, canPaste,
     canUndo: history.canUndo, canRedo: history.canRedo,
     undoLabel: history.peekUndo()?.label ?? null, redoLabel: history.peekRedo()?.label ?? null,
     saving: batch.isPending || hotspot.isPending || updateLayer.isPending || media.inserting,

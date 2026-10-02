@@ -3,8 +3,30 @@ import { ArrowDownToLine, ArrowUpToLine, Copy, Lock, MapPin, Pencil, Trash2 } fr
 import { boxOf, canResize, canRotate, centerOf, isLinear } from '../../engine/geometry.js'
 import { CANVAS_COLORS, objectLabel } from '../../lib/objectFactory.js'
 import { measureTextHeight } from '../../engine/text.js'
+import { SHAPE_KINDS, shapeKindOf } from '../../lib/shapeConvert.js'
 import { Choice, ColorSwatches, FieldLabel, NumberInput, Section } from './fields.jsx'
 import { HotspotIconPicker } from '../HotspotIconPicker.jsx'
+
+const SHAPE_OPTIONS = {
+  closed: [
+    { value: 'rectangle', label: 'Rectángulo' }, { value: 'ellipse', label: 'Elipse' },
+    { value: 'triangle', label: 'Triángulo' }, { value: 'diamond', label: 'Rombo' },
+  ],
+  linear: [{ value: 'line', label: 'Línea' }, { value: 'arrow', label: 'Flecha' }],
+}
+
+// Only rendered for shapes that belong to a convertible family (closed or
+// linear); a freehand polygon or a hotspot/text/image has none.
+function ShapeField({ object, onConvert }) {
+  const kind = shapeKindOf(object)
+  const family = SHAPE_KINDS.closed.includes(kind) ? 'closed' : SHAPE_KINDS.linear.includes(kind) ? 'linear' : null
+  if (!family) return null
+  return (
+    <Section title="Forma">
+      <Choice label="Convertir a" value={kind} options={SHAPE_OPTIONS[family]} onChange={onConvert} />
+    </Section>
+  )
+}
 
 const PIN_SIZE_OPTIONS = [{ value: 'sm', label: 'Pequeño' }, { value: 'md', label: 'Mediano' }, { value: 'lg', label: 'Grande' }]
 const PIN_SCALE_OPTIONS = [{ value: 'screen', label: 'Fijo en pantalla' }, { value: 'plan', label: 'Crece con el plano' }]
@@ -124,7 +146,7 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
   )
 }
 
-export function ObjectInspector({ object, layerName, locked, readOnly = false, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, children }) {
+export function ObjectInspector({ object, layerName, locked, readOnly = false, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, onConvert, children }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-2 px-0.5">
@@ -147,6 +169,7 @@ export function ObjectInspector({ object, layerName, locked, readOnly = false, o
       ) : (
         <>
           <GeometryFields object={object} onPatch={onPatch} />
+          <ShapeField object={object} onConvert={onConvert} />
           <StyleFields object={object} onPatch={onPatch} onHotspotChange={onHotspotChange} />
           <Section title="Organizar">
             <div className="grid grid-cols-3 gap-1.5">

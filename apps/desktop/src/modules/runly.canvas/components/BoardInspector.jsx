@@ -27,6 +27,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           onArrange={(where) => actions.arrange([single], where)}
           onOpenHotspot={() => actions.openHotspot(single)}
           onEditText={() => actions.editText(single)}
+          onConvert={(kind) => actions.convertShapes([single], kind)}
         >
           <MeasuresSection object={single} scale={scale} />
           {canBind(single) ? (

@@ -36,7 +36,7 @@ function baseCursor(tool, spacePan) {
 // painted on the next animation frame, so dragging never waits on a React
 // render. React state only changes when a gesture commits.
 export function CanvasViewport(props) {
-  const { tool, spacePan, onViewportChange, onResize } = props
+  const { tool, spacePan, onViewportChange, onResize, flash } = props
   const canvasRef = useRef(null), rendererRef = useRef(null), dragRef = useRef(null), pointersRef = useRef(new Map())
   const liveRef = useRef(null), propsRef = useRef(props), frameRef = useRef(0), pressTimerRef = useRef(0)
 
@@ -59,6 +59,7 @@ export function CanvasViewport(props) {
       polygonDraft: live?.polygon ?? null,
       editVertices: p.editVertices !== false,
       interactive: !p.readOnly && p.selectedIds.length === 1 && !p.lockedLayerIds?.has(p.objects.find((row) => row.id === p.selectedIds[0])?.layerId),
+      flash: p.flash,
     })
   }
   function schedule() {
@@ -114,13 +115,28 @@ export function CanvasViewport(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool])
 
+  // A focused element pulses for ~1s (see hooks/useFocusAnimation.js); that
+  // needs its own repaint loop since nothing else re-renders during it.
+  useEffect(() => {
+    if (!flash) return undefined
+    let raf = 0, active = true
+    const tick = () => {
+      if (!active) return
+      schedule()
+      if (Date.now() < flash.until) raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => { active = false; cancelAnimationFrame(raf) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flash])
+
   const pointOf = (event) => { const rect = canvasRef.current.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top } }
   // Connected lines/arrows render (and hit-test) at their resolved border
   // position, not their last-saved geometry.
   const resolved = () => resolveConnectors(propsRef.current.objects)
   const selectable = () => {
     const { lockedLayerIds, isSelectable } = propsRef.current
-    let rows = resolved()
+    let rows = resolved().filter((row) => !row.properties?.locked)
     if (lockedLayerIds?.size) rows = rows.filter((row) => !lockedLayerIds.has(row.layerId))
     if (isSelectable) rows = rows.filter((row) => isSelectable(row))
     return rows
@@ -136,7 +152,18 @@ export function CanvasViewport(props) {
       if (dragRef.current !== drag || drag.moved) return
       navigator.vibrate?.(12)
       const p = propsRef.current
-      if (hit) { p.onSelect(toggle(p.selectedIds, hit.id)); dragRef.current = { mode: 'idle' }; return }
+      if (hit) {
+        // With a quick-actions menu available, a long press opens it on the
+        // hit (selecting it first) instead of toggling the selection — the
+        // menu's own "Agregar a la selección" replaces that old gesture.
+        if (p.onContextMenu) {
+          if (!p.selectedIds.includes(hit.id)) p.onSelect([hit.id])
+          dragRef.current = { mode: 'idle' }
+          p.onContextMenu(hit, drag.screen)
+          return
+        }
+        p.onSelect(toggle(p.selectedIds, hit.id)); dragRef.current = { mode: 'idle' }; return
+      }
       dragRef.current = { mode: 'marquee', screen: drag.screen, additive: true, base: p.selectedIds, moved: true }
       liveRef.current = { marquee: rectFrom(drag.screen, drag.screen) }
       schedule()
