@@ -11,6 +11,7 @@ const INVENTORY = { module: 'runly.inventory', permission: 'inventory.item.read'
 export const DATA_SOURCES = Object.freeze({
   inventory_location: { label: 'Ubicación de inventario', ...INVENTORY },
   inventory_item: { label: 'Artículo de inventario', ...INVENTORY },
+  pos_table: { label: 'Mesa de POS', module: 'runly.pos', permission: 'pos.floor.read' },
   ...Object.fromEntries(Object.entries(EXTERNAL_RELATION_TARGETS)
     .filter(([type]) => type !== 'inventory_item')
     .map(([type, target]) => [type, { label: target.label, module: target.module, permission: target.permission }])),
@@ -20,6 +21,14 @@ export const MAX_REFS = 500
 
 const STATUS_LABELS = { available: 'Disponible', assigned: 'Asignado', maintenance: 'Mantenimiento' }
 const STATUS_TONES = { available: 'ok', assigned: 'info', maintenance: 'warning' }
+const POS_STATUS = {
+  AVAILABLE: { label: 'Disponible', tone: 'ok' },
+  RESERVED: { label: 'Reservada', tone: 'info' },
+  OCCUPIED: { label: 'Ocupada', tone: 'warning' },
+  BILL_REQUESTED: { label: 'Cuenta pedida', tone: 'danger' },
+  DIRTY: { label: 'Sucia', tone: 'neutral' },
+  DISABLED: { label: 'No disponible', tone: 'neutral' },
+}
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`
 
 export function createCanvasDataSources({ prisma, relationTargets, access = createUserAccessService({ prisma }) }) {
@@ -85,6 +94,18 @@ export function createCanvasDataSources({ prisma, relationTargets, access = crea
         }]
       }))
     },
+    async pos_table(companyId, ids) {
+      const rows = await prisma.posTable.findMany({ where: { companyId, id: { in: ids }, enabled: true }, select: { id: true, name: true, status: true, capacity: true, zone: { select: { name: true } }, floor: { select: { name: true } } } })
+      return new Map(rows.map((row) => {
+        const status = POS_STATUS[row.status] ?? { label: row.status, tone: 'neutral' }
+        return [row.id, {
+          title: row.name, subtitle: [row.zone?.name, row.floor?.name].filter(Boolean).join(' · ') || null,
+          summary: `${status.label} · ${plural(row.capacity, 'persona', 'personas')}`, tone: status.tone,
+          metrics: [{ label: 'Estado', value: status.label }, { label: 'Capacidad', value: String(row.capacity) }],
+          url: '/app/m/runly.pos',
+        }]
+      }))
+    },
   }
 
   // refs: [{ source, id }] -> { 'source:id': Resolution }
@@ -125,6 +146,14 @@ export function createCanvasDataSources({ prisma, relationTargets, access = crea
         select: { id: true, name: true, address: true }, orderBy: { name: 'asc' }, take: 20,
       })
       return rows.map((row) => ({ id: row.id, title: row.name, subtitle: row.address ?? null }))
+    }
+    if (source === 'pos_table') {
+      const query = String(q ?? '').trim().slice(0, 100)
+      const rows = await prisma.posTable.findMany({
+        where: { companyId, enabled: true, ...(query ? { name: { contains: query, mode: 'insensitive' } } : {}) },
+        select: { id: true, name: true, floor: { select: { name: true } } }, orderBy: { name: 'asc' }, take: 20,
+      })
+      return rows.map((row) => ({ id: row.id, title: row.name, subtitle: row.floor?.name ?? null }))
     }
     return relationTargets.search({ authUserId, companyId, type: source, q, limit: 20 })
   }

@@ -70,4 +70,15 @@ describe('Canvas data sources', () => {
     assert.equal(location.installed, true); assert.equal(location.allowed, true)
     assert.equal(list.find((s) => s.key === 'contact').installed, false)
   })
+
+  it('describes POS tables by status', async () => {
+    const prisma = prismaWith({
+      posTable: { findMany: async ({ where }) => { assert.equal(where.companyId, COMPANY); return [{ id: 't1', name: 'Mesa 4', status: 'OCCUPIED', capacity: 4, zone: { name: 'Terraza' }, floor: { name: 'Planta baja' } }] } },
+    })
+    const sources = createCanvasDataSources({ prisma, access: allowAll, relationTargets: {} })
+    const result = await sources.resolve({ authUserId: 'auth-1', companyId: COMPANY, refs: [{ source: 'pos_table', id: 't1' }] })
+    assert.equal(result['pos_table:t1'].tone, 'warning')
+    assert.equal(result['pos_table:t1'].summary, 'Ocupada · 4 personas')
+    assert.equal(result['pos_table:t1'].subtitle, 'Terraza · Planta baja')
+  })
 })
