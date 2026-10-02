@@ -7,14 +7,8 @@ const ZONE_COLORS = {
   private: 'border-rose-400/60   dark:border-rose-600/60   bg-rose-50/30    dark:bg-rose-900/20   text-rose-600   dark:text-rose-400',
 }
 
-export const POLYGON_ZONE_COLORS = {
-  neutral: { fill: 'rgba(100,116,139,0.12)', stroke: '#64748b' },
-  dining:  { fill: 'rgba(59,130,246,0.12)',  stroke: '#3b82f6' },
-  outdoor: { fill: 'rgba(34,197,94,0.12)',   stroke: '#22c55e' },
-  bar:     { fill: 'rgba(245,158,11,0.12)',  stroke: '#f59e0b' },
-  vip:     { fill: 'rgba(139,92,246,0.12)',  stroke: '#8b5cf6' },
-  private: { fill: 'rgba(239,68,68,0.12)',   stroke: '#ef4444' },
-}
+export { POLYGON_ZONE_COLORS } from '../lib/zoneColors.js'
+import { POLYGON_ZONE_COLORS } from '../lib/zoneColors.js'
 
 export const DRAW_PREVIEW_COLORS = {
   TABLE_SQUARE: 'border-amber-400   bg-amber-100/20   dark:bg-amber-900/20',
