@@ -81,6 +81,9 @@ export default function BoardEditor() {
   const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false), [shareOpen, setShareOpen] = useState(false), [versionsOpen, setVersionsOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [boardDialogMode, setBoardDialogMode] = useState(null)
+  // The server broadcasts board.deleted to every session, including the one
+  // that deleted it (self only filters client sends), so this session skips it.
+  const selfDeleteRef = useRef(false)
   const fittedPageRef = useRef(null)
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
@@ -91,11 +94,10 @@ export default function BoardEditor() {
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
   // Another collaborator deleting this Board while it is open here: this
-  // session never gets its own broadcast (channel self = false), so this
-  // only fires for everyone else — they get redirected to the list.
+  // Other sessions get redirected to the list when the Board is deleted.
   const { presence, cursors, broadcastPointer } = useCanvasRealtime(boardId, {
     pageId, selectedIds,
-    onBoardDeleted: () => { toast.info('Este Board fue eliminado'); navigate('/app/m/runly.canvas') },
+    onBoardDeleted: () => { if (selfDeleteRef.current) return; toast.info('Este Board fue eliminado'); navigate('/app/m/runly.canvas') },
   })
   const pageScale = usePageScale({ boardId, pageId, calibration: activePage?.calibration ?? null, setTool })
   const pageMap = usePageMap({ boardId, pageId, background: activePage?.background ?? null, calibration: activePage?.calibration ?? null, size, setViewport })
@@ -295,7 +297,7 @@ export default function BoardEditor() {
         history={{ undo: actions.undo, redo: actions.redo, canUndo: actions.canUndo, canRedo: actions.canRedo, undoLabel: actions.undoLabel, redoLabel: actions.redoLabel }}
         readOnly={readOnly} onShare={() => setShareOpen(true)} onVersions={() => setVersionsOpen(true)}
         onExport={exportPage.exportAs} exportDisabled={exportPage.exportDisabled}
-        myRole={myRole} onRenameBoard={() => setBoardDialogMode('rename')} onDeleteBoard={() => setBoardDialogMode('delete')}
+        myRole={myRole} onRenameBoard={() => setBoardDialogMode('rename')} onDeleteBoard={() => { selfDeleteRef.current = true; setBoardDialogMode('delete') }}
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
@@ -383,8 +385,8 @@ export default function BoardEditor() {
       <BoardActionsDialogs
         board={board.data ? { id: boardId, name: board.data.name, myRole } : null}
         mode={boardDialogMode}
-        onClose={() => setBoardDialogMode(null)}
-        onDeleted={() => navigate('/app/m/runly.canvas')}
+        onClose={() => { setBoardDialogMode(null); selfDeleteRef.current = false }}
+        onDeleted={() => { selfDeleteRef.current = true; navigate('/app/m/runly.canvas') }}
       />
       <ShareBoardDialog open={shareOpen} onOpenChange={setShareOpen} boardId={boardId} boardName={board.data?.name ?? 'Board'} myRole={myRole} />
       <VersionsSheet
