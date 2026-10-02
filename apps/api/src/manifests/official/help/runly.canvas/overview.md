@@ -23,6 +23,12 @@ Cada pagina trae las capas de su plantilla (por ejemplo, un Plano trae **Plano b
 
 Puedes ocultar una capa (icono de ojo) o bloquearla (candado) para no moverla por accidente. Al elegir una herramienta, Canvas cambia solo a la capa correcta.
 
+- **Datos Runly**: aqui van los objetos **conectados a datos**. Selecciona una forma y usa "Conectar a datos" en el inspector (o el boton "Insertar datos" de la barra inferior) para ligarla a una ubicacion o articulo de inventario, un vehiculo, un colaborador, un proyecto u otro registro. El objeto muestra el nombre del registro, un resumen y un color segun su estado (por ejemplo, una ubicacion con equipos en mantenimiento se ve en ambar) y se actualiza solo cada minuto. Ocultar esta capa oculta todos los datos de la pagina.
+
+### Donde aparece un registro
+
+En la ficha de un articulo de inventario, la seccion **En Canvas** lista los Boards donde ese articulo esta conectado o vinculado, con un boton para abrirlos.
+
 ### Cuadricula y ajuste
 
 Sin nada seleccionado, el inspector muestra **Ajustes del Board**: mostrar u ocultar la cuadricula, su tamano y **Ajustar a la cuadricula**. Con el ajuste activo, las formas se alinean a la cuadricula al dibujarlas, moverlas o cambiar su tamano; manten **Alt** mientras arrastras para desactivarlo un momento.
