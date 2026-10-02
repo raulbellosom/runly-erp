@@ -59,6 +59,7 @@ export function drawZone(ctx, object, { x, y, w, h, zoom, theme }) {
 export function drawDecor(ctx, object, { x, y, w, h, theme }) {
   const kind = object.properties?.kind
   const label = object.properties?.label
+  const props = object.properties ?? {}
   const cx = x + w / 2, cy = y + h / 2
   if (kind === 'WALL') {
     ctx.fillStyle = DECOR_COLORS.WALL.fill
@@ -68,6 +69,12 @@ export function drawDecor(ctx, object, { x, y, w, h, theme }) {
     ctx.strokeStyle = DECOR_COLORS.BAR.stroke
     ctx.lineWidth = 1.5
     roundRect(ctx, x, y, w, h, 10); ctx.fill(); ctx.stroke()
+    // Stools along the bottom edge, one per seat (as the DOM planner drew them).
+    const stools = props.capacity > 0 ? Math.min(props.capacity, Math.floor(w / 18)) : 0
+    for (let i = 0; i < stools; i += 1) {
+      ctx.beginPath(); ctx.arc(x + (w / stools) * (i + 0.5), y + h - 6, Math.min(5, h / 5), 0, Math.PI * 2)
+      ctx.fillStyle = DECOR_COLORS.BAR.stroke; ctx.fill()
+    }
   } else if (kind === 'PLANT') {
     const r = Math.min(w, h) / 2
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2)

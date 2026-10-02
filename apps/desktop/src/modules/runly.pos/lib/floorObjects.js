@@ -46,7 +46,7 @@ export function floorToObjects({ floor, elements = [], tableStates = {} }) {
           dimmed: table?.isMine === false, orphan: Boolean(el.tableId && !table), tableId: el.tableId ?? null, label: el.label ?? null,
         },
       })
-    } else decor.push({ ...base(el, 'pos.decor'), properties: { kind: el.kind, label: el.label ?? null } })
+    } else decor.push({ ...base(el, 'pos.decor'), properties: { kind: el.kind, label: el.label ?? null, capacity: Number(el.style?.capacity ?? 0) || 0 } })
   }
   return [surface, ...below, ...decor, ...tables]
 }

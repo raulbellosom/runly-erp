@@ -59,7 +59,7 @@ function tableObject(el) {
 }
 
 function decorObject(el) {
-  return { ...base(el, 'pos.decor', 'pos'), properties: { kind: el.kind, label: el.label ?? null } }
+  return { ...base(el, 'pos.decor', 'pos'), properties: { kind: el.kind, label: el.label ?? null, capacity: el.capacity ?? 0 } }
 }
 
 // Single planner element -> single Canvas object, used both when building
