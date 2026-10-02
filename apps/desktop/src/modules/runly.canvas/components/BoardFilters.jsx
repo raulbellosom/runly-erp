@@ -1,10 +1,6 @@
 import { useState } from 'react'
-import {
-  Badge, Button, DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger,
-  SelectField, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, useIsMobile,
-} from '@runly/ui'
+import { Badge, Button, SelectField, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, useIsMobile } from '@runly/ui'
 import { ListFilter, X } from 'lucide-react'
-import { templateIcon } from '../lib/boardMeta.js'
 import { useCanvasTemplates } from '../hooks/useCanvasData.js'
 import { activeFilterCount } from '../lib/boardFilters.js'
 
@@ -25,37 +21,12 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Más antiguos' },
 ]
 
-function TemplateDropdown({ templates, selected, onToggle }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" className="shrink-0">
-          Plantilla{selected.length ? <Badge variant="secondary" className="ml-1">{selected.length}</Badge> : null}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {templates.map((template) => {
-          const Icon = templateIcon(template.icon)
-          return (
-            <DropdownMenuCheckboxItem key={template.key} checked={selected.includes(template.key)} onCheckedChange={() => onToggle(template.key)}>
-              <Icon className="mr-2 h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" aria-hidden />{template.label}
-            </DropdownMenuCheckboxItem>
-          )
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 // Shared between the desktop row and the mobile Sheet — the exact same controls either way.
 function FilterControls({ filters, templates, onChange }) {
-  const toggleTemplate = (key) => {
-    const next = filters.templates.includes(key) ? filters.templates.filter((item) => item !== key) : [...filters.templates, key]
-    onChange({ ...filters, templates: next })
-  }
+  const templateOptions = [{ value: 'all', label: 'Todas las plantillas' }, ...templates.map((template) => ({ value: template.key, label: template.label }))]
   return (
     <>
-      <TemplateDropdown templates={templates} selected={filters.templates} onToggle={toggleTemplate} />
+      <SelectField label="Plantilla" value={filters.templates[0] ?? 'all'} options={templateOptions} onValueChange={(value) => onChange({ ...filters, templates: value === 'all' ? [] : [value] })} />
       <SelectField label="Acceso" value={filters.access} options={ACCESS_OPTIONS} onValueChange={(access) => onChange({ ...filters, access })} />
       <SelectField label="Actualizado" value={filters.updated} options={UPDATED_OPTIONS} onValueChange={(updated) => onChange({ ...filters, updated })} />
       <SelectField label="Orden" value={filters.sort} options={SORT_OPTIONS} onValueChange={(sort) => onChange({ ...filters, sort })} />
