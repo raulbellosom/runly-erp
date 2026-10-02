@@ -21,6 +21,7 @@ import { DEFAULT_VIEWPORT, fitBounds, zoomAt } from '../engine/viewport.js'
 import { useBoard, useCanvasImages, useCanvasObjects, useCanvasTemplates, useEntityLinks, useUpdateBoardSettings, useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { toast } from 'sonner'
 import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
+import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
 import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
@@ -92,6 +93,7 @@ export default function BoardEditor() {
 
   const openDialog = useCallback((next) => setDialog(next), [])
   const actions = useBoardEditorActions({ boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog })
+  useBoardThumbnail({ boardId, enabled: Boolean(board.data) && !readOnly, rows: allRows, saving: actions.saving })
 
   // The template's starting tool, applied once per Board for editors only.
   const toolAppliedRef = useRef(null)

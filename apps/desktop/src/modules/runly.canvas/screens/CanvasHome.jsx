@@ -1,18 +1,36 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Button, EmptyState, ErrorState, PageHeader, SearchInput } from '@runly/ui'
 import { PanelsTopLeft, Plus, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '../../../auth/AuthProvider.jsx'
+import { runly } from '../../../lib/runly.js'
 import { BoardCard, BoardCardSkeleton } from '../components/BoardCard.jsx'
 import { CreateBoardDialog } from '../components/CreateBoardDialog.jsx'
 import { useBoards, useCreateBoard } from '../hooks/useCanvasData.js'
 
 const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4'
+const unwrap = (response) => response?.data ?? response
+
+// Signed URLs for every Board that already has a thumbnail, batched in one
+// call and cached for 30 minutes (same pattern as useCanvasImages).
+function useThumbnailUrls(fileIds) {
+  const token = useAuth().session?.access_token
+  return useQuery({
+    queryKey: ['canvas', 'thumbnail-urls', fileIds],
+    queryFn: async () => unwrap(await runly.files.batchSignedUrls(fileIds, token)) ?? {},
+    enabled: Boolean(token && fileIds.length),
+    staleTime: 30 * 60_000,
+  })
+}
 
 export default function CanvasHome() {
   const navigate = useNavigate(), boards = useBoards(), create = useCreateBoard()
   const [open, setOpen] = useState(false), [query, setQuery] = useState('')
   const list = useMemo(() => boards.data ?? [], [boards.data])
+  const thumbnailIds = useMemo(() => [...new Set(list.filter((board) => board.thumbnailFileId).map((board) => board.thumbnailFileId))].sort(), [list])
+  const thumbnailUrls = useThumbnailUrls(thumbnailIds)
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     return term ? list.filter((board) => `${board.name} ${board.description ?? ''}`.toLowerCase().includes(term)) : list
@@ -64,7 +82,11 @@ export default function CanvasHome() {
 
       {ready && filtered.length > 0 ? (
         <ul className={GRID}>
-          {filtered.map((board) => <li key={board.id} className="flex"><BoardCard board={board} onOpen={() => openBoard(board.id)} /></li>)}
+          {filtered.map((board) => (
+            <li key={board.id} className="flex">
+              <BoardCard board={board} onOpen={() => openBoard(board.id)} thumbnailUrl={board.thumbnailFileId ? thumbnailUrls.data?.[board.thumbnailFileId] : null} />
+            </li>
+          ))}
         </ul>
       ) : null}
 

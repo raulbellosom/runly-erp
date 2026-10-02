@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { FileText, Users } from 'lucide-react'
 import { templateIcon, timeAgo } from '../lib/boardMeta.js'
 import { useCanvasTemplates } from '../hooks/useCanvasData.js'
@@ -5,26 +6,32 @@ import { roleLabel } from '../lib/roles.js'
 
 const DOT_GRID = { backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.28) 1px, transparent 1px)', backgroundSize: '16px 16px' }
 
-export function BoardCard({ board, onOpen }) {
+export function BoardCard({ board, onOpen, thumbnailUrl }) {
   const templates = useCanvasTemplates()
   const template = templates.data?.find((item) => item.key === board.templateType)
   const Icon = templateIcon(template?.icon), templateLabel = template?.label ?? 'Board'
   const pages = board._count?.pages ?? 0, collaborators = board._count?.collaborators ?? 0
+  const [failed, setFailed] = useState(false)
+  const showThumbnail = Boolean(thumbnailUrl) && !failed
   return (
     <button
       type="button"
       onClick={onOpen}
       className="group flex w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-left shadow-sm transition-[box-shadow,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
     >
-      <div className="relative flex aspect-[16/9] items-center justify-center bg-[hsl(var(--muted)/0.5)]" style={DOT_GRID}>
-        <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] shadow-sm transition-colors group-hover:text-primary">
-          <Icon className="h-5 w-5" />
-        </span>
-        <span className="absolute left-3 top-3 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))] backdrop-blur">
+      <div className="relative flex aspect-[16/9] items-center justify-center bg-[hsl(var(--muted)/0.5)]" style={showThumbnail ? undefined : DOT_GRID}>
+        {showThumbnail ? (
+          <img src={thumbnailUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" onError={() => setFailed(true)} />
+        ) : (
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] shadow-sm transition-colors group-hover:text-primary">
+            <Icon className="h-5 w-5" />
+          </span>
+        )}
+        <span className="absolute left-3 top-3 z-10 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))] backdrop-blur">
           {templateLabel}
         </span>
         {board.myRole && board.myRole !== 'OWNER' ? (
-          <span className="absolute right-3 top-3 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--foreground))] backdrop-blur">
+          <span className="absolute right-3 top-3 z-10 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--foreground))] backdrop-blur">
             Compartido · {roleLabel(board.myRole)}
           </span>
         ) : null}
