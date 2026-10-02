@@ -1,4 +1,7 @@
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@runly/ui'
+import {
+  Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  Tooltip, TooltipContent, TooltipTrigger, cn,
+} from '@runly/ui'
 import { Ruler } from 'lucide-react'
 import { formatLength } from '../lib/measure.js'
 
@@ -12,23 +15,42 @@ export function scaleLabel(scale) {
   return `1 px = ${formatLength(1, scale)}`
 }
 
-export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = false, onMap }) {
+// Icon-only button inside the zoom stack: the current scale is its tooltip
+// and the menu header; a dot marks a page that has a scale (or a map).
+export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = false, onMap, side = 'left' }) {
   const label = hasMap ? 'Mapa · metros' : scale ? scaleLabel(scale) : 'Sin escala'
+  const calibrated = hasMap || Boolean(scale)
+  const icon = (
+    <span className="relative">
+      <Ruler className="h-4 w-4" />
+      {calibrated ? <span aria-hidden className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+    </span>
+  )
+  const buttonClass = cn('h-9 w-11 rounded-lg px-0', calibrated ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]')
+
   if (!canEdit) {
     return (
-      <div role="status" className="glass pointer-events-auto flex items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-medium shadow-lg">
-        <Ruler className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />{label}
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span role="status" aria-label={`Escala: ${label}`} className={cn('inline-flex items-center justify-center', buttonClass)}>{icon}</span>
+        </TooltipTrigger>
+        <TooltipContent side={side}>Escala: {label}</TooltipContent>
+      </Tooltip>
     )
   }
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" className="glass pointer-events-auto h-9 gap-1.5 rounded-2xl px-3 text-xs font-medium shadow-lg">
-          <Ruler className="h-3.5 w-3.5" />{label}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" aria-label={`Escala: ${label}`} className={buttonClass}>{icon}</Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side={side}>Escala: {label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent side={side} align="start">
+        <DropdownMenuLabel className="text-xs font-medium text-[hsl(var(--muted-foreground))]">Escala: {label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
         {!hasMap ? <DropdownMenuItem onSelect={onCalibrate}>Calibrar escala</DropdownMenuItem> : null}
         {!hasMap && scale ? <DropdownMenuItem onSelect={onClear}>Quitar escala</DropdownMenuItem> : null}
         <DropdownMenuItem onSelect={onMap}>Fondo de mapa…</DropdownMenuItem>

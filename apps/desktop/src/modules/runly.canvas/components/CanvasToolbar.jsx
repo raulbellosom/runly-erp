@@ -14,7 +14,7 @@ export const SHAPES = {
   arrow: { label: 'Flecha', shortcut: 'A', icon: ArrowUpRight },
 }
 
-export function ToolButton({ label, shortcut, active, className, children, ...props }) {
+export function ToolButton({ label, shortcut, active, className, side = 'top', children, ...props }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -34,7 +34,7 @@ export function ToolButton({ label, shortcut, active, className, children, ...pr
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top" className="flex items-center gap-2">
+      <TooltipContent side={side} className="flex items-center gap-2">
         {label}
         {shortcut ? <kbd className="rounded border border-[hsl(var(--border))] px-1 font-mono text-[10px] text-[hsl(var(--muted-foreground))]">{shortcut}</kbd> : null}
       </TooltipContent>

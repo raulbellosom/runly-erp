@@ -333,14 +333,17 @@ export default function BoardEditor() {
             </div>
           ) : null}
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] @6xl:flex-row @6xl:items-end @6xl:justify-center">
-            <div className="pointer-events-none flex w-full items-end justify-end gap-2 @6xl:absolute @6xl:bottom-[max(0.75rem,env(safe-area-inset-bottom))] @6xl:right-3 @6xl:w-auto">
+          {/* Zoom + scale: one vertical stack on the right edge, so the bottom
+              bar only holds the drawing tools (also on phones). */}
+          <div className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 sm:right-3">
+            <ZoomControls orientation="vertical" zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit}>
               <ScaleControl
                 scale={pageScale.scale} canEdit={!readOnly} onCalibrate={pageScale.startCalibrate} onClear={pageScale.clear}
                 hasMap={pageMap.hasMap} onMap={pageMap.open}
               />
-              <ZoomControls zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit} />
-            </div>
+            </ZoomControls>
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <CanvasToolbar
               tool={tool} onToolChange={actions.chooseTool} canDelete={editableSelection.length > 0} onDelete={deleteSelection}
               onInsertMedia={actions.openFilePicker} onInsertData={() => setDialog({ kind: 'data', mode: 'insert' })} inserting={actions.inserting}

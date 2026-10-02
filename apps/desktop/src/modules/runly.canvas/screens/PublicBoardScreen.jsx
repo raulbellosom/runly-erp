@@ -149,8 +149,8 @@ export default function PublicBoardScreen() {
         ) : null}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <p className="glass pointer-events-auto hidden rounded-full px-3 py-2 text-xs text-[hsl(var(--muted-foreground))] shadow-md @xl:block">Arrastra para moverte · pellizca o usa la rueda para acercar · toca un pin para ver su información</p>
-          <div className="pointer-events-none ml-auto"><ZoomControls zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={() => setViewport((current) => zoomAt(current, { x: size.width / 2, y: size.height / 2 }, 1))} onFit={fit} /></div>
         </div>
+        <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 sm:right-3"><ZoomControls orientation="vertical" zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={() => setViewport((current) => zoomAt(current, { x: size.width / 2, y: size.height / 2 }, 1))} onFit={fit} /></div>
       </main>
 
       <Dialog open={Boolean(openHotspot)} onOpenChange={(open) => { if (!open) setOpenHotspotId(null) }}>
