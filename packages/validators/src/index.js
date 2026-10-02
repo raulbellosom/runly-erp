@@ -522,6 +522,14 @@ export const fileBulkDownloadSchema = z.object({
   mode: z.enum(["direct", "zip"]),
 });
 
+// POST /files/:id/links — public view/download link to one file.
+export const fileShareLinkCreateSchema = z.object({
+  mode: z.enum(["view", "download"]).default("view"),
+  label: z.string().trim().max(120).optional(),
+  expiresAt: z.union([z.number().int().positive(), z.string().datetime()]).optional(),
+  maxUses: z.number().int().min(1).max(1_000_000).optional(),
+});
+
 export const createLedgerAccountSchema = z.object({
   name: z.string().trim().min(2, "El nombre es obligatorio.").max(120),
   type: z.enum(["banco", "caja", "cliente", "proveedor", "otro"]),

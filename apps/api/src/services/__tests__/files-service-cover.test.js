@@ -53,6 +53,7 @@ function buildPrismaMock(files) {
   return {
     userProfile: { findUnique: async () => ({ id: PROFILE_ID }) },
     membership: { findFirst: async () => ({ companyId: COMPANY_ID }) },
+    fileAssetShare: { findUnique: async () => null },
     fileAsset: {
       findFirst: async ({ where }) => {
         const row = [...byId.values()].find((r) => rowMatches(r, where));
@@ -109,7 +110,7 @@ describe("files-service setFileCover", () => {
     const service = createFilesService({ prisma, supabaseAdmin: {} });
     const result = await service.setFileCover({
       authUserId: AUTH_USER_ID,
-      activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
+      activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID, permissionSet: new Set(["hr.employee.read"]) },
       id: FILE_B,
     });
     assert.equal(result.isCover, true);
@@ -125,7 +126,7 @@ describe("files-service setFileCover", () => {
     await assert.rejects(() =>
       service.setFileCover({
         authUserId: AUTH_USER_ID,
-        activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
+        activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID, permissionSet: new Set(["hr.employee.read"]) },
         id: FILE_A,
       }),
     );
@@ -141,7 +142,7 @@ describe("files-service reorderFiles", () => {
     const service = createFilesService({ prisma, supabaseAdmin: {} });
     const result = await service.reorderFiles({
       authUserId: AUTH_USER_ID,
-      activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
+      activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID, permissionSet: new Set(["hr.employee.read"]) },
       items: [
         { id: FILE_A, sortOrder: 1 },
         { id: FILE_B, sortOrder: 0 },
@@ -162,7 +163,7 @@ describe("files-service reorderFiles", () => {
     await assert.rejects(() =>
       service.reorderFiles({
         authUserId: AUTH_USER_ID,
-        activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID },
+        activeContext: { companyId: COMPANY_ID, profileId: PROFILE_ID, permissionSet: new Set(["hr.employee.read"]) },
         items: [{ id: FILE_A, sortOrder: 0 }],
       }),
     );

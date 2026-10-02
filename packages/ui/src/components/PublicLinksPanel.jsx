@@ -80,7 +80,7 @@ export function QrDialog({ open, onOpenChange, url, title = "Código QR" }) {
 // `api` lets an official module plug in its own endpoints with the same
 // { list, create, revoke } contract (links must carry `path`, the SPA path
 // of the public page); RME3 modules keep using createPublicLinksApi.
-export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, resource, recordId = null, title = "Enlaces públicos", api: customApi = null }) {
+export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, resource, recordId = null, title = "Enlaces públicos", api: customApi = null, modes = null }) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -155,6 +155,7 @@ export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, reso
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">{link.label || "Enlace sin nombre"}</span>
                     <Badge variant={badge.variant}>{badge.label}</Badge>
+                    {modes && link.mode ? <Badge variant="outline">{modes.find((m) => m.value === link.mode)?.label ?? link.mode}</Badge> : null}
                   </div>
                   <p className="text-xs text-[hsl(var(--muted-foreground))]">
                     Usos: {link.useCount}{link.maxUses ? ` / ${link.maxUses}` : ""}
@@ -185,6 +186,7 @@ export function PublicLinksPanel({ apiBaseUrl, token, companyId, moduleKey, reso
         onOpenChange={setCreateOpen}
         onCreate={(payload) => api.create({ resource, recordId: recordId ?? undefined, ...payload })}
         onCreated={load}
+        modes={modes}
       />
       <QrDialog open={!!qrLink} onOpenChange={(open) => !open && setQrLink(null)} url={publicLinkUrl(qrLink)} />
       <ConfirmDialog

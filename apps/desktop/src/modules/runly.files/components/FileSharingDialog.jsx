@@ -14,6 +14,7 @@ import {
   ErrorState,
   LoadingState,
   ConfirmDialog,
+  PublicLinksPanel,
 } from "@runly/ui";
 import { Users, UserPlus, Link2, X } from "lucide-react";
 import {
@@ -29,17 +30,44 @@ const ROLES = [
   { value: "EDITOR", label: "Puede editar" },
 ];
 const SCOPES = [
-  { value: "RESTRICTED", label: "Personas seleccionadas" },
-  { value: "COMPANY", label: "Personas de la empresa con permiso" },
+  { value: "RESTRICTED", label: "Privado: solo personas invitadas" },
+  { value: "COMPANY", label: "Toda la empresa" },
 ];
+const LINK_MODES = [
+  { value: "view", label: "Solo ver" },
+  { value: "download", label: "Ver y descargar" },
+];
+
+// Public page path inside the SPA (honours VITE_BASE_PATH, e.g. /app/).
+function publicFilePath(linkToken) {
+  const base = String(import.meta.env?.BASE_URL || "/").replace(/\/?$/, "/");
+  return `${base}p/files/${linkToken}`;
+}
+
+function unwrap(response) {
+  return response?.data ?? response;
+}
+
 export function FileSharingDialog({
   file,
   token,
   userId,
+  profileId,
+  isCompanyAdmin,
   onClose,
   onCopyLink,
 }) {
   const queryClient = useQueryClient();
+  const canManageLinks = Boolean(isCompanyAdmin || (file.uploadedById && file.uploadedById === profileId));
+  const linksApi = useMemo(() => {
+    const withPath = (link) => ({ ...link, path: publicFilePath(link.token) });
+    return {
+      list: async () => (unwrap(await runly.files.listLinks(file.id, token)) ?? []).map(withPath),
+      create: async ({ mode, label, expiresAt, maxUses }) =>
+        withPath(unwrap(await runly.files.createLink(file.id, { mode, label, expiresAt, maxUses }, token))),
+      revoke: (linkId) => runly.files.revokeLink(file.id, linkId, token),
+    };
+  }, [file.id, token]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState([]);
   const [role, setRole] = useState("VIEWER");
@@ -117,16 +145,17 @@ export function FileSharingDialog({
           if (!open && !update.isPending && !inviteMany.isPending) onClose();
         }}
       >
-        <DialogContent className="sm:max-w-xl max-h-[85dvh] overflow-y-auto">
+        <DialogContent scrollable className="sm:max-w-xl max-h-[85dvh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Compartir documento
+              Compartir archivo
             </DialogTitle>
             <DialogDescription className="truncate">
               {file.originalName}
             </DialogDescription>
           </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
           {access.isLoading ? (
             <LoadingState message="Cargando acceso…" />
           ) : access.isError ? (
@@ -148,8 +177,8 @@ export function FileSharingDialog({
                     disabled={update.isPending}
                   />
                   <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                    Los permisos del módulo y la pertenencia a la empresa siguen
-                    siendo necesarios. Los administradores conservan acceso.
+                    Los archivos privados solo los ven tú, las personas invitadas
+                    y los administradores.
                   </p>
                   <div className="space-y-3 rounded-xl border p-4">
                     <div>
@@ -257,7 +286,7 @@ export function FileSharingDialog({
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">
                   {file.entityType === "AtlasFile"
                     ? "El propietario o un administrador gestiona el acceso a este documento."
-                    : "Este adjunto conserva el acceso de su módulo de origen."}
+                    : "Este adjunto lo ve quien tenga acceso al registro en su módulo de origen."}
                 </p>
               )}
               {data.owner && (
@@ -329,8 +358,18 @@ export function FileSharingDialog({
                 <Link2 className="h-4 w-4" />
                 Copiar enlace de Runly
               </Button>
+              {canManageLinks && file.enabled !== false && (
+                <div className="border-t pt-4">
+                  <PublicLinksPanel
+                    title="Enlaces públicos"
+                    api={linksApi}
+                    modes={LINK_MODES}
+                  />
+                </div>
+              )}
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
       <ConfirmDialog

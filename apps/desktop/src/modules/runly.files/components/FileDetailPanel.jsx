@@ -16,6 +16,12 @@ import { getOfficeFormat } from "@runly/core";
 import { ExternalLink, FileSearch } from "lucide-react";
 import { resolveFileOrigin } from "../lib/file-origin-resolver";
 
+const ACCESS_LABELS = {
+  private: "Privado (tú y las personas invitadas)",
+  company: "Toda la empresa",
+  module: "Quien tenga acceso en su módulo",
+};
+
 function Row({ label, value }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1.5 border-b border-[hsl(var(--border))]/60">
@@ -68,13 +74,10 @@ export function FileDetailPanel({
           <Row
             label="Acceso"
             value={
-              file.accessScope === "RESTRICTED"
-                ? "Personas seleccionadas"
-                : file.visibility === "PUBLIC"
-                  ? "Público"
-                  : file.entityType === "AtlasFile"
-                    ? "Empresa"
-                    : "Desde el origen"
+              file.visibility === "PUBLIC"
+                ? "Público"
+                : ACCESS_LABELS[file.access] ??
+                  (file.accessScope === "RESTRICTED" ? "Privado" : "Desde el origen")
             }
           />
           <Row label="Modificado" value={formatDate(file.updatedAt)} />

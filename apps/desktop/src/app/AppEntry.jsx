@@ -45,6 +45,7 @@ import PublicNoteScreen from "../modules/runly.notes/PublicNoteScreen.jsx";
 
 const GuestCallScreen = lazy(() => import("../modules/runly.chat/calls/guest/GuestCallScreen.jsx"));
 const PublicBoardScreen = lazy(() => import("../modules/runly.canvas/screens/PublicBoardScreen.jsx"));
+const PublicFileScreen = lazy(() => import("../modules/runly.files/screens/PublicFileScreen.jsx"));
 import { useCallSoundUnlock } from "../modules/runly.chat/calls/useCallSoundUnlock.js";
 import "../styles.css";
 
@@ -171,6 +172,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
                     <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
                     <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
                     <Route path="canvas/:token" element={<Suspense fallback={null}><PublicBoardScreen /></Suspense>} />
+                    <Route path="files/:token" element={<Suspense fallback={null}><PublicFileScreen /></Suspense>} />
                   </Route>
                   <Route element={<AppRouteGuard mode="access" />}>
                     <Route path="/app/accept-invitation" element={<AcceptInvitationScreen />} />
@@ -201,6 +203,7 @@ function App({ initialServerUrl = null, requiresServerSetup = false, bootstrapEr
                     <Route path="notes/:slug" element={<PublicNoteScreen />} />
                     <Route path="call/:token" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
                     <Route path="call" element={<Suspense fallback={null}><GuestCallScreen /></Suspense>} />
+                    <Route path="files/:token" element={<Suspense fallback={null}><PublicFileScreen /></Suspense>} />
                     <Route path="*" element={<PublicModuleOutlet />} />
                   </Route>
                   <Route path="*" element={<PublicWebsiteEntry />} />

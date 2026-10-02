@@ -4,6 +4,7 @@ import { createCollaborationInvitationsService } from './services/collaboration-
 import { createOfficeService } from "./services/office/service.js";
 import { createOfficeRouter } from "./routes/office.js";
 import { createFilesRouter } from "./routes/files.js";
+import { createFilesPublicRouter } from "./routes/files-public.js";
 import { createIdentitySessionsRouter } from "./routes/identity/identity-sessions-routes.js";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -2088,6 +2089,13 @@ app.route("/", createModulePublicGateway({
 app.route("/", createCanvasPublicRouter({
   prisma,
   signFile: (fileId) => getSignedUrlByFileId(fileId, "full", { prisma, supabaseAdmin }),
+  resolveLogoUrl: (fileId) => getSignedUrlByFileId(fileId, "card", { prisma, supabaseAdmin }),
+}));
+
+// File view/download public links: /public/files/:token (path-scoped, no auth).
+app.route("/", createFilesPublicRouter({
+  prisma,
+  supabaseAdmin,
   resolveLogoUrl: (fileId) => getSignedUrlByFileId(fileId, "card", { prisma, supabaseAdmin }),
 }));
 

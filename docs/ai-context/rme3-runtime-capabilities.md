@@ -567,8 +567,8 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `FileUploader` | File upload widget with progress |
 | `FileViewer` | File preview (PDF, image, etc.) |
 | `AttachmentsPanel` | File attachments list panel |
-| `PublicLinksPanel` | Public links of one module resource: list (status, uses, expiry), create, copy, QR and revoke. Props: `apiBaseUrl`, `token`, `companyId`, `moduleKey`, `resource`, `recordId`; optional `api` (`{ list, create, revoke }`, links with `path`) lets an official module use its own endpoints (runly.canvas board links). See `rme3-public-links.md`. |
-| `ShareLinkDialog` | Create-one-link dialog (label, expiry, max uses) used by `PublicLinksPanel`; `onCreate(payload)` must return the link. |
+| `PublicLinksPanel` | Public links of one module resource: list (status, uses, expiry), create, copy, QR and revoke. Props: `apiBaseUrl`, `token`, `companyId`, `moduleKey`, `resource`, `recordId`; optional `api` (`{ list, create, revoke }`, links with `path`) lets an official module use its own endpoints (runly.canvas board links, runly.files file links); optional `modes` (`[{ value, label }]`) adds a mode picker to the create dialog and a mode badge per link. See `rme3-public-links.md`. |
+| `ShareLinkDialog` | Create-one-link dialog (label, expiry, max uses, optional `modes` picker sent as `mode`) used by `PublicLinksPanel`; `onCreate(payload)` must return the link. |
 | `PublicLinkFrame` | Branded frame for public pages opened by a link: company logo/name header and Runly footer. Prop: `publicLink` (from the page props), `title`. |
 | `RunlyCrudView` `extraDetailActions` | Host-provided detail actions `[{ key, label, icon, onClick(record) }]`; used for the public-links "Compartir" action. |
 | `DocumentsPanel` | Documents list panel |

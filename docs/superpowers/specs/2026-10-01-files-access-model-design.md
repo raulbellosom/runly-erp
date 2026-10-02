@@ -6,7 +6,7 @@ runly.files access model: personal cloud, module-derived visibility, and public 
 
 ## 2. Status
 
-Proposed
+Complete (2026-10-02). The data migration ships but is applied with `pnpm db:migrate`.
 
 ## 3. Context
 
@@ -134,7 +134,7 @@ relies on `COMPANY` scope inside an already-authorized task).
    `metadata.sourceEntityId`.
 2. `FileAssetShare` (existing) — unchanged.
 3. Public links reuse `ModulePublicLink` (existing) with
-   `moduleKey = 'runly.files'`, `resourceKey = 'file'`, `recordId = FileAsset.id`,
+   `moduleKey = 'runly.files'`, `resourceKey = 'file.share'`, `recordId = FileAsset.id`,
    `mode = 'view' | 'download'`, plus existing `expiresAt`, `maxUses`,
    `useCount`, `lastUsedAt`, `revokedAt`, `createdByUserId`, `label`.
    A dedicated files link service owns these rows; it does not go through the
@@ -157,11 +157,12 @@ relies on `COMPANY` scope inside an already-authorized task).
 
 All authenticated routes require a session and company context.
 
-1. `GET /files?workspace=mine|shared|modules|all|...` — `all` returns 403 for
-   non-admins. `modules` returns module attachments allowed by resolvers.
+1. `GET /files?workspace=mine|shared|modules|all|...` — for non-admins `all`
+   (or no workspace) returns the union of everything they can read; admins get
+   every company file. `modules` returns module attachments allowed by resolvers.
    Response shape unchanged (`{ data, pagination }`), rows gain
    `origin: { moduleKey, entityType, sourceEntityId, label, route } | null` and
-   `visibility: 'private' | 'shared' | 'company' | 'module'`.
+   `access: 'private' | 'company' | 'module'` (named `access` because `visibility` is an existing storage column).
 2. `GET /files/:id`, signed-url, download, bulk download, rename, enable/disable,
    Office endpoints — same shapes; return 404 when the file is not readable
    (do not reveal existence), 403 when readable but the operation is not allowed.
@@ -248,8 +249,8 @@ N/A.
 
 1. `files.link.create` — actor, `{ fileId, linkId, mode, expiresAt, maxUses }`.
 2. `files.link.revoke` — actor, `{ fileId, linkId }`.
-3. `files.visibility.change` — actor, `{ fileId, before, after }` when toggling
-   "Toda la empresa".
+3. Scope changes from the sharing dialog keep the existing `files.access.changed`
+   entry (`{ scope, userId, role, revoke }`).
 
 ## 23. Edge cases
 
@@ -263,7 +264,7 @@ N/A.
 5. Module attachment shared explicitly via `FileAssetShare`: share grants access
    even without module access (deliberate act of the uploader).
 6. Bulk download mixing readable and unreadable ids: reject the whole request
-   with 404 rather than silently dropping items.
+   (existing 403) rather than silently dropping items.
 7. Projects task attachment rule (`RESTRICTED` cannot be attached) still holds.
 8. `atlas.files` legacy rows are treated as runly.files origin.
 9. Large resolver id sets in list queries: resolvers must return ids filtered by
@@ -291,7 +292,8 @@ N/A.
 2. Given a member of board B, when they open "De mis módulos", then B's
    attachments appear with origin "Canvas".
 3. Given an admin, when they open "Todos", then every company file is listed.
-4. Given a non-admin, when they request `workspace=all`, then the API returns 403.
+4. Given a non-admin, when they request `workspace=all`, then only files they
+   can read are returned (the "Todos" tab is shown to admins only).
 5. Given a runly.files upload without "Compartir con toda la empresa", when
    another non-admin user lists files, then it is not visible.
 6. Given the migration ran, when listing runly.files-origin files that were

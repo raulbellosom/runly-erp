@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { createFilesWorkspaceRouter } from './files-workspace.js';
-import { fileBulkDownloadSchema, fileRenameSchema } from "@runly/validators";
+import { fileBulkDownloadSchema, fileRenameSchema, fileShareLinkCreateSchema } from "@runly/validators";
+import { createFilePublicLinksService } from "../services/files/public-links.js";
 import { FilesServiceError } from "../services/files-service.js";
 import { FileAccessError } from "../services/files/access.js";
 import { getActivityContext, publishActivityFromContext } from "../services/activity-publisher.js";
@@ -10,6 +11,26 @@ export function createFilesRouter({ prisma, supabaseAdmin, filesService, authMid
   const app = new Hono();
   app.route('/', createFilesWorkspaceRouter({ prisma, supabaseAdmin, filesService, authMiddleware, requirePermission }));
   const WEBSITE_BUCKET_NAME = "runly-website";
+  const linksService = createFilePublicLinksService({ prisma, filesService });
+  const linkHandler = (fallback, run) => async (c) => {
+    try {
+      return await run(c, { authUserId: c.get("authUserId"), activeContext: tenantActiveContext(c), fileId: c.req.param("id") });
+    } catch (err) {
+      if (err instanceof FilesServiceError || err instanceof FileAccessError) return c.json({ error: err.message }, err.status);
+      console.error("[runly.files] public link route error", err);
+      return c.json({ error: fallback }, 500);
+    }
+  };
+  app.get("/files/:id/links", authMiddleware, requirePermission("files.assets.read"),
+    linkHandler("No se pudieron cargar los enlaces.", async (c, args) => c.json({ data: await linksService.list(args) })));
+  app.post("/files/:id/links", authMiddleware, requirePermission("files.assets.read"),
+    linkHandler("No se pudo crear el enlace.", async (c, args) => {
+      const parsed = fileShareLinkCreateSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) return c.json({ error: parsed.error.issues?.[0]?.message || "Solicitud inválida." }, 400);
+      return c.json({ data: await linksService.create({ ...args, input: parsed.data }) }, 201);
+    }));
+  app.post("/files/:id/links/:linkId/revoke", authMiddleware, requirePermission("files.assets.read"),
+    linkHandler("No se pudo revocar el enlace.", async (c, args) => c.json({ data: await linksService.revoke({ ...args, linkId: c.req.param("linkId") }) })));
 app.post(
   "/files/upload",
   authMiddleware,
@@ -29,6 +50,7 @@ app.post(
           entityId: body.entityId,
           visibility: body.visibility,
           metadata: body.metadata,
+          shareWithCompany: body.shareWithCompany,
         },
       });
 

@@ -5,6 +5,11 @@ const MODULE_LABELS = {
   "runly.company": "Empresa",
   "runly.contacts": "Contactos",
   "runly.hr": "Recursos Humanos",
+  "runly.canvas": "Canvas",
+  "runly.projects": "Proyectos",
+  "runly.inventory": "Inventario",
+  "runly.purchases": "Compras",
+  "runly.pfm": "Finanzas personales",
 };
 
 function getModuleLabel(moduleKey) {
@@ -59,6 +64,17 @@ export function resolveFileOrigin(file) {
       originHint: sourceEntityId
         ? `Relacionado con colaborador ${sourceEntityId}`
         : "Relacionado con colaboradores",
+    };
+  }
+
+  if (moduleKey === "runly.canvas") {
+    const board = file?.entityType === "CanvasBoard" && sourceEntityId;
+    return {
+      label: board ? "Plano de Canvas" : "Punto de interés de Canvas",
+      moduleLabel: getModuleLabel(moduleKey),
+      detailPath,
+      originPath: board ? `/app/m/runly.canvas/${sourceEntityId}` : "/app/m/runly.canvas",
+      originHint: "Visible para los miembros del plano",
     };
   }
 

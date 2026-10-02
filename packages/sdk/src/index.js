@@ -873,6 +873,10 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       accessMembers: (id, q, token) => request(`/files/${encodeURIComponent(id)}/members${toQueryString({ q })}`, { headers: withAuthHeaders(token), onlineOnly: true }),
       invitations: (page, token) => request(`/files/invitations${toQueryString({ page })}`, { headers: withAuthHeaders(token), onlineOnly: true }),
       respondInvitation: (id, accept, token) => request(`/files/invitations/${encodeURIComponent(id)}/respond`, { method: 'POST', headers: withAuthHeaders(token), body: JSON.stringify({ accept }), onlineOnly: true }),
+      listLinks: (id, token) => request(`/files/${encodeURIComponent(id)}/links`, { headers: withAuthHeaders(token), onlineOnly: true }),
+      createLink: (id, data, token) => request(`/files/${encodeURIComponent(id)}/links`, { method: 'POST', headers: withAuthHeaders(token), body: JSON.stringify(data), onlineOnly: true }),
+      revokeLink: (id, linkId, token) => request(`/files/${encodeURIComponent(id)}/links/${encodeURIComponent(linkId)}/revoke`, { method: 'POST', headers: withAuthHeaders(token), onlineOnly: true }),
+      getPublic: (linkToken) => request(`/public/files/${encodeURIComponent(linkToken)}`, { onlineOnly: true }),
       officeStatus: (token) => request('/files/office/status', { headers: withAuthHeaders(token) }),
       downloadOfficeFile: (id, token) => requestBlob(`/files/${encodeURIComponent(id)}/office/download`, { headers: withAuthHeaders(token) }),
       createOfficeSession: (id, mode = 'auto', token) => request(`/files/${encodeURIComponent(id)}/office/session`, {

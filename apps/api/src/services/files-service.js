@@ -1,4 +1,5 @@
 ﻿import { createFileAccess } from "./files/access.js";
+import { createFileVisibility, describeFile, isFilesOrigin, FILES_ORIGIN_MODULES } from "./files/visibility.js";
 import JSZip from "jszip";
 import { fileKindWhere } from "./files/query.js";
 import { toLocalIso, getOfficeFormat, OFFICE_FORMATS } from "@runly/core";
@@ -185,6 +186,7 @@ function getUniqueZipEntryName(originalName, usedNames) {
 
 export function createFilesService({ prisma, supabaseAdmin }) {
   const access = createFileAccess({ prisma });
+  const visibility = createFileVisibility({ prisma });
   async function mutateUnlockedFile(id, data) {
     return prisma.$transaction(async db => {
       await db.$queryRaw`SELECT id FROM file_asset WHERE id = ${id}::uuid FOR UPDATE`;
@@ -199,7 +201,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
   async function getCompanyAssets({ authUserId, activeContext, fileIds }) {
     const context = await getUserCompanyContext(authUserId, activeContext);
       const { companyId } = context;
-    return prisma.fileAsset.findMany({ where: { id: { in: fileIds }, entityId: companyId, enabled: true, entityType: { in: ALLOWED_FILE_ENTITY_TYPES }, AND: [access.readWhere(context)] }, select: { id: true, bucket: true, objectKey: true } });
+    return prisma.fileAsset.findMany({ where: { id: { in: fileIds }, entityId: companyId, enabled: true, entityType: { in: ALLOWED_FILE_ENTITY_TYPES }, AND: [await visibility.listWhere(context)] }, select: { id: true, bucket: true, objectKey: true } });
   }
   // activeContext: { profileId, companyId, isAdmin, permissionSet } already
   // resolved by the API's tenant middleware (c.get("userId") /
@@ -276,7 +278,11 @@ export function createFilesService({ prisma, supabaseAdmin }) {
     }
 
     if (!context) throw new FilesServiceError("No tienes acceso al archivo.", 403);
-    await access.assertAccess(file, context, operation);
+    // Unreadable files answer 404 so their existence is not revealed.
+    if (!(await visibility.canRead(file, context))) {
+      throw new FilesServiceError("Archivo no encontrado.", 404);
+    }
+    if (operation !== "read") await access.assertAccess(file, context, operation);
     return file;
   }
 
@@ -375,6 +381,11 @@ export function createFilesService({ prisma, supabaseAdmin }) {
         .trim()
         .toUpperCase();
       const metadata = parseMetadata(fields.metadata);
+      // Files uploaded in runly.files are private unless the uploader shares
+      // them with the company; module attachments keep their module's access.
+      const filesOrigin = isFilesOrigin({ entityType, moduleKey });
+      const shareWithCompany = ["true", "1", true].includes(fields.shareWithCompany);
+      const accessScope = filesOrigin && !shareWithCompany ? "RESTRICTED" : "COMPANY";
 
       const objectKey = buildModuleObjectKey({
         moduleKey,
@@ -410,6 +421,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
           moduleKey,
           entityType,
           entityId,
+          accessScope,
           uploadedById: context.profileId,
           metadata: {
             ...metadata,
@@ -457,10 +469,13 @@ export function createFilesService({ prisma, supabaseAdmin }) {
         entityType: { in: ALLOWED_FILE_ENTITY_TYPES },
       };
 
-      where.AND = [access.readWhere(context)];
-      if (query.workspace === "documents") where.AND.push({ entityType: "AtlasFile", moduleKey: { in: ["runly.files", "atlas.files"] } });
-      if (query.workspace === "attachments") where.AND.push({ NOT: { entityType: "AtlasFile", moduleKey: { in: ["runly.files", "atlas.files"] } } });
-      if (query.workspace === "shared") where.AND.push({ shares: { some: { userId: context.profileId, status: "ACCEPTED" } } });
+      where.AND = [await visibility.listWhere(context)];
+      const workspace = String(query.workspace ?? "");
+      const filesOriginWhere = { entityType: "AtlasFile", OR: [{ moduleKey: null }, { moduleKey: { in: FILES_ORIGIN_MODULES } }] };
+      if (workspace === "mine") where.AND.push({ uploadedById: context.profileId });
+      if (workspace === "documents") where.AND.push(filesOriginWhere);
+      if (workspace === "modules" || workspace === "attachments") where.AND.push({ NOT: filesOriginWhere });
+      if (workspace === "shared") where.AND.push({ shares: { some: { userId: context.profileId, status: "ACCEPTED" } } });
       if (query.kind) where.AND.push(fileKindWhere(query.kind));
       if (enabled !== undefined) where.enabled = enabled;
       if (moduleKey) where.moduleKey = moduleKey;
@@ -497,7 +512,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
 
       const enrichedRows = await batchEnrichFileAssets(rows, supabaseAdmin.storage);
       return {
-        data: enrichedRows,
+        data: enrichedRows.map((row) => ({ ...row, ...describeFile(row) })),
         pagination: {
           page,
           pageSize,
@@ -510,7 +525,8 @@ export function createFilesService({ prisma, supabaseAdmin }) {
     async getById({ authUserId, activeContext, id }) {
       const context = await getUserCompanyContext(authUserId, activeContext);
       const { companyId } = context;
-      return ensureFileBelongsToCompany({ fileId: id, companyId, context });
+      const file = await ensureFileBelongsToCompany({ fileId: id, companyId, context });
+      return { ...file, ...describeFile(file) };
     },
 
     async rename({ authUserId, activeContext, id, originalName }) {
@@ -558,7 +574,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
       const files = await prisma.fileAsset.findMany({
         where: {
           id: { in: uniqueRequestedFileIds },
-          AND: [access.readWhere(context)],
+          AND: [await visibility.listWhere(context)],
           entityId: companyId,
           enabled: true,
           entityType: { in: ALLOWED_FILE_ENTITY_TYPES },
@@ -855,6 +871,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
     },
     getCompanyAssets,
     getUserCompanyContext,
+    canReadFile: (file, context) => visibility.canRead(file, context),
 
     async enrichFilesWithSignedUrls(associations) {
       if (!Array.isArray(associations) || associations.length === 0) return associations;

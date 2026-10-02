@@ -4,16 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Badge,
   Button,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
   SelectField,
   ConfirmDialog,
   EmptyState,
   ErrorState,
-  FileUploader,
   PageHeader,
   useOfficeActions,
 } from "@runly/ui";
@@ -44,6 +38,8 @@ import { FilesGridView } from "../components/FilesGridView";
 import { AdvancedFileViewer, getFileKind } from "@runly/ui";
 import { FileDetailPanel } from "../components/FileDetailPanel";
 import { FileRenameModal } from "../components/FileRenameModal";
+import { FilesUploadDialog } from "../components/FilesUploadDialog";
+import { FilesWorkspaceTabs, FILES_WORKSPACES } from "../components/FilesWorkspaceTabs";
 
 function useFileIdFromPath(pathname) {
   return useMemo(() => {
@@ -78,6 +74,7 @@ export default function FilesScreen() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [showUpload, setShowUpload] = useState(false);
+  const [shareWithCompany, setShareWithCompany] = useState(false);
   const [newFormat, setNewFormat] = useState(null);
   const [shareFile, setShareFile] = useState(null);
   const page = Math.max(
@@ -87,14 +84,12 @@ export default function FilesScreen() {
   const pageSize = [20, 50, 100].includes(Number(searchParams.get("pageSize")))
     ? Number(searchParams.get("pageSize"))
     : 20;
-  const workspace = [
-    "documents",
-    "attachments",
-    "shared",
-    "invitations",
-  ].includes(searchParams.get("workspace"))
-    ? searchParams.get("workspace")
-    : "all";
+  const requestedWorkspace = searchParams.get("workspace");
+  const workspace =
+    FILES_WORKSPACES.includes(requestedWorkspace) &&
+    (requestedWorkspace !== "all" || userProfile?.isAdmin)
+      ? requestedWorkspace
+      : "mine";
   const queryParams = {
     page,
     pageSize,
@@ -260,6 +255,7 @@ export default function FilesScreen() {
           formData.append("file", item._file);
           formData.append("moduleKey", "runly.files");
           formData.append("entityType", "AtlasFile");
+          if (shareWithCompany) formData.append("shareWithCompany", "true");
           await runly.files.upload(formData, token);
           setUploadQueue((prev) =>
             prev.map((q) => (q.id === item.id ? { ...q, status: "done" } : q)),
@@ -277,7 +273,7 @@ export default function FilesScreen() {
         setUploadQueue((prev) => prev.filter((q) => q.status === "error"));
       }, 3500);
     },
-    [token, queryClient, canUploadFiles],
+    [token, queryClient, canUploadFiles, shareWithCompany],
   );
 
   useEffect(() => {
@@ -582,42 +578,19 @@ export default function FilesScreen() {
             office?.enabled && office?.available !== false,
           )}
         />
-        <Dialog open={showUpload} onOpenChange={setShowUpload}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Subir archivos</DialogTitle>
-              <DialogDescription>
-                Agrega archivos a este espacio. Se conserva el acceso de la
-                empresa.
-              </DialogDescription>
-            </DialogHeader>
-            <FileUploader
-              multiple
-              onUploadMany={handleUploadFiles}
-              maxSizeMB={10}
-              accept="image/*,application/pdf,text/*,.csv,.xlsx,.doc,.docx,.pptx,.md"
-              disabled={!canUploadFiles}
-            />
-          </DialogContent>
-        </Dialog>
-        <nav className="files-workspace-tabs" aria-label="Vistas de archivos">
-          {[
-            ["all", "Todos"],
-            ["documents", "Documentos"],
-            ["shared", "Compartidos conmigo"],
-            ["attachments", "Adjuntos del ERP"],
-            ["invitations", "Invitaciones"],
-          ].map(([key, label]) => (
-            <Button
-              key={key}
-              variant={workspace === key ? "secondary" : "ghost"}
-              aria-current={workspace === key ? "page" : undefined}
-              onClick={() => changeQuery({ workspace: key })}
-            >
-              {label}
-            </Button>
-          ))}
-        </nav>
+        <FilesUploadDialog
+          open={showUpload}
+          onOpenChange={setShowUpload}
+          onUploadMany={handleUploadFiles}
+          disabled={!canUploadFiles}
+          shareWithCompany={shareWithCompany}
+          onShareWithCompanyChange={setShareWithCompany}
+        />
+        <FilesWorkspaceTabs
+          workspace={workspace}
+          isCompanyAdmin={Boolean(userProfile?.isAdmin)}
+          onChange={(key) => changeQuery({ workspace: key })}
+        />
         {routeQuery.isError && (
           <ErrorState
             title="No se pudo abrir el archivo enlazado"
@@ -794,6 +767,8 @@ export default function FilesScreen() {
             file={shareFile}
             token={token}
             userId={session?.user?.id}
+            profileId={userProfile?.id}
+            isCompanyAdmin={Boolean(userProfile?.isAdmin)}
             onClose={() => setShareFile(null)}
             onCopyLink={copyLink}
           />
@@ -812,7 +787,7 @@ export default function FilesScreen() {
                 Suelta los archivos aqui
               </p>
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                Se subiran a Runly Files · Max. 10 MB por archivo
+                Se subirán a Mis archivos · Máx. 10 MB por archivo
               </p>
             </div>
           </div>

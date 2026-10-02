@@ -3,12 +3,15 @@ import { Copy, Hash, Link2, Tag } from "lucide-react";
 import { Button } from "./Button.jsx";
 import { TextField } from "./FormFieldsInput.jsx";
 import { DatePickerField } from "./DatePickerField.jsx";
+import { SelectField } from "./FormFieldsDateSelect.jsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./Dialog.jsx";
 
 // Creates one public link (label, optional expiry and max uses) and then shows
 // the URL to copy. `onCreate(payload)` must return the created link.
+// `modes` ([{ value, label }]) adds a mode picker; the first one is the default.
 
-export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title = "Compartir por enlace" }) {
+export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title = "Compartir por enlace", modes = null }) {
+  const [mode, setMode] = useState(modes?.[0]?.value ?? null);
   const [label, setLabel] = useState("");
   const [expiresOn, setExpiresOn] = useState(undefined);
   const [maxUses, setMaxUses] = useState("");
@@ -19,7 +22,8 @@ export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title
 
   useEffect(() => {
     if (!open) return;
-    setLabel(""); setExpiresOn(undefined); setMaxUses(""); setError(""); setCreated(null); setCopied(false);
+    setLabel(""); setExpiresOn(undefined); setMaxUses(""); setError(""); setCreated(null); setCopied(false); setMode(modes?.[0]?.value ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const url = created?.path ? `${window.location.origin}${created.path}` : "";
@@ -35,6 +39,7 @@ export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title
     try {
       const link = await onCreate({
         label: label.trim() || undefined,
+        ...(mode ? { mode } : {}),
         // End of the chosen local day, sent as an instant.
         expiresAt: expiresOn ? new Date(`${expiresOn}T23:59:59`).getTime() : undefined,
         maxUses: uses ?? undefined,
@@ -76,6 +81,9 @@ export function ShareLinkDialog({ open, onOpenChange, onCreate, onCreated, title
             </div>
           ) : (
             <>
+              {modes?.length ? (
+                <SelectField id="share-link-mode" label="Permiso del enlace" value={mode} options={modes} onChange={setMode} />
+              ) : null}
               <TextField label="Nombre (opcional)" icon={Tag} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} placeholder="Ej. Clientes de octubre" />
               <DatePickerField label="Vence (opcional)" value={expiresOn} onChange={setExpiresOn} />
               <TextField
