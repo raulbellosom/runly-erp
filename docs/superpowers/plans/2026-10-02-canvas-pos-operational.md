@@ -66,12 +66,11 @@ describe('POS floor adapter', () => {
     assert.deepEqual(polygon.geometry.points, [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 1 }])
   })
   it('falls back to the element label and AVAILABLE without a table', () => {
-    const [, , , , wall] = objects
+    assert.equal(objects.find((o) => o.id === 'w').type, 'pos.decor')
     const solo = floorToObjects({ floor, elements: [{ id: 'x', kind: 'TABLE_SQUARE', x: 0, y: 0, width: 60, height: 60, label: 'B2', style: { capacity: 2 } }], tableStates: {} }).find((o) => o.id === 'x')
     assert.equal(solo.properties.status, 'AVAILABLE')
     assert.equal(solo.properties.name, 'B2')
     assert.equal(solo.properties.dimmed, false)
-    assert.ok(wall === undefined || wall.type === 'pos.decor')
   })
 })
 ```
