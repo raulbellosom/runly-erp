@@ -81,7 +81,11 @@ El boton **Versiones** de la barra superior guarda el estado completo del Board 
 
 ### Miniaturas
 
-La lista de Boards muestra una miniatura de cada Board. Se actualiza sola unos segundos despues de que dejas de editar.
+La lista de Boards muestra una miniatura de cada Board. Se actualiza sola unos segundos despues de que dejas de editar. Si un Board todavia no tiene miniatura, se crea sola unos segundos despues de abrirlo.
+
+### Buscar y filtrar
+
+El buscador de la lista de Boards encuentra un Board por su nombre, descripcion, paginas, hotspots, textos del lienzo y registros vinculados; no importan mayusculas ni acentos y tolera errores de dedo. Cada resultado indica donde coincidio. Los filtros permiten ver solo ciertas plantillas, tus Boards o los compartidos contigo, por fecha de actualizacion, y ordenar por recientes, nombre o antiguedad.
 
 ### Compartir y accesos
 

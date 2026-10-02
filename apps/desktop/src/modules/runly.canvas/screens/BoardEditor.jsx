@@ -117,7 +117,7 @@ export default function BoardEditor() {
     boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog,
     calibratePage: pageScale.calibratePage, hasCalibration: Boolean(activePage?.calibration),
   })
-  useBoardThumbnail({ boardId, enabled: Boolean(board.data) && !readOnly, rows: allRows, saving: actions.saving })
+  useBoardThumbnail({ boardId, enabled: Boolean(board.data) && !readOnly, rows: allRows, saving: actions.saving, board: board.data, loaded: !objects.isLoading })
 
   // The template's starting tool, applied once per Board for editors only.
   const toolAppliedRef = useRef(null)
