@@ -35,6 +35,18 @@ Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se 
 
 Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia.
 
+### Trabajo en equipo en vivo
+
+Cuando otra persona edita el mismo Board ves su **cursor con su nombre** y un contorno de su color alrededor de lo que tiene seleccionado. Sus cambios aparecen al instante sin recargar. Si ustedes dos cambian el mismo elemento casi al mismo tiempo, se guarda el primero y al otro le aparece un aviso con la version mas reciente.
+
+### Versiones
+
+El boton **Versiones** de la barra superior guarda el estado completo del Board con un nombre opcional (por ejemplo "Antes de reacomodar"). El propietario puede **restaurar** cualquier version; antes de restaurar se guarda automaticamente una version del estado actual, asi que nada se pierde. Se conservan las ultimas 100 versiones.
+
+### Miniaturas
+
+La lista de Boards muestra una miniatura de cada Board. Se actualiza sola unos segundos despues de que dejas de editar.
+
 ### Compartir y accesos
 
 Usa el boton **Compartir** de la barra superior del Board.
