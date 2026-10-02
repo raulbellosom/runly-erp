@@ -14,7 +14,6 @@ const MIN_INTERVAL_MS = 60_000
 export function useBoardThumbnail({ boardId, enabled, rows, saving }) {
   const token = useAuth().session?.access_token
   const client = useQueryClient()
-  const loadedRef = useRef(false)
   const dirtyRef = useRef(false)
   const lastRef = useRef(0)
   const timerRef = useRef(null)
@@ -48,10 +47,9 @@ export function useBoardThumbnail({ boardId, enabled, rows, saving }) {
     }
   }
 
-  useEffect(() => {
-    if (!loadedRef.current) { loadedRef.current = true; return }
-    dirtyRef.current = true
-  }, [rows])
+  // Only this session's own saves make the thumbnail stale: opening a Board
+  // (rows arriving) or receiving a collaborator's delta must not upload one.
+  useEffect(() => { if (saving) dirtyRef.current = true }, [saving])
 
   useEffect(() => {
     if (!enabled || !dirtyRef.current || saving) return undefined
