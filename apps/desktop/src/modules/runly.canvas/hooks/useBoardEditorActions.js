@@ -186,6 +186,17 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     applyUpdates(entries, 'Cambiar forma')
   }
 
+  // Moves editable rows to another layer, putting each one on top of it (the
+  // Layers panel's drag-and-drop and the quick-actions menu's "Mover a capa"
+  // both call this; both already checked the destination isn't locked and
+  // accepts the object's type before calling).
+  function moveToLayer(objects, targetLayerId) {
+    const targets = editable(objects).filter((row) => row.layerId !== targetLayerId)
+    if (!targets.length) return
+    let next = topPosition(targetLayerId)
+    applyUpdates(targets.map((row) => ({ row, data: { layerId: targetLayerId, position: next++ } })), 'Mover a capa')
+  }
+
   function copy(objects) {
     const sources = editable(objects).filter((row) => !row.pending).map((row) => snapshot(row))
     if (sources.length) clipboardRef.current = sources
@@ -290,6 +301,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, addDataLayer, addingLayer: createLayer.isPending, undo, redo,
     connectData, disconnectData, insertData,
     setHidden, setLocked, convertShapes, copy, paste, canPaste,
+    moveToLayer,
     canUndo: history.canUndo, canRedo: history.canRedo,
     undoLabel: history.peekUndo()?.label ?? null, redoLabel: history.peekRedo()?.label ?? null,
     saving: batch.isPending || hotspot.isPending || updateLayer.isPending || media.inserting,

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
 import { BoardInspector } from '../components/BoardInspector.jsx'
 import { CalibrateDialog } from '../components/CalibrateDialog.jsx'
+import { CanvasContextMenu } from '../components/CanvasContextMenu.jsx'
 import { CanvasToolbar, SHAPES } from '../components/CanvasToolbar.jsx'
 import { CanvasViewport } from '../components/CanvasViewport.jsx'
 import { DataBindingDialog } from '../components/DataBindingDialog.jsx'
@@ -29,6 +30,7 @@ import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
+import { useContextMenuState } from '../hooks/useContextMenuState.js'
 import { useFocusAnimation } from '../hooks/useFocusAnimation.js'
 import { useExportPage } from '../hooks/useExportPage.js'
 import { usePageMap } from '../hooks/usePageMap.js'
@@ -145,6 +147,8 @@ export default function BoardEditor() {
     const row = ids.length === 1 ? allRows.find((item) => item.id === ids[0]) : null
     if (row && row.layerId !== layerId) setLayerId(row.layerId)
   }
+  const selectAll = () => { setTool('select'); select(rows.filter((row) => !lockedLayerIds.has(row.layerId)).map((row) => row.id)) }
+  const contextMenu = useContextMenuState({ rows, selectedIds, select, viewport, size, enabled: Boolean(board.data) })
   const changePage = (id) => {
     const page = pages.find((item) => item.id === id)
     setPageId(id); setSelectedIds([])
@@ -175,7 +179,7 @@ export default function BoardEditor() {
     onOpen: () => { if (selected) openObject(selected) },
     onUndo: () => { if (!readOnly) actions.undo() },
     onRedo: () => { if (!readOnly) actions.redo() },
-    onSelectAll: () => { setTool('select'); setSelectedIds(rows.filter((row) => !lockedLayerIds.has(row.layerId)).map((row) => row.id)) },
+    onSelectAll: selectAll,
     onEscape: () => {
       if (selectedIds.length || tool !== 'select') { setSelectedIds([]); setTool('select') } else if (zen) setZen(false)
     },
@@ -265,7 +269,18 @@ export default function BoardEditor() {
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
             readOnly={readOnly} grid={pageMap.hasMap ? { ...(settings?.grid ?? {}), enabled: false } : settings?.grid} snapSize={snapSizeFor(settings)}
             remote={cursors} onPointerWorld={broadcastPointer} bindings={bindings.data ?? {}} flash={flash}
-            scale={pageScale.scale} onCalibrate={pageScale.onViewportCalibrate}
+            scale={pageScale.scale} onCalibrate={pageScale.onViewportCalibrate} onContextMenu={contextMenu.openAt}
+          />
+          <CanvasContextMenu
+            menu={contextMenu.menu} onClose={contextMenu.close} layers={layers} lockedLayerIds={lockedLayerIds}
+            readOnly={readOnly} canPaste={actions.canPaste} onFocus={focusOn}
+            onEditText={(object) => setDialog({ kind: 'text', id: object.id })}
+            onOpenHotspot={(object) => setDialog({ kind: 'hotspot', id: object.id })}
+            onDuplicate={actions.duplicate} onCopy={actions.copy} onPaste={actions.paste}
+            onConvert={actions.convertShapes} onMoveToLayer={actions.moveToLayer} onArrange={actions.arrange}
+            onToggleHidden={actions.setHidden} onToggleLocked={actions.setLocked}
+            onConnectData={(object) => setDialog({ kind: 'data', mode: 'connect', id: object.id })}
+            onDelete={actions.remove} onSelectAll={selectAll} onFit={fit} onAddToSelection={select}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (
