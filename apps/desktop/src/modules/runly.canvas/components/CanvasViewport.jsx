@@ -48,7 +48,7 @@ export function CanvasViewport(props) {
     objects = resolveConnectors(objects)
     const single = live?.objects?.size === 1 ? [...live.objects.values()][0] : null
     renderer.render({
-      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [], bindings: p.bindings ?? {},
+      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [], bindings: p.bindings ?? {}, drawers: p.drawers ?? {},
       selectedIds: live?.draft ? new Set() : new Set(p.selectedIds),
       overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single, p.scale) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft, p.scale) } : null,
       marquee: live?.marquee ?? null,
@@ -162,7 +162,7 @@ export function CanvasViewport(props) {
     if (p.readOnly) {
       const hit = rendererRef.current?.hitTest(screen, resolved(), p.viewport, touch ? 14 : 6)
       p.onSelect(hit ? [hit.id] : [])
-      dragRef.current = { mode: 'pan', screen, viewport: p.viewport, tapHotspot: hit?.type === 'hotspot' ? hit : null }
+      dragRef.current = { mode: 'pan', screen, viewport: p.viewport, tapTarget: hit && (p.isTappable ? p.isTappable(hit) : hit.type === 'hotspot') ? hit : null }
       return
     }
 
@@ -192,7 +192,11 @@ export function CanvasViewport(props) {
     const drag = dragRef.current
     if (!drag) {
       if (event.pointerType !== 'mouse' || tool !== 'select' || spacePan) return
-      if (p.readOnly) { setCursor(rendererRef.current?.hitTest(screen, resolved(), p.viewport)?.type === 'hotspot' ? 'pointer' : 'grab'); return }
+      if (p.readOnly) {
+        const hit = rendererRef.current?.hitTest(screen, resolved(), p.viewport)
+        setCursor(hit && (p.isTappable ? p.isTappable(hit) : hit.type === 'hotspot') ? 'pointer' : 'grab')
+        return
+      }
       const world = screenToWorld(screen, p.viewport)
       const single = p.selectedIds.length === 1 ? selectable().find((row) => row.id === p.selectedIds[0]) : null
       const handle = single && hitHandle(world, single, p.viewport.zoom, 9)
@@ -261,7 +265,7 @@ export function CanvasViewport(props) {
     if (drag?.mode === 'pinch') { dragRef.current = pointersRef.current.size ? { mode: 'idle' } : null; return }
     dragRef.current = null
     setCursor(baseCursor(tool, spacePan))
-    if (drag?.tapHotspot && !drag.moved && event.type !== 'pointercancel') { p.onOpen?.(drag.tapHotspot); return }
+    if (drag?.tapTarget && !drag.moved && event.type !== 'pointercancel') { p.onOpen?.(drag.tapTarget); return }
     const live = liveRef.current
     if (event.type === 'pointercancel' || !drag) { liveRef.current = null; schedule(); return }
     if (drag.mode === 'create') {

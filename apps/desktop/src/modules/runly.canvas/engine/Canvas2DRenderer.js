@@ -43,7 +43,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null, drawers = {} } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -57,7 +57,7 @@ export class Canvas2DRenderer {
     ctx.translate(viewport.x, viewport.y); ctx.scale(viewport.zoom, viewport.zoom)
     const selected = []
     for (const object of objects) {
-      this.drawObject(ctx, object, viewport.zoom, images, bindings)
+      this.drawObject(ctx, object, viewport.zoom, images, bindings, drawers)
       if (linkedIds?.has(object.id) || (object.hotspot && linkedIds?.has(object.hotspot.id))) this.drawLinkBadge(ctx, object, viewport.zoom)
       if (selectedIds?.has(object.id)) selected.push(object)
     }
@@ -112,7 +112,7 @@ export class Canvas2DRenderer {
     ctx.setLineDash([])
   }
 
-  drawObject(ctx, object, zoom, images, bindings = {}) {
+  drawObject(ctx, object, zoom, images, bindings = {}, drawers = {}) {
     const b = boxOf(object), style = object.style ?? {}
     const key = bindingKey(object.properties?.binding)
     const data = key ? bindings[key] : null
@@ -126,6 +126,9 @@ export class Canvas2DRenderer {
     const c = centerOf(b)
     ctx.translate(c.x, c.y); ctx.rotate((b.rotation * Math.PI) / 180)
     const x = -b.width / 2, y = -b.height / 2, w = b.width, h = b.height
+    // Custom types (e.g. pos.table) draw entirely through a plugged-in
+    // drawer and never take the tint/data-label treatment below.
+    if (drawers[object.type]) { drawers[object.type](ctx, object, { x, y, w, h, zoom, theme: this.theme }); ctx.restore(); return }
     const drawn = tint ? { ...object, style: { ...style, fill: tint, fillOpacity: 0.14 } } : object
     switch (object.type) {
       case 'hotspot': this.drawHotspot(ctx, object, w, h, stroke, zoom); break
