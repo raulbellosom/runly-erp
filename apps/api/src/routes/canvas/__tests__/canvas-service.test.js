@@ -36,8 +36,41 @@ describe('Runly Canvas service', () => {
     const board = await service.createBoard(COMPANY, USER, { name: ' Terminal 1 ', templateType: 'plan' })
     assert.equal(board.name, 'Terminal 1')
     assert.equal(calls.find(([name]) => name === 'collaborator')[1].role, 'OWNER')
-    assert.deepEqual(calls.find(([name]) => name === 'layers')[1].map((layer) => layer.type), ['vector', 'hotspot', 'data'])
+    assert.deepEqual(calls.find(([name]) => name === 'layers')[1].map((layer) => layer.name), ['Plano base', 'Mobiliario', 'Hotspots'])
+    assert.deepEqual(calls.find(([name]) => name === 'board')[1].settings, { version: 2, grid: { enabled: true, size: 20 }, snapping: true, defaultTool: 'select' })
     assert.equal(calls.find(([name]) => name === 'audit')[1].action, 'BOARD_CREATED')
+  })
+
+  it('creates new pages with the Board template layers', async () => {
+    let layers
+    const tx = {
+      canvasPage: { findFirst: async () => ({ position: 0 }), create: async ({ data }) => ({ id: 'page-2', ...data }) },
+      canvasLayer: { createMany: async ({ data }) => { layers = data } },
+    }
+    const prisma = { canvasBoard: { findFirst: async () => accessibleBoard({ templateType: 'diagram' }) }, $transaction: (fn) => fn(tx) }
+    await createCanvasService({ prisma }).createPage(COMPANY, USER, BOARD, { name: 'Página 2' })
+    assert.deepEqual(layers.map((layer) => [layer.name, layer.position]), [['Formas', 0], ['Notas', 1]])
+  })
+
+  it('returns effective settings with the Board', async () => {
+    const prisma = { canvasBoard: { findFirst: async () => accessibleBoard({ templateType: 'plan', settings: { grid: { enabled: false, size: 10 }, snapping: true }, pages: [] }) } }
+    const board = await createCanvasService({ prisma }).getBoard(COMPANY, USER, BOARD)
+    assert.deepEqual(board.effectiveSettings, { version: 2, grid: { enabled: true, size: 20 }, snapping: true, defaultTool: 'select' })
+  })
+
+  it('validates settings on update', async () => {
+    let saved
+    const prisma = {
+      canvasBoard: {
+        findFirst: async () => accessibleBoard({ templateType: 'plan', settings: null }),
+        update: async ({ data }) => { saved = data; return { id: BOARD, ...data } },
+      },
+      auditLog: { create: async () => ({}) },
+    }
+    const service = createCanvasService({ prisma })
+    await assert.rejects(() => service.updateBoard(COMPANY, USER, BOARD, { settings: { grid: { size: 2 } } }), (error) => error instanceof CanvasServiceError && error.status === 400)
+    await service.updateBoard(COMPANY, USER, BOARD, { settings: { grid: { enabled: true, size: 30 } } })
+    assert.deepEqual(saved.settings, { version: 2, grid: { enabled: true, size: 30 }, snapping: true, defaultTool: 'select' })
   })
 
   it('reorders every layer in two passes to avoid unique-position collisions', async () => {

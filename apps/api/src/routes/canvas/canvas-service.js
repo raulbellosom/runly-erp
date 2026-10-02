@@ -1,5 +1,6 @@
+import { effectiveBoardSettings, normalizeBoardSettings, templateFor, templateLayerRows } from './canvas-templates.js'
+
 const ROLE_RANK = { VIEWER: 1, COMMENTER: 2, EDITOR: 3, OWNER: 4 }
-const BOARD_TEMPLATES = new Set(['blank', 'plan', 'technical-map', 'pdf-review', 'diagram', 'layout'])
 const LAYER_TYPES = new Set(['vector', 'hotspot', 'data'])
 const OBJECT_TYPES = new Set(['line', 'polyline', 'freehand', 'arrow', 'rectangle', 'ellipse', 'polygon', 'path', 'text', 'image', 'group', 'hotspot'])
 const TARGET_TYPES = new Set(['BOARD', 'PAGE', 'OBJECT', 'HOTSPOT'])
@@ -24,6 +25,11 @@ function jsonValue(value) {
 }
 
 function finite(value) { return typeof value === 'number' && Number.isFinite(value) }
+
+// Settings errors from the catalog surface as regular 400 service errors.
+function boardSettings(input, base) {
+  try { return normalizeBoardSettings(input, base) } catch (error) { throw new CanvasServiceError(error.message, 400) }
+}
 
 export function validateCanvasObject(data, { partial = false } = {}) {
   if (!partial || data.type !== undefined) {
@@ -104,19 +110,19 @@ export function createCanvasService({ prisma, entityResolver = null }) {
         collaborators: { orderBy: { createdAt: 'asc' } },
       },
     })
-    return board ? { ...board, myRole: role } : board
+    return board ? { ...board, myRole: role, effectiveSettings: effectiveBoardSettings(board) } : board
   }
 
   async function createBoard(companyId, actorId, data) {
     const name = cleanText(data?.name, 200)
     if (!name) throw new CanvasServiceError('El nombre del Board es requerido.', 400)
-    const templateType = BOARD_TEMPLATES.has(data?.templateType) ? data.templateType : 'blank'
+    const template = templateFor(data?.templateType)
+    const settings = boardSettings(data?.settings, template.settings)
     return prisma.$transaction(async (tx) => {
       const board = await tx.canvasBoard.create({ data: {
         companyId, ownerId: actorId, createdById: actorId, updatedById: actorId, name,
-        description: cleanText(data?.description), templateType,
-        settings: data?.settings ?? { grid: { enabled: false, size: 10 }, snapping: true },
-        metadata: data?.metadata ?? {},
+        description: cleanText(data?.description), templateType: template.key,
+        settings, metadata: data?.metadata ?? {},
       } })
       await tx.canvasCollaborator.create({ data: { boardId: board.id, userId: actorId, role: 'OWNER', createdBy: actorId } })
       const page = await tx.canvasPage.create({ data: {
@@ -124,11 +130,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
         coordinateSystem: { unit: 'px', origin: { x: 0, y: 0 }, axis: 'screen' },
         background: data?.background ?? null,
       } })
-      await tx.canvasLayer.createMany({ data: [
-        { pageId: page.id, name: 'Vectores', type: 'vector', position: 0 },
-        { pageId: page.id, name: 'Hotspots', type: 'hotspot', position: 1 },
-        { pageId: page.id, name: 'Datos Runly', type: 'data', position: 2 },
-      ] })
+      await tx.canvasLayer.createMany({ data: templateLayerRows(template, page.id) })
       await audit(tx, { companyId, actorId, action: 'BOARD_CREATED', entityType: 'CanvasBoard', entityId: board.id, after: board })
       return board
     })
@@ -141,9 +143,10 @@ export function createCanvasService({ prisma, entityResolver = null }) {
       patch.name = cleanText(data.name, 200)
       if (!patch.name) throw new CanvasServiceError('El nombre del Board es requerido.', 400)
     }
-    for (const key of ['description', 'settings', 'metadata', 'thumbnailFileId']) {
+    for (const key of ['description', 'metadata', 'thumbnailFileId']) {
       if (data[key] !== undefined) patch[key] = key === 'description' ? cleanText(data[key]) : data[key]
     }
+    if (data.settings !== undefined) patch.settings = boardSettings(data.settings, effectiveBoardSettings(board))
     const updated = await prisma.canvasBoard.update({ where: { id: boardId }, data: patch })
     await audit(prisma, { companyId, actorId, action: 'BOARD_UPDATED', entityType: 'CanvasBoard', entityId: boardId, before: board, after: updated })
     return updated
@@ -157,7 +160,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
   }
 
   async function createPage(companyId, actorId, boardId, data) {
-    await assertBoardAccess(companyId, actorId, boardId, 'EDITOR')
+    const { board } = await assertBoardAccess(companyId, actorId, boardId, 'EDITOR')
     return prisma.$transaction(async (tx) => {
       const last = await tx.canvasPage.findFirst({ where: { boardId }, orderBy: { position: 'desc' }, select: { position: true } })
       const page = await tx.canvasPage.create({ data: {
@@ -167,11 +170,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
         coordinateSystem: data?.coordinateSystem ?? { unit: 'px', origin: { x: 0, y: 0 }, axis: 'screen' },
         calibration: data?.calibration ?? null, metadata: data?.metadata ?? {},
       } })
-      await tx.canvasLayer.createMany({ data: [
-        { pageId: page.id, name: 'Vectores', type: 'vector', position: 0 },
-        { pageId: page.id, name: 'Hotspots', type: 'hotspot', position: 1 },
-        { pageId: page.id, name: 'Datos Runly', type: 'data', position: 2 },
-      ] })
+      await tx.canvasLayer.createMany({ data: templateLayerRows(templateFor(board.templateType), page.id) })
       return page
     })
   }
