@@ -89,12 +89,13 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     return (response?.data ?? response ?? []).map((result) => result.object).filter(Boolean)
   }
 
-  async function create({ tool, box, point }) {
+  async function create({ tool, box, point, connect }) {
     const layer = layerForTool(tool)
     if (!layer) return toast.error(tool === 'hotspot' ? 'Esta página no tiene capa de hotspots.' : 'No hay una capa de dibujo disponible.')
     if (layer.locked) return toast.error(`La capa «${layer.name}» está bloqueada.`)
     if (layer.id !== layerId) setLayerId(layer.id)
     const data = buildObjectData(tool, box ?? defaultBox(tool, point)), type = data.type
+    if (connect) data.properties = { ...data.properties, connect }
     setTool('select')
     try {
       const [created] = await createRows([{ ...data, pageId, layerId: layer.id, position: topPosition(layer.id) }], 'Crear')
@@ -107,7 +108,13 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   }
 
   function commit(changes, mode) {
-    const entries = changes.map(({ next }) => ({ row: current(next.id), data: { transform: next.transform, geometry: next.geometry } })).filter((entry) => entry.row)
+    const entries = changes.map(({ prev, next }) => {
+      const row = current(next.id)
+      if (!row) return null
+      const data = { transform: next.transform, geometry: next.geometry }
+      if (next.properties !== prev.properties) data.properties = next.properties
+      return { row, data }
+    }).filter(Boolean)
     applyUpdates(entries, LABELS[mode] ?? 'Editar')
   }
 

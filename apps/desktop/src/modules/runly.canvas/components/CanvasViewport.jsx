@@ -4,6 +4,7 @@ import { boxFromDrag, boxOf, hitHandle, isLinear, moveObject, objectBounds, resi
 import { snapMoveDelta, snapPoint } from '../engine/snap.js'
 import { observeThemeChanges, readCanvasTheme } from '../engine/theme.js'
 import { screenToWorld, zoomAt } from '../engine/viewport.js'
+import { connectTargetAt, resolveConnectors } from '../lib/connectors.js'
 import { formatLength } from '../lib/measure.js'
 import { CREATION_TOOLS, draftObject } from '../lib/objectFactory.js'
 
@@ -44,6 +45,7 @@ export function CanvasViewport(props) {
     let objects = p.objects
     if (live?.draft) objects = [...objects, live.draft]
     else if (live?.objects) objects = objects.map((row) => live.objects.get(row.id) ?? row)
+    objects = resolveConnectors(objects)
     const single = live?.objects?.size === 1 ? [...live.objects.values()][0] : null
     renderer.render({
       objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [], bindings: p.bindings ?? {},
@@ -51,6 +53,7 @@ export function CanvasViewport(props) {
       overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single, p.scale) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft, p.scale) } : null,
       marquee: live?.marquee ?? null,
       measure: live?.measure ?? null,
+      connectHint: live?.connectHint ?? null,
       interactive: !p.readOnly && p.selectedIds.length === 1 && !p.lockedLayerIds?.has(p.objects.find((row) => row.id === p.selectedIds[0])?.layerId),
     })
   }
@@ -101,9 +104,13 @@ export function CanvasViewport(props) {
   }, [tool, spacePan])
 
   const pointOf = (event) => { const rect = canvasRef.current.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top } }
+  // Connected lines/arrows render (and hit-test) at their resolved border
+  // position, not their last-saved geometry.
+  const resolved = () => resolveConnectors(propsRef.current.objects)
   const selectable = () => {
-    const { objects, lockedLayerIds } = propsRef.current
-    return lockedLayerIds?.size ? objects.filter((row) => !lockedLayerIds.has(row.layerId)) : objects
+    const { lockedLayerIds } = propsRef.current
+    const rows = resolved()
+    return lockedLayerIds?.size ? rows.filter((row) => !lockedLayerIds.has(row.layerId)) : rows
   }
   const setCursor = (value) => { if (canvasRef.current) canvasRef.current.style.cursor = value }
   const toggle = (ids, id) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]
@@ -153,7 +160,7 @@ export function CanvasViewport(props) {
     // Read-only (viewers, public links): tap selects or opens a hotspot,
     // dragging always pans; nothing can be moved or resized.
     if (p.readOnly) {
-      const hit = rendererRef.current?.hitTest(screen, p.objects, p.viewport, touch ? 14 : 6)
+      const hit = rendererRef.current?.hitTest(screen, resolved(), p.viewport, touch ? 14 : 6)
       p.onSelect(hit ? [hit.id] : [])
       dragRef.current = { mode: 'pan', screen, viewport: p.viewport, tapHotspot: hit?.type === 'hotspot' ? hit : null }
       return
@@ -185,7 +192,7 @@ export function CanvasViewport(props) {
     const drag = dragRef.current
     if (!drag) {
       if (event.pointerType !== 'mouse' || tool !== 'select' || spacePan) return
-      if (p.readOnly) { setCursor(rendererRef.current?.hitTest(screen, p.objects, p.viewport)?.type === 'hotspot' ? 'pointer' : 'grab'); return }
+      if (p.readOnly) { setCursor(rendererRef.current?.hitTest(screen, resolved(), p.viewport)?.type === 'hotspot' ? 'pointer' : 'grab'); return }
       const world = screenToWorld(screen, p.viewport)
       const single = p.selectedIds.length === 1 ? selectable().find((row) => row.id === p.selectedIds[0]) : null
       const handle = single && hitHandle(world, single, p.viewport.zoom, 9)
@@ -210,8 +217,9 @@ export function CanvasViewport(props) {
     const snap = event.altKey ? 0 : (p.snapSize ?? 0)
     if (drag.mode === 'create') {
       if (tool === 'hotspot' || tool === 'text') return
-      const kind = tool === 'line' || tool === 'arrow' ? tool : 'rectangle'
-      liveRef.current = { draft: draftObject(tool, boxFromDrag(kind, snapPoint(drag.world, snap), snapPoint(world, snap), { constrain: event.shiftKey })) }
+      const linear = tool === 'line' || tool === 'arrow'
+      const draft = draftObject(tool, boxFromDrag(linear ? tool : 'rectangle', snapPoint(drag.world, snap), snapPoint(world, snap), { constrain: event.shiftKey }))
+      liveRef.current = { draft, connectHint: linear ? connectTargetAt(world, selectable(), null) : null }
     } else if (drag.mode === 'measure') {
       const offset = boxFromDrag('line', drag.world, snapPoint(world, snap), { constrain: event.shiftKey })
       const b = { x: drag.world.x + offset.width, y: drag.world.y + offset.height }
@@ -225,10 +233,21 @@ export function CanvasViewport(props) {
       // Rotated boxes resize in their own frame; snapping a world point there
       // would fight the rotation, so only unrotated shapes snap.
       const target = boxOf(object).rotation ? world : snapPoint(world, snap)
-      const next = drag.mode === 'rotate'
-        ? rotateObject(object, world, { snap: event.shiftKey })
-        : resizeObject(object, drag.handle, target, { keepRatio: event.shiftKey || object.type === 'image' })
-      liveRef.current = { mode: drag.mode, objects: new Map([[object.id, next]]) }
+      let next, connectHint = null
+      if (drag.mode === 'rotate') {
+        next = rotateObject(object, world, { snap: event.shiftKey })
+      } else {
+        next = resizeObject(object, drag.handle, target, { keepRatio: event.shiftKey || object.type === 'image' })
+        // Dragging a connected endpoint off its shape or onto another one
+        // updates which shape it will snap to; the other end can't be
+        // re-targeted at the same shape.
+        if (isLinear(object) && (drag.handle === 'start' || drag.handle === 'end')) {
+          const otherHandle = drag.handle === 'start' ? 'end' : 'start'
+          connectHint = connectTargetAt(target, selectable(), object.properties?.connect?.[otherHandle] ?? null)
+          next = { ...next, properties: { ...object.properties, connect: { ...(object.properties?.connect ?? { start: null, end: null }), [drag.handle]: connectHint?.id ?? null } } }
+        }
+      }
+      liveRef.current = { mode: drag.mode, objects: new Map([[object.id, next]]), connectHint }
       if (drag.mode === 'rotate') setCursor('grabbing')
     }
     schedule()
@@ -249,8 +268,16 @@ export function CanvasViewport(props) {
       liveRef.current = null
       // Text and hotspots are placed with a tap; shapes use the dragged box
       // when there is one and fall back to a default size otherwise.
-      if (live?.draft && drag.moved) p.onCreate({ tool, box: boxOf(live.draft) })
-      else p.onCreate({ tool, point: snapPoint(drag.world, event.altKey ? 0 : (p.snapSize ?? 0)) })
+      if (live?.draft && drag.moved) {
+        const box = boxOf(live.draft)
+        let connect = null
+        if (tool === 'line' || tool === 'arrow') {
+          const start = connectTargetAt(drag.world, selectable(), null)
+          const end = connectTargetAt({ x: box.x + box.width, y: box.y + box.height }, selectable(), start?.id ?? null)
+          if (start || end) connect = { start: start?.id ?? null, end: end?.id ?? null }
+        }
+        p.onCreate({ tool, box, connect })
+      } else p.onCreate({ tool, point: snapPoint(drag.world, event.altKey ? 0 : (p.snapSize ?? 0)) })
       schedule(); return
     }
     if (drag.mode === 'marquee') {

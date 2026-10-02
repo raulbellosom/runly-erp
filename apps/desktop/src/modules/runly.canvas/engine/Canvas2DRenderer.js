@@ -43,7 +43,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -61,6 +61,7 @@ export class Canvas2DRenderer {
       if (linkedIds?.has(object.id) || (object.hotspot && linkedIds?.has(object.hotspot.id))) this.drawLinkBadge(ctx, object, viewport.zoom)
       if (selectedIds?.has(object.id)) selected.push(object)
     }
+    if (connectHint) this.drawConnectHint(ctx, connectHint, viewport.zoom)
     // Handles only make sense for a single object; a group gets outlines
     // plus one dashed box around everything.
     for (const object of selected) this.drawSelection(ctx, object, viewport.zoom, interactive && selected.length === 1)
@@ -254,6 +255,17 @@ export class Canvas2DRenderer {
     ctx.restore()
   }
 
+  // Outlines the shape a dragged line/arrow endpoint would snap to.
+  drawConnectHint(ctx, object, zoom) {
+    const b = boxOf(object), c = centerOf(b)
+    ctx.save()
+    ctx.lineWidth = 2 / zoom; ctx.strokeStyle = this.theme.primary; ctx.setLineDash([])
+    ctx.translate(c.x, c.y); ctx.rotate((b.rotation * Math.PI) / 180)
+    if (object.type === 'ellipse' || object.type === 'hotspot') { ctx.beginPath(); ctx.ellipse(0, 0, b.width / 2, b.height / 2, 0, 0, Math.PI * 2); ctx.stroke() }
+    else ctx.strokeRect(-b.width / 2, -b.height / 2, b.width, b.height)
+    ctx.restore()
+  }
+
   drawSelection(ctx, object, zoom, interactive) {
     const b = boxOf(object), primary = this.theme.primary
     ctx.save()
@@ -275,6 +287,9 @@ export class Canvas2DRenderer {
         ctx.beginPath()
         if (handle.id === 'rotate' || handle.id === 'start' || handle.id === 'end') ctx.arc(handle.x, handle.y, size * 0.65, 0, Math.PI * 2)
         else { ctx.save(); ctx.translate(handle.x, handle.y); ctx.rotate((b.rotation * Math.PI) / 180); ctx.rect(-size / 2, -size / 2, size, size); ctx.restore() }
+        // A connected endpoint handle is filled solid to show it is attached.
+        const connected = (handle.id === 'start' || handle.id === 'end') && object.properties?.connect?.[handle.id]
+        ctx.fillStyle = connected ? primary : this.theme.surface
         ctx.fill(); ctx.stroke()
       }
     }

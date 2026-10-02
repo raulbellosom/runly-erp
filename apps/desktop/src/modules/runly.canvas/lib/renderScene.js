@@ -1,5 +1,6 @@
 import { Canvas2DRenderer, sceneBounds } from '../engine/Canvas2DRenderer.js'
 import { LIGHT_THEME } from '../engine/theme.js'
+import { resolveConnectors } from './connectors.js'
 
 export const EXPORT_PADDING = 24
 export const EXPORT_MAX = 8000
@@ -46,6 +47,7 @@ async function loadImages(urls) {
 // `readCanvasTheme` can resolve real design-system tokens (getComputedStyle
 // on a detached node returns no custom properties) when `light` is not set.
 export async function renderScene(objects, { width, height, padding = EXPORT_PADDING, imageUrls, bindings = {}, light = false, background = null, maxZoom = Infinity } = {}) {
+  objects = resolveConnectors(objects)
   const bounds = sceneBounds(objects)
   if (!bounds) return null
   const canvas = document.createElement('canvas')
