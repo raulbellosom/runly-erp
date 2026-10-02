@@ -6,7 +6,7 @@ Bibliotecas de Canvas: importar `.excalidrawlib`, iconos SVG (sueltos o ZIP) y g
 
 ## 2. Status
 
-Approved (pedido del usuario, 2026-10-02).
+Complete — Verified: 2026-10-02 (node --test API 81/81 y desktop 131/131, pnpm db:generate, eslint, build:web). Migración 20261002120000_canvas_libraries escrita pero NO aplicada; smoke manual pendiente.
 
 ## 3. Context
 
