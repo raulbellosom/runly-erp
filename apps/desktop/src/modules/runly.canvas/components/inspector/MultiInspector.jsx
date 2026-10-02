@@ -2,7 +2,7 @@ import { Button } from '@runly/ui'
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter,
-  ArrowDownToLine, ArrowUpToLine, Copy, Trash2,
+  ArrowDownToLine, ArrowUpToLine, Copy, Library, Trash2,
 } from 'lucide-react'
 import { CANVAS_COLORS } from '../../lib/objectFactory.js'
 import { Choice, ColorSwatches, Section } from './fields.jsx'
@@ -21,7 +21,7 @@ const ALIGN_MODES = [
 
 // Style edits applied to every selected element at once; values shown only
 // when all elements share them.
-export function MultiInspector({ rows, lockedCount, onPatch, onDelete, onDuplicate, onArrange, onAlign, onDistribute }) {
+export function MultiInspector({ rows, lockedCount, onPatch, onDelete, onDuplicate, onArrange, onAlign, onDistribute, onSaveToLibrary }) {
   const shapes = rows.filter((row) => !['image', 'text', 'hotspot'].includes(row.type))
   const closed = shapes.filter((row) => !['line', 'arrow'].includes(row.type))
   const alignable = rows.length - lockedCount
@@ -69,6 +69,9 @@ export function MultiInspector({ rows, lockedCount, onPatch, onDelete, onDuplica
           <Button type="button" variant="outline" size="sm" className="h-11 flex-col gap-0.5 px-1 text-[11px] sm:h-12" onClick={() => onArrange('back')}><ArrowDownToLine />Al fondo</Button>
         </div>
       </Section>
+      <Button type="button" variant="outline" className="w-full" onClick={() => onSaveToLibrary(rows)}>
+        <Library />Guardar en biblioteca
+      </Button>
       <Button type="button" variant="outline" className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}>
         <Trash2 />Eliminar {rows.length} elementos
       </Button>

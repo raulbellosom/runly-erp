@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { fitSize, isDxf, isImage, isPdf, openPdf, readImageSize, renderPdfPage } from '../lib/media.js'
+import { fitSize, isDxf, isImage, isPdf, maxInsertSide as computeMaxInsertSide, openPdf, readImageSize, renderPdfPage } from '../lib/media.js'
 import { rasterizeDxf } from '../lib/dxf.js'
 import { mediaTargetLayer } from '../lib/boardTemplates.js'
 import { screenToWorld } from '../engine/viewport.js'
@@ -15,7 +15,7 @@ export function useMediaInsert({ upload, viewport, size, drawableLayer, layers, 
   const fileInputRef = useRef(null)
 
   const viewportCenter = () => screenToWorld({ x: size.width / 2, y: size.height / 2 }, viewport)
-  const maxInsertSide = () => Math.max(200, Math.min(900, (Math.min(size.width, size.height) * 0.7) / viewport.zoom))
+  const maxInsertSide = () => computeMaxInsertSide(size, viewport)
 
   async function placeImages(items, label) {
     // Templates flag a backdrop layer (Plano base, Documento…) for inserted

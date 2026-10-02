@@ -73,6 +73,14 @@ Con varios elementos seleccionados, la seccion **Alinear** del inspector los ali
 
 Si sueltas el inicio o el final de una linea o flecha sobre una forma, queda **conectada**: al mover o cambiar el tamano de la forma, la flecha la sigue. Arrastra el extremo fuera de la forma para desconectarlo.
 
+### Bibliotecas
+
+El boton **Biblioteca** (icono de libro) de la barra inferior abre un panel con elementos reutilizables, personales o de la empresa. Puedes importar bibliotecas .excalidrawlib descargadas de libraries.excalidraw.com (revisa la licencia de cada una antes de usarla), iconos SVG sueltos o un ZIP con varios SVG (por ejemplo un paquete de iconos de redes o de nube); cada SVG queda como un elemento de imagen. Si no eliges una biblioteca al importar, se crea una nueva con el nombre del archivo.
+
+Haz clic en un elemento para insertarlo en el centro de la vista, o arrastralo al lienzo para soltarlo en un punto exacto. Desde el menu de acciones rapidas o desde el inspector (un elemento o varios), **Guardar en biblioteca** guarda la seleccion como un elemento nuevo, listo para reutilizar en cualquier Board.
+
+Cada biblioteca puede ser **Personal** (solo tu la ves) o de **Empresa** (todo el equipo la ve); cambiar una biblioteca a Empresa requiere el permiso correspondiente. Desde el menu de cada biblioteca puedes renombrarla, cambiar su alcance o eliminarla.
+
 ### Exportar
 
 El menu **Exportar** de la barra superior descarga la pagina actual como imagen PNG o como PDF listo para imprimir, con el nombre del Board, la fecha y la escala.

@@ -154,7 +154,7 @@ importers:
         version: 2.18.0
       lucide-react:
         specifier: latest
-        version: 1.49.0(@types/react@19.2.14)(react@19.3.0)
+        version: 1.50.0(@types/react@19.2.14)(react@19.3.0)
       motion:
         specifier: ^12.38.0
         version: 12.38.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -368,6 +368,9 @@ importers:
       jspdf:
         specifier: 4.2.1
         version: 4.2.1
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
       lib0:
         specifier: ^0.2.117
         version: 0.2.117
@@ -376,7 +379,7 @@ importers:
         version: 2.21.0(@types/dom-mediacapture-record@1.0.22)
       lucide-react:
         specifier: latest
-        version: 1.49.0(@types/react@19.2.14)(react@19.3.0)
+        version: 1.50.0(@types/react@19.2.14)(react@19.3.0)
       maplibre-gl:
         specifier: ^6.11.2
         version: 6.11.2
@@ -626,7 +629,7 @@ importers:
         version: 1.7.3
       lucide-react:
         specifier: latest
-        version: 1.49.0(@types/react@19.2.14)(react@19.2.5)
+        version: 1.50.0(@types/react@19.2.14)(react@19.2.5)
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -5342,8 +5345,8 @@ packages:
     resolution: {integrity: sha512-DqC6n3QQ77zdFpCMASA1a3Jlb64Hv2N2DciFGkO/4L9+q/IpIAuRlKOvCXabtRW6cQf8usbmM6BE/TOPysCdIA==}
     engines: {bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0'}
 
-  lucide-react@1.49.0:
-    resolution: {integrity: sha512-ApfaNM4/7jBrVopqLJ84Jz8TMQ1Q1JeZ1PmKh25aeS3E1FTVcMkSh1bEQB7dfzdIrwXRP8p3z4AJjTIHHb5IIA==}
+  lucide-react@1.50.0:
+    resolution: {integrity: sha512-RqHPQtKX6S9IE1xOL4oTHHsVQbcwJWTnmlxI6AdI9IpOwKiy7q+COPCQyMepI/Qu1x3h7sunpyEMvqtgFbgNiQ==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -12177,13 +12180,13 @@ snapshots:
 
   lru.min@1.1.4: {}
 
-  lucide-react@1.49.0(@types/react@19.2.14)(react@19.2.5):
+  lucide-react@1.50.0(@types/react@19.2.14)(react@19.2.5):
     dependencies:
       react: 19.2.5
     optionalDependencies:
       '@types/react': 19.2.14
 
-  lucide-react@1.49.0(@types/react@19.2.14)(react@19.3.0):
+  lucide-react@1.50.0(@types/react@19.2.14)(react@19.3.0):
     dependencies:
       react: 19.3.0
     optionalDependencies:

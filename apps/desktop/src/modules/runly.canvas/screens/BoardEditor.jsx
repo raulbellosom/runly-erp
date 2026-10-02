@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
 import { BoardInspector } from '../components/BoardInspector.jsx'
@@ -10,6 +11,9 @@ import { DataBindingDialog } from '../components/DataBindingDialog.jsx'
 import { EditorTopBar } from '../components/EditorTopBar.jsx'
 import { HotspotDialog } from '../components/HotspotDialog.jsx'
 import { LayersPanel } from '../components/layers/LayersPanel.jsx'
+import { LibraryPanel } from '../components/library/LibraryPanel.jsx'
+import { SaveToLibraryDialog } from '../components/library/SaveToLibraryDialog.jsx'
+import { libraryItemsKey } from '../hooks/useLibraries.js'
 import { MapBackdrop } from '../components/MapBackdrop.jsx'
 import { MapLocationDialog } from '../components/MapLocationDialog.jsx'
 import { PdfPagesDialog } from '../components/PdfPagesDialog.jsx'
@@ -23,7 +27,7 @@ import { initialLayerId, parseEmptyAction } from '../lib/boardTemplates.js'
 import { sceneBounds } from '../engine/Canvas2DRenderer.js'
 import { snapSizeFor } from '../engine/snap.js'
 import { measureTextHeight } from '../engine/text.js'
-import { DEFAULT_VIEWPORT, fitBounds, zoomAt } from '../engine/viewport.js'
+import { DEFAULT_VIEWPORT, fitBounds, screenToWorld, zoomAt } from '../engine/viewport.js'
 import { useBindings, useBoard, useCanvasImages, useCanvasObjects, useCanvasTemplates, useEntityLinks, useUpdateBoardSettings, useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { toast } from 'sonner'
 import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
@@ -68,10 +72,12 @@ export default function BoardEditor() {
   // arrives as the wildcard segment (`/app/m/runly.canvas/<boardId>`).
   const { '*': wildcard } = useParams(), boardId = String(wildcard ?? '').split('/').filter(Boolean)[0]
   const navigate = useNavigate(), board = useBoard(boardId), isDesktop = !useIsMobile(1280)
+  const queryClient = useQueryClient()
   const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedIds, setSelectedIds] = useState([]), [tool, setTool] = useState('select')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })
   const [desktopPanels, setDesktopPanels] = useState({ left: true, right: true }), [mobileSheet, setMobileSheet] = useState(null)
   const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false), [shareOpen, setShareOpen] = useState(false), [versionsOpen, setVersionsOpen] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const fittedPageRef = useRef(null)
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
@@ -160,6 +166,27 @@ export default function BoardEditor() {
     else if (!isDesktop) setMobileSheet('right')
   }
   const deleteSelection = () => actions.remove(editableSelection)
+  // Stores ids, not row references, so the dialog always saves the latest
+  // geometry/style even if it opened a moment before the last edit landed.
+  const saveToLibrary = (objects) => setDialog({ kind: 'save-library', ids: objects.map((object) => object.id) })
+  const saveToLibraryRows = dialog?.kind === 'save-library' ? allRows.filter((row) => dialog.ids.includes(row.id)) : []
+  // Dropping a library tile (see LibraryPanel/LibraryItemTile): the payload
+  // is just ids, resolved from the same React Query cache the panel already
+  // populated (see hooks/useLibraries.js#libraryItemsKey).
+  const onLibraryDragOver = (event) => { if (event.dataTransfer.types.includes('application/x-runly-library-item')) event.preventDefault() }
+  const onLibraryDrop = (event) => {
+    const raw = event.dataTransfer.getData('application/x-runly-library-item')
+    if (!raw || readOnly) return
+    event.preventDefault()
+    let parsed
+    try { parsed = JSON.parse(raw) } catch { return }
+    const items = queryClient.getQueryData(libraryItemsKey(parsed.libraryId)) ?? []
+    const item = items.find((entry) => entry.id === parsed.itemId)
+    if (!item) return toast.error('No se encontró el elemento de la biblioteca.')
+    const rect = event.currentTarget.getBoundingClientRect()
+    const point = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, viewport)
+    actions.insertLibraryItem(item, point)
+  }
   const saveText = (object, text) => {
     const row = allRows.find((item) => item.id === object.id)
     if (row) actions.patch([row], { properties: { text }, geometry: { height: measureTextHeight(text, row.style, row.geometry?.width ?? 220) } }, 'Editar texto')
@@ -225,7 +252,7 @@ export default function BoardEditor() {
         openHotspot: (object) => setDialog({ kind: 'hotspot', id: object.id }),
         editText: (object) => setDialog({ kind: 'text', id: object.id }),
         openDataDialog: (object) => setDialog({ kind: 'data', mode: 'connect', id: object.id }),
-        disconnectData: actions.disconnectData,
+        disconnectData: actions.disconnectData, saveToLibrary,
       }}
     />
   )
@@ -262,7 +289,7 @@ export default function BoardEditor() {
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
-        <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]">
+        <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]" onDragOver={onLibraryDragOver} onDrop={onLibraryDrop}>
           {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
           <MapBackdrop background={activePage?.background} viewport={viewport} size={size} config={pageMap.config} />
           <CanvasViewport
@@ -283,6 +310,7 @@ export default function BoardEditor() {
             onToggleHidden={actions.setHidden} onToggleLocked={actions.setLocked}
             onConnectData={(object) => setDialog({ kind: 'data', mode: 'connect', id: object.id })}
             onDelete={actions.remove} onSelectAll={selectAll} onFit={fit} onAddToSelection={select}
+            onSaveToLibrary={saveToLibrary}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (
@@ -316,6 +344,7 @@ export default function BoardEditor() {
             <CanvasToolbar
               tool={tool} onToolChange={actions.chooseTool} canDelete={editableSelection.length > 0} onDelete={deleteSelection}
               onInsertMedia={actions.openFilePicker} onInsertData={() => setDialog({ kind: 'data', mode: 'insert' })} inserting={actions.inserting}
+              onToggleLibrary={() => setLibraryOpen((value) => !value)} libraryOpen={libraryOpen}
               readOnly={readOnly}
             />
           </div>
@@ -344,6 +373,11 @@ export default function BoardEditor() {
         canCreate={!readOnly} canRestore={myRole === 'OWNER'}
         onRestored={() => { setSelectedIds([]); setPageId(null); fittedPageRef.current = null }}
       />
+      <LibraryPanel
+        open={libraryOpen} onOpenChange={setLibraryOpen}
+        onInsert={(item) => actions.insertLibraryItem(item, screenToWorld({ x: size.width / 2, y: size.height / 2 }, viewport))}
+      />
+      <SaveToLibraryDialog open={dialog?.kind === 'save-library'} rows={saveToLibraryRows} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <TextEditDialog object={dialog?.kind === 'text' ? dialogObject : null} onSave={saveText} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <DataBindingDialog
         open={dialog?.kind === 'data'} mode={dialog?.mode ?? 'connect'} onOpenChange={(open) => { if (!open) setDialog(null) }}

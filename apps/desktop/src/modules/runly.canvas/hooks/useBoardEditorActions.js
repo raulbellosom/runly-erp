@@ -5,6 +5,8 @@ import { buildOperations, createHistory, snapshot } from '../lib/history.js'
 import { alignDeltas, distributeDeltas } from '../lib/arrange.js'
 import { convertShape } from '../lib/shapeConvert.js'
 import { reorderedLayerIds } from '../lib/layerTree.js'
+import { fitSize, maxInsertSide } from '../lib/media.js'
+import { placeObjects } from '../lib/libraryImport/normalize.js'
 import { screenToWorld } from '../engine/viewport.js'
 import { useCreateHotspot, useCreateLayer, useCreatePage, useObjectBatch, useReorderLayers, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
@@ -319,10 +321,60 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     } catch (error) { fail(error) }
   }
 
+  // Inserts a library item (spec: docs/superpowers/specs/2026-10-02-canvas-libraries-design.md
+  // §8/§23). An `objects` item is centred on `point`: its own shapes go to
+  // the active drawing layer, while any hotspot inside it goes to the
+  // hotspot layer and gets a fresh hotspot record titled "Hotspot" (a saved
+  // hotspot's own title/description/icon are not part of a library item —
+  // edge case 6). An `image` item reuses the already-uploaded fileId, sized
+  // like a freshly inserted image (fitSize/maxInsertSide).
+  async function insertLibraryItem(item, point) {
+    if (item.kind === 'image') {
+      const layer = drawableLayer()
+      if (!layer) return toast.error('No hay una capa de dibujo disponible.')
+      const dims = fitSize(item.width ?? 0, item.height ?? 0, maxInsertSide(size, viewport))
+      try {
+        await createRows([{
+          pageId, layerId: layer.id, type: 'image', position: topPosition(layer.id),
+          transform: { x: point.x - dims.width / 2, y: point.y - dims.height / 2, rotation: 0, scaleX: 1, scaleY: 1 },
+          geometry: dims, style: {}, properties: { fileId: item.fileAssetId, name: item.name, naturalWidth: item.width, naturalHeight: item.height },
+        }], 'Insertar de biblioteca')
+      } catch (error) { fail(error) }
+      return
+    }
+
+    const layer = drawableLayer()
+    if (!layer) return toast.error('No hay una capa de dibujo disponible.')
+    const hotspotLayer = layers.find((candidate) => candidate.type === 'hotspot')
+    const payload = item.payload ?? { objects: [], width: 0, height: 0 }
+    const origin = { x: point.x - (payload.width ?? 0) / 2, y: point.y - (payload.height ?? 0) / 2 }
+    const placed = placeObjects(payload, origin)
+    if (!placed.length) return
+
+    let shapePosition = topPosition(layer.id), hotspotPosition = hotspotLayer ? topPosition(hotspotLayer.id) : 0, skippedHotspots = 0
+    const datas = []
+    for (const object of placed) {
+      if (object.type === 'hotspot') {
+        if (!hotspotLayer) { skippedHotspots += 1; continue }
+        datas.push({ ...object, pageId, layerId: hotspotLayer.id, position: hotspotPosition++ })
+      } else {
+        datas.push({ ...object, pageId, layerId: layer.id, position: shapePosition++ })
+      }
+    }
+    if (!datas.length) return toast.error('Esta página no tiene capa de hotspots.')
+    try {
+      const created = await createRows(datas, 'Insertar de biblioteca')
+      await Promise.all(created.filter((object) => object.type === 'hotspot').map((object) => hotspot.mutateAsync({ objectId: object.id, title: 'Hotspot' })))
+      if (skippedHotspots) {
+        toast.info(skippedHotspots === 1 ? 'Se omitió un hotspot: esta página no tiene capa de hotspots.' : `Se omitieron ${skippedHotspots} hotspots: esta página no tiene capa de hotspots.`)
+      }
+    } catch (error) { fail(error) }
+  }
+
   return {
     batch, hotspot, createPage, updateLayer, ...media,
     chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, addDataLayer, addingLayer: createLayer.isPending, undo, redo,
-    connectData, disconnectData, insertData,
+    connectData, disconnectData, insertData, insertLibraryItem,
     setHidden, setLocked, convertShapes, copy, paste, canPaste,
     moveToLayer, reorderLayers, reorderElements,
     canUndo: history.canUndo, canRedo: history.canRedo,

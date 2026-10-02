@@ -4,7 +4,7 @@ import {
 } from '@runly/ui'
 import {
   ArrowDownToLine, ArrowUpToLine, CheckSquare, Clipboard, ClipboardPaste, Copy, Database, Eye, EyeOff,
-  FolderInput, ListPlus, LocateFixed, Lock, LockOpen, Maximize, MapPin, Pencil, Shapes, Trash2,
+  FolderInput, Library, ListPlus, LocateFixed, Lock, LockOpen, Maximize, MapPin, Pencil, Shapes, Trash2,
 } from 'lucide-react'
 import { canBind } from '../lib/dataBindings.js'
 import { canHostType } from '../lib/layerKinds.js'
@@ -40,7 +40,7 @@ function shapeFamilyOf(object) {
 export function CanvasContextMenu({
   menu, onClose, layers, lockedLayerIds, readOnly, canPaste,
   onFocus, onEditText, onOpenHotspot, onDuplicate, onCopy, onPaste, onConvert, onMoveToLayer,
-  onArrange, onToggleHidden, onToggleLocked, onConnectData, onDelete, onSelectAll, onFit, onAddToSelection,
+  onArrange, onToggleHidden, onToggleLocked, onConnectData, onDelete, onSelectAll, onFit, onAddToSelection, onSaveToLibrary,
 }) {
   const target = menu?.target ?? null
   const selection = menu?.selection ?? []
@@ -80,6 +80,7 @@ export function CanvasContextMenu({
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled={!anyEditable} onSelect={() => onDuplicate(selection)}><Copy />Duplicar</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onCopy(selection)}><Clipboard />Copiar</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onSaveToLibrary(selection)}><Library />Guardar en biblioteca</DropdownMenuItem>
               {shapeFamily ? (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger disabled={!anyEditable}><Shapes />Cambiar forma</DropdownMenuSubTrigger>

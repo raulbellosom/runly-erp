@@ -1,5 +1,5 @@
 import { Badge, Button, Switch, Textarea } from '@runly/ui'
-import { ArrowDownToLine, ArrowUpToLine, Copy, Lock, MapPin, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpToLine, Copy, Library, Lock, MapPin, Pencil, Trash2 } from 'lucide-react'
 import { boxOf, canResize, canRotate, centerOf, isLinear } from '../../engine/geometry.js'
 import { CANVAS_COLORS, objectLabel } from '../../lib/objectFactory.js'
 import { measureTextHeight } from '../../engine/text.js'
@@ -146,7 +146,7 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
   )
 }
 
-export function ObjectInspector({ object, layerName, locked, readOnly = false, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, onConvert, children }) {
+export function ObjectInspector({ object, layerName, locked, readOnly = false, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, onConvert, onSaveToLibrary, children }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-2 px-0.5">
@@ -183,6 +183,11 @@ export function ObjectInspector({ object, layerName, locked, readOnly = false, o
 
       {children}
 
+      {!readOnly ? (
+        <Button type="button" variant="outline" className="w-full" onClick={() => onSaveToLibrary([object])}>
+          <Library />Guardar en biblioteca
+        </Button>
+      ) : null}
       {!locked && !readOnly ? (
         <Button type="button" variant="outline" className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}>
           <Trash2 />Eliminar

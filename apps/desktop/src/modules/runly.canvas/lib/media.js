@@ -90,3 +90,11 @@ export function fitSize(width, height, maxSide = 800) {
   const scale = Math.min(1, maxSide / Math.max(width, height))
   return { width: Math.round(width * scale), height: Math.round(height * scale) }
 }
+
+// Caps a newly inserted image/library item to a reasonable fraction of the
+// current viewport, in world units, so it never appears gigantic (zoomed
+// out) or imperceptibly tiny (zoomed in). Shared by useMediaInsert and
+// library item insertion (useBoardEditorActions).
+export function maxInsertSide(size, viewport) {
+  return Math.max(200, Math.min(900, (Math.min(size.width, size.height) * 0.7) / viewport.zoom))
+}

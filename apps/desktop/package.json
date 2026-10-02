@@ -78,6 +78,7 @@
     "hls.js": "^1.7.3",
     "html2canvas": "^1.4.1",
     "jspdf": "4.2.1",
+    "jszip": "^3.10.1",
     "lib0": "^0.2.117",
     "livekit-client": "2.21.0",
     "lucide-react": "latest",
