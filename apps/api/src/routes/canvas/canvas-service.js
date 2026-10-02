@@ -191,13 +191,6 @@ export function createCanvasService({ prisma, entityResolver = null, removeFiles
     return updated
   }
 
-  async function archiveBoard(companyId, actorId, boardId) {
-    const { board } = await assertBoardAccess(companyId, actorId, boardId, 'OWNER')
-    const updated = await prisma.canvasBoard.update({ where: { id: boardId }, data: { archivedAt: new Date(), updatedById: actorId } })
-    await audit(prisma, { companyId, actorId, action: 'BOARD_ARCHIVED', entityType: 'CanvasBoard', entityId: boardId, before: board, after: updated })
-    return updated
-  }
-
   async function createPage(companyId, actorId, boardId, data) {
     const { board } = await assertBoardAccess(companyId, actorId, boardId, 'EDITOR')
     // A map background fixes calibration/coordinateSystem too, so it is
@@ -684,7 +677,7 @@ export function createCanvasService({ prisma, entityResolver = null, removeFiles
   }
 
   return {
-    assertBoardAccess, listBoards, getBoard, createBoard, updateBoard, archiveBoard,
+    assertBoardAccess, listBoards, getBoard, createBoard, updateBoard,
     createPage, updatePage, deletePage, createLayer, updateLayer, deleteLayer, reorderLayers, listObjects, batchObjects,
     createHotspot, updateHotspot, deleteHotspot, createEntityLink, listEntityLinks, removeEntityLink, listReferences,
     addCollaborator, listCollaborators, removeCollaborator, createVersion, listVersions, restoreVersion,

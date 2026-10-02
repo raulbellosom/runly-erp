@@ -14,7 +14,9 @@ export function createCanvasDomain({ request, withAuthHeaders, toQueryString }) 
     createBoard: (data, token) => send('POST', '/canvas/boards', data, token),
     getBoard: (boardId, token) => send('GET', `/canvas/boards/${id(boardId)}`, undefined, token),
     updateBoard: (boardId, data, token) => send('PATCH', `/canvas/boards/${id(boardId)}`, data, token),
-    archiveBoard: (boardId, token) => send('DELETE', `/canvas/boards/${id(boardId)}`, undefined, token),
+    // Permanent delete: removes the Board, its pages/objects/hotspots/
+    // versions/collaborators, comments, public links and uploaded files.
+    deleteBoard: (boardId, token) => send('DELETE', `/canvas/boards/${id(boardId)}`, undefined, token),
     createPage: (boardId, data, token) => send('POST', `/canvas/boards/${id(boardId)}/pages`, data, token),
     updatePage: (boardId, pageId, data, token) => send('PATCH', `/canvas/boards/${id(boardId)}/pages/${id(pageId)}`, data, token),
     deletePage: (boardId, pageId, token) => send('DELETE', `/canvas/boards/${id(boardId)}/pages/${id(pageId)}`, undefined, token),

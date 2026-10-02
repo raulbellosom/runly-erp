@@ -91,6 +91,33 @@ describe('Runly Canvas routes', () => {
     assert.deepEqual((await response.json()).data, [{ boardId: 'b1', score: 10, matches: [] }])
   })
 
+  it('deletes a board for real (204) and broadcasts board.deleted', async () => {
+    const sent = []
+    const broadcaster = { broadcastToChannel: async (topic, event, payload) => { sent.push({ topic, event, payload }) } }
+    const requirePermission = () => async (c, next) => { c.set('companyId', 'company-1'); c.set('userContext', { profile: { id: 'user-1' } }); return next() }
+    const service = { assertBoardAccess: async () => ({ board: { id: 'board-1', name: 'Board', templateType: 'blank' }, role: 'OWNER' }) }
+    const tx = {
+      entityComment: { deleteMany: async () => {} },
+      modulePublicLink: { deleteMany: async () => {} },
+      canvasBoard: { delete: async () => {} },
+      auditLog: { create: async () => {} },
+      $queryRaw: async () => [],
+    }
+    const prisma = {
+      canvasPage: { count: async () => 0 },
+      canvasObject: { count: async () => 0 },
+      canvasHotspot: { findMany: async () => [] },
+      fileAsset: { findMany: async () => [] },
+      $transaction: (fn) => fn(tx),
+    }
+    const app = createCanvasRouter({ requirePermission, service, prisma, broadcaster })
+    const response = await app.request('http://localhost/canvas/boards/board-1', { method: 'DELETE' })
+    assert.equal(response.status, 204)
+    assert.equal(sent[0].topic, 'canvas:board:board-1')
+    assert.equal(sent[0].payload.action, 'board.deleted')
+    assert.equal(sent[0].payload.boardId, 'board-1')
+  })
+
   it('MirAI board types mirror the catalog', async () => {
     const { BOARD_TYPES } = await import('../canvas-mirai-queries.js')
     const { CANVAS_TEMPLATES } = await import('../canvas-templates.js')

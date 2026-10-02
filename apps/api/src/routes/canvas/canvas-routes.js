@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { UserAccessError, createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
+import { createCanvasBoardDeletion } from './canvas-board-delete.js'
 import { createCanvasLibrariesService } from './canvas-libraries.js'
 import { createCanvasSearch } from './canvas-search.js'
 import { createCanvasPublicLinksService } from './canvas-public.js'
@@ -44,6 +45,7 @@ export function objectsDelta(results) {
 export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder(), search = null, librariesService = null, removeFiles = null }) {
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver, ...(removeFiles ? { removeFiles } : {}) })
+  const boardDeletion = createCanvasBoardDeletion({ prisma, canvas, removeFiles: removeFiles ?? ((where) => prisma.fileAsset.updateMany({ where, data: { enabled: false } })) })
   const libraries = librariesService ?? (prisma ? createCanvasLibrariesService({ prisma }) : null)
   const canvasSearch = search ?? (prisma ? createCanvasSearch({ prisma }) : null)
   const access = prisma ? createUserAccessService({ prisma }) : null
@@ -139,9 +141,12 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
       changed(boardId, 'board.updated'); return c.json(result)
     } catch (error) { return errorResponse(c, error, 'Error al actualizar el Board.') }
   })
+  // Permanent delete (not an archive): removes the Board, its pages/
+  // objects/hotspots/versions/collaborators (DB cascade), comments, public
+  // links and uploaded files (see canvas-board-delete.js).
   app.delete('/canvas/boards/:boardId', requirePermission('canvas.delete'), async (c) => {
-    try { const boardId = c.req.param('boardId'); const result = await canvas.archiveBoard(companyId(c), actorId(c), boardId); changed(boardId, 'board.archived'); return c.json(result) }
-    catch (error) { return errorResponse(c, error, 'Error al archivar el Board.') }
+    try { const boardId = c.req.param('boardId'); await boardDeletion.deleteBoard(companyId(c), actorId(c), boardId); changed(boardId, 'board.deleted'); return c.body(null, 204) }
+    catch (error) { return errorResponse(c, error, 'Error al eliminar el Board.') }
   })
 
   app.post('/canvas/boards/:boardId/pages', requirePermission('canvas.edit'), async (c) => {
