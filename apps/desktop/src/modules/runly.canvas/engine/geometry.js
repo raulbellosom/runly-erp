@@ -154,3 +154,44 @@ export function boxFromDrag(type, a, b, { constrain = false } = {}) {
   if (constrain) { const side = Math.max(Math.abs(dx), Math.abs(dy)); dx = Math.sign(dx || 1) * side; dy = Math.sign(dy || 1) * side }
   return { x: Math.min(a.x, a.x + dx), y: Math.min(a.y, a.y + dy), width: Math.max(Math.abs(dx), MIN_SIZE), height: Math.max(Math.abs(dy), MIN_SIZE) }
 }
+
+// ---- Polygon vertices (points are box-relative 0..1) -------------------
+export function absolutePoints(object) {
+  const b = boxOf(object), c = centerOf(b)
+  return (object.geometry?.points ?? []).map((p) => rotatePoint({ x: b.x + p.x * b.width, y: b.y + p.y * b.height }, c, b.rotation))
+}
+
+// Rebuilds box + relative points from world points, keeping the rotation.
+export function polygonFromAbsolute(object, world) {
+  const b = boxOf(object), c = centerOf(b)
+  const local = world.map((p) => rotatePoint(p, c, -b.rotation))
+  const xs = local.map((p) => p.x), ys = local.map((p) => p.y)
+  const minX = Math.min(...xs), minY = Math.min(...ys)
+  const width = Math.max(Math.max(...xs) - minX, MIN_SIZE), height = Math.max(Math.max(...ys) - minY, MIN_SIZE)
+  // The local box is unrotated around the old centre; place it so its centre maps back correctly.
+  const localCenter = { x: minX + width / 2, y: minY + height / 2 }
+  const worldCenter = rotatePoint(localCenter, c, b.rotation)
+  return {
+    ...object,
+    transform: { ...object.transform, x: worldCenter.x - width / 2, y: worldCenter.y - height / 2 },
+    geometry: { ...object.geometry, width, height, points: local.map((p) => ({ x: (p.x - minX) / width, y: (p.y - minY) / height })) },
+  }
+}
+
+export function polygonHandles(object) {
+  const points = absolutePoints(object)
+  return [
+    ...points.map((p, i) => ({ id: `v:${i}`, ...p })),
+    ...points.map((p, i) => { const q = points[(i + 1) % points.length]; return { id: `m:${i}`, x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 } }),
+  ]
+}
+
+// handle 'v:i' moves vertex i; 'm:i' inserts after i; 'delete:i' removes i (min 3).
+export function editVertex(object, handle, point) {
+  const [kind, raw] = handle.split(':'), index = Number(raw)
+  const points = absolutePoints(object)
+  if (kind === 'v') points[index] = point
+  else if (kind === 'm') points.splice(index + 1, 0, point)
+  else if (kind === 'delete') { if (points.length <= 3) return object; points.splice(index, 1) }
+  return polygonFromAbsolute(object, points)
+}
