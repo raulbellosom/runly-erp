@@ -178,7 +178,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     try { return await createPage.mutateAsync({ name: `Página ${count + 1}` }) } catch (error) { fail(error); return null }
   }
 
-  const media = useMediaInsert({ upload, viewport, size, drawableLayer, rows, pageId, createRows, fail })
+  const media = useMediaInsert({ upload, viewport, size, drawableLayer, layers, lockLayer: (layer) => toggleLayer(layer, { locked: true }), rows, pageId, createRows, fail })
 
   return {
     batch, hotspot, createPage, updateLayer, ...media,

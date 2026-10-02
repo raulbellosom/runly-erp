@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fitSize, isImage, isPdf, openPdf, readImageSize, renderPdfPage } from '../lib/media.js'
+import { mediaTargetLayer } from '../lib/boardTemplates.js'
 import { screenToWorld } from '../engine/viewport.js'
 
 // Image and PDF insertion. PDFs with several pages go through a page picker;
 // every inserted page becomes an image object placed side by side.
-export function useMediaInsert({ upload, viewport, size, drawableLayer, rows, pageId, createRows, fail }) {
+export function useMediaInsert({ upload, viewport, size, drawableLayer, layers, lockLayer, rows, pageId, createRows, fail }) {
   const [inserting, setInserting] = useState(false)
   const [pdf, setPdf] = useState(null)
   const fileInputRef = useRef(null)
@@ -14,8 +15,12 @@ export function useMediaInsert({ upload, viewport, size, drawableLayer, rows, pa
   const maxInsertSide = () => Math.max(200, Math.min(900, (Math.min(size.width, size.height) * 0.7) / viewport.zoom))
 
   async function placeImages(items, label) {
-    const layer = drawableLayer()
+    // Templates flag a backdrop layer (Plano base, Documento…) for inserted
+    // media; a hidden or locked one falls back to the active drawing layer.
+    const target = mediaTargetLayer(layers)
+    const layer = target && target.visible && !target.locked ? target : drawableLayer()
     if (!layer) throw new Error('No hay una capa de dibujo disponible.')
+    if (target && layer !== target) toast.info(`La capa «${target.name}» está ${target.locked ? 'bloqueada' : 'oculta'}; se insertó en la capa activa.`)
     const center = viewportCenter(), gap = 40
     const totalWidth = items.reduce((sum, item) => sum + item.size.width, 0) + gap * (items.length - 1)
     // Images go behind existing shapes so plans work as a backdrop.
@@ -31,6 +36,7 @@ export function useMediaInsert({ upload, viewport, size, drawableLayer, rows, pa
       return data
     })
     await createRows(datas, label)
+    if (layer === target && target.metadata?.lockAfterInsert) await lockLayer(target)
   }
 
   async function insertImage(file) {
