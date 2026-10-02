@@ -8,7 +8,7 @@ Cada **Board** tiene paginas, y cada pagina tiene capas. Varias personas pueden 
 
 ### Tipos de Board (plantillas)
 
-Al crear un Board eliges una plantilla. La plantilla solo sirve para identificar el uso del Board y mostrar su icono en la lista: **todas las herramientas funcionan igual en cualquier tipo** (formas, textos, hotspots, imagenes y PDF).
+Al crear un Board eliges una plantilla. Cada plantilla **prepara el Board para su uso**: crea capas con nombre, configura la cuadricula y el ajuste a la cuadricula, elige la herramienta inicial y muestra en la pagina vacia el primer paso recomendado. Todas las herramientas (formas, textos, hotspots, imagenes y PDF) funcionan en cualquier plantilla, y la cuadricula se puede cambiar despues.
 
 - **En blanco**: lienzo libre para bocetos, ideas o cualquier uso que no encaje en otro tipo.
 - **Plano**: plantas de oficinas, bodegas, locales o casas. Inserta el plano como imagen o PDF y marca areas con rectangulos y puntos con hotspots (tomas electricas, extintores, camaras).
@@ -19,13 +19,13 @@ Al crear un Board eliges una plantilla. La plantilla solo sirve para identificar
 
 ### Capas
 
-Cada pagina trae tres capas:
-
-- **Vectores**: formas, textos, imagenes y PDF.
-- **Hotspots**: puntos con informacion (titulo, descripcion, estado, color), archivos adjuntos y registros vinculados.
-- **Datos Runly**: para elementos que representan registros del ERP; dibujalos aqui y vinculalos desde el inspector.
+Cada pagina trae las capas de su plantilla (por ejemplo, un Plano trae **Plano base**, **Mobiliario** y **Hotspots**; una Revision de PDF trae **Documento**, **Anotaciones** y **Hotspots**). Las imagenes y PDF que insertes van a la capa de fondo de la plantilla (Plano base, Instalaciones, Espacios o Documento); en Revision de PDF esa capa se bloquea al insertar para que las paginas no se muevan mientras anotas. Los hotspots siempre van a su capa de hotspots.
 
 Puedes ocultar una capa (icono de ojo) o bloquearla (candado) para no moverla por accidente. Al elegir una herramienta, Canvas cambia solo a la capa correcta.
+
+### Cuadricula y ajuste
+
+Sin nada seleccionado, el inspector muestra **Ajustes del Board**: mostrar u ocultar la cuadricula, su tamano y **Ajustar a la cuadricula**. Con el ajuste activo, las formas se alinean a la cuadricula al dibujarlas, moverlas o cambiar su tamano; manten **Alt** mientras arrastras para desactivarlo un momento.
 
 ### Hotspots y registros vinculados
 
