@@ -61,8 +61,8 @@ export function canvasReducer(state, action) {
       return {
         elements: state.elements.map((el) => {
           if (el.id !== action.id) return el
-          const newX = Math.max(0, action.x)
-          const newY = Math.max(0, action.y)
+          const newX = action.x
+          const newY = action.y
           if (el.kind === 'POLYGON' && el.points?.length) {
             const ddx = newX - el.x
             const ddy = newY - el.y
@@ -96,8 +96,8 @@ export function canvasReducer(state, action) {
           const patch = patches.get(el.id)
           if (!patch) return el
           const next = { ...el, ...patch }
-          if (patch.x !== undefined) next.x = round2(Math.max(0, patch.x))
-          if (patch.y !== undefined) next.y = round2(Math.max(0, patch.y))
+          if (patch.x !== undefined) next.x = round2(patch.x)
+          if (patch.y !== undefined) next.y = round2(patch.y)
           if (patch.width !== undefined) next.width = round2(Math.max(20, patch.width))
           if (patch.height !== undefined) next.height = round2(Math.max(20, patch.height))
           return next
@@ -156,13 +156,25 @@ export function useHistoryReducer(reducer, initialState) {
 }
 
 // Maps planner elements to the save payload for PUT /pos/floors/:id/layout.
+// The planner canvas is unbounded, but the API stores x/y >= 0: the whole
+// layout is shifted together so its top-left lands on 0 (shape unchanged).
+function layoutOffset(elements) {
+  const xs = [], ys = []
+  for (const el of elements) {
+    xs.push(el.x); ys.push(el.y)
+    for (const p of el.points ?? []) { xs.push(p.x); ys.push(p.y) }
+  }
+  return { dx: Math.max(0, -Math.min(0, ...xs)), dy: Math.max(0, -Math.min(0, ...ys)) }
+}
+
 export function layoutPayload(elements) {
+  const { dx, dy } = layoutOffset(elements)
   return elements.map((el) => {
     const item = {
       ...(String(el.id).startsWith('temp_') ? {} : { id: el.id }),
       kind: el.kind,
-      x: el.x,
-      y: el.y,
+      x: round2(el.x + dx),
+      y: round2(el.y + dy),
       width: el.width,
       height: el.height,
       rotation: el.rotation ?? 0,
@@ -173,7 +185,7 @@ export function layoutPayload(elements) {
       color: el.color ?? undefined,
     }
     if (el.kind === 'POLYGON' && el.points?.length) {
-      item.style = { points: el.points }
+      item.style = { points: el.points.map((p) => ({ x: round2(p.x + dx), y: round2(p.y + dy) })) }
     }
     return item
   })

@@ -22,19 +22,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2))
 }
 
-export function drawSurface(ctx, object, { x, y, w, h, theme }) {
-  roundRect(ctx, x, y, w, h, 8)
-  ctx.fillStyle = theme.surface
-  ctx.fill()
-  ctx.lineWidth = 1
-  ctx.globalAlpha *= 0.6
-  ctx.strokeStyle = theme.muted
-  ctx.stroke()
-  ctx.setLineDash([6, 4])
-  ctx.globalAlpha *= 0.5
-  ctx.strokeRect(x + 12, y + 12, w - 24, h - 24)
-  ctx.setLineDash([])
-}
 
 export function drawZone(ctx, object, { x, y, w, h, zoom, theme }) {
   const colors = POLYGON_ZONE_COLORS[object.properties?.color] ?? POLYGON_ZONE_COLORS.neutral
@@ -260,7 +247,6 @@ export function drawTable(ctx, object, { x, y, w, h, theme }) {
 }
 
 export const POS_DRAWERS = {
-  'pos.surface': drawSurface,
   'pos.zone': drawZone,
   'pos.decor': drawDecor,
   'pos.table': drawTable,

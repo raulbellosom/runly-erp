@@ -13,9 +13,8 @@ describe('POS floor adapter', () => {
   const tableStates = { 'tab-1': { id: 'tab-1', name: 'Mesa 1', status: 'OCCUPIED', capacity: 6, isMine: false } }
   const objects = floorToObjects({ floor, elements, tableStates })
 
-  it('starts with the floor surface and keeps zones/polygons below tables', () => {
-    assert.equal(objects[0].type, 'pos.surface')
-    assert.deepEqual(objects[0].geometry, { width: 1400, height: 900 })
+  it('has no fixed floor rectangle and keeps zones/polygons below tables', () => {
+    assert.equal(objects.some((o) => o.type === 'pos.surface'), false)
     const order = objects.map((o) => o.id)
     assert.ok(order.indexOf('z') < order.indexOf('t') && order.indexOf('p') < order.indexOf('t'))
   })

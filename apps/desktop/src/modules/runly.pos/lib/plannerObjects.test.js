@@ -22,11 +22,24 @@ describe('POS planner adapter', () => {
     assert.equal(table.properties.planner, true)
     assert.deepEqual(objectToPatch({ ...table, transform: { ...table.transform, x: -5.123 } }), { id: 't', x: -5.12, y: 100, width: 80, height: 80, rotation: 30 })
   })
-  it('APPLY clamps and the payload carries rotation', () => {
+  it('APPLY allows any position, keeps a minimum size, and the payload carries rotation', () => {
     const state = canvasReducer({ elements, dirty: false }, { type: 'APPLY', patches: [{ id: 't', x: -5, y: 3.456, width: 10, height: 90, rotation: 30 }] })
     const t = state.elements.find((e) => e.id === 't')
-    assert.deepEqual({ x: t.x, y: t.y, width: t.width, height: t.height }, { x: 0, y: 3.46, width: 20, height: 90 })
+    assert.deepEqual({ x: t.x, y: t.y, width: t.width, height: t.height }, { x: -5, y: 3.46, width: 20, height: 90 })
     assert.equal(state.dirty, true)
     assert.equal(layoutPayload(state.elements).find((e) => e.id === 't').rotation, 30)
+  })
+
+  it('shifts the whole layout on save so no coordinate is negative', () => {
+    const layout = [
+      { id: 'a', kind: 'TABLE_SQUARE', x: -30, y: 40, width: 80, height: 80 },
+      { id: 'b', kind: 'POLYGON', x: 10, y: -20, width: 100, height: 50, points: [{ x: 10, y: -20 }, { x: 110, y: -20 }, { x: 60, y: 30 }] },
+    ]
+    const payload = layoutPayload(layout)
+    assert.deepEqual([payload[0].x, payload[0].y], [0, 60])
+    assert.deepEqual([payload[1].x, payload[1].y], [40, 0])
+    assert.deepEqual(payload[1].style.points, [{ x: 40, y: 0 }, { x: 140, y: 0 }, { x: 90, y: 50 }])
+    const untouched = layoutPayload([{ id: 'c', kind: 'WALL', x: 5, y: 7, width: 10, height: 10 }])
+    assert.deepEqual([untouched[0].x, untouched[0].y], [5, 7])
   })
 })

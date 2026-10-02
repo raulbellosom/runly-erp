@@ -15,7 +15,6 @@ import { POS_DRAWERS } from '../lib/floorDrawers.js'
 import { buildPlannerElement, elementToObject, objectToPatch, plannerToObjects } from '../lib/plannerObjects.js'
 
 const CREATION_TOOLS = new Set(Object.keys(DEFAULT_SIZES).filter((kind) => kind !== 'POLYGON'))
-const LOCKED_LAYER_IDS = new Set(['pos-surface'])
 const NO_IMAGES = new Map()
 const NO_IDS = new Set()
 const FIT_PADDING = 48
@@ -31,7 +30,6 @@ function hintFor(tool) {
   return label ? `Arrastra para dibujar: ${label} · clic para tamaño estándar · Esc para cancelar` : null
 }
 
-function isSelectable(object) { return object.type !== 'pos.surface' }
 function isEditableTarget(target) { return Boolean(target?.closest?.('input, textarea, [contenteditable], [role="dialog"]')) }
 
 export default function FloorPlannerStage({
@@ -45,11 +43,10 @@ export default function FloorPlannerStage({
   const fittedFloorRef = useRef(null)
 
   const objects = useMemo(() => plannerToObjects({ floor, elements }), [floor, elements])
-  const surface = objects[0]
-
+  // No fixed floor rectangle: the view frames whatever has been drawn.
   const fit = useCallback(
-    () => onViewportChange(fitBounds(sceneBounds([surface]), size, FIT_PADDING)),
-    [surface, size, onViewportChange],
+    () => onViewportChange(fitBounds(sceneBounds(objects), size, FIT_PADDING)),
+    [objects, size, onViewportChange],
   )
 
   // Fit once per floor, as soon as the container has a real size.
@@ -124,8 +121,7 @@ export default function FloorPlannerStage({
         onCreate={handleCreate}
         onCommit={handleCommit}
         onContextMenu={handleContextMenu}
-        isSelectable={isSelectable}
-        lockedLayerIds={LOCKED_LAYER_IDS}
+        lockedLayerIds={NO_IDS}
         creationTools={CREATION_TOOLS}
         draftFor={draftFor}
         drawers={POS_DRAWERS}
@@ -140,6 +136,17 @@ export default function FloorPlannerStage({
           <p role="status" className="glass rounded-full px-3.5 py-2 text-center text-xs font-medium shadow-md">
             {hint}
           </p>
+        </div>
+      ) : null}
+
+      {!hint && !objects.length ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+          <div className="max-w-xs text-center">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">Este plano está vacío</p>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Elige un elemento en el panel y colócalo con un clic. Dibuja paredes, zonas o un polígono para dar forma a tu local.
+            </p>
+          </div>
         </div>
       ) : null}
 

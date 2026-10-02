@@ -24,13 +24,7 @@ function polygonObject(el) {
   return object
 }
 
-export function floorToObjects({ floor, elements = [], tableStates = {} }) {
-  const surface = {
-    id: '__surface__', type: 'pos.surface',
-    transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-    geometry: { width: Math.max(num(floor?.canvasWidth, 1400), 1400), height: Math.max(num(floor?.canvasHeight, 900), 900) },
-    style: {}, properties: {},
-  }
+export function floorToObjects({ elements = [], tableStates = {} }) {
   const below = [], decor = [], tables = []
   for (const el of elements) {
     if (el.kind === 'POLYGON') below.push(polygonObject(el))
@@ -48,5 +42,5 @@ export function floorToObjects({ floor, elements = [], tableStates = {} }) {
       })
     } else decor.push({ ...base(el, 'pos.decor'), properties: { kind: el.kind, label: el.label ?? null, capacity: Number(el.style?.capacity ?? 0) || 0 } })
   }
-  return [surface, ...below, ...decor, ...tables]
+  return [...below, ...decor, ...tables]
 }

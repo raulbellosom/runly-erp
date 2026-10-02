@@ -20,14 +20,6 @@ function base(el, type, layerId) {
   }
 }
 
-function surfaceObject(floor) {
-  return {
-    id: '__surface__', type: 'pos.surface', layerId: 'pos-surface',
-    transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-    geometry: { width: Math.max(num(floor?.canvasWidth, 1400), 1400), height: Math.max(num(floor?.canvasHeight, 900), 900) },
-    style: {}, properties: {},
-  }
-}
 
 function polygonObject(el) {
   const object = base(el, 'polygon', 'pos')
@@ -75,7 +67,7 @@ export function elementToObject(el) {
 // tables always paint on top and zones always paint behind everything else,
 // independent of the planner elements' array order (which still drives
 // front/back ordering within each bucket, via bringForward/sendBackward).
-export function plannerToObjects({ floor, elements = [] }) {
+export function plannerToObjects({ elements = [] }) {
   const below = [], decor = [], tables = []
   for (const el of elements) {
     const object = elementToObject(el)
@@ -83,7 +75,7 @@ export function plannerToObjects({ floor, elements = [] }) {
     else if (TABLE_KINDS.has(el.kind)) tables.push(object)
     else decor.push(object)
   }
-  return [surfaceObject(floor), ...below, ...decor, ...tables]
+  return [...below, ...decor, ...tables]
 }
 
 // Canvas object (after a move/resize/rotate/vertex-edit commit) -> the
