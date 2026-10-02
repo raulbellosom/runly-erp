@@ -6,7 +6,7 @@ Plantillas de Board con comportamiento real y nuevo diálogo de creación.
 
 ## 2. Status
 
-Approved (diseño aprobado en conversación 2026-10-01).
+Complete — Verified: 2026-10-01 (node --test API 34/34 y desktop 34/34, eslint de archivos tocados, build:web). Smoke manual en navegador pendiente.
 
 ## 3. Context
 

@@ -6,7 +6,7 @@ Canvas Fase 1 — colaboración sólida y visibilidad del trabajo.
 
 ## 2. Status
 
-Approved (decisión delegada por el usuario, 2026-10-01).
+Complete — Verified: 2026-10-01 (node --test API 43/43 y desktop 46/46, eslint de archivos tocados, build:web). Smoke manual con dos sesiones pendiente.
 
 ## 3. Context
 
