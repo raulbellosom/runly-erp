@@ -64,7 +64,7 @@ export default function BoardEditor() {
   const template = templates.data?.find((item) => item.key === board.data?.templateType) ?? null
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
-  const { presence } = useCanvasRealtime(boardId)
+  const { presence, cursors, broadcastPointer } = useCanvasRealtime(boardId, { pageId, selectedIds })
   // Lets MirAI answer about "this Board" without the user naming it.
   useMiraiRecordContext({ recordType: 'board', recordId: board.data?.id, label: board.data?.name })
 
@@ -222,6 +222,7 @@ export default function BoardEditor() {
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
             readOnly={readOnly} grid={settings?.grid} snapSize={snapSizeFor(settings)}
+            remote={cursors} onPointerWorld={broadcastPointer}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (

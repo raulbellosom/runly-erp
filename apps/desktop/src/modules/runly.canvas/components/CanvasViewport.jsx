@@ -43,7 +43,7 @@ export function CanvasViewport(props) {
     else if (live?.objects) objects = objects.map((row) => live.objects.get(row.id) ?? row)
     const single = live?.objects?.size === 1 ? [...live.objects.values()][0] : null
     renderer.render({
-      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid,
+      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [],
       selectedIds: live?.draft ? new Set() : new Set(p.selectedIds),
       overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft) } : null,
       marquee: live?.marquee ?? null,
@@ -163,6 +163,7 @@ export function CanvasViewport(props) {
 
   function pointerMove(event) {
     const p = propsRef.current, screen = pointOf(event)
+    if (event.pointerType !== 'touch') p.onPointerWorld?.(screenToWorld(screen, p.viewport))
     if (pointersRef.current.has(event.pointerId)) pointersRef.current.set(event.pointerId, screen)
     const drag = dragRef.current
     if (!drag) {
@@ -269,6 +270,7 @@ export function CanvasViewport(props) {
       onPointerMove={pointerMove}
       onPointerUp={pointerUp}
       onPointerCancel={pointerUp}
+      onPointerLeave={() => propsRef.current.onPointerWorld?.(null)}
       onDoubleClick={doubleClick}
       onContextMenu={(event) => event.preventDefault()}
     />

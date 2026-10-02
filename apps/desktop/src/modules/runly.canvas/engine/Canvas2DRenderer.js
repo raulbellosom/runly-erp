@@ -42,7 +42,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [] } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -61,9 +61,13 @@ export class Canvas2DRenderer {
     // plus one dashed box around everything.
     for (const object of selected) this.drawSelection(ctx, object, viewport.zoom, interactive && selected.length === 1)
     if (selected.length > 1) this.drawGroupBox(ctx, selected, viewport.zoom)
+    for (const cursor of remote) {
+      for (const object of objects) if (cursor.selectedIds?.includes(object.id)) this.drawRemoteSelection(ctx, object, viewport.zoom, cursor.color)
+    }
     ctx.restore()
     if (overlay?.object && overlay.text) this.drawOverlayLabel(ctx, overlay, viewport)
     if (marquee) this.drawMarquee(ctx, marquee)
+    for (const cursor of remote) if (Number.isFinite(cursor.x) && Number.isFinite(cursor.y)) this.drawRemoteCursor(ctx, cursor, viewport)
   }
 
   drawGrid(ctx, viewport, size = GRID_STEP) {
@@ -235,6 +239,28 @@ export class Canvas2DRenderer {
     ctx.save()
     ctx.setLineDash([6 / zoom, 4 / zoom]); ctx.lineWidth = 1 / zoom; ctx.strokeStyle = this.theme.primary
     ctx.strokeRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2)
+    ctx.restore()
+  }
+
+  drawRemoteSelection(ctx, object, zoom, color) {
+    const b = objectBounds(object), pad = 5 / zoom
+    ctx.save()
+    ctx.setLineDash([5 / zoom, 4 / zoom]); ctx.lineWidth = 1.5 / zoom; ctx.strokeStyle = color
+    ctx.strokeRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2)
+    ctx.restore()
+  }
+
+  // Arrow pointer plus a name pill, in screen space.
+  drawRemoteCursor(ctx, cursor, viewport) {
+    const p = worldToScreen(cursor, viewport)
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 16); ctx.lineTo(4.5, 12); ctx.lineTo(8, 19); ctx.lineTo(10.5, 18); ctx.lineTo(7, 11); ctx.lineTo(12, 11); ctx.closePath()
+    ctx.fillStyle = cursor.color; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = '#ffffff'; ctx.stroke()
+    ctx.font = `600 11px ${this.theme.font}`; ctx.textBaseline = 'middle'
+    const label = cursor.name.length > 24 ? `${cursor.name.slice(0, 23)}…` : cursor.name, width = ctx.measureText(label).width + 12
+    ctx.beginPath(); ctx.roundRect(12, 18, width, 18, 9); ctx.fillStyle = cursor.color; ctx.fill()
+    ctx.fillStyle = '#ffffff'; ctx.fillText(label, 18, 27.5)
     ctx.restore()
   }
 
