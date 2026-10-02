@@ -18,6 +18,20 @@ function errorResponse(c, error, fallback) {
   return c.json({ error: fallback }, 500)
 }
 
+const DELTA_MAX_CHARS = 200_000
+
+// Realtime payload for an object batch: the rows other editors need to patch
+// their caches, or `refetch` when it would be too large for one message.
+export function objectsDelta(results) {
+  const upserts = [], deletedIds = []
+  for (const result of results) {
+    if (result.op === 'delete') deletedIds.push(result.id)
+    else if (result.op !== 'conflict' && result.object) upserts.push(result.object)
+  }
+  const delta = { upserts, deletedIds }
+  return JSON.stringify(delta).length <= DELTA_MAX_CHARS ? delta : { refetch: true }
+}
+
 export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null }) {
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver })
@@ -84,7 +98,7 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
     catch (error) { return errorResponse(c, error, 'Error al cargar objetos.') }
   })
   app.post('/canvas/boards/:boardId/objects/batch', requirePermission('canvas.edit'), async (c) => {
-    try { const id = c.req.param('boardId'); const body = await c.req.json(); const rows = await canvas.batchObjects(companyId(c), actorId(c), id, body.operations); changed(id, 'objects.changed', { count: rows.length }); return c.json({ data: rows }) }
+    try { const id = c.req.param('boardId'); const body = await c.req.json(); const rows = await canvas.batchObjects(companyId(c), actorId(c), id, body.operations); changed(id, 'objects.changed', objectsDelta(rows)); return c.json({ data: rows }) }
     catch (error) { return errorResponse(c, error, 'Error al guardar objetos.') }
   })
   app.post('/canvas/boards/:boardId/hotspots', requirePermission('canvas.edit'), async (c) => {

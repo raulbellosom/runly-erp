@@ -33,6 +33,28 @@ describe('Runly Canvas routes', () => {
     }
   })
 
+  it('broadcasts changed rows as a delta and skips conflicts', async () => {
+    const sent = []
+    const broadcaster = { broadcastToChannel: async (topic, event, payload) => { sent.push({ topic, event, payload }) } }
+    const requirePermission = () => async (c, next) => { c.set('companyId', 'company-1'); c.set('userContext', { profile: { id: 'user-1' } }); return next() }
+    const service = { batchObjects: async () => [
+      { op: 'update', object: { id: 'a', revision: 3 } },
+      { op: 'delete', id: 'b' },
+      { op: 'conflict', id: 'c', object: { id: 'c', revision: 9 } },
+    ] }
+    const app = createCanvasRouter({ requirePermission, service, broadcaster })
+    await app.request('http://localhost/canvas/boards/board-1/objects/batch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operations: [] }) })
+    assert.equal(sent[0].payload.action, 'objects.changed')
+    assert.deepEqual(sent[0].payload.upserts, [{ id: 'a', revision: 3 }])
+    assert.deepEqual(sent[0].payload.deletedIds, ['b'])
+  })
+
+  it('falls back to refetch for oversized deltas', async () => {
+    const { objectsDelta } = await import('../canvas-routes.js')
+    const big = { id: 'x', revision: 2, properties: { text: 'a'.repeat(210_000) } }
+    assert.deepEqual(objectsDelta([{ op: 'update', object: big }]), { refetch: true })
+  })
+
   it('serves the template catalog behind canvas.view', async () => {
     const permissions = []
     const requirePermission = (key) => { permissions.push(key); return async (_c, next) => next() }

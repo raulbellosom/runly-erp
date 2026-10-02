@@ -91,14 +91,34 @@ describe('Runly Canvas service', () => {
     assert.deepEqual(updates, [['b', -100000], ['a', -100001], ['b', 0], ['a', 1]])
   })
 
-  it('rejects stale object batch updates with an optimistic revision conflict', async () => {
-    const tx = { canvasObject: { updateMany: async () => ({ count: 0 }) } }
+  it('reports a stale object batch update as a conflict with the current row', async () => {
+    const current = { id: 'object-1', revision: 5 }
+    const tx = { canvasObject: { updateMany: async () => ({ count: 0 }), findFirst: async () => current }, canvasBoard: { update: async () => ({}) } }
     const prisma = { canvasBoard: { findFirst: async () => accessibleBoard() }, $transaction: (fn) => fn(tx) }
     const service = createCanvasService({ prisma })
-    await assert.rejects(
-      () => service.batchObjects(COMPANY, USER, BOARD, [{ op: 'update', id: 'object-1', expectedRevision: 2, data: { transform: { x: 2, y: 3 } } }]),
-      (error) => error instanceof CanvasServiceError && error.status === 409 && error.code === 'REVISION_CONFLICT',
-    )
+    const [result] = await service.batchObjects(COMPANY, USER, BOARD, [{ op: 'update', id: 'object-1', expectedRevision: 2, data: { transform: { x: 2, y: 3 } } }])
+    assert.equal(result.op, 'conflict')
+    assert.equal(result.object, current)
+  })
+
+  it('keeps valid operations and reports stale ones as conflicts', async () => {
+    const current = { id: 'b', revision: 5, hotspot: null }
+    const tx = {
+      canvasObject: {
+        updateMany: async ({ where }) => ({ count: where.id === 'a' ? 1 : 0 }),
+        findFirst: async ({ where }) => (where.id === 'a' ? { id: 'a', revision: 3 } : where.id === 'b' ? current : null),
+      },
+      canvasBoard: { update: async () => ({}) },
+    }
+    const prisma = { canvasBoard: { findFirst: async () => accessibleBoard() }, $transaction: (fn) => fn(tx) }
+    const results = await createCanvasService({ prisma }).batchObjects(COMPANY, USER, BOARD, [
+      { op: 'update', id: 'a', expectedRevision: 2, data: { transform: { x: 1, y: 1 } } },
+      { op: 'update', id: 'b', expectedRevision: 1, data: { transform: { x: 2, y: 2 } } },
+      { op: 'delete', id: 'gone', expectedRevision: 1 },
+    ])
+    assert.deepEqual(results.map((r) => r.op), ['update', 'conflict', 'conflict'])
+    assert.equal(results[1].object, current)
+    assert.equal(results[2].object, null)
   })
 
   it('restores a soft-deleted object only when it is actually deleted', async () => {

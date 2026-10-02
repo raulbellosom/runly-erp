@@ -265,6 +265,10 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     }
     return prisma.$transaction(async (tx) => {
       const results = []
+      // A stale or missing row is reported with its current server state
+      // (null = gone) instead of aborting the whole batch.
+      const currentRow = (id) => tx.canvasObject.findFirst({ where: { id, companyId, boardId, deletedAt: null }, include: { hotspot: true } })
+      const conflict = async (id) => results.push({ op: 'conflict', id, object: await currentRow(id) })
       for (const operation of operations) {
         if (operation.op === 'create') {
           const data = operation.data ?? {}
@@ -283,14 +287,15 @@ export function createCanvasService({ prisma, entityResolver = null }) {
           if (!operation.id || !Number.isInteger(expectedRevision)) throw new CanvasServiceError('La revisión esperada es requerida.', 400)
           if (operation.data?.layerId) {
             const current = await tx.canvasObject.findFirst({ where: { id: operation.id, companyId, boardId, deletedAt: null }, select: { pageId: true } })
-            const layer = current && await tx.canvasLayer.findFirst({ where: { id: operation.data.layerId, pageId: current.pageId, page: { boardId } }, select: { id: true } })
+            if (!current) { await conflict(operation.id); continue }
+            const layer = await tx.canvasLayer.findFirst({ where: { id: operation.data.layerId, pageId: current.pageId, page: { boardId } }, select: { id: true } })
             if (!layer) throw new CanvasServiceError('Capa no encontrada.', 404)
           }
           const changed = await tx.canvasObject.updateMany({
             where: { id: operation.id, companyId, boardId, deletedAt: null, revision: expectedRevision },
             data: objectPatch(operation.data ?? {}, actorId),
           })
-          if (changed.count !== 1) throw new CanvasServiceError('El objeto cambió en otra sesión.', 409, 'REVISION_CONFLICT')
+          if (changed.count !== 1) { await conflict(operation.id); continue }
           results.push({ op: 'update', object: await tx.canvasObject.findFirst({ where: { id: operation.id, companyId, boardId } }) })
         } else if (operation.op === 'delete') {
           const expectedRevision = Number(operation.expectedRevision)
@@ -298,7 +303,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
             where: { id: operation.id, companyId, boardId, deletedAt: null, ...(Number.isInteger(expectedRevision) ? { revision: expectedRevision } : {}) },
             data: { deletedAt: new Date(), updatedById: actorId, revision: { increment: 1 } },
           })
-          if (changed.count !== 1) throw new CanvasServiceError('El objeto no existe o cambió en otra sesión.', 409, 'REVISION_CONFLICT')
+          if (changed.count !== 1) { await conflict(operation.id); continue }
           results.push({ op: 'delete', id: operation.id })
         } else if (operation.op === 'restore') {
           // Undo of a delete (or redo of a create) brings back the same row, so
@@ -307,7 +312,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
             where: { id: operation.id, companyId, boardId, deletedAt: { not: null } },
             data: { deletedAt: null, updatedById: actorId, revision: { increment: 1 } },
           })
-          if (changed.count !== 1) throw new CanvasServiceError('El objeto ya no se puede restaurar.', 409, 'REVISION_CONFLICT')
+          if (changed.count !== 1) { await conflict(operation.id); continue }
           results.push({ op: 'restore', object: await tx.canvasObject.findFirst({ where: { id: operation.id, companyId, boardId }, include: { hotspot: true } }) })
         } else {
           throw new CanvasServiceError('Operación de objeto no soportada.', 400)
