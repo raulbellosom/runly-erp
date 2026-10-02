@@ -46,7 +46,9 @@ export class Canvas2DRenderer {
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
-    this.drawGrid(ctx, viewport)
+    // Public links and older callers pass no grid: keep the dotted default.
+    const grid = scene.grid ?? { enabled: true, size: GRID_STEP }
+    if (grid.enabled) this.drawGrid(ctx, viewport, grid.size)
     ctx.save()
     ctx.translate(viewport.x, viewport.y); ctx.scale(viewport.zoom, viewport.zoom)
     const selected = []
@@ -64,14 +66,14 @@ export class Canvas2DRenderer {
     if (marquee) this.drawMarquee(ctx, marquee)
   }
 
-  drawGrid(ctx, viewport) {
-    let step = GRID_STEP * viewport.zoom
+  drawGrid(ctx, viewport, size = GRID_STEP) {
+    let step = size * viewport.zoom
     while (step < 12) step *= 2
     const offsetX = ((viewport.x % step) + step) % step, offsetY = ((viewport.y % step) + step) % step
-    const size = viewport.zoom >= 0.75 ? 1.5 : 1
+    const dotSize = viewport.zoom >= 0.75 ? 1.5 : 1
     ctx.fillStyle = this.theme.grid
     for (let x = offsetX; x < this.width; x += step) {
-      for (let y = offsetY; y < this.height; y += step) ctx.fillRect(x - size / 2, y - size / 2, size, size)
+      for (let y = offsetY; y < this.height; y += step) ctx.fillRect(x - dotSize / 2, y - dotSize / 2, dotSize, dotSize)
     }
   }
 
