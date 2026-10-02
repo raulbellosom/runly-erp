@@ -6,7 +6,7 @@
 //   target null              -> delete
 //   target present, row gone -> restore (same id, keeps hotspot/links/files)
 //   both present             -> update the tracked fields
-export const TRACKED_FIELDS = ['transform', 'geometry', 'style', 'properties', 'position', 'layerId']
+export const TRACKED_FIELDS = ['transform', 'geometry', 'style', 'properties', 'position', 'layerId', 'type']
 const LIMIT = 100
 
 export function snapshot(row) {
