@@ -5,8 +5,9 @@ import { useCanvasTemplates } from '../hooks/useCanvasData.js'
 import { roleLabel } from '../lib/roles.js'
 
 const DOT_GRID = { backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.28) 1px, transparent 1px)', backgroundSize: '16px 16px' }
+const FIELD_LABEL = { name: 'Nombre', description: 'Descripción', page: 'Página', hotspot: 'Hotspot', text: 'Texto', link: 'Registro' }
 
-export function BoardCard({ board, onOpen, thumbnailUrl }) {
+export function BoardCard({ board, onOpen, thumbnailUrl, matches }) {
   const templates = useCanvasTemplates()
   const template = templates.data?.find((item) => item.key === board.templateType)
   const Icon = templateIcon(template?.icon), templateLabel = template?.label ?? 'Board'
@@ -39,6 +40,11 @@ export function BoardCard({ board, onOpen, thumbnailUrl }) {
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         <h3 className="line-clamp-2 font-semibold leading-snug text-[hsl(var(--foreground))]" title={board.name}>{board.name}</h3>
         {board.description ? <p className="line-clamp-2 text-sm text-[hsl(var(--muted-foreground))]">{board.description}</p> : null}
+        {matches?.length ? (
+          <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
+            Coincide en: {matches.map((match) => `${FIELD_LABEL[match.field] ?? match.field}: ${match.snippet || match.label}`).join(' · ')}
+          </p>
+        ) : null}
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-[hsl(var(--muted-foreground))]">
           <span className="inline-flex items-center gap-1 tabular-nums"><FileText className="h-3.5 w-3.5" />{pages} {pages === 1 ? 'página' : 'páginas'}</span>
           {collaborators > 1 ? <span className="inline-flex items-center gap-1 tabular-nums"><Users className="h-3.5 w-3.5" />{collaborators}</span> : null}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Button, EmptyState, ErrorState, PageHeader, SearchInput } from '@runly/ui'
@@ -7,11 +7,37 @@ import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
 import { BoardCard, BoardCardSkeleton } from '../components/BoardCard.jsx'
+import { BoardFilters } from '../components/BoardFilters.jsx'
 import { CreateBoardDialog } from '../components/CreateBoardDialog.jsx'
-import { useBoards, useCreateBoard } from '../hooks/useCanvasData.js'
+import { useBoardSearch, useBoards, useCreateBoard } from '../hooks/useCanvasData.js'
+import { DEFAULT_FILTERS, activeFilterCount, applyBoardFilters, orderBySearch } from '../lib/boardFilters.js'
 
 const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4'
+const STORAGE_KEY = 'runly.canvas.home.filters'
+const SEARCH_DEBOUNCE_MS = 250
 const unwrap = (response) => response?.data ?? response
+
+function loadStoredFilters() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    return parsed && typeof parsed === 'object' ? { ...DEFAULT_FILTERS, ...parsed } : DEFAULT_FILTERS
+  } catch { return DEFAULT_FILTERS }
+}
+
+function storeFilters(filters) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(filters)) } catch { /* best effort — e.g. private mode */ }
+}
+
+// Debounces the search box so the server query only fires once typing pauses.
+function useDebouncedValue(value, delay) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  return debounced
+}
 
 // Signed URLs for every Board that already has a thumbnail, batched in one
 // call and cached for 30 minutes (same pattern as useCanvasImages).
@@ -28,14 +54,28 @@ function useThumbnailUrls(fileIds) {
 export default function CanvasHome() {
   const navigate = useNavigate(), boards = useBoards(), create = useCreateBoard()
   const [open, setOpen] = useState(false), [query, setQuery] = useState('')
+  const [filters, setFilters] = useState(loadStoredFilters)
+  useEffect(() => storeFilters(filters), [filters])
+
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS)
+  const searching = debouncedQuery.trim().length >= 2
+  const search = useBoardSearch(debouncedQuery)
+
   const list = useMemo(() => boards.data ?? [], [boards.data])
   const thumbnailIds = useMemo(() => [...new Set(list.filter((board) => board.thumbnailFileId).map((board) => board.thumbnailFileId))].sort(), [list])
   const thumbnailUrls = useThumbnailUrls(thumbnailIds)
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase()
-    return term ? list.filter((board) => `${board.name} ${board.description ?? ''}`.toLowerCase().includes(term)) : list
-  }, [list, query])
+
+  // Search order wins over the "Orden" filter (sort: null keeps it); template/
+  // access/updated still apply so the two ways to narrow the list compose.
+  const filtered = useMemo(() => (
+    searching
+      ? applyBoardFilters(orderBySearch(list, search.data ?? []), { ...filters, sort: null })
+      : applyBoardFilters(list, filters)
+  ), [list, filters, searching, search.data])
+
   const openBoard = (id) => navigate(`/app/m/runly.canvas/${id}`)
+  const filtersActive = activeFilterCount(filters) > 0
+  const clearFilters = () => setFilters(DEFAULT_FILTERS)
 
   async function submit(data) {
     try {
@@ -47,6 +87,9 @@ export default function CanvasHome() {
   }
 
   const ready = !boards.isLoading && !boards.isError
+  // Only the FIRST search fetch shows a skeleton — keepPreviousData keeps the
+  // prior results (and isLoading false) while a refined query is in flight.
+  const searchLoading = searching && search.isLoading
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6">
       <PageHeader
@@ -57,11 +100,17 @@ export default function CanvasHome() {
       />
 
       {ready && list.length > 0 ? (
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery('')} placeholder="Buscar Boards…" className="w-full sm:max-w-xs" />
-          <p className="text-sm tabular-nums text-[hsl(var(--muted-foreground))]" aria-live="polite">
-            {filtered.length} {filtered.length === 1 ? 'Board' : 'Boards'}
-          </p>
+        <div className="mb-5 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SearchInput
+              value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery('')}
+              placeholder="Buscar en nombres, hotspots, textos y registros…" className="w-full sm:max-w-sm"
+            />
+            <p className="text-sm tabular-nums text-[hsl(var(--muted-foreground))]" aria-live="polite">
+              {filtered.length} {filtered.length === 1 ? 'Board' : 'Boards'}
+            </p>
+          </div>
+          <BoardFilters filters={filters} onChange={setFilters} onClear={clearFilters} />
         </div>
       ) : null}
 
@@ -76,15 +125,30 @@ export default function CanvasHome() {
           action={<Button onClick={() => setOpen(true)}><Plus />Crear Board</Button>}
         />
       ) : null}
-      {ready && list.length > 0 && !filtered.length ? (
-        <EmptyState icon={SearchX} title="Sin resultados" description={`Ningún Board coincide con «${query.trim()}».`} action={<Button variant="outline" onClick={() => setQuery('')}>Limpiar búsqueda</Button>} />
+
+      {ready && list.length > 0 && searchLoading ? (
+        <div className={GRID} aria-busy="true" aria-label="Buscando Boards">{[1, 2, 3].map((key) => <BoardCardSkeleton key={key} />)}</div>
       ) : null}
 
-      {ready && filtered.length > 0 ? (
+      {ready && list.length > 0 && !searchLoading && !filtered.length ? (
+        <EmptyState
+          icon={SearchX}
+          title="Sin resultados"
+          description={searching ? `Ningún Board coincide con «${debouncedQuery.trim()}».` : 'Ningún Board coincide con los filtros seleccionados.'}
+          action={(
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {searching ? <Button variant="outline" onClick={() => setQuery('')}>Limpiar búsqueda</Button> : null}
+              {filtersActive ? <Button variant="outline" onClick={clearFilters}>Limpiar filtros</Button> : null}
+            </div>
+          )}
+        />
+      ) : null}
+
+      {ready && !searchLoading && filtered.length > 0 ? (
         <ul className={GRID}>
           {filtered.map((board) => (
             <li key={board.id} className="flex">
-              <BoardCard board={board} onOpen={() => openBoard(board.id)} thumbnailUrl={board.thumbnailFileId ? thumbnailUrls.data?.[board.thumbnailFileId] : null} />
+              <BoardCard board={board} onOpen={() => openBoard(board.id)} thumbnailUrl={board.thumbnailFileId ? thumbnailUrls.data?.[board.thumbnailFileId] : null} matches={board.matches} />
             </li>
           ))}
         </ul>

@@ -16,6 +16,18 @@ export function useBoards() {
   const token = useToken()
   return useQuery({ queryKey: ['canvas', 'boards'], queryFn: () => runly.canvas.listBoards(token), enabled: Boolean(token) })
 }
+// Content-aware server search (name, description, pages, hotspots, text,
+// linked records) — only fires once the (debounced) query has ≥ 2 chars.
+export function useBoardSearch(q) {
+  const token = useToken()
+  return useQuery({
+    queryKey: ['canvas', 'search', q],
+    queryFn: async () => unwrap(await runly.canvas.search(q, token)) ?? [],
+    enabled: Boolean(token) && q.trim().length >= 2,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
+}
 export function useBoard(boardId) {
   const token = useToken()
   return useQuery({ queryKey: boardKey(boardId), queryFn: () => runly.canvas.getBoard(boardId, token), enabled: Boolean(token && boardId) })
