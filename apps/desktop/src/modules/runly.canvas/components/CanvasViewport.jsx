@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { Canvas2DRenderer } from '../engine/Canvas2DRenderer.js'
+import { Canvas2DRenderer, sceneBounds } from '../engine/Canvas2DRenderer.js'
 import { boxFromDrag, boxOf, hitHandle, isLinear, moveObject, objectBounds, resizeObject, rotateObject } from '../engine/geometry.js'
+import { snapMoveDelta, snapPoint } from '../engine/snap.js'
 import { observeThemeChanges, readCanvasTheme } from '../engine/theme.js'
 import { screenToWorld, zoomAt } from '../engine/viewport.js'
 import { CREATION_TOOLS, draftObject } from '../lib/objectFactory.js'
@@ -42,7 +43,7 @@ export function CanvasViewport(props) {
     else if (live?.objects) objects = objects.map((row) => live.objects.get(row.id) ?? row)
     const single = live?.objects?.size === 1 ? [...live.objects.values()][0] : null
     renderer.render({
-      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds,
+      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid,
       selectedIds: live?.draft ? new Set() : new Set(p.selectedIds),
       overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft) } : null,
       marquee: live?.marquee ?? null,
@@ -151,7 +152,7 @@ export function CanvasViewport(props) {
     if (hit) {
       const group = p.selectedIds.includes(hit.id) ? rows.filter((row) => p.selectedIds.includes(row.id)) : [hit]
       if (!p.selectedIds.includes(hit.id)) p.onSelect([hit.id])
-      dragRef.current = { mode: 'move', screen, world, objects: group, hitId: hit.id, moved: false }
+      dragRef.current = { mode: 'move', screen, world, objects: group, bounds: sceneBounds(group), hitId: hit.id, moved: false }
       if (touch) armLongPress(dragRef.current, hit)
       return
     }
@@ -187,18 +188,24 @@ export function CanvasViewport(props) {
     if (drag.mode === 'pan') { onViewportChange({ ...drag.viewport, x: drag.viewport.x + screen.x - drag.screen.x, y: drag.viewport.y + screen.y - drag.screen.y }); return }
     if (drag.mode === 'marquee') { liveRef.current = { marquee: rectFrom(drag.screen, screen) }; schedule(); return }
     const world = screenToWorld(screen, p.viewport)
+    // Alt temporarily disables snapping for the current gesture.
+    const snap = event.altKey ? 0 : (p.snapSize ?? 0)
     if (drag.mode === 'create') {
       if (tool === 'hotspot' || tool === 'text') return
-      liveRef.current = { draft: draftObject(tool, boxFromDrag(tool === 'line' || tool === 'arrow' ? tool : 'rectangle', drag.world, world, { constrain: event.shiftKey })) }
+      const kind = tool === 'line' || tool === 'arrow' ? tool : 'rectangle'
+      liveRef.current = { draft: draftObject(tool, boxFromDrag(kind, snapPoint(drag.world, snap), snapPoint(world, snap), { constrain: event.shiftKey })) }
     } else if (drag.mode === 'move') {
-      const dx = world.x - drag.world.x, dy = world.y - drag.world.y
+      const { dx, dy } = snapMoveDelta(drag.bounds, world.x - drag.world.x, world.y - drag.world.y, snap)
       liveRef.current = { mode: 'move', objects: new Map(drag.objects.map((object) => [object.id, moveObject(object, dx, dy)])) }
       setCursor('grabbing')
     } else {
       const [object] = drag.objects
+      // Rotated boxes resize in their own frame; snapping a world point there
+      // would fight the rotation, so only unrotated shapes snap.
+      const target = boxOf(object).rotation ? world : snapPoint(world, snap)
       const next = drag.mode === 'rotate'
         ? rotateObject(object, world, { snap: event.shiftKey })
-        : resizeObject(object, drag.handle, world, { keepRatio: event.shiftKey || object.type === 'image' })
+        : resizeObject(object, drag.handle, target, { keepRatio: event.shiftKey || object.type === 'image' })
       liveRef.current = { mode: drag.mode, objects: new Map([[object.id, next]]) }
       if (drag.mode === 'rotate') setCursor('grabbing')
     }
@@ -221,7 +228,7 @@ export function CanvasViewport(props) {
       // Text and hotspots are placed with a tap; shapes use the dragged box
       // when there is one and fall back to a default size otherwise.
       if (live?.draft && drag.moved) p.onCreate({ tool, box: boxOf(live.draft) })
-      else p.onCreate({ tool, point: drag.world })
+      else p.onCreate({ tool, point: snapPoint(drag.world, event.altKey ? 0 : (p.snapSize ?? 0)) })
       schedule(); return
     }
     if (drag.mode === 'marquee') {
@@ -255,7 +262,7 @@ export function CanvasViewport(props) {
     <canvas
       ref={canvasRef}
       role="application"
-      aria-label="Lienzo del Board. V seleccionar, H mover vista, R rectángulo, O elipse, L línea, A flecha, T texto, P hotspot. Ctrl+Z deshacer, Ctrl+Shift+Z rehacer, Ctrl+A seleccionar todo, Suprimir elimina la selección, las flechas la desplazan."
+      aria-label="Lienzo del Board. V seleccionar, H mover vista, R rectángulo, O elipse, L línea, A flecha, T texto, P hotspot. Ctrl+Z deshacer, Ctrl+Shift+Z rehacer, Ctrl+A seleccionar todo, Suprimir elimina la selección, las flechas la desplazan. Alt al arrastrar desactiva el ajuste a la cuadrícula."
       tabIndex={0}
       className="block h-full w-full touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
       onPointerDown={pointerDown}
