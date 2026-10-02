@@ -6,7 +6,7 @@ Hotspots con tamaño fijo en pantalla (estilo Google Maps) o a escala del plano.
 
 ## 2. Status
 
-Approved (pedido del usuario, 2026-10-02).
+Complete — Verified: 2026-10-02 (node --test desktop canvas+pos 95/95, eslint de archivos tocados, build:web). Smoke manual pendiente.
 
 ## 3. Context
 
