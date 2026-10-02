@@ -43,10 +43,13 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
+    // Exports paint a solid page background (e.g. white) before the grid
+    // and objects; the editor leaves this unset and shows the app canvas.
+    if (background) { ctx.fillStyle = background; ctx.fillRect(0, 0, this.width, this.height) }
     // Public links and older callers pass no grid: keep the dotted default.
     const grid = scene.grid ?? { enabled: true, size: GRID_STEP }
     if (grid.enabled) this.drawGrid(ctx, viewport, grid.size)

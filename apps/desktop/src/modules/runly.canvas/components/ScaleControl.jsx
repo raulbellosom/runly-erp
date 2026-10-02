@@ -3,8 +3,10 @@ import { Ruler } from 'lucide-react'
 import { formatLength } from '../lib/measure.js'
 
 // Scale label: "1 m = 42 px" when a meter maps to at least 1 px, otherwise
-// the inverse ("1 px = 2 cm") so the number shown is never below 1.
-function scaleLabel(scale) {
+// the inverse ("1 px = 2 cm") so the number shown is never below 1. Exported
+// so the PDF export (lib/exportPage.js via hooks/useExportPage.js) can show
+// the same text in its header.
+export function scaleLabel(scale) {
   const perPixel = 1 / scale.scale
   if (perPixel >= 1) return `1 ${scale.unit} = ${Math.round(perPixel)} px`
   return `1 px = ${formatLength(1, scale)}`

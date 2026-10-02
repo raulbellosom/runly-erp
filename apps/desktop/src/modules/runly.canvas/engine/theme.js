@@ -15,6 +15,10 @@ const FALLBACK = Object.freeze({
   font: 'system-ui, sans-serif',
 })
 
+// Light-mode theme for exports (PNG/PDF): always on white, independent of
+// the viewer's current app theme.
+export const LIGHT_THEME = FALLBACK
+
 function hslToken(styles, name, alpha) {
   const raw = styles.getPropertyValue(name).trim()
   if (!raw) return null

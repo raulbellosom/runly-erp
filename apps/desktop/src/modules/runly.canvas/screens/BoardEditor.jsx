@@ -27,6 +27,7 @@ import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
+import { useExportPage } from '../hooks/useExportPage.js'
 import { usePageScale } from '../hooks/usePageScale.js'
 import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
 
@@ -87,6 +88,7 @@ export default function BoardEditor() {
     (layerOrder.get(a.layerId) ?? 0) - (layerOrder.get(b.layerId) ?? 0) || (a.position ?? 0) - (b.position ?? 0)), [allRows, hiddenLayerIds, layerOrder])
   // Only visible objects resolve against the ERP; a bound shape in a hidden layer stays unresolved.
   const bindings = useBindings(boardId, rows)
+  const exportPage = useExportPage({ board: board.data, activePage, rows, bindings: bindings.data, scale: pageScale.scale })
   const objectCounts = useMemo(() => allRows.reduce((acc, row) => ({ ...acc, [row.layerId]: (acc[row.layerId] ?? 0) + 1 }), {}), [allRows])
   const links = useMemo(() => linksQuery.data ?? [], [linksQuery.data])
   const linkedIds = useMemo(() => new Set(links.map((link) => link.targetId)), [links])
@@ -229,6 +231,7 @@ export default function BoardEditor() {
         zen={zen} onToggleZen={() => setZen((value) => !value)}
         history={{ undo: actions.undo, redo: actions.redo, canUndo: actions.canUndo, canRedo: actions.canRedo, undoLabel: actions.undoLabel, redoLabel: actions.redoLabel }}
         readOnly={readOnly} onShare={() => setShareOpen(true)} onVersions={() => setVersionsOpen(true)}
+        onExport={exportPage.exportAs} exportDisabled={exportPage.exportDisabled}
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}

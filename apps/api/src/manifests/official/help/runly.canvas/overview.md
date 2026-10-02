@@ -41,6 +41,18 @@ Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se 
 
 Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia.
 
+### Escala y medidas
+
+Con **Calibrar escala** (junto a los controles de zoom) trazas una linea sobre una medida conocida del plano, por ejemplo una pared de 5 m, y escribes su longitud real. Desde entonces la herramienta **Medir** (tecla M) muestra distancias en metros, centimetros, milimetros o pies, y el inspector muestra ancho, alto, area y perimetro de cada forma. Cada pagina tiene su propia escala.
+
+### Alinear y distribuir
+
+Con varios elementos seleccionados, la seccion **Alinear** del inspector los alinea por la izquierda, el centro, la derecha, arriba, en medio o abajo, y los distribuye con espacios iguales (minimo tres).
+
+### Exportar
+
+El menu **Exportar** de la barra superior descarga la pagina actual como imagen PNG o como PDF listo para imprimir, con el nombre del Board, la fecha y la escala.
+
 ### Trabajo en equipo en vivo
 
 Cuando otra persona edita el mismo Board ves su **cursor con su nombre** y un contorno de su color alrededor de lo que tiene seleccionado. Sus cambios aparecen al instante sin recargar. Si ustedes dos cambian el mismo elemento casi al mismo tiempo, se guarda el primero y al otro le aparece un aviso con la version mas reciente.
