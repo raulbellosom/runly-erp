@@ -6,7 +6,7 @@ Canvas Fase 4a — escala real, medición, alinear/distribuir y exportación.
 
 ## 2. Status
 
-Approved (decisión delegada por el usuario, 2026-10-01).
+Complete — Verified: 2026-10-01 (node --test API 50/50 y desktop 57/57, eslint de archivos tocados, build:web). Smoke manual pendiente.
 
 ## 3. Context
 
