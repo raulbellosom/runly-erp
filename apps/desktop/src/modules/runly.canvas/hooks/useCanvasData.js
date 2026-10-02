@@ -187,6 +187,33 @@ export function useCollaboratorMutations(boardId) {
   return { save, remove }
 }
 
+// Template catalog (static per API build).
+export function useCanvasTemplates() {
+  const token = useToken()
+  return useQuery({
+    queryKey: ['canvas', 'templates'],
+    queryFn: async () => unwrap(await runly.canvas.listTemplates(token)) ?? [],
+    enabled: Boolean(token),
+    staleTime: Infinity,
+  })
+}
+
+// Board settings are applied optimistically so the grid redraws at once.
+export function useUpdateBoardSettings(boardId) {
+  const token = useToken(), client = useQueryClient(), key = boardKey(boardId)
+  return useMutation({
+    mutationFn: (settings) => runly.canvas.updateBoard(boardId, { settings }, token),
+    onMutate: (settings) => {
+      client.cancelQueries({ queryKey: key, exact: true })
+      const previous = client.getQueryData(key)
+      client.setQueryData(key, (board) => board ? { ...board, effectiveSettings: settings } : board)
+      return { previous }
+    },
+    onError: (_error, _settings, context) => client.setQueryData(key, context?.previous),
+    onSettled: () => client.invalidateQueries({ queryKey: key, exact: true }),
+  })
+}
+
 // Public page path inside the SPA (honours VITE_BASE_PATH, e.g. /app/).
 export function publicBoardPath(token) {
   const base = String(import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/')

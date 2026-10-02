@@ -2,9 +2,10 @@ import { MousePointerClick, Users } from 'lucide-react'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
 import { MultiInspector } from './inspector/MultiInspector.jsx'
 import { ObjectInspector } from './inspector/ObjectInspector.jsx'
+import { BoardSettingsSection } from './inspector/BoardSettingsSection.jsx'
 import { Section } from './inspector/fields.jsx'
 
-export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, presence, actions, readOnly = false }) {
+export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, presence, actions, settings, onSettingsChange, readOnly = false }) {
   const single = selectedRows.length === 1 ? selectedRows[0] : null
   const linkTarget = single && single.type !== 'hotspot' && !single.pending ? { targetType: 'OBJECT', targetId: single.id } : null
   return (
@@ -37,13 +38,16 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           onArrange={(where) => actions.arrange(selectedRows, where)}
         />
       ) : (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[hsl(var(--border))] px-4 py-6 text-center">
-          <MousePointerClick className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">Selecciona un elemento para editar su posición, tamaño, colores y vínculos.</p>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">
-            Shift + clic o arrastrar en un área vacía para seleccionar varios. En pantallas táctiles, mantén presionado. Doble clic abre hotspots y textos.
-          </p>
-        </div>
+        <>
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[hsl(var(--border))] px-4 py-6 text-center">
+            <MousePointerClick className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">Selecciona un elemento para editar su posición, tamaño, colores y vínculos.</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              Shift + clic o arrastrar en un área vacía para seleccionar varios. En pantallas táctiles, mantén presionado. Doble clic abre hotspots y textos.
+            </p>
+          </div>
+          <BoardSettingsSection settings={settings} onChange={onSettingsChange} readOnly={readOnly} />
+        </>
       )}
 
       <Section title="Conectados ahora">

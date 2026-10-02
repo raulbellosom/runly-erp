@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
+import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
 import { BoardInspector } from '../components/BoardInspector.jsx'
 import { CanvasToolbar, SHAPES } from '../components/CanvasToolbar.jsx'
 import { CanvasViewport } from '../components/CanvasViewport.jsx'
@@ -12,10 +12,12 @@ import { TextEditDialog } from '../components/TextEditDialog.jsx'
 import { ZoomControls } from '../components/ZoomControls.jsx'
 import { ShareBoardDialog } from '../components/ShareBoardDialog.jsx'
 import { canEditBoard } from '../lib/roles.js'
+import { initialLayerId, parseEmptyAction } from '../lib/boardTemplates.js'
 import { sceneBounds } from '../engine/Canvas2DRenderer.js'
+import { snapSizeFor } from '../engine/snap.js'
 import { measureTextHeight } from '../engine/text.js'
 import { DEFAULT_VIEWPORT, fitBounds, zoomAt } from '../engine/viewport.js'
-import { useBoard, useCanvasImages, useCanvasObjects, useEntityLinks, useUpdateHotspot } from '../hooks/useCanvasData.js'
+import { useBoard, useCanvasImages, useCanvasObjects, useCanvasTemplates, useEntityLinks, useUpdateBoardSettings, useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { toast } from 'sonner'
 import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
@@ -57,6 +59,9 @@ export default function BoardEditor() {
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
   const myRole = board.data?.myRole ?? 'VIEWER', readOnly = Boolean(board.data) && !canEditBoard(myRole)
+  const settings = board.data?.effectiveSettings ?? null
+  const templates = useCanvasTemplates(), updateSettings = useUpdateBoardSettings(boardId)
+  const template = templates.data?.find((item) => item.key === board.data?.templateType) ?? null
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
   const { presence } = useCanvasRealtime(boardId)
@@ -81,11 +86,19 @@ export default function BoardEditor() {
 
   useEffect(() => {
     const page = pages[0]
-    if (!pageId && page) { setPageId(page.id); setLayerId(page.layers?.find((layer) => layer.type === 'vector')?.id ?? page.layers?.[0]?.id) }
+    if (!pageId && page) { setPageId(page.id); setLayerId(initialLayerId(page)) }
   }, [pages, pageId])
 
   const openDialog = useCallback((next) => setDialog(next), [])
   const actions = useBoardEditorActions({ boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog })
+
+  // The template's starting tool, applied once per Board for editors only.
+  const toolAppliedRef = useRef(null)
+  useEffect(() => {
+    if (!settings || !layerId || toolAppliedRef.current === boardId) return
+    toolAppliedRef.current = boardId
+    if (!readOnly && settings.defaultTool && settings.defaultTool !== 'select') actions.chooseTool(settings.defaultTool)
+  }, [settings, layerId, boardId, readOnly, actions])
 
   const fit = useCallback(() => setViewport(fitBounds(sceneBounds(rows), size)), [rows, size])
   useEffect(() => {
@@ -104,7 +117,7 @@ export default function BoardEditor() {
   const changePage = (id) => {
     const page = pages.find((item) => item.id === id)
     setPageId(id); setSelectedIds([])
-    setLayerId(page?.layers?.find((layer) => layer.type === 'vector')?.id ?? page?.layers?.[0]?.id)
+    setLayerId(initialLayerId(page))
     if (!isDesktop) setMobileSheet(null)
   }
   const openObject = (object) => {
@@ -158,6 +171,8 @@ export default function BoardEditor() {
       links={links}
       presence={presence}
       readOnly={readOnly}
+      settings={settings}
+      onSettingsChange={(next) => updateSettings.mutate(next, { onError: (error) => toast.error(error.message) })}
       actions={{
         patch: actions.patch, remove: actions.remove,
         hotspotChange: (object, data) => {
@@ -170,6 +185,13 @@ export default function BoardEditor() {
     />
   )
   const hint = hintFor(tool)
+  const empty = template?.emptyState ?? { title: 'Esta página está vacía', description: 'Dibuja formas, escribe textos, coloca hotspots o inserta una imagen o PDF desde la barra inferior.', action: null }
+  const emptyAction = parseEmptyAction(empty.action?.kind)
+  // The file picker must open from this click: browsers block it otherwise.
+  const runEmptyAction = () => {
+    if (emptyAction?.type === 'insert-media') actions.openFilePicker()
+    else if (emptyAction?.type === 'tool') actions.chooseTool(emptyAction.tool)
+  }
   const subtitle = [activePage?.name, activeLayer ? `Capa: ${activeLayer.name}` : null].filter(Boolean).join(' · ')
   const dialogObject = dialog ? allRows.find((row) => row.id === dialog.id) ?? null : null
 
@@ -199,14 +221,17 @@ export default function BoardEditor() {
             objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={images} linkedIds={linkedIds}
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
-            readOnly={readOnly}
+            readOnly={readOnly} grid={settings?.grid} snapSize={snapSizeFor(settings)}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
               <div className="max-w-xs text-center">
-                <p className="text-sm font-medium text-[hsl(var(--foreground))]">Esta página está vacía</p>
-                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{readOnly ? 'Todavía no hay contenido en esta página.' : 'Dibuja formas, escribe textos, coloca hotspots o inserta una imagen o PDF desde la barra inferior.'}</p>
+                <p className="text-sm font-medium text-[hsl(var(--foreground))]">{readOnly ? 'Esta página está vacía' : empty.title}</p>
+                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{readOnly ? 'Todavía no hay contenido en esta página.' : empty.description}</p>
+                {!readOnly && emptyAction ? (
+                  <Button size="sm" className="pointer-events-auto mt-3" disabled={actions.inserting} onClick={runEmptyAction}>{empty.action.label}</Button>
+                ) : null}
               </div>
             </div>
           ) : null}
