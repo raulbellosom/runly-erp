@@ -11,6 +11,7 @@ import { PdfPagesDialog } from '../components/PdfPagesDialog.jsx'
 import { TextEditDialog } from '../components/TextEditDialog.jsx'
 import { ZoomControls } from '../components/ZoomControls.jsx'
 import { ShareBoardDialog } from '../components/ShareBoardDialog.jsx'
+import { VersionsSheet } from '../components/VersionsSheet.jsx'
 import { canEditBoard } from '../lib/roles.js'
 import { initialLayerId, parseEmptyAction } from '../lib/boardTemplates.js'
 import { sceneBounds } from '../engine/Canvas2DRenderer.js'
@@ -54,7 +55,7 @@ export default function BoardEditor() {
   const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedIds, setSelectedIds] = useState([]), [tool, setTool] = useState('select')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })
   const [desktopPanels, setDesktopPanels] = useState({ left: true, right: true }), [mobileSheet, setMobileSheet] = useState(null)
-  const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false), [shareOpen, setShareOpen] = useState(false)
+  const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false), [shareOpen, setShareOpen] = useState(false), [versionsOpen, setVersionsOpen] = useState(false)
   const fittedPageRef = useRef(null)
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
@@ -211,7 +212,7 @@ export default function BoardEditor() {
         leftOpen={leftOpen} rightOpen={rightOpen} onToggleLeft={() => togglePanel('left')} onToggleRight={() => togglePanel('right')}
         zen={zen} onToggleZen={() => setZen((value) => !value)}
         history={{ undo: actions.undo, redo: actions.redo, canUndo: actions.canUndo, canRedo: actions.canRedo, undoLabel: actions.undoLabel, redoLabel: actions.redoLabel }}
-        readOnly={readOnly} onShare={() => setShareOpen(true)}
+        readOnly={readOnly} onShare={() => setShareOpen(true)} onVersions={() => setVersionsOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
@@ -275,6 +276,11 @@ export default function BoardEditor() {
 
       <HotspotDialog boardId={boardId} pageId={pageId} object={dialog?.kind === 'hotspot' ? dialogObject : null} links={links} readOnly={readOnly} canAttach={myRole === 'COMMENTER'} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <ShareBoardDialog open={shareOpen} onOpenChange={setShareOpen} boardId={boardId} boardName={board.data?.name ?? 'Board'} myRole={myRole} />
+      <VersionsSheet
+        open={versionsOpen} onOpenChange={setVersionsOpen} boardId={boardId} currentVersionId={board.data?.currentVersionId}
+        canCreate={!readOnly} canRestore={myRole === 'OWNER'}
+        onRestored={() => { setSelectedIds([]); setPageId(null); fittedPageRef.current = null }}
+      />
       <TextEditDialog object={dialog?.kind === 'text' ? dialogObject : null} onSave={saveText} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <PdfPagesDialog key={actions.pdf?.file.name} pdf={actions.pdf} busy={actions.inserting} onConfirm={(pagesToInsert) => actions.insertPdfPages(pagesToInsert)} onCancel={actions.cancelPdf} />
     </div>

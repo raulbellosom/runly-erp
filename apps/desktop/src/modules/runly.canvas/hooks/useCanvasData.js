@@ -217,6 +217,25 @@ export function useUpdateBoardSettings(boardId) {
   })
 }
 
+// ---- Versions ---------------------------------------------------------
+const versionsKey = (boardId) => ['canvas', 'boards', boardId, 'versions']
+export function useVersions(boardId, enabled = true) {
+  const token = useToken()
+  return useQuery({ queryKey: versionsKey(boardId), queryFn: async () => unwrap(await runly.canvas.listVersions(boardId, token)) ?? [], enabled: Boolean(token && boardId && enabled) })
+}
+export function useVersionMutations(boardId) {
+  const token = useToken(), client = useQueryClient()
+  const create = useMutation({
+    mutationFn: (data) => runly.canvas.createVersion(boardId, data, token),
+    onSuccess: () => { client.invalidateQueries({ queryKey: versionsKey(boardId) }); client.invalidateQueries({ queryKey: boardKey(boardId), exact: true }) },
+  })
+  const restore = useMutation({
+    mutationFn: (versionId) => runly.canvas.restoreVersion(boardId, versionId, token),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['canvas', 'boards', boardId] }),
+  })
+  return { create, restore }
+}
+
 // Public page path inside the SPA (honours VITE_BASE_PATH, e.g. /app/).
 export function publicBoardPath(token) {
   const base = String(import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/')
