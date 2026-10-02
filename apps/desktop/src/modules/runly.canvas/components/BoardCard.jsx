@@ -1,11 +1,14 @@
 import { FileText, Users } from 'lucide-react'
-import { templateMeta, timeAgo } from '../lib/boardMeta.js'
+import { templateIcon, timeAgo } from '../lib/boardMeta.js'
+import { useCanvasTemplates } from '../hooks/useCanvasData.js'
 import { roleLabel } from '../lib/roles.js'
 
 const DOT_GRID = { backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.28) 1px, transparent 1px)', backgroundSize: '16px 16px' }
 
 export function BoardCard({ board, onOpen }) {
-  const template = templateMeta(board.templateType), Icon = template.icon
+  const templates = useCanvasTemplates()
+  const template = templates.data?.find((item) => item.key === board.templateType)
+  const Icon = templateIcon(template?.icon), templateLabel = template?.label ?? 'Board'
   const pages = board._count?.pages ?? 0, collaborators = board._count?.collaborators ?? 0
   return (
     <button
@@ -18,7 +21,7 @@ export function BoardCard({ board, onOpen }) {
           <Icon className="h-5 w-5" />
         </span>
         <span className="absolute left-3 top-3 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))] backdrop-blur">
-          {template.label}
+          {templateLabel}
         </span>
         {board.myRole && board.myRole !== 'OWNER' ? (
           <span className="absolute right-3 top-3 rounded-full bg-[hsl(var(--card)/0.9)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--foreground))] backdrop-blur">

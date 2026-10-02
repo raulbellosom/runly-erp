@@ -1,17 +1,9 @@
 import { FileSearch, Frame, LayoutGrid, Map, Square, Workflow } from 'lucide-react'
 
-export const BOARD_TEMPLATES = [
-  { value: 'blank', label: 'En blanco', description: 'Lienzo libre', icon: Square },
-  { value: 'plan', label: 'Plano', description: 'Planta o croquis', icon: Frame },
-  { value: 'technical-map', label: 'Mapa técnico', description: 'Instalaciones y puntos', icon: Map },
-  { value: 'diagram', label: 'Diagrama', description: 'Procesos y flujos', icon: Workflow },
-  { value: 'layout', label: 'Distribución', description: 'Espacios y mobiliario', icon: LayoutGrid },
-  { value: 'pdf-review', label: 'Revisión de PDF', description: 'Marcas sobre documentos', icon: FileSearch },
-]
-
-export function templateMeta(value) {
-  return BOARD_TEMPLATES.find((template) => template.value === value) ?? BOARD_TEMPLATES[0]
-}
+// Lucide icon per catalog `icon` name; labels and texts come from the API
+// catalog (GET /canvas/templates).
+const TEMPLATE_ICONS = { square: Square, frame: Frame, map: Map, workflow: Workflow, 'layout-grid': LayoutGrid, 'file-search': FileSearch }
+export const templateIcon = (name) => TEMPLATE_ICONS[name] ?? Square
 
 const UNITS = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]]
 const relative = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
