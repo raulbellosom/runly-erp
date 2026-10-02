@@ -53,5 +53,7 @@ export function createCanvasDomain({ request, withAuthHeaders, toQueryString }) 
     searchDataSource: (source, q, token) => send('GET', `/canvas/data-sources/${id(source)}/search${toQueryString({ q })}`, undefined, token),
     resolveBindings: (boardId, refs, token) => send('POST', `/canvas/boards/${id(boardId)}/bindings/resolve`, { refs }, token),
     listReferences: (params, token) => send('GET', `/canvas/references${toQueryString(params)}`, undefined, token),
+    // Content-aware Board search (name, description, pages, hotspots, text, linked records).
+    search: (q, token) => send('GET', `/canvas/search${toQueryString({ q })}`, undefined, token),
   }
 }

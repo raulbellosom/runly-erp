@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { UserAccessError, createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
+import { createCanvasSearch } from './canvas-search.js'
 import { createCanvasPublicLinksService } from './canvas-public.js'
 import { createGeocoder } from './canvas-geocoder.js'
 import { CANVAS_TEMPLATES } from './canvas-templates.js'
@@ -33,9 +34,10 @@ export function objectsDelta(results) {
   return JSON.stringify(delta).length <= DELTA_MAX_CHARS ? delta : { refetch: true }
 }
 
-export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder() }) {
+export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder(), search = null }) {
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver })
+  const canvasSearch = search ?? (prisma ? createCanvasSearch({ prisma }) : null)
   const access = prisma ? createUserAccessService({ prisma }) : null
   const publicLinks = prisma ? createCanvasPublicLinksService({ prisma, canvas }) : null
   const changed = (boardId, action, payload = {}) => broadcaster?.broadcastToChannel?.(`canvas:board:${boardId}`, 'canvas.changed', { boardId, action, ...payload }).catch(() => {})
@@ -65,6 +67,12 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   app.get('/canvas/references', requirePermission('canvas.view'), async (c) => {
     try { return c.json({ data: await canvas.listReferences(companyId(c), actorId(c), c.req.query()) }) }
     catch (error) { return errorResponse(c, error, 'Error al buscar referencias.') }
+  })
+  // Content-aware Board search: name, description, pages, hotspots, canvas
+  // text and linked records (see canvas-search.js).
+  app.get('/canvas/search', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await canvasSearch.search(companyId(c), actorId(c), c.req.query('q') ?? '') }) }
+    catch (error) { return errorResponse(c, error, 'Error al buscar Boards.') }
   })
 
   app.get('/canvas/boards', requirePermission('canvas.view'), async (c) => {

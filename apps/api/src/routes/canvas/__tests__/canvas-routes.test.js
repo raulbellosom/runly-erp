@@ -80,6 +80,17 @@ describe('Runly Canvas routes', () => {
     assert.equal((await response.json()).data['inventory_item:i'].title, 'X')
   })
 
+  it('forwards companyId, actorId and q to the search service', async () => {
+    let received
+    const requirePermission = () => async (c, next) => { c.set('companyId', 'company-1'); c.set('authUserId', 'auth-1'); c.set('userContext', { profile: { id: 'user-1' } }); return next() }
+    const search = { search: async (companyId, actorId, q) => { received = { companyId, actorId, q }; return [{ boardId: 'b1', score: 10, matches: [] }] } }
+    const app = createCanvasRouter({ requirePermission, service: {}, search })
+    const response = await app.request('http://localhost/canvas/search?q=extintor')
+    assert.equal(response.status, 200)
+    assert.deepEqual(received, { companyId: 'company-1', actorId: 'user-1', q: 'extintor' })
+    assert.deepEqual((await response.json()).data, [{ boardId: 'b1', score: 10, matches: [] }])
+  })
+
   it('MirAI board types mirror the catalog', async () => {
     const { BOARD_TYPES } = await import('../canvas-mirai-queries.js')
     const { CANVAS_TEMPLATES } = await import('../canvas-templates.js')
