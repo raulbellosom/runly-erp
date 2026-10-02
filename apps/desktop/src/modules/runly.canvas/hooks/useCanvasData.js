@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
 import { applyOperations, mergeBatchResults, toServerOperations } from '../lib/optimistic.js'
@@ -64,6 +65,8 @@ export function useObjectBatch(boardId, pageId, { onCreated } = {}) {
         return { ...result, object: { ...result.object, ...queued } }
       })
       client.setQueryData(key, (rows) => mergeBatchResults(rows, results))
+      const conflicts = results.filter((result) => result.op === 'conflict').length
+      if (conflicts) toast.warning(conflicts === 1 ? 'Otra persona cambió un elemento; se cargó su versión más reciente.' : `Otra persona cambió ${conflicts} elementos; se cargó su versión más reciente.`)
       if (followUps.length) selfRef.current?.mutate(followUps)
     },
     onError: () => client.invalidateQueries({ queryKey: key }),

@@ -25,6 +25,12 @@ describe('Canvas optimistic batch', () => {
     assert.deepEqual(merged.map((row) => row.id), ['a', 'b', 'server-1'])
     assert.deepEqual(merged[0].hotspot, { id: 'h' })
   })
+
+  it('replaces conflicted rows with the server version or drops gone ones', () => {
+    const conflictRows = [{ id: 'a', revision: 4, hotspot: { id: 'h' } }, { id: 'b', revision: 2 }]
+    const next = mergeBatchResults(conflictRows, [{ op: 'conflict', id: 'a', object: { id: 'a', revision: 7 } }, { op: 'conflict', id: 'b', object: null }])
+    assert.deepEqual(next, [{ id: 'a', revision: 7, hotspot: { id: 'h' } }])
+  })
 })
 
 describe('Canvas optimistic restore', () => {

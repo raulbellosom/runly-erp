@@ -163,7 +163,12 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     if (!operations.length) return
     const target = direction === 'undo' ? 'before' : 'after'
     setSelectedIds(entry.changes.filter((change) => change[target]).map((change) => history.resolveId(change.id)))
-    try { await batch.mutateAsync(operations) } catch (error) {
+    try {
+      const response = await batch.mutateAsync(operations)
+      if ((response?.data ?? response ?? []).some((result) => result.op === 'conflict')) {
+        history.revert(direction); bump()
+      }
+    } catch (error) {
       history.revert(direction); bump()
       toast.error(error?.code === 'REVISION_CONFLICT' || /otra sesión|restaurar/.test(error?.message ?? '') ? 'Otra persona cambió este elemento; no se pudo deshacer.' : error?.message)
     }

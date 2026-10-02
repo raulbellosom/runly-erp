@@ -38,6 +38,10 @@ export function mergeBatchResults(rows = [], results = []) {
       next = existing ? next.map((row) => row.id === restored.id ? restored : row) : [...next, restored]
     } else if (result.op === 'update' && result.object) {
       next = next.map((row) => row.id === result.object.id ? { ...result.object, hotspot: row.hotspot } : row)
+    } else if (result.op === 'conflict') {
+      next = result.object
+        ? next.map((row) => row.id === result.id ? { ...result.object, hotspot: result.object.hotspot ?? row.hotspot } : row)
+        : next.filter((row) => row.id !== result.id)
     }
   }
   return next

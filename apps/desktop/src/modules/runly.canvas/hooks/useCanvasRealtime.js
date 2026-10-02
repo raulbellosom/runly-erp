@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { getSupabaseClient } from '../../../lib/supabase.js'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
+import { applyObjectDelta, invalidationTargets } from '../lib/realtimeCache.js'
 
 function createCanvasRealtimeSession({ boardId, user, onChanged, onPresence }) {
   const supabase = getSupabaseClient()
@@ -28,9 +29,19 @@ export function useCanvasRealtime(boardId) {
     const session = createCanvasRealtimeSession({
       boardId,
       user: { id: userId, displayName, email },
-      onChanged: () => {
-        client.invalidateQueries({ queryKey: ['canvas', 'boards', boardId] })
-        client.invalidateQueries({ queryKey: ['canvas', 'boards', boardId, 'objects'] })
+      onChanged: (message) => {
+        const payload = message?.payload ?? {}
+        if (payload.action === 'objects.changed' && !payload.refetch && (payload.upserts || payload.deletedIds)) {
+          for (const [key] of client.getQueriesData({ queryKey: ['canvas', 'boards', boardId, 'objects'] })) {
+            const pageId = key[4]
+            client.setQueryData(key, (rows) => (rows ? applyObjectDelta(rows, pageId, payload) : rows))
+          }
+          return
+        }
+        const keys = { board: ['canvas', 'boards', boardId], objects: ['canvas', 'boards', boardId, 'objects'], links: ['canvas', 'boards', boardId, 'links'], versions: ['canvas', 'boards', boardId, 'versions'] }
+        for (const target of payload.action === 'objects.changed' ? ['objects'] : invalidationTargets(payload.action)) {
+          client.invalidateQueries({ queryKey: keys[target], exact: target === 'board' })
+        }
       },
       onPresence: setPresence,
     })
