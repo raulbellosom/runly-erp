@@ -54,15 +54,3 @@ export function BoardCard({ board, onOpen, thumbnailUrl, matches }) {
     </button>
   )
 }
-
-export function BoardCardSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))]" aria-hidden>
-      <div className="aspect-[16/9] animate-pulse bg-[hsl(var(--muted))] motion-reduce:animate-none" />
-      <div className="space-y-2 p-4">
-        <div className="h-4 w-2/3 animate-pulse rounded bg-[hsl(var(--muted))] motion-reduce:animate-none" />
-        <div className="h-3 w-1/3 animate-pulse rounded bg-[hsl(var(--muted))] motion-reduce:animate-none" />
-      </div>
-    </div>
-  )
-}

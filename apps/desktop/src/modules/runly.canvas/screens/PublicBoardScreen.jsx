@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, SelectField, Skeleton } from '@runly/ui'
+import { CanvasLoadingSkeleton } from '../components/skeletons.jsx'
 import { Eye, LinkIcon } from 'lucide-react'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { CanvasViewport } from '../components/CanvasViewport.jsx'
@@ -136,7 +137,7 @@ export default function PublicBoardScreen() {
       </header>
 
       <main className="@container relative min-h-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]">
-        {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
+        {board.isLoading || objects.isLoading ? <CanvasLoadingSkeleton /> : null}
         <CanvasViewport
           objects={rows} lockedLayerIds={NO_LOCKS} selectedIds={selectedIds} images={images} linkedIds={NO_LOCKS}
           onSelect={setSelectedIds} onCreate={() => {}} onCommit={() => {}} onOpen={(object) => { if (object.hotspot) setOpenHotspotId(object.id) }}

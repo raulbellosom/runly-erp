@@ -2,7 +2,7 @@ import {
   Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
   Tooltip, TooltipContent, TooltipTrigger, cn,
 } from '@runly/ui'
-import { Ruler } from 'lucide-react'
+import { Map as MapIcon, Ruler } from 'lucide-react'
 import { formatLength } from '../lib/measure.js'
 
 // Scale label: "1 m = 42 px" when a meter maps to at least 1 px, otherwise
@@ -22,7 +22,7 @@ export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = fa
   const calibrated = hasMap || Boolean(scale)
   const icon = (
     <span className="relative">
-      <Ruler className="h-4 w-4" />
+      {hasMap ? <MapIcon className="h-4 w-4" /> : <Ruler className="h-4 w-4" />}
       {calibrated ? <span aria-hidden className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-primary" /> : null}
     </span>
   )

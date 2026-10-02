@@ -6,6 +6,7 @@ import { History, Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { timeAgo } from '../lib/boardMeta.js'
 import { useVersionMutations, useVersions } from '../hooks/useCanvasData.js'
+import { VersionRowSkeleton } from './skeletons.jsx'
 
 function VersionRow({ version, current, canRestore, onRestore }) {
   return (
@@ -77,9 +78,9 @@ export function VersionsSheet({ open, onOpenChange, boardId, currentVersionId, c
           ) : null}
           <div className="min-h-0 flex-1 overflow-y-auto">
             {versions.isLoading ? (
-              <div className="space-y-2 p-4">
-                {[1, 2, 3].map((key) => <Skeleton key={key} className="h-14 rounded-xl" />)}
-              </div>
+              <ul aria-busy="true" className="divide-y divide-[hsl(var(--border))]">
+                {[1, 2, 3].map((key) => <VersionRowSkeleton key={key} withAction={canRestore} />)}
+              </ul>
             ) : versions.isError ? (
               <div className="p-4"><ErrorState title="No se pudieron cargar las versiones" description={versions.error?.message} onRetry={() => versions.refetch()} /></div>
             ) : !rows.length ? (

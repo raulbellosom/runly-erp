@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
+import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, cn, useIsMobile } from '@runly/ui'
+import { CanvasLoadingSkeleton, LayersPanelSkeleton } from '../components/skeletons.jsx'
 import { BoardInspector } from '../components/BoardInspector.jsx'
 import { CalibrateDialog } from '../components/CalibrateDialog.jsx'
 import { CanvasContextMenu } from '../components/CanvasContextMenu.jsx'
@@ -219,7 +220,7 @@ export default function BoardEditor() {
     else setMobileSheet((current) => current === side ? null : side)
   }
 
-  const pagesPanel = (
+  const pagesPanel = board.isLoading ? <LayersPanelSkeleton /> : (
     <LayersPanel
       pages={pages} activePageId={pageId} onPageChange={changePage} activeLayerId={layerId} onLayerChange={setLayerId}
       onAddPage={async () => { const page = await actions.addPage(pages.length); if (page?.id) changePage(page.id) }}
@@ -290,7 +291,7 @@ export default function BoardEditor() {
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
         <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]" onDragOver={onLibraryDragOver} onDrop={onLibraryDrop}>
-          {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
+          {board.isLoading || objects.isLoading ? <CanvasLoadingSkeleton /> : null}
           <MapBackdrop background={activePage?.background} viewport={viewport} size={size} config={pageMap.config} />
           <CanvasViewport
             objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={sharpImages} linkedIds={linkedIds}

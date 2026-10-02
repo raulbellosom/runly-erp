@@ -9,6 +9,7 @@ import {
 } from '@runly/ui'
 import { Building2, FolderUp, Library as LibraryIcon, Loader2, MoreVertical, Pencil, Plus, Trash2, User } from 'lucide-react'
 import { useAuth } from '../../../../auth/AuthProvider.jsx'
+import { LibraryTileSkeleton } from '../skeletons.jsx'
 import { runly } from '../../../../lib/runly.js'
 import { libraryItemsKey, useLibraries, useLibraryImport, useLibraryItemMutations, useLibraryMutations } from '../../hooks/useLibraries.js'
 import { LIBRARY_IMPORT_ACCEPT } from '../../lib/libraryImport/formats.js'
@@ -51,7 +52,7 @@ function LibraryFormDialog({ open, onOpenChange, library, canManage, onSubmit, p
 }
 
 function LibraryItemsGrid({ library, items, imageUrls, loading, error, onInsert, onDeleteItem }) {
-  if (loading) return <div className="grid grid-cols-3 gap-2 p-1 sm:grid-cols-4">{[1, 2, 3, 4].map((key) => <Skeleton key={key} className="h-28 rounded-xl" />)}</div>
+  if (loading) return <div className="grid grid-cols-3 gap-2 p-1 sm:grid-cols-4">{[1, 2, 3, 4].map((key) => <LibraryTileSkeleton key={key} />)}</div>
   if (error) return <p className="px-1 py-2 text-sm text-destructive">No se pudieron cargar los elementos.</p>
   if (!items.length) return <p className="px-1 py-2 text-sm text-[hsl(var(--muted-foreground))]">Esta biblioteca no tiene elementos.</p>
   return (
@@ -171,7 +172,12 @@ export function LibraryPanel({ open, onOpenChange, onInsert }) {
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             {libraries.isLoading ? (
-              <div className="space-y-2">{[1, 2, 3].map((key) => <Skeleton key={key} className="h-12 rounded-xl" />)}</div>
+              <div className="space-y-4" aria-busy="true">{[1, 2].map((key) => (
+                <div key={key} className="space-y-2">
+                  <div className="flex items-center gap-2 px-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-4 w-14 rounded-full" /></div>
+                  <div className="grid grid-cols-3 gap-2 p-1 sm:grid-cols-4">{[1, 2, 3, 4].map((tile) => <LibraryTileSkeleton key={tile} />)}</div>
+                </div>
+              ))}</div>
             ) : libraries.isError ? (
               <ErrorState title="No se pudieron cargar las bibliotecas" description={libraries.error?.message} onRetry={() => libraries.refetch()} />
             ) : !rows.length ? (

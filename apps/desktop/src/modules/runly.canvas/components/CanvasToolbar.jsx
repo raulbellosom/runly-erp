@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Separator, Tooltip, TooltipContent, TooltipTrigger, cn,
 } from '@runly/ui'
-import { ArrowUpRight, ChevronUp, Circle, Database, Diamond, Hand, ImagePlus, Library, Loader2, MapPin, Minus, MousePointer2, Ruler, Square, Trash2, Triangle, Type } from 'lucide-react'
+import { ArrowUpRight, ChevronUp, Circle, Database, Diamond, Hand, ImagePlus, Library, Loader2, MapPin, Minus, MousePointer2, RulerDimensionLine, Square, Trash2, Triangle, Type } from 'lucide-react'
 import { SHAPE_TOOLS } from '../lib/objectFactory.js'
 
 export const SHAPES = {
@@ -81,7 +81,7 @@ export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInser
       <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1.5 shadow-lg">
         <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')}><MousePointer2 /></ToolButton>
         <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')}><Hand /></ToolButton>
-        <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')}><Ruler /></ToolButton>
+        <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')}><RulerDimensionLine /></ToolButton>
         <span className="px-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">Solo lectura · toca un hotspot para verlo</span>
       </div>
     )
@@ -90,7 +90,7 @@ export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInser
     <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-0.5 rounded-2xl p-1.5 shadow-lg sm:gap-1">
       <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')}><MousePointer2 /></ToolButton>
       <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')} className="max-sm:hidden"><Hand /></ToolButton>
-      <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')}><Ruler /></ToolButton>
+      <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')}><RulerDimensionLine /></ToolButton>
       <Separator orientation="vertical" className="mx-0.5 h-6 sm:mx-1" />
       <ShapePicker tool={tool} onToolChange={onToolChange} />
       <ToolButton label="Texto" shortcut="T" active={tool === 'text'} onClick={() => onToolChange('text')}><Type /></ToolButton>

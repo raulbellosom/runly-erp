@@ -6,7 +6,8 @@ import { PanelsTopLeft, Plus, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
-import { BoardCard, BoardCardSkeleton } from '../components/BoardCard.jsx'
+import { BoardCard } from '../components/BoardCard.jsx'
+import { BoardCardSkeleton, HomeToolbarSkeleton } from '../components/skeletons.jsx'
 import { BoardFilters } from '../components/BoardFilters.jsx'
 import { CreateBoardDialog } from '../components/CreateBoardDialog.jsx'
 import { useBoardSearch, useBoards, useCreateBoard } from '../hooks/useCanvasData.js'
@@ -114,7 +115,8 @@ export default function CanvasHome() {
         </div>
       ) : null}
 
-      {boards.isLoading ? <div className={GRID} aria-busy="true" aria-label="Cargando Boards">{[1, 2, 3].map((key) => <BoardCardSkeleton key={key} />)}</div> : null}
+      {boards.isLoading ? <HomeToolbarSkeleton /> : null}
+      {boards.isLoading ? <div className={GRID} aria-busy="true" aria-label="Cargando Boards">{[1, 2, 3, 4, 5, 6].map((key) => <BoardCardSkeleton key={key} />)}</div> : null}
       {boards.isError ? <ErrorState title="No se pudieron cargar los Boards" description={boards.error?.message} onRetry={() => boards.refetch()} /> : null}
 
       {ready && !list.length ? (
@@ -127,7 +129,7 @@ export default function CanvasHome() {
       ) : null}
 
       {ready && list.length > 0 && searchLoading ? (
-        <div className={GRID} aria-busy="true" aria-label="Buscando Boards">{[1, 2, 3].map((key) => <BoardCardSkeleton key={key} />)}</div>
+        <div className={GRID} aria-busy="true" aria-label="Buscando Boards">{[1, 2, 3, 4, 5, 6].map((key) => <BoardCardSkeleton key={key} />)}</div>
       ) : null}
 
       {ready && list.length > 0 && !searchLoading && !filtered.length ? (

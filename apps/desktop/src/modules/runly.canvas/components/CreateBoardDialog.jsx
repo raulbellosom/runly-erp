@@ -1,9 +1,10 @@
 import { Fragment, useState } from 'react'
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ErrorState, Input, Label, Skeleton, Textarea, cn } from '@runly/ui'
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ErrorState, Input, Label, Textarea, cn } from '@runly/ui'
 import { Check, Loader2 } from 'lucide-react'
 import { useCanvasTemplates } from '../hooks/useCanvasData.js'
 import { templateIcon } from '../lib/boardMeta.js'
 import { TemplatePreview } from './TemplatePreview.jsx'
+import { TemplateCardSkeleton } from './skeletons.jsx'
 
 const EMPTY = { name: '', description: '', templateType: 'blank' }
 const HEADING = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]'
@@ -52,7 +53,7 @@ export function CreateBoardDialog({ open, onOpenChange, onSubmit, pending }) {
               {templates.isError ? (
                 <ErrorState title="No se pudieron cargar las plantillas" description={templates.error?.message} onRetry={() => templates.refetch()} />
               ) : templates.isLoading ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-36 rounded-xl" />)}</div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <TemplateCardSkeleton key={index} />)}</div>
               ) : (
                 <div role="radiogroup" aria-label="Plantilla" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {list.map((template) => {
