@@ -42,6 +42,15 @@ export const TEMPLATE_PREVIEWS = {
     { kind: 'rect', x: 40, y: 28, w: 40, h: 8, r: 2, tone: 'accent', dash: true },
     { kind: 'circle', cx: 82, cy: 50, r: 5, tone: 'accent' },
   ],
+  'site-map': [
+    { kind: 'rect', x: 10, y: 10, w: 22, h: 16, r: 2, tone: 'soft' },
+    { kind: 'rect', x: 40, y: 8, w: 18, h: 14, r: 2, tone: 'soft' },
+    { kind: 'rect', x: 86, y: 14, w: 22, h: 16, r: 2, tone: 'soft' },
+    { kind: 'path', d: 'M4 44 H114', tone: 'line' },
+    { kind: 'path', d: 'M30 44 V60', tone: 'line' },
+    { kind: 'circle', cx: 30, cy: 44, r: 4.5, tone: 'accent' },
+    { kind: 'circle', cx: 86, cy: 44, r: 4.5, tone: 'accent' },
+  ],
 }
 
 export const previewFor = (key) => TEMPLATE_PREVIEWS[key] ?? TEMPLATE_PREVIEWS.blank

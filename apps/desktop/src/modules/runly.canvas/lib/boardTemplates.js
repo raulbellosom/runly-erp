@@ -16,9 +16,10 @@ export function mediaTargetLayer(layers) {
   return layers.find((layer) => layer.metadata?.mediaTarget) ?? null
 }
 
-// emptyState.action.kind: 'insert-media' | 'tool:<creation tool>'
+// emptyState.action.kind: 'insert-media' | 'tool:<creation tool>' | 'map'
 export function parseEmptyAction(kind) {
   if (kind === 'insert-media') return { type: 'insert-media' }
+  if (kind === 'map') return { type: 'map' }
   const tool = typeof kind === 'string' && kind.startsWith('tool:') ? kind.slice(5) : null
   return tool && CREATION_TOOLS.has(tool) ? { type: 'tool', tool } : null
 }

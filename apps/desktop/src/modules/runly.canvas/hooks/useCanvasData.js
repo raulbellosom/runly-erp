@@ -240,6 +240,25 @@ export function useCanvasTemplates() {
   })
 }
 
+// Map provider config (static per instance): whether map backgrounds are
+// enabled, the MapLibre style URL and the attribution text to show.
+export function useMapConfig() {
+  const token = useToken()
+  return useQuery({
+    queryKey: ['canvas', 'map-config'],
+    queryFn: async () => unwrap(await runly.canvas.getMapConfig(token)) ?? { enabled: false, styleUrl: null, attribution: null },
+    enabled: Boolean(token),
+    staleTime: Infinity,
+  })
+}
+
+// Address/place search for the "Fondo de mapa" dialog; a mutation (not a
+// query) so it only fires on submit, respecting Nominatim's usage policy.
+export function useGeocode() {
+  const token = useToken()
+  return useMutation({ mutationFn: async (q) => unwrap(await runly.canvas.geocode(q, token)) ?? [] })
+}
+
 // Board settings are applied optimistically so the grid redraws at once.
 export function useUpdateBoardSettings(boardId) {
   const token = useToken(), client = useQueryClient(), key = boardKey(boardId)

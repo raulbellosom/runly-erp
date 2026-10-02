@@ -12,8 +12,8 @@ export function scaleLabel(scale) {
   return `1 px = ${formatLength(1, scale)}`
 }
 
-export function ScaleControl({ scale, canEdit, onCalibrate, onClear }) {
-  const label = scale ? scaleLabel(scale) : 'Sin escala'
+export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = false, onMap }) {
+  const label = hasMap ? 'Mapa · metros' : scale ? scaleLabel(scale) : 'Sin escala'
   if (!canEdit) {
     return (
       <div role="status" className="glass pointer-events-auto flex items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-medium shadow-lg">
@@ -29,8 +29,9 @@ export function ScaleControl({ scale, canEdit, onCalibrate, onClear }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onCalibrate}>Calibrar escala</DropdownMenuItem>
-        {scale ? <DropdownMenuItem onSelect={onClear}>Quitar escala</DropdownMenuItem> : null}
+        {!hasMap ? <DropdownMenuItem onSelect={onCalibrate}>Calibrar escala</DropdownMenuItem> : null}
+        {!hasMap && scale ? <DropdownMenuItem onSelect={onClear}>Quitar escala</DropdownMenuItem> : null}
+        <DropdownMenuItem onSelect={onMap}>Fondo de mapa…</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

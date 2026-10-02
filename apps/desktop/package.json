@@ -80,6 +80,7 @@
     "lib0": "^0.2.117",
     "livekit-client": "2.21.0",
     "lucide-react": "latest",
+    "maplibre-gl": "^6.11.2",
     "modern-screenshot": "^4.7.0",
     "motion": "^12.38.0",
     "pdfjs-dist": "^5.0.0",

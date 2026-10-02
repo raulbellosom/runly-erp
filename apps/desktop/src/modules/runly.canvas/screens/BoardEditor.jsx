@@ -8,6 +8,8 @@ import { CanvasViewport } from '../components/CanvasViewport.jsx'
 import { DataBindingDialog } from '../components/DataBindingDialog.jsx'
 import { EditorTopBar } from '../components/EditorTopBar.jsx'
 import { HotspotDialog } from '../components/HotspotDialog.jsx'
+import { MapBackdrop } from '../components/MapBackdrop.jsx'
+import { MapLocationDialog } from '../components/MapLocationDialog.jsx'
 import { PagesLayersPanel } from '../components/PagesLayersPanel.jsx'
 import { PdfPagesDialog } from '../components/PdfPagesDialog.jsx'
 import { ScaleControl } from '../components/ScaleControl.jsx'
@@ -28,6 +30,7 @@ import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
 import { useExportPage } from '../hooks/useExportPage.js'
+import { usePageMap } from '../hooks/usePageMap.js'
 import { usePageScale } from '../hooks/usePageScale.js'
 import { useSharpPdfImages } from '../hooks/useSharpPdfImages.js'
 import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
@@ -77,6 +80,7 @@ export default function BoardEditor() {
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
   const { presence, cursors, broadcastPointer } = useCanvasRealtime(boardId, { pageId, selectedIds })
   const pageScale = usePageScale({ boardId, pageId, calibration: activePage?.calibration ?? null, setTool })
+  const pageMap = usePageMap({ boardId, pageId, background: activePage?.background ?? null, calibration: activePage?.calibration ?? null, size, setViewport })
   // Lets MirAI answer about "this Board" without the user naming it.
   useMiraiRecordContext({ recordType: 'board', recordId: board.data?.id, label: board.data?.name })
 
@@ -215,6 +219,7 @@ export default function BoardEditor() {
   const runEmptyAction = () => {
     if (emptyAction?.type === 'insert-media') actions.openFilePicker()
     else if (emptyAction?.type === 'tool') actions.chooseTool(emptyAction.tool)
+    else if (emptyAction?.type === 'map') pageMap.open()
   }
   const subtitle = [activePage?.name, activeLayer ? `Capa: ${activeLayer.name}` : null].filter(Boolean).join(' · ')
   const dialogObject = dialog ? allRows.find((row) => row.id === dialog.id) ?? null : null
@@ -242,11 +247,12 @@ export default function BoardEditor() {
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
         <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]">
           {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
+          <MapBackdrop background={activePage?.background} viewport={viewport} size={size} config={pageMap.config} />
           <CanvasViewport
             objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={sharpImages} linkedIds={linkedIds}
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
-            readOnly={readOnly} grid={settings?.grid} snapSize={snapSizeFor(settings)}
+            readOnly={readOnly} grid={pageMap.hasMap ? { ...(settings?.grid ?? {}), enabled: false } : settings?.grid} snapSize={snapSizeFor(settings)}
             remote={cursors} onPointerWorld={broadcastPointer} bindings={bindings.data ?? {}}
             scale={pageScale.scale} onCalibrate={pageScale.onViewportCalibrate}
           />
@@ -273,7 +279,10 @@ export default function BoardEditor() {
 
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:flex-row @3xl:items-end @3xl:justify-center">
             <div className="pointer-events-none flex w-full items-end justify-end gap-2 @3xl:absolute @3xl:bottom-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:right-3 @3xl:w-auto">
-              <ScaleControl scale={pageScale.scale} canEdit={!readOnly} onCalibrate={pageScale.startCalibrate} onClear={pageScale.clear} />
+              <ScaleControl
+                scale={pageScale.scale} canEdit={!readOnly} onCalibrate={pageScale.startCalibrate} onClear={pageScale.clear}
+                hasMap={pageMap.hasMap} onMap={pageMap.open}
+              />
               <ZoomControls zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit} />
             </div>
             <CanvasToolbar
@@ -321,6 +330,11 @@ export default function BoardEditor() {
       <CalibrateDialog
         open={pageScale.dialogOpen} onOpenChange={(open) => { if (!open) pageScale.closeDialog() }}
         pixels={pageScale.pixels} onSave={pageScale.save} pending={pageScale.saving}
+      />
+      <MapLocationDialog
+        open={pageMap.dialogOpen} onOpenChange={(open) => { if (!open) pageMap.close() }}
+        current={activePage?.background ?? null} hasManualCalibration={pageMap.hasManualCalibration} hasObjects={rows.length > 0}
+        onSave={pageMap.save} onRemove={pageMap.remove} pending={pageMap.pending}
       />
     </div>
   )

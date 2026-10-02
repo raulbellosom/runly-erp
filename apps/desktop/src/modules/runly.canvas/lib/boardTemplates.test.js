@@ -24,6 +24,7 @@ describe('Canvas template helpers', () => {
   it('parses empty-state actions', () => {
     assert.deepEqual(parseEmptyAction('insert-media'), { type: 'insert-media' })
     assert.deepEqual(parseEmptyAction('tool:rectangle'), { type: 'tool', tool: 'rectangle' })
+    assert.deepEqual(parseEmptyAction('map'), { type: 'map' })
     assert.equal(parseEmptyAction('tool:laser'), null)
     assert.equal(parseEmptyAction(undefined), null)
   })

@@ -1,8 +1,8 @@
-import { FileSearch, Frame, LayoutGrid, Map, Square, Workflow } from 'lucide-react'
+import { FileSearch, Frame, Globe, LayoutGrid, Map, Square, Workflow } from 'lucide-react'
 
 // Lucide icon per catalog `icon` name; labels and texts come from the API
 // catalog (GET /canvas/templates).
-const TEMPLATE_ICONS = { square: Square, frame: Frame, map: Map, workflow: Workflow, 'layout-grid': LayoutGrid, 'file-search': FileSearch }
+const TEMPLATE_ICONS = { square: Square, frame: Frame, map: Map, globe: Globe, workflow: Workflow, 'layout-grid': LayoutGrid, 'file-search': FileSearch }
 export const templateIcon = (name) => TEMPLATE_ICONS[name] ?? Square
 
 const UNITS = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]]
