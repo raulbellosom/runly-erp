@@ -6,6 +6,7 @@ const MAX_RASTER_SIDE = 6000
 
 export const isPdf = (file) => file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name ?? '')
 export const isImage = (file) => /^image\//.test(file?.type ?? '')
+export const isDxf = (file) => /\.dxf$/i.test(file?.name ?? '')
 
 let pdfjsPromise = null
 function getPdfjs() {

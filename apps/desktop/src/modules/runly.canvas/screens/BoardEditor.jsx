@@ -113,7 +113,10 @@ export default function BoardEditor() {
   }, [pages, pageId])
 
   const openDialog = useCallback((next) => setDialog(next), [])
-  const actions = useBoardEditorActions({ boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog })
+  const actions = useBoardEditorActions({
+    boardId, pageId, rows: allRows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog,
+    calibratePage: pageScale.calibratePage, hasCalibration: Boolean(activePage?.calibration),
+  })
   useBoardThumbnail({ boardId, enabled: Boolean(board.data) && !readOnly, rows: allRows, saving: actions.saving })
 
   // The template's starting tool, applied once per Board for editors only.
@@ -294,7 +297,7 @@ export default function BoardEditor() {
           <input
             ref={actions.fileInputRef}
             type="file"
-            accept="image/*,application/pdf"
+            accept="image/*,application/pdf,.dxf"
             className="hidden"
             onChange={(event) => { actions.handleFile(event.target.files?.[0]); event.target.value = '' }}
           />

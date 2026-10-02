@@ -41,6 +41,14 @@ Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se 
 
 Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia. Al acercarte a una pagina de PDF, Canvas la vuelve a dibujar desde el PDF original con mas resolucion para que se lean los detalles.
 
+### Mapas
+
+La plantilla **Mapa de sitio** (o "Fondo de mapa..." en el menu de escala) pone un mapa de OpenStreetMap detras de la pagina. Busca una direccion o lugar y el mapa se movera y hara zoom junto con el lienzo. En una pagina con mapa las medidas salen en metros sin calibrar. El mapa no aparece en exportaciones, miniaturas ni enlaces publicos.
+
+### Planos DXF
+
+Puedes insertar un archivo **DXF** de AutoCAD con el boton de insertar. Canvas lo dibuja como imagen en la capa de fondo y, si el archivo declara sus unidades (milimetros, centimetros, metros, pulgadas o pies), la pagina queda calibrada automaticamente.
+
 ### Escala y medidas
 
 Con **Calibrar escala** (junto a los controles de zoom) trazas una linea sobre una medida conocida del plano, por ejemplo una pared de 5 m, y escribes su longitud real. Desde entonces la herramienta **Medir** (tecla M) muestra distancias en metros, centimetros, milimetros o pies, y el inspector muestra ancho, alto, area y perimetro de cada forma. Cada pagina tiene su propia escala.

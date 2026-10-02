@@ -36,7 +36,16 @@ export function usePageScale({ boardId, pageId, calibration, setTool }) {
     })
   }, [pageId, updatePage])
 
+  // Sets calibration directly, bypassing the drag-to-dialog flow — used by
+  // DXF import to auto-calibrate a page from the file's declared units.
+  const calibratePage = useCallback((nextCalibration) => {
+    if (!pageId) return
+    updatePage.mutate({ pageId, data: { calibration: nextCalibration } }, {
+      onError: (error) => toast.error(error.message),
+    })
+  }, [pageId, updatePage])
+
   const pixels = pending ? Math.hypot(pending.b.x - pending.a.x, pending.b.y - pending.a.y) : 0
 
-  return { scale, startCalibrate, onViewportCalibrate, dialogOpen: Boolean(pending), pixels, save, closeDialog, clear, saving: updatePage.isPending }
+  return { scale, startCalibrate, onViewportCalibrate, dialogOpen: Boolean(pending), pixels, save, closeDialog, clear, calibratePage, saving: updatePage.isPending }
 }

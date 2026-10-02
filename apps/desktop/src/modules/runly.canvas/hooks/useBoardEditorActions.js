@@ -22,7 +22,7 @@ function mergePatch(object, patch) {
 
 // All editor mutations live here so BoardEditor stays a layout component.
 // Every change is recorded in a per-page undo history (see lib/history.js).
-export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog }) {
+export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, setLayerId, setSelectedIds, setTool, viewport, size, openDialog, calibratePage, hasCalibration }) {
   // Undo can fire later (e.g. from a toast action), so replays read the
   // latest rows instead of the ones captured when the callback was created.
   const rowsRef = useRef(rows)
@@ -204,7 +204,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     try { return await createPage.mutateAsync({ name: `Página ${count + 1}` }) } catch (error) { fail(error); return null }
   }
 
-  const media = useMediaInsert({ upload, viewport, size, drawableLayer, layers, lockLayer: (layer) => toggleLayer(layer, { locked: true }), rows, pageId, createRows, fail })
+  const media = useMediaInsert({ upload, viewport, size, drawableLayer, layers, lockLayer: (layer) => toggleLayer(layer, { locked: true }), rows, pageId, createRows, fail, calibratePage, hasCalibration })
 
   const dataLayer = () => layers.find((layer) => layer.type === 'data' && !layer.locked) ?? null
 
