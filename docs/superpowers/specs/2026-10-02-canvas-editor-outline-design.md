@@ -6,7 +6,7 @@ Panel izquierdo con árbol de capas y elementos, menú de acciones rápidas (cli
 
 ## 2. Status
 
-Approved (pedido del usuario, 2026-10-02).
+Complete — Verified: 2026-10-02 (node --test desktop canvas+pos 110/110, API 66/66, eslint de archivos tocados, build:web). Smoke manual pendiente (sobre todo arrastrar en móvil y pulsación larga).
 
 ## 3. Context
 
