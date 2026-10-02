@@ -179,6 +179,9 @@ N/A. Sin modelos nuevos ni modificados; sin migración. `settings` ya es jsonb.
   `templateType` desconocido → `blank`; `settings` se toma de la plantilla
   (si el cliente envía `settings`, se fusiona sobre los de la plantilla y se
   valida); las capas iniciales salen de la plantilla.
+- `GET /canvas/boards/:boardId` — la respuesta añade `effectiveSettings`: los
+  `settings` guardados si tienen `version: 2`, o los de la plantilla del Board
+  en caso contrario (ver caso límite 1). El editor sólo lee `effectiveSettings`.
 - `PATCH /canvas/boards/:boardId` — `settings` se valida: `grid.size` entero
   4–200, booleanos donde corresponde, `defaultTool` dentro de la lista de
   herramientas; siempre se guarda con `version: 2`. Error 400 con mensaje en
@@ -236,7 +239,8 @@ Sin acciones nuevas. `BOARD_CREATED` y `BOARD_UPDATED` ya registran
 
 1. Boards existentes tienen `settings = { grid: { enabled: false, size: 10 },
    snapping: true }` (default antiguo) o `null`. Si `settings.version !== 2`,
-   el editor usa los ajustes de la plantilla de su `templateType`; así un
+   la API devuelve como `effectiveSettings` los de la plantilla de su
+   `templateType`; así un
    Board antiguo "En blanco" no gana ajuste a 10 px de golpe. El primer
    cambio en "Ajustes del Board" guarda `version: 2`.
 2. Boards antiguos conservan sus capas (Vectores/Hotspots/Datos Runly); no hay
