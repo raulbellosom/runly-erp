@@ -39,7 +39,7 @@ Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se 
 
 ### Imagenes y PDF
 
-Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia.
+Con el boton de insertar (o la tecla I) subes una imagen o un PDF. De un PDF con varias paginas eliges cuales colocar; cada pagina queda como imagen nitida en el lienzo, detras de las formas, y el PDF original se guarda como referencia. Al acercarte a una pagina de PDF, Canvas la vuelve a dibujar desde el PDF original con mas resolucion para que se lean los detalles.
 
 ### Escala y medidas
 
@@ -48,6 +48,10 @@ Con **Calibrar escala** (junto a los controles de zoom) trazas una linea sobre u
 ### Alinear y distribuir
 
 Con varios elementos seleccionados, la seccion **Alinear** del inspector los alinea por la izquierda, el centro, la derecha, arriba, en medio o abajo, y los distribuye con espacios iguales (minimo tres).
+
+### Conectores
+
+Si sueltas el inicio o el final de una linea o flecha sobre una forma, queda **conectada**: al mover o cambiar el tamano de la forma, la flecha la sigue. Arrastra el extremo fuera de la forma para desconectarlo.
 
 ### Exportar
 

@@ -29,6 +29,7 @@ import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
 import { useExportPage } from '../hooks/useExportPage.js'
 import { usePageScale } from '../hooks/usePageScale.js'
+import { useSharpPdfImages } from '../hooks/useSharpPdfImages.js'
 import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
 
 const HINTS = {
@@ -93,6 +94,10 @@ export default function BoardEditor() {
   const links = useMemo(() => linksQuery.data ?? [], [linksQuery.data])
   const linkedIds = useMemo(() => new Set(links.map((link) => link.targetId)), [links])
   const images = useCanvasImages(allRows)
+  // Editor-only: re-renders visible PDF page images from the source PDF at
+  // higher resolution as the user zooms in; exports/thumbnails keep using
+  // the stored raster (see useExportPage.js / useBoardThumbnail.js).
+  const sharpImages = useSharpPdfImages({ rows, viewport, size, images })
   const selectedRows = useMemo(() => rows.filter((row) => selectedIds.includes(row.id)), [rows, selectedIds])
   const selected = selectedRows.length === 1 ? selectedRows[0] : null
   const editableSelection = readOnly ? [] : selectedRows.filter((row) => !lockedLayerIds.has(row.layerId))
@@ -238,7 +243,7 @@ export default function BoardEditor() {
         <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]">
           {board.isLoading || objects.isLoading ? <Skeleton className="absolute inset-3 rounded-2xl" /> : null}
           <CanvasViewport
-            objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={images} linkedIds={linkedIds}
+            objects={rows} lockedLayerIds={lockedLayerIds} selectedIds={selectedIds} images={sharpImages} linkedIds={linkedIds}
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
             readOnly={readOnly} grid={settings?.grid} snapSize={snapSizeFor(settings)}

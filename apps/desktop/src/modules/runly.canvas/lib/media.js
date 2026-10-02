@@ -23,6 +23,28 @@ export async function openPdf(file) {
   return pdfjs.getDocument({ data: await file.arrayBuffer() }).promise
 }
 
+// Loads a PDF from a (signed, CORS-enabled) URL.
+export async function openPdfFromUrl(url) {
+  const pdfjs = await getPdfjs()
+  const response = await fetch(url, { mode: 'cors' })
+  if (!response.ok) throw new Error('No se pudo cargar el PDF')
+  return pdfjs.getDocument({ data: await response.arrayBuffer() }).promise
+}
+
+// Renders a PDF page to a canvas whose longest side is `targetSide` px.
+export async function renderPdfPageCanvas(doc, pageNumber, targetSide) {
+  const page = await doc.getPage(pageNumber)
+  const base = page.getViewport({ scale: 1 })
+  const viewport = page.getViewport({ scale: targetSide / Math.max(base.width, base.height) })
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height)
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+  await page.render({ canvasContext: ctx, viewport }).promise
+  // The renderer checks image.complete/naturalWidth.
+  return Object.assign(canvas, { complete: true, naturalWidth: canvas.width, naturalHeight: canvas.height })
+}
+
 function canvasToBlob(canvas, type = 'image/png') {
   return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('No se pudo generar la imagen')), type))
 }
