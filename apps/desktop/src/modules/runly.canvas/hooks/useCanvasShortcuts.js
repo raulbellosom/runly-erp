@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-const TOOL_KEYS = { v: 'select', h: 'pan', r: 'rectangle', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'hotspot' }
+const TOOL_KEYS = { v: 'select', h: 'pan', r: 'rectangle', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'hotspot', m: 'measure' }
 const ARROWS = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }
 
 function isEditableTarget(target) {

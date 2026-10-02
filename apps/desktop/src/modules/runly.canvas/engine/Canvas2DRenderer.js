@@ -43,7 +43,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {} } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -66,6 +66,7 @@ export class Canvas2DRenderer {
       for (const object of objects) if (cursor.selectedIds?.includes(object.id)) this.drawRemoteSelection(ctx, object, viewport.zoom, cursor.color)
     }
     ctx.restore()
+    if (measure) this.drawMeasure(ctx, measure, viewport)
     if (overlay?.object && overlay.text) this.drawOverlayLabel(ctx, overlay, viewport)
     if (marquee) this.drawMarquee(ctx, marquee)
     for (const cursor of remote) if (Number.isFinite(cursor.x) && Number.isFinite(cursor.y)) this.drawRemoteCursor(ctx, cursor, viewport)
@@ -313,6 +314,22 @@ export class Canvas2DRenderer {
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
     ctx.globalAlpha = 1; ctx.strokeStyle = this.theme.primary; ctx.lineWidth = 1
     ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width, rect.height)
+    ctx.restore()
+  }
+
+  // Dashed measure line with endpoints and a length pill, in screen space.
+  drawMeasure(ctx, measure, viewport) {
+    const a = worldToScreen(measure.a, viewport), b = worldToScreen(measure.b, viewport)
+    ctx.save()
+    ctx.strokeStyle = this.theme.primary; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4])
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([])
+    for (const p of [a, b]) { ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.fillStyle = this.theme.primary; ctx.fill() }
+    if (measure.text) {
+      ctx.font = `600 11px ${this.theme.font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 14 }, width = ctx.measureText(measure.text).width + 14
+      ctx.fillStyle = this.theme.primary; ctx.beginPath(); ctx.roundRect(mid.x - width / 2, mid.y - 10, width, 20, 6); ctx.fill()
+      ctx.fillStyle = '#ffffff'; ctx.fillText(measure.text, mid.x, mid.y + 0.5)
+    }
     ctx.restore()
   }
 

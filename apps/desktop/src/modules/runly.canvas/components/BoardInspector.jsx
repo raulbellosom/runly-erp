@@ -2,12 +2,13 @@ import { MousePointerClick, Users } from 'lucide-react'
 import { bindingKey, canBind } from '../lib/dataBindings.js'
 import { DataBindingSection } from './inspector/DataBindingSection.jsx'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
+import { MeasuresSection } from './inspector/MeasuresSection.jsx'
 import { MultiInspector } from './inspector/MultiInspector.jsx'
 import { ObjectInspector } from './inspector/ObjectInspector.jsx'
 import { BoardSettingsSection } from './inspector/BoardSettingsSection.jsx'
 import { Section } from './inspector/fields.jsx'
 
-export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, bindings, presence, actions, settings, onSettingsChange, readOnly = false }) {
+export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, bindings, presence, actions, settings, onSettingsChange, scale = null, readOnly = false }) {
   const single = selectedRows.length === 1 ? selectedRows[0] : null
   const linkTarget = single && single.type !== 'hotspot' && !single.pending ? { targetType: 'OBJECT', targetId: single.id } : null
   const dataKey = single ? bindingKey(single.properties?.binding) : null
@@ -27,6 +28,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           onOpenHotspot={() => actions.openHotspot(single)}
           onEditText={() => actions.editText(single)}
         >
+          <MeasuresSection object={single} scale={scale} />
           {canBind(single) ? (
             <DataBindingSection
               object={single}

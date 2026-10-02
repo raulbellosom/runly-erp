@@ -4,24 +4,27 @@ import { boxFromDrag, boxOf, hitHandle, isLinear, moveObject, objectBounds, resi
 import { snapMoveDelta, snapPoint } from '../engine/snap.js'
 import { observeThemeChanges, readCanvasTheme } from '../engine/theme.js'
 import { screenToWorld, zoomAt } from '../engine/viewport.js'
+import { formatLength } from '../lib/measure.js'
 import { CREATION_TOOLS, draftObject } from '../lib/objectFactory.js'
 
 const DRAG_THRESHOLD = 4
 const LONG_PRESS_MS = 450
+const MEASURE_TOOLS = new Set(['measure', 'calibrate'])
 const HANDLE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', rotate: 'grab', start: 'move', end: 'move' }
 
 function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) }
 function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
 function rectFrom(a, b) { return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) } }
 function intersects(a, b) { return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y }
-function overlayText(mode, object) {
+function overlayText(mode, object, scale) {
   if (mode === 'rotate') return `${Math.round(object.transform?.rotation ?? 0)}°`
   const b = boxOf(object)
-  if (isLinear(object)) return `${Math.round(Math.hypot(b.width, b.height))} px`
-  return `${Math.round(b.width)} × ${Math.round(b.height)}`
+  if (isLinear(object)) return formatLength(Math.hypot(b.width, b.height), scale)
+  return `${formatLength(b.width, scale)} × ${formatLength(b.height, scale)}`
 }
 function baseCursor(tool, spacePan) {
   if (tool === 'pan' || spacePan) return 'grab'
+  if (MEASURE_TOOLS.has(tool)) return 'crosshair'
   if (CREATION_TOOLS.has(tool)) return tool === 'text' ? 'text' : 'crosshair'
   return 'default'
 }
@@ -45,8 +48,9 @@ export function CanvasViewport(props) {
     renderer.render({
       objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [], bindings: p.bindings ?? {},
       selectedIds: live?.draft ? new Set() : new Set(p.selectedIds),
-      overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft) } : null,
+      overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single, p.scale) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft, p.scale) } : null,
       marquee: live?.marquee ?? null,
+      measure: live?.measure ?? null,
       interactive: !p.readOnly && p.selectedIds.length === 1 && !p.lockedLayerIds?.has(p.objects.find((row) => row.id === p.selectedIds[0])?.layerId),
     })
   }
@@ -90,7 +94,11 @@ export function CanvasViewport(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => { if (canvasRef.current) canvasRef.current.style.cursor = baseCursor(tool, spacePan) }, [tool, spacePan])
+  useEffect(() => {
+    if (canvasRef.current) canvasRef.current.style.cursor = baseCursor(tool, spacePan)
+    if (liveRef.current?.sticky) { liveRef.current = null; schedule() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool, spacePan])
 
   const pointOf = (event) => { const rect = canvasRef.current.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top } }
   const selectable = () => {
@@ -122,6 +130,7 @@ export function CanvasViewport(props) {
     event.currentTarget.focus({ preventScroll: true })
     const screen = pointOf(event), world = screenToWorld(screen, p.viewport), touch = event.pointerType === 'touch'
     const additive = event.shiftKey || event.ctrlKey || event.metaKey
+    if (liveRef.current?.sticky) { liveRef.current = null; schedule() }
     pointersRef.current.set(event.pointerId, screen)
     if (pointersRef.current.size === 2) {
       clearTimeout(pressTimerRef.current)
@@ -133,6 +142,14 @@ export function CanvasViewport(props) {
     if (pointersRef.current.size > 2) return
     if (tool === 'pan' || spacePan || event.button === 1) { dragRef.current = { mode: 'pan', screen, viewport: p.viewport }; setCursor('grabbing'); return }
     if (CREATION_TOOLS.has(tool) && !p.readOnly) { dragRef.current = { mode: 'create', screen, world }; return }
+    // Measure works for every role; calibrate is only offered to editors by
+    // the toolbar, but the viewport itself does not need to re-check that.
+    if (MEASURE_TOOLS.has(tool)) {
+      dragRef.current = { mode: 'measure', screen, world: snapPoint(world, event.altKey ? 0 : (p.snapSize ?? 0)) }
+      liveRef.current = null
+      schedule()
+      return
+    }
     // Read-only (viewers, public links): tap selects or opens a hotspot,
     // dragging always pans; nothing can be moved or resized.
     if (p.readOnly) {
@@ -195,6 +212,10 @@ export function CanvasViewport(props) {
       if (tool === 'hotspot' || tool === 'text') return
       const kind = tool === 'line' || tool === 'arrow' ? tool : 'rectangle'
       liveRef.current = { draft: draftObject(tool, boxFromDrag(kind, snapPoint(drag.world, snap), snapPoint(world, snap), { constrain: event.shiftKey })) }
+    } else if (drag.mode === 'measure') {
+      const offset = boxFromDrag('line', drag.world, snapPoint(world, snap), { constrain: event.shiftKey })
+      const b = { x: drag.world.x + offset.width, y: drag.world.y + offset.height }
+      liveRef.current = { measure: { a: drag.world, b, text: tool === 'measure' ? formatLength(Math.hypot(offset.width, offset.height), p.scale) : null } }
     } else if (drag.mode === 'move') {
       const { dx, dy } = snapMoveDelta(drag.bounds, world.x - drag.world.x, world.y - drag.world.y, snap)
       liveRef.current = { mode: 'move', objects: new Map(drag.objects.map((object) => [object.id, moveObject(object, dx, dy)])) }
@@ -240,6 +261,16 @@ export function CanvasViewport(props) {
         const area = rectFrom(a, b)
         const hits = selectable().filter((row) => intersects(objectBounds(row), area)).map((row) => row.id)
         p.onSelect([...new Set([...drag.base, ...hits])])
+      }
+      schedule(); return
+    }
+    if (drag.mode === 'measure') {
+      const measured = live?.measure && drag.moved && Math.hypot(live.measure.b.x - live.measure.a.x, live.measure.b.y - live.measure.a.y) >= 4
+      if (tool === 'calibrate') {
+        if (measured) p.onCalibrate?.({ a: live.measure.a, b: live.measure.b })
+        liveRef.current = null
+      } else {
+        liveRef.current = measured ? { measure: live.measure, sticky: true } : null
       }
       schedule(); return
     }

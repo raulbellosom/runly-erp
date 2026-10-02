@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn, useIsMobile } from '@runly/ui'
 import { BoardInspector } from '../components/BoardInspector.jsx'
+import { CalibrateDialog } from '../components/CalibrateDialog.jsx'
 import { CanvasToolbar, SHAPES } from '../components/CanvasToolbar.jsx'
 import { CanvasViewport } from '../components/CanvasViewport.jsx'
 import { DataBindingDialog } from '../components/DataBindingDialog.jsx'
@@ -9,6 +10,7 @@ import { EditorTopBar } from '../components/EditorTopBar.jsx'
 import { HotspotDialog } from '../components/HotspotDialog.jsx'
 import { PagesLayersPanel } from '../components/PagesLayersPanel.jsx'
 import { PdfPagesDialog } from '../components/PdfPagesDialog.jsx'
+import { ScaleControl } from '../components/ScaleControl.jsx'
 import { TextEditDialog } from '../components/TextEditDialog.jsx'
 import { ZoomControls } from '../components/ZoomControls.jsx'
 import { ShareBoardDialog } from '../components/ShareBoardDialog.jsx'
@@ -25,9 +27,13 @@ import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
 import { useCanvasRealtime } from '../hooks/useCanvasRealtime.js'
 import { useCanvasShortcuts } from '../hooks/useCanvasShortcuts.js'
+import { usePageScale } from '../hooks/usePageScale.js'
 import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext.js'
 
-const HINTS = { text: 'Toca el lienzo para escribir un texto', hotspot: 'Toca el lienzo para colocar un hotspot' }
+const HINTS = {
+  text: 'Toca el lienzo para escribir un texto', hotspot: 'Toca el lienzo para colocar un hotspot',
+  measure: 'Arrastra para medir · Shift mantiene 45°', calibrate: 'Traza una línea sobre una medida conocida',
+}
 const hintFor = (tool) => HINTS[tool] ?? (SHAPES[tool] ? `Arrastra para dibujar: ${SHAPES[tool].label.toLowerCase()} · Shift mantiene proporción` : null)
 
 function DesktopPanel({ side, label, children }) {
@@ -68,6 +74,7 @@ export default function BoardEditor() {
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
   const { presence, cursors, broadcastPointer } = useCanvasRealtime(boardId, { pageId, selectedIds })
+  const pageScale = usePageScale({ boardId, pageId, calibration: activePage?.calibration ?? null, setTool })
   // Lets MirAI answer about "this Board" without the user naming it.
   useMiraiRecordContext({ recordType: 'board', recordId: board.data?.id, label: board.data?.name })
 
@@ -139,7 +146,7 @@ export default function BoardEditor() {
 
   const { spacePan } = useCanvasShortcuts({
     enabled: Boolean(board.data),
-    onTool: (next) => { if (!readOnly || next === 'select' || next === 'pan') actions.chooseTool(next) },
+    onTool: (next) => { if (!readOnly || next === 'select' || next === 'pan' || next === 'measure') actions.chooseTool(next) },
     onInsert: () => { if (!readOnly) actions.openFilePicker() },
     onDelete: deleteSelection,
     onDuplicate: () => actions.duplicate(editableSelection),
@@ -179,6 +186,7 @@ export default function BoardEditor() {
       presence={presence}
       readOnly={readOnly}
       settings={settings}
+      scale={pageScale.scale}
       onSettingsChange={(next) => updateSettings.mutate(next, { onError: (error) => toast.error(error.message) })}
       actions={{
         patch: actions.patch, remove: actions.remove,
@@ -232,6 +240,7 @@ export default function BoardEditor() {
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
             readOnly={readOnly} grid={settings?.grid} snapSize={snapSizeFor(settings)}
             remote={cursors} onPointerWorld={broadcastPointer} bindings={bindings.data ?? {}}
+            scale={pageScale.scale} onCalibrate={pageScale.onViewportCalibrate}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (
@@ -255,7 +264,8 @@ export default function BoardEditor() {
           ) : null}
 
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:flex-row @3xl:items-end @3xl:justify-center">
-            <div className="pointer-events-none flex w-full justify-end @3xl:absolute @3xl:bottom-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:right-3 @3xl:w-auto">
+            <div className="pointer-events-none flex w-full items-end justify-end gap-2 @3xl:absolute @3xl:bottom-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:right-3 @3xl:w-auto">
+              <ScaleControl scale={pageScale.scale} canEdit={!readOnly} onCalibrate={pageScale.startCalibrate} onClear={pageScale.clear} />
               <ZoomControls zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit} />
             </div>
             <CanvasToolbar
@@ -300,6 +310,10 @@ export default function BoardEditor() {
         }}
       />
       <PdfPagesDialog key={actions.pdf?.file.name} pdf={actions.pdf} busy={actions.inserting} onConfirm={(pagesToInsert) => actions.insertPdfPages(pagesToInsert)} onCancel={actions.cancelPdf} />
+      <CalibrateDialog
+        open={pageScale.dialogOpen} onOpenChange={(open) => { if (!open) pageScale.closeDialog() }}
+        pixels={pageScale.pixels} onSave={pageScale.save} pending={pageScale.saving}
+      />
     </div>
   )
 }
