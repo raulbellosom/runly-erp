@@ -757,6 +757,10 @@ async function writeLocalEnv(supabaseInput, identity) {
   const ollamaBaseUrl   = fromLocalEnv("OLLAMA_BASE_URL") || "http://localhost:11434";
   const ollamaModelLight = fromLocalEnv("OLLAMA_MODEL_LIGHT") || "qwen3:4b";
   const ollamaModelHeavy = fromLocalEnv("OLLAMA_MODEL_HEAVY") || "qwen3:8b";
+  // runly.canvas map backgrounds + geocoding proxy — optional, work with no keys.
+  const canvasMaps        = fromLocalEnv("CANVAS_MAPS") || "true";
+  const canvasMapStyleUrl = fromLocalEnv("CANVAS_MAP_STYLE_URL");
+  const canvasGeocoderUrl = fromLocalEnv("CANVAS_GEOCODER_URL");
   const supportEmail = fromLocalEnv("RUNLY_SUPPORT_EMAIL");
   // LiveKit Egress → Supabase Storage (call recordings) — optional. In
   // selfhosted mode these four are NOT independent user secrets to preserve
@@ -968,6 +972,16 @@ AI_LOCAL_ENABLED=${aiLocalEnabled}
 OLLAMA_BASE_URL=${ollamaBaseUrl}
 OLLAMA_MODEL_LIGHT=${ollamaModelLight}
 OLLAMA_MODEL_HEAVY=${ollamaModelHeavy}
+
+# ── runly.canvas maps (optional) — no API key needed ─────────────────────────
+# Map backgrounds use OpenFreeMap vector tiles (MapLibre GL) and address search
+# goes through the API to OpenStreetMap Nominatim (max 1 req/s, cached).
+# CANVAS_MAPS=false turns maps off. Leave the URLs empty to use the defaults:
+#   CANVAS_MAP_STYLE_URL  -> https://tiles.openfreemap.org/styles/liberty
+#   CANVAS_GEOCODER_URL   -> https://nominatim.openstreetmap.org
+CANVAS_MAPS=${canvasMaps}
+CANVAS_MAP_STYLE_URL=${canvasMapStyleUrl}
+CANVAS_GEOCODER_URL=${canvasGeocoderUrl}
 
 # ── Reportar bug (opcional) ───────────────────────────────────────────────────
 # Destino del boton "Reportar bug". Se envia por el SMTP de plataforma

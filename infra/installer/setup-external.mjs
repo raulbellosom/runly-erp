@@ -400,6 +400,18 @@ const OPTIONAL_VAR_GROUPS = [
       { key: "CHAT_MIRAI_WEB_MODEL",        placeholder: "", comment: "# Groq compound fallback, paid plan; only used without TAVILY_API_KEY" },
     ],
   },
+  {
+    header: [
+      "# ── runly.canvas maps (optional) — no API key needed ─────────────────────────",
+      "# OpenFreeMap tiles (MapLibre GL) + OpenStreetMap Nominatim through the API.",
+      "# Empty URLs use the defaults; CANVAS_MAPS=false turns maps off.",
+    ],
+    vars: [
+      { key: "CANVAS_MAPS",          placeholder: "true", comment: null },
+      { key: "CANVAS_MAP_STYLE_URL", placeholder: "", comment: "# Default: https://tiles.openfreemap.org/styles/liberty" },
+      { key: "CANVAS_GEOCODER_URL",  placeholder: "", comment: "# Default: https://nominatim.openstreetmap.org (max 1 req/s; use your own for heavy use)" },
+    ],
+  },
 ];
 
 async function writeComposeEnv(envFilePath) {
