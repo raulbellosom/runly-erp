@@ -6,7 +6,7 @@ Página principal de Canvas: filtros, búsqueda dentro del contenido y portadas 
 
 ## 2. Status
 
-Approved (pedido del usuario, 2026-10-02).
+Complete — Verified: 2026-10-02 (node --test API 66/66 y desktop 97/97, SQL de búsqueda ejecutado en la base de desarrollo en modo lectura, eslint, build:web). Smoke manual pendiente.
 
 ## 3. Context
 
