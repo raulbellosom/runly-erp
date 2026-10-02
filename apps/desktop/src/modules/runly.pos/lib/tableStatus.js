@@ -1,6 +1,6 @@
 // Visual style per PosTable status — colors, ring width and labels shown on
 // the waiter floor view. Shared by the Canvas-engine table drawer
-// (floorDrawers.js); moved verbatim from the old FloorOperationalCanvas.jsx.
+// (floorDrawers.js); moved verbatim from the old operational canvas component.
 export const TABLE_STATUS_STYLE = {
   AVAILABLE:      { ring: '#16a34a', fill: 'rgba(220,252,231,0.97)', ringWidth: 2,   label: 'Disponible',   dot: '#22c55e', textColor: '#14532d' },
   OCCUPIED:       { ring: '#d97706', fill: 'rgba(254,243,199,0.97)', ringWidth: 2.5, label: 'Ocupada',      dot: '#f59e0b', textColor: '#78350f' },

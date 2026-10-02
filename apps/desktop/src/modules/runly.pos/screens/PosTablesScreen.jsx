@@ -10,7 +10,7 @@ import { usePosOutlets } from '../hooks/usePosSettings'
 import { useCreatePosOrder, usePosOrders, useClaimOrder } from '../hooks/usePosOrder'
 import { useIsDesktop } from '../../../hooks/useIsDesktop'
 import { useAuth } from '../../../auth/AuthProvider'
-import FloorOperationalCanvas from '../components/FloorOperationalCanvas'
+import FloorOperationalStage from '../components/FloorOperationalStage'
 import TableMap from '../components/TableMap'
 
 // ─── Table action panel ───────────────────────────────────────────────────────
@@ -512,7 +512,7 @@ export default function PosTablesScreen({ comanderoMode = false }) {
             description="Crea un plano en el diseñador de plantas y publícalo para ver las mesas."
           />
         ) : activeMode === 'canvas' && hasCanvasElements ? (
-          <FloorOperationalCanvas
+          <FloorOperationalStage
             floor={floorDetail}
             elements={elements}
             tableStates={tableStates}
