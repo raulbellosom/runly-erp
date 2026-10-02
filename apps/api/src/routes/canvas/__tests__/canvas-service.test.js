@@ -180,6 +180,12 @@ describe('Runly Canvas service', () => {
     assert.doesNotThrow(() => validateCanvasObject({ ...base, properties: { binding: null } }))
   })
 
+  it('validates line connections', () => {
+    const base = { type: 'arrow', geometry: { x2: 10, y2: 0 } }
+    assert.doesNotThrow(() => validateCanvasObject({ ...base, properties: { connect: { start: '00000000-0000-4000-8000-000000000009', end: null } } }))
+    assert.throws(() => validateCanvasObject({ ...base, properties: { connect: { start: 'x' } } }), (error) => error.status === 400)
+  })
+
   it('finds boards that reference a record through links or bindings', async () => {
     let objectWhere, boardWhere
     const prisma = {

@@ -1,6 +1,7 @@
 import { effectiveBoardSettings, normalizeBoardSettings, templateFor, templateLayerRows } from './canvas-templates.js'
 import { isDataSource } from './canvas-data-sources.js'
 import { normalizeCalibration } from './canvas-calibration.js'
+import { isValidConnect } from './canvas-connect.js'
 
 const ROLE_RANK = { VIEWER: 1, COMMENTER: 2, EDITOR: 3, OWNER: 4 }
 const LAYER_TYPES = new Set(['vector', 'hotspot', 'data'])
@@ -68,6 +69,7 @@ export function validateCanvasObject(data, { partial = false } = {}) {
   if (binding != null) {
     if (!isDataSource(binding.source) || typeof binding.id !== 'string' || !UUID.test(binding.id)) throw new CanvasServiceError('La conexión de datos no es válida.', 400)
   }
+  if (!isValidConnect(data.properties?.connect)) throw new CanvasServiceError('La conexión de la línea no es válida.', 400)
   return true
 }
 
