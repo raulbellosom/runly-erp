@@ -1,6 +1,6 @@
-// Chair layout math for POS table shapes. Shared by the planner
-// (FloorCanvasHelpers.jsx, which re-exports these) and the Canvas-engine
-// operational drawer (floorDrawers.js).
+// Chair layout math for POS table shapes. Shared by the Canvas-engine
+// table drawer (floorDrawers.js), used by both the operational (waiter)
+// view and the floor planner.
 export const CHAIR_PAD = 18
 
 export function squareChairPositions(width, height, capacity, style = 'auto') {

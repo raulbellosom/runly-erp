@@ -1,6 +1,6 @@
 // Fill/stroke colors for POLYGON and FLOOR_ZONE decor, keyed by the zone
-// "color" style field. Shared by the planner (FloorCanvasDecor.jsx, which
-// re-exports this) and the Canvas-engine floor drawers (floorDrawers.js).
+// "color" style field. Shared by the planner adapter (plannerObjects.js)
+// and the Canvas-engine floor drawers (floorDrawers.js).
 export const POLYGON_ZONE_COLORS = {
   neutral: { fill: 'rgba(100,116,139,0.12)', stroke: '#64748b' },
   dining:  { fill: 'rgba(59,130,246,0.12)',  stroke: '#3b82f6' },

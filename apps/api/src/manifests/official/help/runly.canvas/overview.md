@@ -33,6 +33,10 @@ En la ficha de un articulo de inventario, la seccion **En Canvas** lista los Boa
 
 Sin nada seleccionado, el inspector muestra **Ajustes del Board**: mostrar u ocultar la cuadricula, su tamano y **Ajustar a la cuadricula**. Con el ajuste activo, las formas se alinean a la cuadricula al dibujarlas, moverlas o cambiar su tamano; manten **Alt** mientras arrastras para desactivarlo un momento.
 
+### Poligonos
+
+Los poligonos muestran un punto en cada vertice cuando estan seleccionados: arrastralo para moverlo, arrastra el punto pequeno entre dos vertices para agregar uno nuevo y haz doble clic en un vertice para quitarlo.
+
 ### Hotspots y registros vinculados
 
 Un hotspot es un pin con informacion. Al colocarlo se abre su ficha; despues se abre con doble clic, con Enter o con el boton del inspector. En la ficha puedes poner titulo, descripcion, estado (Activo, En revision, Resuelto, Inactivo), color, **icono del pin** (mas de 200 iconos recomendados por categoria —seguridad, electricidad, agua, redes, oficina, almacen, mantenimiento, vehiculos, personas, lugares y estados— con busqueda en espanol, y la libreria completa de mas de 1800 iconos), **vincular registros de Runly** y **adjuntar archivos** (fotos, fichas tecnicas, manuales). Cualquier forma tambien puede tener registros vinculados desde el inspector; los elementos vinculados muestran un pequeno distintivo en el lienzo.
