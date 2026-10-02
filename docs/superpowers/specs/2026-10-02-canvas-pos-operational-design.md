@@ -6,7 +6,7 @@ Canvas Fase 6a — el plano operativo de POS usa el motor de Canvas; las mesas d
 
 ## 2. Status
 
-Approved (decisión delegada por el usuario, 2026-10-02).
+Complete — Verified: 2026-10-02 (node --test API 58/58, desktop canvas+pos 74/74, eslint de archivos tocados, build:web). Smoke manual en tablet y escritorio pendiente.
 
 ## 3. Context
 
