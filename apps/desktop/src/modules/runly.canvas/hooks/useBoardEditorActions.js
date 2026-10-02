@@ -4,11 +4,10 @@ import { buildObjectData, defaultBox } from '../lib/objectFactory.js'
 import { buildOperations, createHistory, snapshot } from '../lib/history.js'
 import { alignDeltas, distributeDeltas } from '../lib/arrange.js'
 import { convertShape } from '../lib/shapeConvert.js'
-import { reorderedLayerIds } from '../lib/layerTree.js'
 import { fitSize, maxInsertSide } from '../lib/media.js'
 import { placeObjects } from '../lib/libraryImport/normalize.js'
 import { screenToWorld } from '../engine/viewport.js'
-import { useCreateHotspot, useCreateLayer, useCreatePage, useObjectBatch, useReorderLayers, useUpdateLayer, useUploadFile } from './useCanvasData.js'
+import { useCreateHotspot, useCreateLayer, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
 
 const DRAWABLE = new Set(['vector', 'data'])
@@ -51,7 +50,6 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   const { mutation: batch, patchPending } = useObjectBatch(boardId, pageId, { onCreated })
   const hotspot = useCreateHotspot(boardId, pageId)
   const createPage = useCreatePage(boardId), updateLayer = useUpdateLayer(boardId), upload = useUploadFile(boardId), createLayer = useCreateLayer(boardId)
-  const reorderLayersMutation = useReorderLayers(boardId)
 
   const fail = (error) => toast.error(error?.message ?? 'No se pudo guardar el cambio.')
   const layerById = (id) => layers.find((layer) => layer.id === id)
@@ -199,14 +197,6 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     if (!targets.length) return
     let next = topPosition(targetLayerId)
     applyUpdates(targets.map((row) => ({ row, data: { layerId: targetLayerId, position: next++ } })), 'Mover a capa')
-  }
-
-  // The Layers panel drags layers top-first; the API stores/paints them
-  // bottom-first, so it converts with lib/layerTree.js's reorderedLayerIds()
-  // before sending. Not recorded in the undo history (layer order, like
-  // visibility/lock, is a shared board setting — see lib/history.js).
-  async function reorderLayers(visualOrder) {
-    try { await reorderLayersMutation.mutateAsync({ pageId, layerIds: reorderedLayerIds(visualOrder) }) } catch (error) { fail(error) }
   }
 
   // Applies the `{ id, position, layerId? }` patches lib/layerTree.js's
@@ -376,9 +366,9 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, addDataLayer, addingLayer: createLayer.isPending, undo, redo,
     connectData, disconnectData, insertData, insertLibraryItem,
     setHidden, setLocked, convertShapes, copy, paste, canPaste,
-    moveToLayer, reorderLayers, reorderElements,
+    moveToLayer, reorderElements,
     canUndo: history.canUndo, canRedo: history.canRedo,
     undoLabel: history.peekUndo()?.label ?? null, redoLabel: history.peekRedo()?.label ?? null,
-    saving: batch.isPending || hotspot.isPending || updateLayer.isPending || reorderLayersMutation.isPending || media.inserting,
+    saving: batch.isPending || hotspot.isPending || updateLayer.isPending || media.inserting,
   }
 }

@@ -50,7 +50,7 @@ const hintFor = (tool) => HINTS[tool] ?? (SHAPES[tool] ? `Arrastra para dibujar:
 
 function DesktopPanel({ side, label, children }) {
   return (
-    <aside aria-label={label} className={cn('shrink-0 border-[hsl(var(--border))] bg-[hsl(var(--card))]', side === 'left' ? 'w-64 border-r' : 'w-80 border-l')}>
+    <aside aria-label={label} className={cn('shrink-0 border-[hsl(var(--border))] bg-[hsl(var(--card))]', side === 'left' ? 'w-72 border-r' : 'w-80 border-l')}>
       {children}
     </aside>
   )
@@ -227,7 +227,7 @@ export default function BoardEditor() {
       onAddDataLayer={actions.addDataLayer} addingLayer={actions.addingLayer}
       layers={layers} allRows={allRows} selectedIds={selectedIds} onSelect={select} onFocus={focusOn}
       onSetHidden={actions.setHidden} onSetLocked={actions.setLocked}
-      onReorderLayers={actions.reorderLayers} onReorderElements={actions.reorderElements}
+      onReorderElements={actions.reorderElements}
     />
   )
   const inspectorPanel = (
