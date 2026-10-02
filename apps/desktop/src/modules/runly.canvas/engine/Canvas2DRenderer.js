@@ -3,6 +3,7 @@ import { readCanvasTheme } from './theme.js'
 import { drawIconNode, getIconNode } from './icons.js'
 import { TEXT_LINE_HEIGHT, textFont, wrapLines } from './text.js'
 import { screenToWorld, worldToScreen } from './viewport.js'
+import { bindingKey } from '../lib/dataBindings.js'
 
 export { objectBounds }
 const GRID_STEP = 24
@@ -42,7 +43,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [] } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {} } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -53,7 +54,7 @@ export class Canvas2DRenderer {
     ctx.translate(viewport.x, viewport.y); ctx.scale(viewport.zoom, viewport.zoom)
     const selected = []
     for (const object of objects) {
-      this.drawObject(ctx, object, viewport.zoom, images)
+      this.drawObject(ctx, object, viewport.zoom, images, bindings)
       if (linkedIds?.has(object.id) || (object.hotspot && linkedIds?.has(object.hotspot.id))) this.drawLinkBadge(ctx, object, viewport.zoom)
       if (selectedIds?.has(object.id)) selected.push(object)
     }
@@ -106,8 +107,13 @@ export class Canvas2DRenderer {
     ctx.setLineDash([])
   }
 
-  drawObject(ctx, object, zoom, images) {
-    const b = boxOf(object), style = object.style ?? {}, stroke = this.strokeColor(object)
+  drawObject(ctx, object, zoom, images, bindings = {}) {
+    const b = boxOf(object), style = object.style ?? {}
+    const key = bindingKey(object.properties?.binding)
+    const data = key ? bindings[key] : null
+    // Bound objects take their status colour unless the user opted out.
+    const tint = data && object.properties?.binding?.tint !== false ? this.theme.tones[data.tone] ?? this.theme.tones.neutral : null
+    const stroke = tint ?? this.strokeColor(object)
     ctx.save()
     ctx.globalAlpha = Number(style.opacity ?? 1)
     ctx.lineJoin = 'round'; ctx.lineCap = 'round'
@@ -115,14 +121,51 @@ export class Canvas2DRenderer {
     const c = centerOf(b)
     ctx.translate(c.x, c.y); ctx.rotate((b.rotation * Math.PI) / 180)
     const x = -b.width / 2, y = -b.height / 2, w = b.width, h = b.height
+    const drawn = tint ? { ...object, style: { ...style, fill: tint, fillOpacity: 0.14 } } : object
     switch (object.type) {
       case 'hotspot': this.drawHotspot(ctx, object, w, h, stroke, zoom); break
-      case 'ellipse': ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke); break
-      case 'polygon': this.polygonPath(ctx, object, x, y, w, h); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke); break
-      case 'text': this.drawText(ctx, object, x, y, w); break
+      case 'ellipse': ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); this.applyFill(ctx, drawn, stroke); this.applyStroke(ctx, drawn, stroke); break
+      case 'polygon': this.polygonPath(ctx, object, x, y, w, h); this.applyFill(ctx, drawn, stroke); this.applyStroke(ctx, drawn, stroke); break
+      case 'text': this.drawText(ctx, object, x, y, w, tint); break
       case 'image': this.drawImage(ctx, object, x, y, w, h, images); break
-      default: ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(Number(style.radius ?? 8), w / 2, h / 2)); this.applyFill(ctx, object, stroke); this.applyStroke(ctx, object, stroke)
+      default: ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(Number(style.radius ?? 8), w / 2, h / 2)); this.applyFill(ctx, drawn, stroke); this.applyStroke(ctx, drawn, stroke)
     }
+    // Hotspots keep their pin (tint only) and text keeps its own glyph (tinted
+    // colour); other bound shapes get the title/summary label and data badge.
+    if (data && object.type !== 'hotspot' && object.type !== 'text' && object.type !== 'image') {
+      const badgeColor = tint ?? this.theme.tones.neutral
+      this.drawDataLabel(ctx, data, x, y, w, h, zoom, badgeColor)
+      this.drawDataBadge(ctx, x + w, y, zoom, badgeColor)
+    }
+    ctx.restore()
+  }
+
+  drawDataLabel(ctx, data, x, y, w, h, zoom, color) {
+    if (!data) return
+    const roomy = w * zoom >= 80 && h * zoom >= 40
+    const title = data.title.length > 40 ? `${data.title.slice(0, 39)}…` : data.title
+    ctx.save()
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = this.theme.foreground
+    if (roomy) {
+      const size = Math.min(16, Math.max(10, h / 5))
+      ctx.font = `600 ${size}px ${this.theme.font}`
+      ctx.fillText(title, x + w / 2, y + h / 2 - (data.summary ? size * 0.7 : 0), w - 12)
+      if (data.summary) { ctx.font = `400 ${size * 0.85}px ${this.theme.font}`; ctx.fillStyle = color; ctx.fillText(data.summary, x + w / 2, y + h / 2 + size * 0.7, w - 12) }
+    } else {
+      const size = 12 / zoom
+      ctx.font = `600 ${size}px ${this.theme.font}`; ctx.textBaseline = 'top'
+      ctx.fillText(title, x + w / 2, y + h + 4 / zoom)
+    }
+    ctx.restore()
+  }
+
+  drawDataBadge(ctx, cx, cy, zoom, color) {
+    const r = 7 / zoom
+    ctx.save()
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2 / zoom
+    // Tiny database glyph: two stacked ellipses.
+    for (const dy of [-2.2, 1.8]) { ctx.beginPath(); ctx.ellipse(cx, cy + dy / zoom, 3.2 / zoom, 1.4 / zoom, 0, 0, Math.PI * 2); ctx.stroke() }
     ctx.restore()
   }
 
@@ -155,10 +198,10 @@ export class Canvas2DRenderer {
     ctx.closePath(); ctx.fillStyle = stroke; ctx.fill()
   }
 
-  drawText(ctx, object, x, y, w) {
+  drawText(ctx, object, x, y, w, tint) {
     const style = object.style ?? {}, size = Number(style.fontSize ?? 18)
     ctx.font = textFont(style, this.theme.font)
-    ctx.fillStyle = style.textColor || style.stroke || this.theme.foreground
+    ctx.fillStyle = tint || style.textColor || style.stroke || this.theme.foreground
     ctx.textBaseline = 'top'
     const lines = wrapLines(ctx, object.properties?.text || 'Texto', w)
     lines.forEach((line, index) => ctx.fillText(line, x, y + index * size * TEXT_LINE_HEIGHT + size * 0.1))

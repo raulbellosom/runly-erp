@@ -1,6 +1,9 @@
 // Resolves design-system tokens into concrete colors the Canvas2D context can
 // use. Canvas cannot read CSS variables, so the renderer receives a plain
 // object and is re-themed whenever the app toggles `.dark` on <html>.
+// Status colours for bound objects — fixed, independent of the design theme
+// (a maintenance-flagged location looks amber in both light and dark mode).
+const TONES = Object.freeze({ ok: '#16a34a', info: '#2563eb', warning: '#d97706', danger: '#dc2626', neutral: '#64748b' })
 const FALLBACK = Object.freeze({
   primary: '#fd6016',
   foreground: 'hsl(222 47% 11%)',
@@ -8,6 +11,7 @@ const FALLBACK = Object.freeze({
   grid: 'hsl(214 13% 80%)',
   surface: 'hsl(0 0% 100%)',
   hotspot: '#dc2626',
+  tones: TONES,
   font: 'system-ui, sans-serif',
 })
 
@@ -27,6 +31,7 @@ export function readCanvasTheme(element) {
     grid: hslToken(styles, '--muted-foreground', 0.28) ?? FALLBACK.grid,
     surface: hslToken(styles, '--card') ?? FALLBACK.surface,
     hotspot: FALLBACK.hotspot,
+    tones: TONES,
     font: styles.fontFamily || FALLBACK.font,
   }
 }

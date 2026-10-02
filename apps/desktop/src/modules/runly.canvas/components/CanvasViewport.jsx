@@ -43,7 +43,7 @@ export function CanvasViewport(props) {
     else if (live?.objects) objects = objects.map((row) => live.objects.get(row.id) ?? row)
     const single = live?.objects?.size === 1 ? [...live.objects.values()][0] : null
     renderer.render({
-      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [],
+      objects, viewport: p.viewport, images: p.images, linkedIds: p.linkedIds, grid: p.grid, remote: p.remote ?? [], bindings: p.bindings ?? {},
       selectedIds: live?.draft ? new Set() : new Set(p.selectedIds),
       overlay: single && live.mode !== 'move' ? { object: single, text: overlayText(live.mode, single) } : live?.draft ? { object: live.draft, text: overlayText('create', live.draft) } : null,
       marquee: live?.marquee ?? null,

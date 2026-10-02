@@ -18,7 +18,7 @@ import { sceneBounds } from '../engine/Canvas2DRenderer.js'
 import { snapSizeFor } from '../engine/snap.js'
 import { measureTextHeight } from '../engine/text.js'
 import { DEFAULT_VIEWPORT, fitBounds, zoomAt } from '../engine/viewport.js'
-import { useBoard, useCanvasImages, useCanvasObjects, useCanvasTemplates, useEntityLinks, useUpdateBoardSettings, useUpdateHotspot } from '../hooks/useCanvasData.js'
+import { useBindings, useBoard, useCanvasImages, useCanvasObjects, useCanvasTemplates, useEntityLinks, useUpdateBoardSettings, useUpdateHotspot } from '../hooks/useCanvasData.js'
 import { toast } from 'sonner'
 import { useBoardEditorActions } from '../hooks/useBoardEditorActions.js'
 import { useBoardThumbnail } from '../hooks/useBoardThumbnail.js'
@@ -77,6 +77,8 @@ export default function BoardEditor() {
   // Paint order: layer stack first, then each object's position in its layer.
   const rows = useMemo(() => allRows.filter((row) => !hiddenLayerIds.has(row.layerId)).sort((a, b) =>
     (layerOrder.get(a.layerId) ?? 0) - (layerOrder.get(b.layerId) ?? 0) || (a.position ?? 0) - (b.position ?? 0)), [allRows, hiddenLayerIds, layerOrder])
+  // Only visible objects resolve against the ERP; a bound shape in a hidden layer stays unresolved.
+  const bindings = useBindings(boardId, rows)
   const objectCounts = useMemo(() => allRows.reduce((acc, row) => ({ ...acc, [row.layerId]: (acc[row.layerId] ?? 0) + 1 }), {}), [allRows])
   const links = useMemo(() => linksQuery.data ?? [], [linksQuery.data])
   const linkedIds = useMemo(() => new Set(links.map((link) => link.targetId)), [links])
@@ -225,7 +227,7 @@ export default function BoardEditor() {
             onSelect={select} onCreate={actions.create} onCommit={actions.commit} onOpen={openObject}
             tool={tool} spacePan={spacePan} viewport={viewport} onViewportChange={setViewport} onResize={setSize}
             readOnly={readOnly} grid={settings?.grid} snapSize={snapSizeFor(settings)}
-            remote={cursors} onPointerWorld={broadcastPointer}
+            remote={cursors} onPointerWorld={broadcastPointer} bindings={bindings.data ?? {}}
           />
 
           {!board.isLoading && !objects.isLoading && !rows.length && !hint ? (

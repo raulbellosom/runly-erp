@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
+import { bindingRefs, chunk } from '../lib/dataBindings.js'
 import { applyOperations, mergeBatchResults, toServerOperations } from '../lib/optimistic.js'
 
 function useToken() { return useAuth().session?.access_token }
@@ -171,6 +172,37 @@ export function useCanvasImages(objects) {
     return () => { cancelled = true }
   }, [urls.data])
   return images
+}
+
+// Live data for bound objects of the visible page (polled while open).
+export function useBindings(boardId, rows) {
+  const token = useToken()
+  const refs = useMemo(() => bindingRefs(rows), [rows])
+  const keyPart = refs.map((ref) => `${ref.source}:${ref.id}`).sort().join('|')
+  return useQuery({
+    queryKey: ['canvas', 'boards', boardId, 'bindings', keyPart],
+    queryFn: async () => {
+      const parts = await Promise.all(chunk(refs, 500).map(async (batch) => unwrap(await runly.canvas.resolveBindings(boardId, batch, token)) ?? {}))
+      return Object.assign({}, ...parts)
+    },
+    enabled: Boolean(token && boardId && refs.length),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
+  })
+}
+export function useDataSources(enabled = true) {
+  const token = useToken()
+  return useQuery({ queryKey: ['canvas', 'data-sources'], queryFn: async () => unwrap(await runly.canvas.listDataSources(token)) ?? [], enabled: Boolean(token && enabled), staleTime: 5 * 60_000 })
+}
+export function useDataSourceSearch(source, q) {
+  const token = useToken()
+  return useQuery({
+    queryKey: ['canvas', 'data-search', source, q],
+    queryFn: async () => unwrap(await runly.canvas.searchDataSource(source, q, token)) ?? [],
+    enabled: Boolean(token && source), placeholderData: keepPreviousData, staleTime: 30_000,
+  })
 }
 
 // ---- Sharing ----------------------------------------------------------
