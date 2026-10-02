@@ -74,6 +74,10 @@ export default function BoardEditor() {
   // arrives as the wildcard segment (`/app/m/runly.canvas/<boardId>`).
   const { '*': wildcard } = useParams(), boardId = String(wildcard ?? '').split('/').filter(Boolean)[0]
   const navigate = useNavigate(), board = useBoard(boardId), isDesktop = !useIsMobile(1280)
+  // Narrower breakpoint than the panel one above: shrinks the zoom stack and
+  // the bottom toolbar so they fit a phone screen (see EditorTopBar for the
+  // matching top-bar collapse, computed the same way via its own hook call).
+  const phone = useIsMobile()
   const queryClient = useQueryClient()
   const [pageId, setPageId] = useState(null), [layerId, setLayerId] = useState(null), [selectedIds, setSelectedIds] = useState([]), [tool, setTool] = useState('select')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT), [size, setSize] = useState({ width: 0, height: 0 })
@@ -339,19 +343,21 @@ export default function BoardEditor() {
 
           {hint ? (
             <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-4">
-              <p role="status" className="glass rounded-full px-3.5 py-2 text-center text-xs font-medium shadow-md">
+              <p role="status" className="glass max-w-[90vw] rounded-full px-3.5 py-2 text-center text-xs font-medium shadow-md">
                 {hint}<span className="hidden text-[hsl(var(--muted-foreground))] sm:inline"> · Esc para cancelar</span>
               </p>
             </div>
           ) : null}
 
-          {/* Zoom + scale: one vertical stack on the right edge, so the bottom
-              bar only holds the drawing tools (also on phones). */}
-          <div className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 sm:right-3">
-            <ZoomControls orientation="vertical" zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit}>
+          {/* Zoom + scale: one vertical stack, so the bottom bar only holds
+              the drawing tools. Desktop/tablet keep it centered on the right
+              edge; on phones it moves to the bottom-right, above the
+              toolbar, shrunk and without +/- (pinch-zoom covers that). */}
+          <div className={cn('pointer-events-none absolute z-20', phone ? 'inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] flex justify-end pr-2' : 'right-2 top-1/2 -translate-y-1/2 sm:right-3')}>
+            <ZoomControls orientation="vertical" compact={phone} zoom={viewport.zoom} onZoomIn={() => zoomBy(1.2)} onZoomOut={() => zoomBy(1 / 1.2)} onReset={resetZoom} onFit={fit}>
               <ScaleControl
                 scale={pageScale.scale} canEdit={!readOnly} onCalibrate={pageScale.startCalibrate} onClear={pageScale.clear}
-                hasMap={pageMap.hasMap} onMap={pageMap.open}
+                hasMap={pageMap.hasMap} onMap={pageMap.open} compact={phone}
               />
             </ZoomControls>
           </div>
@@ -360,7 +366,7 @@ export default function BoardEditor() {
               tool={tool} onToolChange={actions.chooseTool} canDelete={editableSelection.length > 0} onDelete={deleteSelection}
               onInsertMedia={actions.openFilePicker} onInsertData={() => setDialog({ kind: 'data', mode: 'insert' })} inserting={actions.inserting}
               onToggleLibrary={() => setLibraryOpen((value) => !value)} libraryOpen={libraryOpen}
-              readOnly={readOnly}
+              readOnly={readOnly} compact={phone}
             />
           </div>
           <input

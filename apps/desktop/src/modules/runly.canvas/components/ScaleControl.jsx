@@ -17,7 +17,7 @@ export function scaleLabel(scale) {
 
 // Icon-only button inside the zoom stack: the current scale is its tooltip
 // and the menu header; a dot marks a page that has a scale (or a map).
-export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = false, onMap, side = 'left' }) {
+export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = false, onMap, side = 'left', compact = false }) {
   const label = hasMap ? 'Mapa · metros' : scale ? scaleLabel(scale) : 'Sin escala'
   const calibrated = hasMap || Boolean(scale)
   const icon = (
@@ -26,7 +26,7 @@ export function ScaleControl({ scale, canEdit, onCalibrate, onClear, hasMap = fa
       {calibrated ? <span aria-hidden className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-primary" /> : null}
     </span>
   )
-  const buttonClass = cn('h-9 w-11 rounded-lg px-0', calibrated ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]')
+  const buttonClass = cn('rounded-lg px-0', compact ? 'h-9 w-9' : 'h-9 w-11', calibrated ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]')
 
   if (!canEdit) {
     return (

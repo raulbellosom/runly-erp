@@ -3,8 +3,10 @@ import { Maximize, Minus, Plus } from 'lucide-react'
 import { ToolButton } from './CanvasToolbar.jsx'
 
 // Horizontal by default (POS floors); the Canvas editor stacks it vertically
-// on the right edge, with optional extra controls (scale) on top.
-export function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, onFit, orientation = 'horizontal', children }) {
+// on the right edge, with optional extra controls (scale) on top. `compact`
+// (phone editor only) shrinks everything to 36px, drops +/- (pinch covers
+// zooming) and shows just scale/percent/fit.
+export function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, onFit, orientation = 'horizontal', compact = false, children }) {
   const vertical = orientation === 'vertical'
   const tipSide = vertical ? 'left' : 'top'
   const percent = (
@@ -15,7 +17,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, onFit, orient
           variant="ghost"
           onClick={onReset}
           aria-label={`Zoom ${Math.round(zoom * 100)}%. Restablecer a 100%`}
-          className={cn('rounded-lg font-mono tabular-nums', vertical ? 'h-9 w-11 px-0 text-[11px]' : 'h-11 min-w-14 px-2 text-xs sm:h-9')}
+          className={cn('rounded-lg font-mono tabular-nums', compact ? 'h-9 w-9 px-0 text-[10px]' : vertical ? 'h-9 w-11 px-0 text-[11px]' : 'h-11 min-w-14 px-2 text-xs sm:h-9')}
         >
           {Math.round(zoom * 100)}%
         </Button>
@@ -25,6 +27,9 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, onFit, orient
   )
   const zoomOut = <ToolButton label="Alejar" shortcut="-" side={tipSide} onClick={onZoomOut}><Minus /></ToolButton>
   const zoomIn = <ToolButton label="Acercar" shortcut="+" side={tipSide} onClick={onZoomIn}><Plus /></ToolButton>
+  const fitButton = (
+    <ToolButton label="Ajustar al contenido" shortcut="1" side={tipSide} onClick={onFit} className={compact ? 'h-9 w-9' : undefined}><Maximize /></ToolButton>
+  )
   return (
     <div role="group" aria-label="Zoom" className={cn('glass pointer-events-auto flex items-center gap-0.5 rounded-2xl p-1 shadow-lg', vertical && 'flex-col')}>
       {children ? (
@@ -33,8 +38,8 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, onFit, orient
           <span aria-hidden className={cn('bg-[hsl(var(--border))]', vertical ? 'my-0.5 h-px w-6' : 'mx-0.5 h-6 w-px')} />
         </>
       ) : null}
-      {vertical ? <>{zoomIn}{percent}{zoomOut}</> : <>{zoomOut}{percent}{zoomIn}</>}
-      <ToolButton label="Ajustar al contenido" shortcut="1" side={tipSide} onClick={onFit}><Maximize /></ToolButton>
+      {compact ? percent : vertical ? <>{zoomIn}{percent}{zoomOut}</> : <>{zoomOut}{percent}{zoomIn}</>}
+      {fitButton}
     </div>
   )
 }

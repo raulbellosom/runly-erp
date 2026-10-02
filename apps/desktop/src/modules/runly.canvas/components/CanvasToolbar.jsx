@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import {
-  Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Separator, Tooltip, TooltipContent, TooltipTrigger, cn,
+  Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Separator,
+  Tooltip, TooltipContent, TooltipTrigger, cn,
 } from '@runly/ui'
-import { ArrowUpRight, ChevronUp, Circle, Database, Diamond, Hand, ImagePlus, Library, Loader2, MapPin, Minus, MousePointer2, RulerDimensionLine, Square, Trash2, Triangle, Type } from 'lucide-react'
+import {
+  ArrowUpRight, ChevronUp, Circle, Database, Diamond, Hand, ImagePlus, Library, Loader2, MapPin, Minus, MousePointer2,
+  Plus, RulerDimensionLine, Square, Trash2, Triangle, Type,
+} from 'lucide-react'
 import { SHAPE_TOOLS } from '../lib/objectFactory.js'
 
 export const SHAPES = {
@@ -13,6 +17,15 @@ export const SHAPES = {
   line: { label: 'Línea', shortcut: 'L', icon: Minus },
   arrow: { label: 'Flecha', shortcut: 'A', icon: ArrowUpRight },
 }
+// Compact (phone) "Formas" picker also offers Texto, so a single button
+// covers every drawing tool that used to sit next to it in the full bar.
+const SHAPES_WITH_TEXT = { ...SHAPES, text: { label: 'Texto', shortcut: 'T', icon: Type } }
+const SHAPE_AND_TEXT_TOOLS = [...SHAPE_TOOLS, 'text']
+
+// Buttons on the phone bottom bar are 40px (vs the icon size default, which
+// shrinks to 36px at sm). Kept as a class string so every compact control
+// stays the same size across the whole <768px range.
+const COMPACT_SIZE = 'h-10 w-10 sm:h-10 sm:w-10'
 
 export function ToolButton({ label, shortcut, active, className, side = 'top', children, ...props }) {
   return (
@@ -75,14 +88,102 @@ function ShapePicker({ tool, onToolChange }) {
   )
 }
 
-export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInsertMedia, onInsertData, onToggleLibrary, libraryOpen, inserting, readOnly = false }) {
+// Phone variant of ShapePicker: a single 40px button (no split chevron)
+// whose face shows the last shape or text tool chosen; tapping it always
+// opens the grid instead of re-applying that tool, since screen space is
+// too tight for a second hit target.
+function CompactShapePicker({ tool, onToolChange }) {
+  const [lastShape, setLastShape] = useState('rectangle')
+  const current = SHAPE_AND_TEXT_TOOLS.includes(tool) ? tool : lastShape
+  const meta = SHAPES_WITH_TEXT[current], Icon = meta.icon
+  const choose = (value) => { setLastShape(value); onToolChange(value) }
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button" size="icon" variant="ghost" aria-label="Formas"
+              aria-pressed={SHAPE_AND_TEXT_TOOLS.includes(tool)}
+              className={cn('rounded-lg text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]', COMPACT_SIZE,
+                SHAPE_AND_TEXT_TOOLS.includes(tool) && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground')}
+            >
+              <Icon />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">Formas</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent side="top" align="center" className="min-w-44">
+        {SHAPE_AND_TEXT_TOOLS.map((value) => {
+          const { label, shortcut, icon: ItemIcon } = SHAPES_WITH_TEXT[value]
+          return (
+            <DropdownMenuItem key={value} onSelect={() => choose(value)} className={cn('gap-2.5', tool === value && 'font-semibold')}>
+              <ItemIcon className="h-4 w-4" />{label}
+              {shortcut ? <span className="ml-auto font-mono text-[10px] text-[hsl(var(--muted-foreground))]">{shortcut}</span> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// Phone variant that tucks the rarer actions (media/data/library insert and
+// measure) behind one "Insertar" button, so the bar never needs more than
+// five 40px targets to fit inside a 360px-wide screen.
+function CompactInsertMenu({ onInsertMedia, onInsertData, onToggleLibrary, onMeasure, inserting }) {
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" size="icon" variant="ghost" aria-label="Insertar" disabled={inserting} className={cn('rounded-lg text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]', COMPACT_SIZE)}>
+              {inserting ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : <Plus />}
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">Insertar</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent side="top" align="center" className="min-w-48">
+        <DropdownMenuItem onSelect={onInsertMedia} disabled={inserting} className="gap-2.5"><ImagePlus className="h-4 w-4" />Imagen o PDF</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onInsertData} disabled={inserting} className="gap-2.5"><Database className="h-4 w-4" />Datos de Runly</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onToggleLibrary} className="gap-2.5"><Library className="h-4 w-4" />Biblioteca</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onMeasure} className="gap-2.5"><RulerDimensionLine className="h-4 w-4" />Medir</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInsertMedia, onInsertData, onToggleLibrary, libraryOpen, inserting, readOnly = false, compact = false }) {
   if (readOnly) {
     return (
       <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1.5 shadow-lg">
-        <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')}><MousePointer2 /></ToolButton>
-        <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')}><Hand /></ToolButton>
-        <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')}><RulerDimensionLine /></ToolButton>
-        <span className="px-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">Solo lectura · toca un hotspot para verlo</span>
+        <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')} className={compact ? COMPACT_SIZE : undefined}><MousePointer2 /></ToolButton>
+        {!compact ? <ToolButton label="Mover vista" shortcut="H" active={tool === 'pan'} onClick={() => onToolChange('pan')} className="max-sm:hidden"><Hand /></ToolButton> : null}
+        <ToolButton label="Medir" shortcut="M" active={tool === 'measure'} onClick={() => onToolChange('measure')} className={compact ? COMPACT_SIZE : undefined}><RulerDimensionLine /></ToolButton>
+        <span className="px-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+          {compact ? 'Solo lectura' : 'Solo lectura · toca un hotspot para verlo'}
+        </span>
+      </div>
+    )
+  }
+  if (compact) {
+    return (
+      <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-0.5 rounded-2xl p-1.5 shadow-lg">
+        <ToolButton label="Seleccionar" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')} className={COMPACT_SIZE}><MousePointer2 /></ToolButton>
+        <CompactShapePicker tool={tool} onToolChange={onToolChange} />
+        <ToolButton label="Hotspot" shortcut="P" active={tool === 'hotspot'} onClick={() => onToolChange('hotspot')} className={COMPACT_SIZE}><MapPin /></ToolButton>
+        <CompactInsertMenu
+          onInsertMedia={onInsertMedia} onInsertData={onInsertData} onToggleLibrary={onToggleLibrary}
+          onMeasure={() => onToolChange('measure')} inserting={inserting}
+        />
+        {canDelete ? (
+          <ToolButton label="Eliminar selección" shortcut="Supr" onClick={onDelete} className={cn(COMPACT_SIZE, 'hover:bg-destructive/10 hover:text-destructive')}>
+            <Trash2 />
+          </ToolButton>
+        ) : null}
       </div>
     )
   }
