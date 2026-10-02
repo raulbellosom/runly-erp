@@ -1,4 +1,4 @@
-import { boxOf, centerOf, handlesOf, hitObject, isLinear, objectBounds, rotatePoint } from './geometry.js'
+import { boxOf, canEditVertices, centerOf, handlesOf, hitObject, isLinear, objectBounds, polygonHandles, ROTATE_HANDLE_OFFSET, rotatePoint } from './geometry.js'
 import { readCanvasTheme } from './theme.js'
 import { drawIconNode, getIconNode } from './icons.js'
 import { TEXT_LINE_HEIGHT, textFont, wrapLines } from './text.js'
@@ -43,7 +43,7 @@ export class Canvas2DRenderer {
 
   render(scene) {
     this.scene = scene
-    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null, drawers = {} } = scene
+    const { objects, viewport, selectedIds, images, linkedIds, overlay, marquee, interactive = true, remote = [], bindings = {}, measure = null, background = null, connectHint = null, drawers = {}, editVertices = true, polygonDraft = null } = scene
     const ctx = this.context, dpr = this.dpr || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -62,9 +62,10 @@ export class Canvas2DRenderer {
       if (selectedIds?.has(object.id)) selected.push(object)
     }
     if (connectHint) this.drawConnectHint(ctx, connectHint, viewport.zoom)
+    if (polygonDraft) this.drawPolygonDraft(ctx, polygonDraft, viewport.zoom)
     // Handles only make sense for a single object; a group gets outlines
     // plus one dashed box around everything.
-    for (const object of selected) this.drawSelection(ctx, object, viewport.zoom, interactive && selected.length === 1)
+    for (const object of selected) this.drawSelection(ctx, object, viewport.zoom, interactive && selected.length === 1, editVertices)
     if (selected.length > 1) this.drawGroupBox(ctx, selected, viewport.zoom)
     for (const cursor of remote) {
       for (const object of objects) if (cursor.selectedIds?.includes(object.id)) this.drawRemoteSelection(ctx, object, viewport.zoom, cursor.color)
@@ -269,7 +270,7 @@ export class Canvas2DRenderer {
     ctx.restore()
   }
 
-  drawSelection(ctx, object, zoom, interactive) {
+  drawSelection(ctx, object, zoom, interactive, editVertices = true) {
     const b = boxOf(object), primary = this.theme.primary
     ctx.save()
     ctx.lineWidth = 1.5 / zoom; ctx.strokeStyle = primary; ctx.fillStyle = this.theme.surface
@@ -279,6 +280,7 @@ export class Canvas2DRenderer {
       ctx.strokeRect(-b.width / 2 - pad, -b.height / 2 - pad, b.width + pad * 2, b.height + pad * 2)
       ctx.restore()
     }
+    if (interactive && editVertices && canEditVertices(object)) { this.drawVertexHandles(ctx, object, zoom, b); ctx.restore(); return }
     if (interactive) {
       const handles = handlesOf(object, zoom), size = 8 / zoom
       const rotate = handles.find((h) => h.id === 'rotate')
@@ -296,6 +298,48 @@ export class Canvas2DRenderer {
         ctx.fill(); ctx.stroke()
       }
     }
+    ctx.restore()
+  }
+
+  // Vertex handles (filled squares) + midpoint handles (small, half-opacity
+  // circles) plus the rotate handle; no box resize handles for this mode.
+  drawVertexHandles(ctx, object, zoom, b) {
+    const primary = this.theme.primary
+    const top = rotatePoint({ x: centerOf(b).x, y: b.y }, centerOf(b), b.rotation)
+    const rotate = { id: 'rotate', ...rotatePoint({ x: centerOf(b).x, y: b.y - ROTATE_HANDLE_OFFSET / zoom }, centerOf(b), b.rotation) }
+    ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(rotate.x, rotate.y); ctx.stroke()
+    ctx.beginPath(); ctx.arc(rotate.x, rotate.y, (8 / zoom) * 0.65, 0, Math.PI * 2)
+    ctx.fillStyle = this.theme.surface; ctx.fill(); ctx.stroke()
+    for (const handle of polygonHandles(object)) {
+      const isVertex = handle.id.startsWith('v:'), size = isVertex ? 7 / zoom : 5 / zoom
+      ctx.save()
+      ctx.globalAlpha = isVertex ? 1 : 0.5
+      ctx.beginPath()
+      if (isVertex) ctx.rect(handle.x - size / 2, handle.y - size / 2, size, size)
+      else ctx.arc(handle.x, handle.y, size / 2, 0, Math.PI * 2)
+      ctx.fillStyle = primary
+      ctx.fill(); ctx.strokeStyle = this.theme.surface; ctx.lineWidth = 1 / zoom; ctx.stroke()
+      ctx.restore()
+    }
+  }
+
+  // Open polyline for the in-progress free-drawn polygon: committed points,
+  // a dashed segment to the cursor, and a dot at each vertex.
+  drawPolygonDraft(ctx, draft, zoom) {
+    const { points, cursor } = draft
+    if (!points.length) return
+    ctx.save()
+    ctx.lineWidth = 1.5 / zoom; ctx.strokeStyle = this.theme.primary
+    ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y)
+    for (const point of points.slice(1)) ctx.lineTo(point.x, point.y)
+    ctx.stroke()
+    if (cursor) {
+      ctx.setLineDash([6 / zoom, 4 / zoom])
+      ctx.beginPath(); ctx.moveTo(points[points.length - 1].x, points[points.length - 1].y); ctx.lineTo(cursor.x, cursor.y); ctx.stroke()
+      ctx.setLineDash([])
+    }
+    ctx.fillStyle = this.theme.surface
+    for (const point of points) { ctx.beginPath(); ctx.arc(point.x, point.y, 4 / zoom, 0, Math.PI * 2); ctx.fill(); ctx.stroke() }
     ctx.restore()
   }
 

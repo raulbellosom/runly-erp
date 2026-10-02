@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { absolutePoints, boxFromDrag, centerOf, boxOf, editVertex, hitObject, polygonFromAbsolute, polygonHandles, resizeObject, rotateObject, rotatePoint } from './geometry.js'
+import { absolutePoints, boxFromDrag, canEditVertices, centerOf, boxOf, editVertex, hitHandle, hitObject, polygonFromAbsolute, polygonHandles, resizeObject, ROTATE_HANDLE_OFFSET, rotateObject, rotatePoint } from './geometry.js'
 
 const rect = (rotation = 0) => ({ type: 'rectangle', transform: { x: 0, y: 0, rotation }, geometry: { width: 100, height: 50 } })
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`)
@@ -62,5 +62,16 @@ describe('polygon vertices', () => {
     assert.deepEqual(absolutePoints(inserted)[1], { x: 60, y: 10 })
     assert.equal(editVertex(inserted, 'delete:1').geometry.points.length, 3)
     assert.equal(editVertex(poly, 'delete:0'), poly)
+  })
+  it('is only eligible for vertex editing with at least three points', () => {
+    assert.equal(canEditVertices(poly), true)
+    assert.equal(canEditVertices(rect()), false)
+    assert.equal(canEditVertices({ ...poly, geometry: { ...poly.geometry, points: [{ x: 0, y: 0 }] } }), false)
+  })
+  it('hitHandle finds vertex and midpoint handles by default, and rotate stays available', () => {
+    assert.equal(hitHandle({ x: 10, y: 20 }, poly, 1), 'v:0')
+    assert.equal(hitHandle({ x: 60, y: 20 }, poly, 1), 'm:0')
+    assert.equal(hitHandle({ x: 60, y: 20 - ROTATE_HANDLE_OFFSET }, poly, 1), 'rotate')
+    assert.equal(hitHandle({ x: 10, y: 20 }, poly, 1, 8, false), 'nw')
   })
 })

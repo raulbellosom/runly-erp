@@ -85,13 +85,37 @@ export function handlesOf(object, zoom = 1) {
     }
     for (const id of BOX_HANDLES) handles.push({ id, ...rotatePoint({ x: local[id][0], y: local[id][1] }, c, b.rotation) })
   }
-  if (canRotate(object)) handles.push({ id: 'rotate', ...rotatePoint({ x: c.x, y: b.y - ROTATE_HANDLE_OFFSET / zoom }, c, b.rotation) })
+  if (canRotate(object)) handles.push(rotateHandlePoint(object, zoom))
   return handles
 }
 
-export function hitHandle(point, object, zoom, radiusPx = 8) {
+function rotateHandlePoint(object, zoom) {
+  const b = boxOf(object), c = centerOf(b)
+  return { id: 'rotate', ...rotatePoint({ x: c.x, y: b.y - ROTATE_HANDLE_OFFSET / zoom }, c, b.rotation) }
+}
+
+// A polygon with at least three relative points is eligible for vertex
+// editing instead of box resize handles.
+export function canEditVertices(object) {
+  return object?.type === 'polygon' && Array.isArray(object.geometry?.points) && object.geometry.points.length >= 3
+}
+
+// Vertex + midpoint handles plus the rotate handle (no box resize handles).
+export function vertexHandles(object, zoom = 1) {
+  const handles = polygonHandles(object)
+  if (canRotate(object)) handles.push(rotateHandlePoint(object, zoom))
+  return handles
+}
+
+// Handle set used for hit-testing and drawing a selected object: vertex
+// editing for eligible polygons (unless disabled), box handles otherwise.
+export function interactionHandles(object, zoom = 1, editVertices = true) {
+  return editVertices && canEditVertices(object) ? vertexHandles(object, zoom) : handlesOf(object, zoom)
+}
+
+export function hitHandle(point, object, zoom, radiusPx = 8, editVertices = true) {
   const radius = radiusPx / zoom
-  return handlesOf(object, zoom).find((h) => Math.hypot(point.x - h.x, point.y - h.y) <= radius)?.id ?? null
+  return interactionHandles(object, zoom, editVertices).find((h) => Math.hypot(point.x - h.x, point.y - h.y) <= radius)?.id ?? null
 }
 
 // Resizes in the object's own (unrotated) frame so the opposite edge/corner

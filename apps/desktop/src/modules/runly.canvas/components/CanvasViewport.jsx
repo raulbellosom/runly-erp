@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { Canvas2DRenderer, sceneBounds } from '../engine/Canvas2DRenderer.js'
-import { boxFromDrag, boxOf, hitHandle, isLinear, moveObject, objectBounds, resizeObject, rotateObject } from '../engine/geometry.js'
+import { boxFromDrag, boxOf, editVertex, hitHandle, isLinear, moveObject, objectBounds, resizeObject, rotateObject } from '../engine/geometry.js'
 import { snapMoveDelta, snapPoint } from '../engine/snap.js'
 import { observeThemeChanges, readCanvasTheme } from '../engine/theme.js'
 import { screenToWorld, zoomAt } from '../engine/viewport.js'
 import { connectTargetAt, resolveConnectors } from '../lib/connectors.js'
 import { formatLength } from '../lib/measure.js'
 import { CREATION_TOOLS, draftObject } from '../lib/objectFactory.js'
+import { closesPolygonDraft, cursorForHandle } from '../lib/viewportPolygon.js'
 
 const DRAG_THRESHOLD = 4
 const LONG_PRESS_MS = 450
@@ -25,6 +26,7 @@ function overlayText(mode, object, scale) {
 }
 function baseCursor(tool, spacePan) {
   if (tool === 'pan' || spacePan) return 'grab'
+  if (tool === 'polygon-draw') return 'crosshair'
   if (MEASURE_TOOLS.has(tool)) return 'crosshair'
   if (CREATION_TOOLS.has(tool)) return tool === 'text' ? 'text' : 'crosshair'
   return 'default'
@@ -54,6 +56,8 @@ export function CanvasViewport(props) {
       marquee: live?.marquee ?? null,
       measure: live?.measure ?? null,
       connectHint: live?.connectHint ?? null,
+      polygonDraft: live?.polygon ?? null,
+      editVertices: p.editVertices !== false,
       interactive: !p.readOnly && p.selectedIds.length === 1 && !p.lockedLayerIds?.has(p.objects.find((row) => row.id === p.selectedIds[0])?.layerId),
     })
   }
@@ -103,14 +107,23 @@ export function CanvasViewport(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, spacePan])
 
+  // A free-polygon draft belongs to one tool activation; switching tools
+  // (not just holding Space to pan) cancels it silently.
+  useEffect(() => {
+    if (liveRef.current?.polygon) { liveRef.current = null; schedule() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool])
+
   const pointOf = (event) => { const rect = canvasRef.current.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top } }
   // Connected lines/arrows render (and hit-test) at their resolved border
   // position, not their last-saved geometry.
   const resolved = () => resolveConnectors(propsRef.current.objects)
   const selectable = () => {
-    const { lockedLayerIds } = propsRef.current
-    const rows = resolved()
-    return lockedLayerIds?.size ? rows.filter((row) => !lockedLayerIds.has(row.layerId)) : rows
+    const { lockedLayerIds, isSelectable } = propsRef.current
+    let rows = resolved()
+    if (lockedLayerIds?.size) rows = rows.filter((row) => !lockedLayerIds.has(row.layerId))
+    if (isSelectable) rows = rows.filter((row) => isSelectable(row))
+    return rows
   }
   const setCursor = (value) => { if (canvasRef.current) canvasRef.current.style.cursor = value }
   const toggle = (ids, id) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]
@@ -148,7 +161,20 @@ export function CanvasViewport(props) {
     }
     if (pointersRef.current.size > 2) return
     if (tool === 'pan' || spacePan || event.button === 1) { dragRef.current = { mode: 'pan', screen, viewport: p.viewport }; setCursor('grabbing'); return }
-    if (CREATION_TOOLS.has(tool) && !p.readOnly) { dragRef.current = { mode: 'create', screen, world }; return }
+    if (tool === 'polygon-draw' && !p.readOnly) {
+      const point = snapPoint(world, event.altKey ? 0 : (p.snapSize ?? 0))
+      const points = liveRef.current?.polygon?.points ?? []
+      if (closesPolygonDraft(points, screen, p.viewport)) {
+        liveRef.current = null
+        p.onCreate({ tool: 'polygon-draw', points })
+      } else {
+        liveRef.current = { polygon: { points: [...points, point], cursor: point } }
+      }
+      dragRef.current = { mode: 'idle' }
+      schedule()
+      return
+    }
+    if ((p.creationTools ?? CREATION_TOOLS).has(tool) && !p.readOnly) { dragRef.current = { mode: 'create', screen, world }; return }
     // Measure works for every role; calibrate is only offered to editors by
     // the toolbar, but the viewport itself does not need to re-check that.
     if (MEASURE_TOOLS.has(tool)) {
@@ -168,7 +194,7 @@ export function CanvasViewport(props) {
 
     const rows = selectable()
     const single = p.selectedIds.length === 1 ? rows.find((row) => row.id === p.selectedIds[0]) : null
-    const handle = single && !additive && hitHandle(world, single, p.viewport.zoom, touch ? 16 : 9)
+    const handle = single && !additive && hitHandle(world, single, p.viewport.zoom, touch ? 16 : 9, p.editVertices !== false)
     if (handle) { dragRef.current = { mode: handle === 'rotate' ? 'rotate' : 'resize', handle, screen, objects: [single], moved: false }; return }
 
     const hit = rendererRef.current?.hitTest(screen, rows, p.viewport, touch ? 14 : 6)
@@ -189,6 +215,13 @@ export function CanvasViewport(props) {
     const p = propsRef.current, screen = pointOf(event)
     if (event.pointerType !== 'touch') p.onPointerWorld?.(screenToWorld(screen, p.viewport))
     if (pointersRef.current.has(event.pointerId)) pointersRef.current.set(event.pointerId, screen)
+    if (tool === 'polygon-draw' && liveRef.current?.polygon) {
+      const snap = event.altKey ? 0 : (p.snapSize ?? 0)
+      const cursor = snapPoint(screenToWorld(screen, p.viewport), snap)
+      liveRef.current = { polygon: { points: liveRef.current.polygon.points, cursor } }
+      schedule()
+      return
+    }
     const drag = dragRef.current
     if (!drag) {
       if (event.pointerType !== 'mouse' || tool !== 'select' || spacePan) return
@@ -199,8 +232,8 @@ export function CanvasViewport(props) {
       }
       const world = screenToWorld(screen, p.viewport)
       const single = p.selectedIds.length === 1 ? selectable().find((row) => row.id === p.selectedIds[0]) : null
-      const handle = single && hitHandle(world, single, p.viewport.zoom, 9)
-      setCursor(handle ? HANDLE_CURSORS[handle] : rendererRef.current?.hitTest(screen, selectable(), p.viewport) ? 'move' : 'default')
+      const handle = single && hitHandle(world, single, p.viewport.zoom, 9, p.editVertices !== false)
+      setCursor(handle ? cursorForHandle(handle, HANDLE_CURSORS) : rendererRef.current?.hitTest(screen, selectable(), p.viewport) ? 'move' : 'default')
       return
     }
     if (drag.mode === 'pinch') {
@@ -222,7 +255,9 @@ export function CanvasViewport(props) {
     if (drag.mode === 'create') {
       if (tool === 'hotspot' || tool === 'text') return
       const linear = tool === 'line' || tool === 'arrow'
-      const draft = draftObject(tool, boxFromDrag(linear ? tool : 'rectangle', snapPoint(drag.world, snap), snapPoint(world, snap), { constrain: event.shiftKey }))
+      const box = boxFromDrag(linear ? tool : 'rectangle', snapPoint(drag.world, snap), snapPoint(world, snap), { constrain: event.shiftKey })
+      const draft = p.draftFor ? p.draftFor(tool, box) : draftObject(tool, box)
+      if (!draft) { liveRef.current = null; schedule(); return }
       liveRef.current = { draft, connectHint: linear ? connectTargetAt(world, selectable(), null) : null }
     } else if (drag.mode === 'measure') {
       const offset = boxFromDrag('line', drag.world, snapPoint(world, snap), { constrain: event.shiftKey })
@@ -232,6 +267,10 @@ export function CanvasViewport(props) {
       const { dx, dy } = snapMoveDelta(drag.bounds, world.x - drag.world.x, world.y - drag.world.y, snap)
       liveRef.current = { mode: 'move', objects: new Map(drag.objects.map((object) => [object.id, moveObject(object, dx, dy)])) }
       setCursor('grabbing')
+    } else if (drag.handle?.startsWith('v:') || drag.handle?.startsWith('m:')) {
+      const [object] = drag.objects
+      const next = editVertex(object, drag.handle, snapPoint(world, snap))
+      liveRef.current = { mode: drag.mode, objects: new Map([[object.id, next]]) }
     } else {
       const [object] = drag.objects
       // Rotated boxes resize in their own frame; snapping a world point there
@@ -316,9 +355,48 @@ export function CanvasViewport(props) {
   }
 
   function doubleClick(event) {
-    const p = propsRef.current
-    const hit = rendererRef.current?.hitTest(pointOf(event), selectable(), p.viewport)
+    const p = propsRef.current, screen = pointOf(event)
+    if (tool === 'polygon-draw' && liveRef.current?.polygon) {
+      // The dblclick's second click already added a duplicate point.
+      const points = liveRef.current.polygon.points.slice(0, -1)
+      liveRef.current = null
+      if (points.length >= 3) p.onCreate({ tool: 'polygon-draw', points })
+      schedule()
+      return
+    }
+    const world = screenToWorld(screen, p.viewport)
+    const single = p.selectedIds.length === 1 ? selectable().find((row) => row.id === p.selectedIds[0]) : null
+    const handle = single && hitHandle(world, single, p.viewport.zoom, 9, p.editVertices !== false)
+    if (handle && handle.startsWith('v:')) {
+      const next = editVertex(single, handle.replace('v:', 'delete:'), null)
+      if (next !== single) p.onCommit([{ prev: single, next }], 'resize')
+      return
+    }
+    const hit = rendererRef.current?.hitTest(screen, selectable(), p.viewport)
     if (hit) p.onOpen?.(hit)
+  }
+
+  // Escape cancels the free-polygon draft; Enter finishes it (ignored, with
+  // nothing to finish, when there are fewer than three points).
+  function canvasKeyDown(event) {
+    if (tool !== 'polygon-draw' || !liveRef.current?.polygon) return
+    if (event.key === 'Escape') { event.stopPropagation(); liveRef.current = null; schedule(); return }
+    if (event.key === 'Enter') {
+      event.stopPropagation()
+      const { points } = liveRef.current.polygon
+      liveRef.current = null
+      if (points.length >= 3) propsRef.current.onCreate({ tool: 'polygon-draw', points })
+      schedule()
+    }
+  }
+
+  function contextMenu(event) {
+    event.preventDefault()
+    const p = propsRef.current
+    if (!p.onContextMenu) return
+    const screen = pointOf(event)
+    const hit = rendererRef.current?.hitTest(screen, selectable(), p.viewport)
+    p.onContextMenu(hit ?? null, screen)
   }
 
   return (
@@ -334,7 +412,8 @@ export function CanvasViewport(props) {
       onPointerCancel={pointerUp}
       onPointerLeave={() => propsRef.current.onPointerWorld?.(null)}
       onDoubleClick={doubleClick}
-      onContextMenu={(event) => event.preventDefault()}
+      onKeyDown={canvasKeyDown}
+      onContextMenu={contextMenu}
     />
   )
 }
