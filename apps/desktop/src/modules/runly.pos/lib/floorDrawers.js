@@ -125,8 +125,74 @@ export function drawDecor(ctx, object, { x, y, w, h, theme }) {
   }
 }
 
+// Amber palette matching the planner's old DOM table (FloorCanvasHelpers.jsx
+// TableSvg), theme-aware since canvas2d can't read Tailwind `dark:` classes.
+const PLANNER_TABLE_COLORS = {
+  light: { body: '#fffbeb', bodyStroke: '#fbbf24', chair: '#fde68a', chairStroke: '#fbbf24', name: '#78350f', capacity: '#b45309' },
+  dark: { body: 'rgba(69,26,3,0.7)', bodyStroke: '#f59e0b', chair: '#92400e', chairStroke: '#d97706', name: '#fef3c7', capacity: '#fbbf24' },
+}
+
+function isDarkMode() {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+}
+
+// The floor planner (editor) shows a fixed amber table instead of the live
+// status colors — there is no order/status while designing a floor.
+function drawPlannerTable(ctx, object, { x, y, w, h, theme }) {
+  const props = object.properties ?? {}
+  const palette = isDarkMode() ? PLANNER_TABLE_COLORS.dark : PLANNER_TABLE_COLORS.light
+  const isRound = Boolean(props.round)
+  const capacity = props.capacity ?? 0
+  const chairStyle = props.chairStyle ?? 'auto'
+  const name = props.name ?? ''
+
+  const chairs = isRound ? roundChairPositions(w, h, capacity, chairStyle) : squareChairPositions(w, h, capacity, chairStyle)
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = palette.chairStroke
+  ctx.fillStyle = palette.chair
+  for (const c of chairs) {
+    ctx.beginPath()
+    if (c.r) ctx.arc(x + (c.cx - CHAIR_PAD), y + (c.cy - CHAIR_PAD), c.r, 0, Math.PI * 2)
+    else roundRect(ctx, x + (c.x - CHAIR_PAD), y + (c.y - CHAIR_PAD), c.w, c.h, c.rx ?? 3)
+    ctx.fill(); ctx.stroke()
+  }
+
+  ctx.beginPath()
+  if (isRound) ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2 - 1.5, 0, Math.PI * 2)
+  else roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 9)
+  ctx.fillStyle = palette.body
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.strokeStyle = palette.bodyStroke
+  ctx.stroke()
+
+  if (!isRound && w > 50 && h > 40) {
+    ctx.beginPath()
+    ctx.moveTo(x + 10, y + h / 2); ctx.lineTo(x + w - 10, y + h / 2)
+    ctx.strokeStyle = palette.bodyStroke
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
+
+  const displayName = name.length > 9 ? `${name.slice(0, 8)}…` : name
+  const nameFontSize = Math.min(12, w / 6)
+  if (displayName) {
+    ctx.font = `700 ${nameFontSize}px ${theme?.font ?? 'sans-serif'}`
+    ctx.fillStyle = palette.name
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(displayName, x + w / 2, y + h / 2 + (capacity ? -5 : 1))
+  }
+  if (capacity > 0) {
+    ctx.font = `400 9px ${theme?.font ?? 'sans-serif'}`
+    ctx.fillStyle = palette.capacity
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(`${capacity} pax`, x + w / 2, y + h / 2 + (displayName ? 10 : 1))
+  }
+}
+
 export function drawTable(ctx, object, { x, y, w, h, theme }) {
   const props = object.properties ?? {}
+  if (props.planner) return drawPlannerTable(ctx, object, { x, y, w, h, theme })
   const status = props.status ?? 'AVAILABLE'
   const s = TABLE_STATUS_STYLE[status] ?? DEFAULT_STATUS
   const isDisabled = status === 'DISABLED'
