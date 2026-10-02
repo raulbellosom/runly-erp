@@ -31,6 +31,12 @@ describe('Canvas optimistic batch', () => {
     const next = mergeBatchResults(conflictRows, [{ op: 'conflict', id: 'a', object: { id: 'a', revision: 7 } }, { op: 'conflict', id: 'b', object: null }])
     assert.deepEqual(next, [{ id: 'a', revision: 7, hotspot: { id: 'h' } }])
   })
+
+  it('does not duplicate a create whose realtime echo arrived first', () => {
+    const rows = [{ id: 'local-1', pending: true }, { id: 'srv-1', revision: 1 }]
+    const next = mergeBatchResults(rows, [{ op: 'create', clientId: 'local-1', object: { id: 'srv-1', revision: 1 } }])
+    assert.deepEqual(next, [{ id: 'srv-1', revision: 1 }])
+  })
 })
 
 describe('Canvas optimistic restore', () => {

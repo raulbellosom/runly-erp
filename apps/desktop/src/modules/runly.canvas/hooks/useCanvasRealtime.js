@@ -27,12 +27,16 @@ export function useCanvasRealtime(boardId, { pageId, selectedIds } = {}) {
   const channelRef = useRef(null)
   const [presence, setPresence] = useState([])
   const [cursors, setCursors] = useState(() => new Map())
-  // Ticking "now" lets stale cursors disappear even without a new message.
+  // Ticking "now" lets stale cursors disappear even without a new message;
+  // it only runs while someone else's cursor is known, so a solo editor
+  // never re-renders on a timer.
   const [now, setNow] = useState(() => Date.now())
+  const hasCursors = cursors.size > 0
   useEffect(() => {
+    if (!hasCursors) return undefined
     const timer = setInterval(() => setNow(Date.now()), 2000)
     return () => clearInterval(timer)
-  }, [])
+  }, [hasCursors])
   useEffect(() => {
     if (!boardId || !userId) return undefined
     const session = createCanvasRealtimeSession({

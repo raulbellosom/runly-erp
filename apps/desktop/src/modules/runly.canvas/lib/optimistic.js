@@ -29,9 +29,15 @@ export function mergeBatchResults(rows = [], results = []) {
   let next = rows
   for (const result of results) {
     if (result.op === 'create' && result.object) {
-      next = next.some((row) => row.id === result.clientId)
-        ? next.map((row) => row.id === result.clientId ? result.object : row)
-        : [...next, result.object]
+      // The realtime echo of this create may have inserted the server row
+      // already; then the optimistic row is just dropped.
+      if (next.some((row) => row.id === result.object.id)) {
+        next = next.filter((row) => row.id !== result.clientId).map((row) => row.id === result.object.id ? result.object : row)
+      } else {
+        next = next.some((row) => row.id === result.clientId)
+          ? next.map((row) => row.id === result.clientId ? result.object : row)
+          : [...next, result.object]
+      }
     } else if (result.op === 'restore' && result.object) {
       const existing = next.find((row) => row.id === result.object.id)
       const restored = { ...result.object, hotspot: result.object.hotspot ?? existing?.hotspot }
