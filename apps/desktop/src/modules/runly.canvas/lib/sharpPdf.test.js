@@ -9,14 +9,18 @@ describe('Sharp PDF buckets', () => {
   })
   it('asks for a power-of-two bucket when zoomed past the raster density', () => {
     assert.equal(neededBucket(page, 4), 2)
-    // 1700px raster: 4x would exceed 4096px, so it stays at the 2x bucket.
-    assert.equal(neededBucket(page, 8), 2)
+    // 1700px raster: 8x would exceed 7200px, so it stays at the 4x bucket.
+    assert.equal(neededBucket(page, 8), 4)
     const small = { ...page, properties: { ...page.properties, naturalWidth: 600, naturalHeight: 800 } }
-    assert.equal(neededBucket(small, 8), 4)
+    assert.equal(neededBucket(small, 8), 8)
   })
   it('caps the bucket so the render stays under the max side', () => {
     const bucket = neededBucket(page, 64)
     assert.ok(1700 * bucket <= MAX_SHARP_SIDE * 1.0001)
+  })
+  it('does not replace an already larger stored raster with a smaller sharp render', () => {
+    const large = { ...page, properties: { ...page.properties, naturalWidth: 5400, naturalHeight: 7200 } }
+    assert.equal(neededBucket(large, 8), 0)
   })
   it('selects only visible PDF page images', () => {
     const viewportBounds = { x: 0, y: 0, width: 100, height: 100 }

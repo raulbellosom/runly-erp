@@ -1,8 +1,8 @@
 // Image / PDF helpers for inserting files onto a board. PDF pages are
 // rasterized client-side (pdfjs, lazily loaded) and stored as PNG FileAssets,
 // so the renderer only ever draws images.
-const PDF_DPI = 200
-const MAX_RASTER_SIDE = 6000
+export const PDF_DPI = 300
+export const MAX_RASTER_SIDE = 7200
 
 export const isPdf = (file) => file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name ?? '')
 export const isImage = (file) => /^image\//.test(file?.type ?? '')
@@ -46,6 +46,10 @@ export async function renderPdfPageCanvas(doc, pageNumber, targetSide) {
   return Object.assign(canvas, { complete: true, naturalWidth: canvas.width, naturalHeight: canvas.height })
 }
 
+export function pdfRenderScale(width, height, dpi = PDF_DPI) {
+  return Math.min(dpi / 72, MAX_RASTER_SIDE / Math.max(width, height))
+}
+
 function canvasToBlob(canvas, type = 'image/png') {
   return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('No se pudo generar la imagen')), type))
 }
@@ -53,7 +57,7 @@ function canvasToBlob(canvas, type = 'image/png') {
 export async function renderPdfPage(doc, pageNumber, dpi = PDF_DPI) {
   const page = await doc.getPage(pageNumber)
   const base = page.getViewport({ scale: 1 })
-  const scale = Math.min(dpi / 72, MAX_RASTER_SIDE / Math.max(base.width, base.height))
+  const scale = pdfRenderScale(base.width, base.height, dpi)
   const viewport = page.getViewport({ scale })
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height)

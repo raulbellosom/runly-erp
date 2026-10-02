@@ -333,8 +333,8 @@ export default function BoardEditor() {
             </div>
           ) : null}
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:flex-row @3xl:items-end @3xl:justify-center">
-            <div className="pointer-events-none flex w-full items-end justify-end gap-2 @3xl:absolute @3xl:bottom-[max(0.75rem,env(safe-area-inset-bottom))] @3xl:right-3 @3xl:w-auto">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] @6xl:flex-row @6xl:items-end @6xl:justify-center">
+            <div className="pointer-events-none flex w-full items-end justify-end gap-2 @6xl:absolute @6xl:bottom-[max(0.75rem,env(safe-area-inset-bottom))] @6xl:right-3 @6xl:w-auto">
               <ScaleControl
                 scale={pageScale.scale} canEdit={!readOnly} onCalibrate={pageScale.startCalibrate} onClear={pageScale.clear}
                 hasMap={pageMap.hasMap} onMap={pageMap.open}
