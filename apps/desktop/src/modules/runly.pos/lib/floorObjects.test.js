@@ -22,7 +22,7 @@ describe('POS floor adapter', () => {
   it('converts decimals, rotation and polygon points', () => {
     const table = objects.find((o) => o.id === 't')
     assert.deepEqual(table.transform, { x: 500.5, y: 200, rotation: 15, scaleX: 1, scaleY: 1 })
-    assert.deepEqual(table.properties, { kind: 'TABLE_ROUND', round: true, capacity: 6, chairStyle: 'auto', name: 'Mesa 1', status: 'OCCUPIED', dimmed: true, tableId: 'tab-1', label: 'M1' })
+    assert.deepEqual(table.properties, { kind: 'TABLE_ROUND', round: true, capacity: 6, chairStyle: 'auto', name: 'Mesa 1', status: 'OCCUPIED', dimmed: true, orphan: false, tableId: 'tab-1', label: 'M1' })
     assert.ok(isTableObject(table))
     const polygon = objects.find((o) => o.id === 'p')
     assert.equal(polygon.type, 'polygon')
@@ -34,5 +34,7 @@ describe('POS floor adapter', () => {
     assert.equal(solo.properties.status, 'AVAILABLE')
     assert.equal(solo.properties.name, 'B2')
     assert.equal(solo.properties.dimmed, false)
+    const ghost = floorToObjects({ floor, elements: [{ id: 'g', kind: 'TABLE_SQUARE', tableId: 'gone', x: 0, y: 0, width: 60, height: 60 }], tableStates: {} }).find((o) => o.id === 'g')
+    assert.equal(ghost.properties.orphan, true)
   })
 })

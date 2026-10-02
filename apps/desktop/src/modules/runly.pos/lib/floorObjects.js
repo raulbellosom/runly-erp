@@ -43,7 +43,7 @@ export function floorToObjects({ floor, elements = [], tableStates = {} }) {
           kind: el.kind, round: el.kind === 'TABLE_ROUND',
           capacity: table?.capacity ?? el.style?.capacity ?? 0, chairStyle: el.style?.chairStyle ?? 'auto',
           name: table?.name ?? el.label ?? '', status: table?.status ?? 'AVAILABLE',
-          dimmed: table?.isMine === false, tableId: el.tableId ?? null, label: el.label ?? null,
+          dimmed: table?.isMine === false, orphan: Boolean(el.tableId && !table), tableId: el.tableId ?? null, label: el.label ?? null,
         },
       })
     } else decor.push({ ...base(el, 'pos.decor'), properties: { kind: el.kind, label: el.label ?? null } })

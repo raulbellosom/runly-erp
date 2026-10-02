@@ -137,7 +137,7 @@ export function drawTable(ctx, object, { x, y, w, h, theme }) {
 
   // Dimming mirrors the old DOM view: disabled tables fade the most, tables
   // hidden by the "mis mesas" filter fade less, everything else is opaque.
-  ctx.globalAlpha *= isDisabled ? 0.4 : props.dimmed ? 0.45 : 1
+  ctx.globalAlpha *= props.orphan ? 0.25 : isDisabled ? 0.4 : props.dimmed ? 0.45 : 1
 
   const chairs = isRound ? roundChairPositions(w, h, capacity, chairStyle) : squareChairPositions(w, h, capacity, chairStyle)
   ctx.lineWidth = 1.5
