@@ -37,6 +37,8 @@ const ALLOWED_FILE_ENTITY_TYPES = [
   // runly.canvas: hotspot attachments and images/PDF pages placed on boards.
   "CanvasHotspot",
   "CanvasBoard",
+  // runly.canvas: SVG icons uploaded into a library for reuse across Boards.
+  "CanvasLibrary",
 ];
 const ALLOWED_EXACT_MIME_TYPES = new Set([
   ...Object.values(OFFICE_FORMATS).map(format => format.mimeType),

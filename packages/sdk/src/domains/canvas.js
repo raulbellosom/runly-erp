@@ -55,5 +55,14 @@ export function createCanvasDomain({ request, withAuthHeaders, toQueryString }) 
     listReferences: (params, token) => send('GET', `/canvas/references${toQueryString(params)}`, undefined, token),
     // Content-aware Board search (name, description, pages, hotspots, text, linked records).
     search: (q, token) => send('GET', `/canvas/search${toQueryString({ q })}`, undefined, token),
+    // Reusable element libraries (personal or company); see canvas-libraries.js.
+    listLibraries: (token) => send('GET', '/canvas/libraries', undefined, token),
+    createLibrary: (data, token) => send('POST', '/canvas/libraries', data, token),
+    updateLibrary: (libraryId, data, token) => send('PATCH', `/canvas/libraries/${id(libraryId)}`, data, token),
+    deleteLibrary: (libraryId, token) => send('DELETE', `/canvas/libraries/${id(libraryId)}`, undefined, token),
+    listLibraryItems: (libraryId, token) => send('GET', `/canvas/libraries/${id(libraryId)}/items`, undefined, token),
+    addLibraryItems: (libraryId, items, token) => send('POST', `/canvas/libraries/${id(libraryId)}/items`, { items }, token),
+    renameLibraryItem: (libraryId, itemId, data, token) => send('PATCH', `/canvas/libraries/${id(libraryId)}/items/${id(itemId)}`, data, token),
+    deleteLibraryItem: (libraryId, itemId, token) => send('DELETE', `/canvas/libraries/${id(libraryId)}/items/${id(itemId)}`, undefined, token),
   }
 }

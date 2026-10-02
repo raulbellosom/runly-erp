@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { UserAccessError, createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
+import { createCanvasLibrariesService } from './canvas-libraries.js'
 import { createCanvasSearch } from './canvas-search.js'
 import { createCanvasPublicLinksService } from './canvas-public.js'
 import { createGeocoder } from './canvas-geocoder.js'
@@ -8,6 +9,12 @@ import { CANVAS_TEMPLATES } from './canvas-templates.js'
 
 const actorId = (c) => c.get('userContext')?.profile?.id ?? null
 const companyId = (c) => c.get('companyId') ?? null
+// Libraries have no dedicated permission: canvas.create covers a user's own
+// personal libraries, canvas.manage additionally unlocks company ones.
+const canManageLibraries = (c) => {
+  const context = c.get('userContext') ?? {}
+  return Boolean(context.isAdmin) || Boolean(context.permissionSet?.has('canvas.manage'))
+}
 
 function errorResponse(c, error, fallback) {
   if (error instanceof CanvasServiceError) return c.json({ error: error.message, code: error.code }, error.status)
@@ -34,9 +41,10 @@ export function objectsDelta(results) {
   return JSON.stringify(delta).length <= DELTA_MAX_CHARS ? delta : { refetch: true }
 }
 
-export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder(), search = null }) {
+export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder(), search = null, librariesService = null }) {
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver })
+  const libraries = librariesService ?? (prisma ? createCanvasLibrariesService({ prisma }) : null)
   const canvasSearch = search ?? (prisma ? createCanvasSearch({ prisma }) : null)
   const access = prisma ? createUserAccessService({ prisma }) : null
   const publicLinks = prisma ? createCanvasPublicLinksService({ prisma, canvas }) : null
@@ -73,6 +81,44 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   app.get('/canvas/search', requirePermission('canvas.view'), async (c) => {
     try { return c.json({ data: await canvasSearch.search(companyId(c), actorId(c), c.req.query('q') ?? '') }) }
     catch (error) { return errorResponse(c, error, 'Error al buscar Boards.') }
+  })
+
+  // Reusable element libraries (personal or company) — see spec §12.
+  // canvas.create covers a caller's own personal libraries; canvas.manage
+  // (computed per-request above) additionally unlocks company-scoped ones.
+  app.get('/canvas/libraries', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await libraries.list(companyId(c), actorId(c), { canManage: canManageLibraries(c) }) }) }
+    catch (error) { return errorResponse(c, error, 'Error al listar bibliotecas.') }
+  })
+  app.get('/canvas/libraries/:id/items', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await libraries.items(companyId(c), actorId(c), c.req.param('id')) }) }
+    catch (error) { return errorResponse(c, error, 'Error al listar elementos.') }
+  })
+  app.post('/canvas/libraries', requirePermission('canvas.create'), async (c) => {
+    try { return c.json(await libraries.create(companyId(c), actorId(c), await c.req.json(), { canManage: canManageLibraries(c) }), 201) }
+    catch (error) { return errorResponse(c, error, 'Error al crear la biblioteca.') }
+  })
+  app.patch('/canvas/libraries/:id', requirePermission('canvas.create'), async (c) => {
+    try { return c.json(await libraries.update(companyId(c), actorId(c), c.req.param('id'), await c.req.json(), { canManage: canManageLibraries(c) })) }
+    catch (error) { return errorResponse(c, error, 'Error al actualizar la biblioteca.') }
+  })
+  app.delete('/canvas/libraries/:id', requirePermission('canvas.create'), async (c) => {
+    try { await libraries.remove(companyId(c), actorId(c), c.req.param('id'), { canManage: canManageLibraries(c) }); return c.body(null, 204) }
+    catch (error) { return errorResponse(c, error, 'Error al eliminar la biblioteca.') }
+  })
+  app.post('/canvas/libraries/:id/items', requirePermission('canvas.create'), async (c) => {
+    try {
+      const body = await c.req.json()
+      return c.json({ data: await libraries.addItems(companyId(c), actorId(c), c.req.param('id'), body.items, { canManage: canManageLibraries(c) }) }, 201)
+    } catch (error) { return errorResponse(c, error, 'Error al agregar elementos.') }
+  })
+  app.patch('/canvas/libraries/:id/items/:itemId', requirePermission('canvas.create'), async (c) => {
+    try { return c.json(await libraries.renameItem(companyId(c), actorId(c), c.req.param('id'), c.req.param('itemId'), await c.req.json(), { canManage: canManageLibraries(c) })) }
+    catch (error) { return errorResponse(c, error, 'Error al renombrar el elemento.') }
+  })
+  app.delete('/canvas/libraries/:id/items/:itemId', requirePermission('canvas.create'), async (c) => {
+    try { await libraries.removeItem(companyId(c), actorId(c), c.req.param('id'), c.req.param('itemId'), { canManage: canManageLibraries(c) }); return c.body(null, 204) }
+    catch (error) { return errorResponse(c, error, 'Error al eliminar el elemento.') }
   })
 
   app.get('/canvas/boards', requirePermission('canvas.view'), async (c) => {

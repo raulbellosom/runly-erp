@@ -4554,6 +4554,47 @@ model CanvasVersion {
   @@map("canvas_version")
 }
 
+// Reusable element libraries (spec:
+// docs/superpowers/specs/2026-10-02-canvas-libraries-design.md). Personal
+// libraries are visible only to their owner; company libraries to every
+// member of the company. Items carry either a relative-coordinate object
+// payload or a reference to an uploaded (sanitized) SVG FileAsset.
+model CanvasLibrary {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  name      String
+  scope     String   @default("PERSONAL")
+  source    String   @default("custom")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items CanvasLibraryItem[]
+
+  @@index([companyId, scope])
+  @@index([ownerId])
+  @@map("canvas_library")
+}
+
+model CanvasLibraryItem {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  libraryId   String   @map("library_id") @db.Uuid
+  name        String
+  kind        String
+  payload     Json?
+  fileAssetId String?  @map("file_asset_id") @db.Uuid
+  width       Float?
+  height      Float?
+  position    Int      @default(0)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  library CanvasLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+
+  @@index([libraryId, position])
+  @@map("canvas_library_item")
+}
+
 // Public links to RME3 module resources (spec:
 // docs/superpowers/specs/2026-09-28-module-public-links-design.md).
 model ModulePublicLink {
