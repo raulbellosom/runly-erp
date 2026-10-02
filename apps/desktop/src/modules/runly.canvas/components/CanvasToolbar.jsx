@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Separator, Tooltip, TooltipContent, TooltipTrigger, cn,
 } from '@runly/ui'
-import { ArrowUpRight, ChevronUp, Circle, Diamond, Hand, ImagePlus, Loader2, MapPin, Minus, MousePointer2, Square, Trash2, Triangle, Type } from 'lucide-react'
+import { ArrowUpRight, ChevronUp, Circle, Database, Diamond, Hand, ImagePlus, Loader2, MapPin, Minus, MousePointer2, Square, Trash2, Triangle, Type } from 'lucide-react'
 import { SHAPE_TOOLS } from '../lib/objectFactory.js'
 
 export const SHAPES = {
@@ -75,7 +75,7 @@ function ShapePicker({ tool, onToolChange }) {
   )
 }
 
-export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInsertMedia, inserting, readOnly = false }) {
+export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInsertMedia, onInsertData, inserting, readOnly = false }) {
   if (readOnly) {
     return (
       <div role="toolbar" aria-label="Herramientas del lienzo" className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1.5 shadow-lg">
@@ -96,6 +96,7 @@ export function CanvasToolbar({ tool, onToolChange, canDelete, onDelete, onInser
       <ToolButton label="Insertar imagen o PDF" shortcut="I" onClick={onInsertMedia} disabled={inserting}>
         {inserting ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : <ImagePlus />}
       </ToolButton>
+      <ToolButton label="Insertar datos" onClick={onInsertData} disabled={inserting}><Database /></ToolButton>
       <Separator orientation="vertical" className="mx-0.5 h-6 sm:mx-1" />
       <ToolButton label="Eliminar selección" shortcut="Supr" disabled={!canDelete} onClick={onDelete} className="hover:bg-destructive/10 hover:text-destructive">
         <Trash2 />

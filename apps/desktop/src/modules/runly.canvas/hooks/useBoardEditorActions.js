@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { buildObjectData, defaultBox } from '../lib/objectFactory.js'
 import { buildOperations, createHistory, snapshot } from '../lib/history.js'
+import { screenToWorld } from '../engine/viewport.js'
 import { useCreateHotspot, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
 
@@ -185,9 +186,37 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
 
   const media = useMediaInsert({ upload, viewport, size, drawableLayer, layers, lockLayer: (layer) => toggleLayer(layer, { locked: true }), rows, pageId, createRows, fail })
 
+  const dataLayer = () => layers.find((layer) => layer.type === 'data' && !layer.locked) ?? null
+
+  // Binds a shape and moves it to the page's data layer when there is one.
+  function connectData(object, binding) {
+    const row = current(object.id)
+    if (!row || layerById(row.layerId)?.locked) return
+    const target = dataLayer()
+    const data = { properties: { ...(row.properties ?? {}), binding } }
+    if (target && target.id !== row.layerId) { data.layerId = target.id; data.position = topPosition(target.id) }
+    applyUpdates([{ row, data }], 'Conectar a datos')
+  }
+  function disconnectData(object) {
+    const row = current(object.id)
+    if (!row) return
+    const { binding: _binding, ...properties } = row.properties ?? {}
+    applyUpdates([{ row, data: { properties } }], 'Desconectar datos')
+  }
+  async function insertData(binding, record) {
+    const layer = dataLayer() ?? drawableLayer()
+    if (!layer) return toast.error('No hay una capa disponible para insertar datos.')
+    const center = screenToWorld({ x: size.width / 2, y: size.height / 2 }, viewport)
+    const data = buildObjectData('rectangle', { x: center.x - 100, y: center.y - 50, width: 200, height: 100 })
+    try {
+      await createRows([{ ...data, properties: { ...data.properties, binding, label: record?.title ?? null }, pageId, layerId: layer.id, position: topPosition(layer.id) }], 'Insertar datos')
+    } catch (error) { fail(error) }
+  }
+
   return {
     batch, hotspot, createPage, updateLayer, ...media,
     chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, toggleLayer, addPage, undo, redo,
+    connectData, disconnectData, insertData,
     canUndo: history.canUndo, canRedo: history.canRedo,
     undoLabel: history.peekUndo()?.label ?? null, redoLabel: history.peekRedo()?.label ?? null,
     saving: batch.isPending || hotspot.isPending || updateLayer.isPending || media.inserting,

@@ -4,6 +4,7 @@ import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, Skele
 import { BoardInspector } from '../components/BoardInspector.jsx'
 import { CanvasToolbar, SHAPES } from '../components/CanvasToolbar.jsx'
 import { CanvasViewport } from '../components/CanvasViewport.jsx'
+import { DataBindingDialog } from '../components/DataBindingDialog.jsx'
 import { EditorTopBar } from '../components/EditorTopBar.jsx'
 import { HotspotDialog } from '../components/HotspotDialog.jsx'
 import { PagesLayersPanel } from '../components/PagesLayersPanel.jsx'
@@ -174,6 +175,7 @@ export default function BoardEditor() {
       layers={layers}
       lockedLayerIds={lockedLayerIds}
       links={links}
+      bindings={bindings.data ?? {}}
       presence={presence}
       readOnly={readOnly}
       settings={settings}
@@ -186,6 +188,8 @@ export default function BoardEditor() {
         }, duplicate: actions.duplicate, arrange: actions.arrange,
         openHotspot: (object) => setDialog({ kind: 'hotspot', id: object.id }),
         editText: (object) => setDialog({ kind: 'text', id: object.id }),
+        openDataDialog: (object) => setDialog({ kind: 'data', mode: 'connect', id: object.id }),
+        disconnectData: actions.disconnectData,
       }}
     />
   )
@@ -256,7 +260,7 @@ export default function BoardEditor() {
             </div>
             <CanvasToolbar
               tool={tool} onToolChange={actions.chooseTool} canDelete={editableSelection.length > 0} onDelete={deleteSelection}
-              onInsertMedia={actions.openFilePicker} inserting={actions.inserting}
+              onInsertMedia={actions.openFilePicker} onInsertData={() => setDialog({ kind: 'data', mode: 'insert' })} inserting={actions.inserting}
               readOnly={readOnly}
             />
           </div>
@@ -286,6 +290,15 @@ export default function BoardEditor() {
         onRestored={() => { setSelectedIds([]); setPageId(null); fittedPageRef.current = null }}
       />
       <TextEditDialog object={dialog?.kind === 'text' ? dialogObject : null} onSave={saveText} onOpenChange={(open) => { if (!open) setDialog(null) }} />
+      <DataBindingDialog
+        open={dialog?.kind === 'data'} mode={dialog?.mode ?? 'connect'} onOpenChange={(open) => { if (!open) setDialog(null) }}
+        pending={actions.batch.isPending}
+        onConfirm={(binding, record) => {
+          if (dialog?.mode === 'insert') actions.insertData(binding, record)
+          else if (dialogObject) actions.connectData(dialogObject, binding)
+          setDialog(null)
+        }}
+      />
       <PdfPagesDialog key={actions.pdf?.file.name} pdf={actions.pdf} busy={actions.inserting} onConfirm={(pagesToInsert) => actions.insertPdfPages(pagesToInsert)} onCancel={actions.cancelPdf} />
     </div>
   )

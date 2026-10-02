@@ -1,13 +1,16 @@
 import { MousePointerClick, Users } from 'lucide-react'
+import { bindingKey, canBind } from '../lib/dataBindings.js'
+import { DataBindingSection } from './inspector/DataBindingSection.jsx'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
 import { MultiInspector } from './inspector/MultiInspector.jsx'
 import { ObjectInspector } from './inspector/ObjectInspector.jsx'
 import { BoardSettingsSection } from './inspector/BoardSettingsSection.jsx'
 import { Section } from './inspector/fields.jsx'
 
-export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, presence, actions, settings, onSettingsChange, readOnly = false }) {
+export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, links, bindings, presence, actions, settings, onSettingsChange, readOnly = false }) {
   const single = selectedRows.length === 1 ? selectedRows[0] : null
   const linkTarget = single && single.type !== 'hotspot' && !single.pending ? { targetType: 'OBJECT', targetId: single.id } : null
+  const dataKey = single ? bindingKey(single.properties?.binding) : null
   return (
     <div className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain p-3 pb-6">
       {single ? (
@@ -24,6 +27,16 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           onOpenHotspot={() => actions.openHotspot(single)}
           onEditText={() => actions.editText(single)}
         >
+          {canBind(single) ? (
+            <DataBindingSection
+              object={single}
+              data={dataKey ? bindings?.[dataKey] : undefined}
+              readOnly={readOnly}
+              locked={lockedLayerIds.has(single.layerId)}
+              onConnect={() => actions.openDataDialog(single)}
+              onDisconnect={() => actions.disconnectData(single)}
+            />
+          ) : null}
           {linkTarget ? <EntityLinksSection boardId={boardId} links={links} readOnly={readOnly} {...linkTarget} /> : null}
         </ObjectInspector>
       ) : selectedRows.length > 1 && readOnly ? (
