@@ -42,6 +42,10 @@ describe('Canvas templates catalog', () => {
     assert.deepEqual(effectiveBoardSettings({ templateType: 'plan', settings: saved }), saved)
   })
 
+  it('plan, technical-map and layout end with a data layer', () => {
+    for (const key of ['plan', 'technical-map', 'layout']) assert.equal(templateFor(key).layers.at(-1).type, 'data', key)
+  })
+
   it('builds ordered layer rows with metadata', () => {
     const rows = templateLayerRows(templateFor('pdf-review'), 'page-1')
     assert.deepEqual(rows.map((row) => [row.name, row.type, row.position]), [['Documento', 'vector', 0], ['Anotaciones', 'vector', 1], ['Hotspots', 'hotspot', 2]])

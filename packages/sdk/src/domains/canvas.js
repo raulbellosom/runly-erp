@@ -45,5 +45,11 @@ export function createCanvasDomain({ request, withAuthHeaders, toQueryString }) 
     // ERP records a board object or hotspot can be linked to (same catalog the
     // Module Builder relation fields use).
     searchRecords: (type, search, token) => send('GET', `/relation-targets/${id(type)}/search${toQueryString({ search, pageSize: 20 })}`, undefined, token),
+    // Data layer: sources an object can bind to, live resolution of bound
+    // objects of a Board, and reverse references (Boards an ERP record appears in).
+    listDataSources: (token) => send('GET', '/canvas/data-sources', undefined, token),
+    searchDataSource: (source, q, token) => send('GET', `/canvas/data-sources/${id(source)}/search${toQueryString({ q })}`, undefined, token),
+    resolveBindings: (boardId, refs, token) => send('POST', `/canvas/boards/${id(boardId)}/bindings/resolve`, { refs }, token),
+    listReferences: (params, token) => send('GET', `/canvas/references${toQueryString(params)}`, undefined, token),
   }
 }

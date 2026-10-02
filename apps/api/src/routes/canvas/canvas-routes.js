@@ -32,7 +32,7 @@ export function objectsDelta(results) {
   return JSON.stringify(delta).length <= DELTA_MAX_CHARS ? delta : { refetch: true }
 }
 
-export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null }) {
+export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null }) {
   const app = new Hono()
   const canvas = service ?? createCanvasService({ prisma, entityResolver })
   const access = prisma ? createUserAccessService({ prisma }) : null
@@ -40,6 +40,26 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   const changed = (boardId, action, payload = {}) => broadcaster?.broadcastToChannel?.(`canvas:board:${boardId}`, 'canvas.changed', { boardId, action, ...payload }).catch(() => {})
 
   app.get('/canvas/templates', requirePermission('canvas.view'), (c) => c.json({ data: CANVAS_TEMPLATES }))
+
+  app.get('/canvas/data-sources', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await dataSources.catalog({ authUserId: c.get('authUserId'), companyId: companyId(c) }) }) }
+    catch (error) { return errorResponse(c, error, 'Error al listar fuentes de datos.') }
+  })
+  app.get('/canvas/data-sources/:source/search', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await dataSources.search({ authUserId: c.get('authUserId'), companyId: companyId(c), source: c.req.param('source'), q: c.req.query('q') ?? '' }) }) }
+    catch (error) { return errorResponse(c, error, 'Error al buscar registros.') }
+  })
+  app.post('/canvas/boards/:boardId/bindings/resolve', requirePermission('canvas.view'), async (c) => {
+    try {
+      await canvas.assertBoardAccess(companyId(c), actorId(c), c.req.param('boardId'))
+      const body = await c.req.json().catch(() => ({}))
+      return c.json({ data: await dataSources.resolve({ authUserId: c.get('authUserId'), companyId: companyId(c), refs: Array.isArray(body.refs) ? body.refs : [] }) })
+    } catch (error) { return errorResponse(c, error, 'Error al cargar los datos del Board.') }
+  })
+  app.get('/canvas/references', requirePermission('canvas.view'), async (c) => {
+    try { return c.json({ data: await canvas.listReferences(companyId(c), actorId(c), c.req.query()) }) }
+    catch (error) { return errorResponse(c, error, 'Error al buscar referencias.') }
+  })
 
   app.get('/canvas/boards', requirePermission('canvas.view'), async (c) => {
     try { return c.json(await canvas.listBoards(companyId(c), actorId(c))) }

@@ -36,7 +36,7 @@ describe('Runly Canvas service', () => {
     const board = await service.createBoard(COMPANY, USER, { name: ' Terminal 1 ', templateType: 'plan' })
     assert.equal(board.name, 'Terminal 1')
     assert.equal(calls.find(([name]) => name === 'collaborator')[1].role, 'OWNER')
-    assert.deepEqual(calls.find(([name]) => name === 'layers')[1].map((layer) => layer.name), ['Plano base', 'Mobiliario', 'Hotspots'])
+    assert.deepEqual(calls.find(([name]) => name === 'layers')[1].map((layer) => layer.name), ['Plano base', 'Mobiliario', 'Hotspots', 'Datos Runly'])
     assert.deepEqual(calls.find(([name]) => name === 'board')[1].settings, { version: 2, grid: { enabled: true, size: 20 }, snapping: true, defaultTool: 'select' })
     assert.equal(calls.find(([name]) => name === 'audit')[1].action, 'BOARD_CREATED')
   })
@@ -170,6 +170,28 @@ describe('Runly Canvas service', () => {
     assert.equal(validateCanvasObject({ type: 'rectangle', transform: { x: 1, y: 2 }, geometry: { width: 100, height: 50 } }), true)
     assert.throws(() => validateCanvasObject({ type: 'rectangle', transform: { x: 1, y: 2 }, geometry: { width: -1, height: 50 } }), /width/)
     assert.throws(() => validateCanvasObject({ type: 'polygon', transform: {}, geometry: { points: [{ x: 1, y: 2 }] } }), /puntos/)
+  })
+
+  it('validates object bindings', () => {
+    const base = { type: 'rectangle', geometry: { width: 10, height: 10 } }
+    assert.doesNotThrow(() => validateCanvasObject({ ...base, properties: { binding: { source: 'inventory_location', id: '00000000-0000-4000-8000-000000000009' } } }))
+    assert.throws(() => validateCanvasObject({ ...base, properties: { binding: { source: 'nope', id: '00000000-0000-4000-8000-000000000009' } } }), (error) => error.status === 400)
+    assert.throws(() => validateCanvasObject({ ...base, properties: { binding: { source: 'inventory_item', id: 'x' } } }), (error) => error.status === 400)
+    assert.doesNotThrow(() => validateCanvasObject({ ...base, properties: { binding: null } }))
+  })
+
+  it('finds boards that reference a record through links or bindings', async () => {
+    let objectWhere, boardWhere
+    const prisma = {
+      canvasObject: { findMany: async (query) => { objectWhere = query.where; return [{ boardId: 'bound-board' }] } },
+      canvasBoard: { findMany: async (query) => { boardWhere = query.where; return [{ id: BOARD, name: 'Plano', templateType: 'plan' }] } },
+    }
+    const rows = await createCanvasService({ prisma }).listReferences(COMPANY, USER, { moduleKey: 'runly.inventory', entityType: 'inventory_item', entityId: 'it-1' })
+    assert.deepEqual(rows, [{ boardId: BOARD, name: 'Plano', templateType: 'plan' }])
+    assert.equal(objectWhere.companyId, COMPANY)
+    assert.ok(JSON.stringify(objectWhere).includes('it-1'))
+    assert.equal(boardWhere.companyId, COMPANY)
+    assert.ok(JSON.stringify(boardWhere).includes('bound-board'))
   })
 
   it('only accepts thumbnails uploaded for the Board and disables the previous one', async () => {

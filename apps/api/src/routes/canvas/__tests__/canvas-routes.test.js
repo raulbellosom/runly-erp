@@ -67,6 +67,19 @@ describe('Runly Canvas routes', () => {
     assert.ok(permissions.includes('canvas.view'))
   })
 
+  it('resolves bindings for a board the user can view', async () => {
+    let asserted, resolved
+    const requirePermission = () => async (c, next) => { c.set('companyId', 'company-1'); c.set('authUserId', 'auth-1'); c.set('userContext', { profile: { id: 'user-1' } }); return next() }
+    const service = { assertBoardAccess: async (...args) => { asserted = args; return {} } }
+    const dataSources = { resolve: async (input) => { resolved = input; return { 'inventory_item:i': { title: 'X', tone: 'ok' } } } }
+    const app = createCanvasRouter({ requirePermission, service, dataSources })
+    const response = await app.request('http://localhost/canvas/boards/board-1/bindings/resolve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ refs: [{ source: 'inventory_item', id: 'i' }] }) })
+    assert.equal(response.status, 200)
+    assert.deepEqual(asserted.slice(0, 3), ['company-1', 'user-1', 'board-1'])
+    assert.equal(resolved.authUserId, 'auth-1')
+    assert.equal((await response.json()).data['inventory_item:i'].title, 'X')
+  })
+
   it('MirAI board types mirror the catalog', async () => {
     const { BOARD_TYPES } = await import('../canvas-mirai-queries.js')
     const { CANVAS_TEMPLATES } = await import('../canvas-templates.js')

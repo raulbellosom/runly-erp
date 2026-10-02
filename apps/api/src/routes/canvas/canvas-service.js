@@ -1,9 +1,11 @@
 import { effectiveBoardSettings, normalizeBoardSettings, templateFor, templateLayerRows } from './canvas-templates.js'
+import { isDataSource } from './canvas-data-sources.js'
 
 const ROLE_RANK = { VIEWER: 1, COMMENTER: 2, EDITOR: 3, OWNER: 4 }
 const LAYER_TYPES = new Set(['vector', 'hotspot', 'data'])
 const OBJECT_TYPES = new Set(['line', 'polyline', 'freehand', 'arrow', 'rectangle', 'ellipse', 'polygon', 'path', 'text', 'image', 'group', 'hotspot'])
 const TARGET_TYPES = new Set(['BOARD', 'PAGE', 'OBJECT', 'HOTSPOT'])
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export class CanvasServiceError extends Error {
   constructor(message, status = 500, code = null) {
@@ -56,6 +58,10 @@ export function validateCanvasObject(data, { partial = false } = {}) {
         throw new CanvasServiceError('La geometría de puntos no es válida.', 400)
       }
     }
+  }
+  const binding = data.properties?.binding
+  if (binding != null) {
+    if (!isDataSource(binding.source) || typeof binding.id !== 'string' || !UUID.test(binding.id)) throw new CanvasServiceError('La conexión de datos no es válida.', 400)
   }
   return true
 }
@@ -416,6 +422,42 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     await audit(prisma, { companyId, actorId, action: 'ENTITY_LINK_REMOVED', entityType: 'CanvasEntityLink', entityId: linkId, before: link })
   }
 
+  // Boards of the active company the user can open where a record appears,
+  // through an entity link or an object's data binding. CanvasBoard has no
+  // direct `objects` relation, so the bound boards are found first (distinct
+  // boardId from CanvasObject) and then combined with entityLinks.
+  async function listReferences(companyId, actorId, { moduleKey, entityType, entityId }) {
+    if (!moduleKey || !entityType || !entityId) throw new CanvasServiceError('Indica el registro a buscar.', 400)
+    const source = entityType === 'inventory_item' || entityType === 'inventory.asset' ? 'inventory_item' : entityType
+    const bound = await prisma.canvasObject.findMany({
+      where: {
+        companyId, deletedAt: null,
+        AND: [
+          { properties: { path: ['binding', 'source'], equals: source } },
+          { properties: { path: ['binding', 'id'], equals: entityId } },
+        ],
+      },
+      select: { boardId: true },
+      distinct: ['boardId'],
+      take: 200,
+    })
+    const boardIds = bound.map((row) => row.boardId)
+    const rows = await prisma.canvasBoard.findMany({
+      where: {
+        companyId, archivedAt: null,
+        AND: [
+          { OR: [{ ownerId: actorId }, { collaborators: { some: { userId: actorId } } }] },
+          { OR: [
+            { id: { in: boardIds } },
+            { entityLinks: { some: { moduleKey, entityType, entityId } } },
+          ] },
+        ],
+      },
+      select: { id: true, name: true, templateType: true }, orderBy: { updatedAt: 'desc' }, take: 50,
+    })
+    return rows.map((row) => ({ boardId: row.id, name: row.name, templateType: row.templateType }))
+  }
+
   async function addCollaborator(companyId, actorId, boardId, data, assertCandidate) {
     const { board } = await assertBoardAccess(companyId, actorId, boardId, 'OWNER')
     if (!['EDITOR', 'COMMENTER', 'VIEWER'].includes(data?.role)) throw new CanvasServiceError('Rol de colaborador no válido.', 400)
@@ -617,7 +659,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
   return {
     assertBoardAccess, listBoards, getBoard, createBoard, updateBoard, archiveBoard,
     createPage, updatePage, deletePage, createLayer, updateLayer, deleteLayer, reorderLayers, listObjects, batchObjects,
-    createHotspot, updateHotspot, deleteHotspot, createEntityLink, listEntityLinks, removeEntityLink,
+    createHotspot, updateHotspot, deleteHotspot, createEntityLink, listEntityLinks, removeEntityLink, listReferences,
     addCollaborator, listCollaborators, removeCollaborator, createVersion, listVersions, restoreVersion,
     listAttachments, listHotspotAttachments, addAttachment, removeAttachment, listComments, createComment,
   }
