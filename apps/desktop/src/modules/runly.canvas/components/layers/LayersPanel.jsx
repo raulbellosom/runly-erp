@@ -25,7 +25,7 @@ function writeStoredBool(key, value) {
 // Drag-and-drop only changes element order inside the element's current
 // layer. Moving elements between layers remains an explicit menu action.
 export function LayersPanel({
-  pages, activePageId, onPageChange, onAddPage, addingPage,
+  boardId, pages, activePageId, onPageChange, onAddPage, addingPage,
   layers, allRows, activeLayerId, onLayerChange, selectedIds, onSelect,
   onToggleLayer, onFocus, onSetHidden, onSetLocked, onReorderElements,
   onAddDataLayer, addingLayer = false, readOnly = false,
@@ -98,7 +98,7 @@ export function LayersPanel({
           <AccordionItem value="pages">
             <AccordionTrigger>Páginas · {activePage?.name ?? 'Sin páginas'} ({pages.length})</AccordionTrigger>
             <AccordionContent>
-              <PagesSection pages={pages} activePageId={activePageId} onPageChange={onPageChange} onAddPage={onAddPage} addingPage={addingPage} readOnly={readOnly} />
+              <PagesSection boardId={boardId} pages={pages} activePageId={activePageId} onPageChange={onPageChange} onAddPage={onAddPage} addingPage={addingPage} readOnly={readOnly} />
             </AccordionContent>
           </AccordionItem>
         </Accordion>

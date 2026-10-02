@@ -1,5 +1,6 @@
-import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn } from '@runly/ui'
-import { ArrowLeft, Check, Eye, History, Loader2, Maximize2, Minimize2, PanelLeft, PanelRight, Redo2, Share2, Undo2 } from 'lucide-react'
+import { ActionMenu, Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn } from '@runly/ui'
+import { ArrowLeft, Check, Eye, History, Loader2, Maximize2, Minimize2, PanelLeft, PanelRight, Pencil, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
+import { canEditBoard } from '../lib/roles.js'
 import { ToolButton } from './CanvasToolbar.jsx'
 import { ExportMenu } from './ExportMenu.jsx'
 
@@ -37,7 +38,11 @@ function SaveStatus({ saving }) {
   )
 }
 
-export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight, zen, onToggleZen, history, readOnly = false, onShare, onVersions, onExport, exportDisabled }) {
+export function EditorTopBar({ title, subtitle, loading, saving, presence, onBack, leftOpen, rightOpen, onToggleLeft, onToggleRight, zen, onToggleZen, history, readOnly = false, onShare, onVersions, onExport, exportDisabled, myRole, onRenameBoard, onDeleteBoard }) {
+  const moreItems = [
+    canEditBoard(myRole) && onRenameBoard ? { label: 'Renombrar Board', icon: Pencil, onClick: onRenameBoard } : null,
+    myRole === 'OWNER' && onDeleteBoard ? { label: 'Eliminar Board', icon: Trash2, onClick: onDeleteBoard, variant: 'destructive' } : null,
+  ].filter(Boolean)
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 sm:px-3">
       <Button type="button" variant="ghost" onClick={onBack} aria-label="Volver a Boards" className="h-11 shrink-0 gap-1.5 px-2.5 sm:h-9">
@@ -69,6 +74,7 @@ export function EditorTopBar({ title, subtitle, loading, saving, presence, onBac
         </>
       )}
       <PresenceStack users={presence} />
+      {moreItems.length ? <ActionMenu items={moreItems} label="Más opciones" /> : null}
       <ExportMenu disabled={exportDisabled} onExport={onExport} />
       <ToolButton label="Versiones" onClick={onVersions}><History /></ToolButton>
       <Button type="button" variant="outline" onClick={onShare} className="h-11 shrink-0 gap-1.5 px-3 sm:h-9" aria-label="Compartir Board">

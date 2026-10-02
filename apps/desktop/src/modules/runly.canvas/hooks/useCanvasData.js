@@ -40,6 +40,31 @@ export function useCreateBoard() {
   const token = useToken(), client = useQueryClient()
   return useMutation({ mutationFn: (data) => runly.canvas.createBoard(data, token), onSuccess: () => client.invalidateQueries({ queryKey: ['canvas', 'boards'] }) })
 }
+// Renaming a Board (from the home card menu or the editor's "Más" menu).
+export function useRenameBoard() {
+  const token = useToken(), client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ boardId, name }) => runly.canvas.updateBoard(boardId, { name }, token),
+    onSuccess: (_data, { boardId }) => {
+      client.invalidateQueries({ queryKey: ['canvas', 'boards'], exact: true })
+      client.invalidateQueries({ queryKey: boardKey(boardId), exact: true })
+    },
+  })
+}
+// Permanent delete: the Board, its pages/objects/hotspots/versions,
+// comments, public links and files are gone server-side (see
+// canvas-board-delete.js) — drop its cache entirely and refresh the list.
+export function useDeleteBoard() {
+  const token = useToken(), client = useQueryClient()
+  return useMutation({
+    mutationFn: (boardId) => runly.canvas.deleteBoard(boardId, token),
+    onSuccess: (_data, boardId) => {
+      client.removeQueries({ queryKey: boardKey(boardId) })
+      client.invalidateQueries({ queryKey: ['canvas', 'boards'], exact: true })
+      client.invalidateQueries({ queryKey: ['canvas', 'search'] })
+    },
+  })
+}
 export function useCreatePage(boardId) {
   const token = useToken(), client = useQueryClient()
   return useMutation({ mutationFn: (data) => runly.canvas.createPage(boardId, data, token), onSuccess: () => client.invalidateQueries({ queryKey: boardKey(boardId) }) })
@@ -48,6 +73,13 @@ export function useUpdatePage(boardId) {
   const token = useToken(), client = useQueryClient()
   return useMutation({
     mutationFn: ({ pageId, data }) => runly.canvas.updatePage(boardId, pageId, data, token),
+    onSuccess: () => client.invalidateQueries({ queryKey: boardKey(boardId), exact: true }),
+  })
+}
+export function useDeletePage(boardId) {
+  const token = useToken(), client = useQueryClient()
+  return useMutation({
+    mutationFn: (pageId) => runly.canvas.deletePage(boardId, pageId, token),
     onSuccess: () => client.invalidateQueries({ queryKey: boardKey(boardId), exact: true }),
   })
 }

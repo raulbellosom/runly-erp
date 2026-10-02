@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ErrorState, Sheet, SheetContent, SheetHeader, SheetTitle, cn, useIsMobile } from '@runly/ui'
 import { CanvasLoadingSkeleton, LayersPanelSkeleton } from '../components/skeletons.jsx'
+import { BoardActionsDialogs } from '../components/BoardActionsDialogs.jsx'
 import { BoardInspector } from '../components/BoardInspector.jsx'
 import { CalibrateDialog } from '../components/CalibrateDialog.jsx'
 import { CanvasContextMenu } from '../components/CanvasContextMenu.jsx'
@@ -79,6 +80,7 @@ export default function BoardEditor() {
   const [desktopPanels, setDesktopPanels] = useState({ left: true, right: true }), [mobileSheet, setMobileSheet] = useState(null)
   const [dialog, setDialog] = useState(null), [zen, setZen] = useState(false), [shareOpen, setShareOpen] = useState(false), [versionsOpen, setVersionsOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [boardDialogMode, setBoardDialogMode] = useState(null)
   const fittedPageRef = useRef(null)
 
   const pages = useMemo(() => board.data?.pages ?? [], [board.data])
@@ -88,7 +90,13 @@ export default function BoardEditor() {
   const template = templates.data?.find((item) => item.key === board.data?.templateType) ?? null
   const activePage = pages.find((page) => page.id === pageId), layers = useMemo(() => activePage?.layers ?? [], [activePage])
   const objects = useCanvasObjects(boardId, pageId), linksQuery = useEntityLinks(boardId), updateHotspot = useUpdateHotspot(boardId, pageId)
-  const { presence, cursors, broadcastPointer } = useCanvasRealtime(boardId, { pageId, selectedIds })
+  // Another collaborator deleting this Board while it is open here: this
+  // session never gets its own broadcast (channel self = false), so this
+  // only fires for everyone else — they get redirected to the list.
+  const { presence, cursors, broadcastPointer } = useCanvasRealtime(boardId, {
+    pageId, selectedIds,
+    onBoardDeleted: () => { toast.info('Este Board fue eliminado'); navigate('/app/m/runly.canvas') },
+  })
   const pageScale = usePageScale({ boardId, pageId, calibration: activePage?.calibration ?? null, setTool })
   const pageMap = usePageMap({ boardId, pageId, background: activePage?.background ?? null, calibration: activePage?.calibration ?? null, size, setViewport })
   // Lets MirAI answer about "this Board" without the user naming it.
@@ -222,7 +230,7 @@ export default function BoardEditor() {
 
   const pagesPanel = board.isLoading ? <LayersPanelSkeleton /> : (
     <LayersPanel
-      pages={pages} activePageId={pageId} onPageChange={changePage} activeLayerId={layerId} onLayerChange={setLayerId}
+      boardId={boardId} pages={pages} activePageId={pageId} onPageChange={changePage} activeLayerId={layerId} onLayerChange={setLayerId}
       onAddPage={async () => { const page = await actions.addPage(pages.length); if (page?.id) changePage(page.id) }}
       addingPage={actions.createPage.isPending} onToggleLayer={actions.toggleLayer} readOnly={readOnly}
       onAddDataLayer={actions.addDataLayer} addingLayer={actions.addingLayer}
@@ -287,6 +295,7 @@ export default function BoardEditor() {
         history={{ undo: actions.undo, redo: actions.redo, canUndo: actions.canUndo, canRedo: actions.canRedo, undoLabel: actions.undoLabel, redoLabel: actions.redoLabel }}
         readOnly={readOnly} onShare={() => setShareOpen(true)} onVersions={() => setVersionsOpen(true)}
         onExport={exportPage.exportAs} exportDisabled={exportPage.exportDisabled}
+        myRole={myRole} onRenameBoard={() => setBoardDialogMode('rename')} onDeleteBoard={() => setBoardDialogMode('delete')}
       />
       <div className="flex min-h-0 flex-1">
         {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
@@ -371,6 +380,12 @@ export default function BoardEditor() {
       ) : null}
 
       <HotspotDialog boardId={boardId} pageId={pageId} object={dialog?.kind === 'hotspot' ? dialogObject : null} links={links} readOnly={readOnly} canAttach={myRole === 'COMMENTER'} onOpenChange={(open) => { if (!open) setDialog(null) }} />
+      <BoardActionsDialogs
+        board={board.data ? { id: boardId, name: board.data.name, myRole } : null}
+        mode={boardDialogMode}
+        onClose={() => setBoardDialogMode(null)}
+        onDeleted={() => navigate('/app/m/runly.canvas')}
+      />
       <ShareBoardDialog open={shareOpen} onOpenChange={setShareOpen} boardId={boardId} boardName={board.data?.name ?? 'Board'} myRole={myRole} />
       <VersionsSheet
         open={versionsOpen} onOpenChange={setVersionsOpen} boardId={boardId} currentVersionId={board.data?.currentVersionId}

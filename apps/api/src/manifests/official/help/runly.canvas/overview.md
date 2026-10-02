@@ -25,6 +25,12 @@ El panel izquierdo muestra **Paginas** (plegable; la cabecera siempre indica la 
 
 - **Datos Runly**: aqui van los objetos **conectados a datos**. Selecciona una forma y usa "Conectar a datos" en el inspector (o el boton "Insertar datos" de la barra inferior) para ligarla a una ubicacion o articulo de inventario, un vehiculo, un colaborador, un proyecto, una mesa de POS (se ve libre, ocupada o con cuenta pedida) u otro registro. El objeto muestra el nombre del registro, un resumen y un color segun su estado (por ejemplo, una ubicacion con equipos en mantenimiento se ve en ambar) y se actualiza solo cada minuto. Ocultar esta capa oculta todos los datos de la pagina.
 
+### Renombrar y eliminar paginas o el Board
+
+En el panel de paginas, el menu de cada pagina (icono de tres puntos) permite **renombrarla** (la fila se vuelve un campo de texto; Enter guarda, Esc cancela, no se guarda si queda vacio) o **eliminarla** junto con sus capas y elementos; no se puede eliminar la unica pagina de un Board.
+
+Desde la tarjeta de un Board en la lista, o desde el boton **Mas** de la barra superior del editor, los editores pueden **renombrar el Board**. Solo el propietario puede **eliminarlo**: la eliminacion es definitiva y borra paginas, elementos, hotspots, versiones, comentarios, enlaces publicos y archivos del Board; para confirmar hay que escribir el nombre exacto del Board. Si alguien mas tiene el Board abierto cuando lo eliminas, vuelve a la lista de Boards con un aviso.
+
 ### Acciones rapidas y cambiar forma
 
 Clic derecho sobre el lienzo (o pulsacion larga sobre un elemento en pantalla tactil) abre un menu en ese punto: Enfocar, Editar texto o Abrir hotspot segun el tipo, Duplicar, Copiar, Cambiar forma, Mover a capa, Traer al frente, Enviar al fondo, Ocultar, Bloquear y Eliminar; sobre el lienzo vacio ofrece Pegar, Seleccionar todo y Ajustar vista. Tambien se abre con Shift+F10 o la tecla de menu del teclado, centrado en la seleccion. Copiar y pegar tambien funcionan con Ctrl+C / Ctrl+V.

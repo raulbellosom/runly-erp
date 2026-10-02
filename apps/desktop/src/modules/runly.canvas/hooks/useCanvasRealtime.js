@@ -21,12 +21,16 @@ function createCanvasRealtimeSession({ boardId, user, onChanged, onCursor, onPre
   return { channel, destroy: () => supabase.removeChannel(channel) }
 }
 
-export function useCanvasRealtime(boardId, { pageId, selectedIds } = {}) {
+export function useCanvasRealtime(boardId, { pageId, selectedIds, onBoardDeleted } = {}) {
   const { userProfile } = useAuth(), client = useQueryClient()
   const userId = userProfile?.id, displayName = userProfile?.displayName, email = userProfile?.email
   const channelRef = useRef(null)
   const [presence, setPresence] = useState([])
   const [cursors, setCursors] = useState(() => new Map())
+  // Updated every render (no effect dep) so the subscription below always
+  // calls the latest callback without resubscribing the channel.
+  const onBoardDeletedRef = useRef(onBoardDeleted)
+  onBoardDeletedRef.current = onBoardDeleted
   // Ticking "now" lets stale cursors disappear even without a new message;
   // it only runs while someone else's cursor is known, so a solo editor
   // never re-renders on a timer.
@@ -44,6 +48,16 @@ export function useCanvasRealtime(boardId, { pageId, selectedIds } = {}) {
       user: { id: userId, displayName, email },
       onChanged: (message) => {
         const payload = message?.payload ?? {}
+        // The deleting session never receives its own broadcast (channel is
+        // configured with broadcast.self = false), so this only fires for
+        // other collaborators who had the Board open — they get redirected
+        // instead of the usual cache invalidation (the Board is gone).
+        if (payload.action === 'board.deleted') {
+          client.removeQueries({ queryKey: ['canvas', 'boards', boardId] })
+          client.invalidateQueries({ queryKey: ['canvas', 'boards'], exact: true })
+          onBoardDeletedRef.current?.()
+          return
+        }
         if (payload.action === 'objects.changed' && !payload.refetch && (payload.upserts || payload.deletedIds)) {
           for (const [key] of client.getQueriesData({ queryKey: ['canvas', 'boards', boardId, 'objects'] })) {
             const pageId = key[4]

@@ -6,6 +6,7 @@ import { PanelsTopLeft, Plus, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { runly } from '../../../lib/runly.js'
+import { BoardActionsDialogs } from '../components/BoardActionsDialogs.jsx'
 import { BoardCard } from '../components/BoardCard.jsx'
 import { BoardCardSkeleton, HomeToolbarSkeleton } from '../components/skeletons.jsx'
 import { BoardFilters } from '../components/BoardFilters.jsx'
@@ -55,6 +56,7 @@ function useThumbnailUrls(fileIds) {
 export default function CanvasHome() {
   const navigate = useNavigate(), boards = useBoards(), create = useCreateBoard()
   const [open, setOpen] = useState(false), [query, setQuery] = useState('')
+  const [boardDialog, setBoardDialog] = useState({ board: null, mode: null })
   const [filters, setFilters] = useState(loadStoredFilters)
   useEffect(() => storeFilters(filters), [filters])
 
@@ -150,13 +152,23 @@ export default function CanvasHome() {
         <ul className={GRID}>
           {filtered.map((board) => (
             <li key={board.id} className="flex">
-              <BoardCard board={board} onOpen={() => openBoard(board.id)} thumbnailUrl={board.thumbnailFileId ? thumbnailUrls.data?.[board.thumbnailFileId] : null} matches={board.matches} />
+              <BoardCard
+                board={board} onOpen={() => openBoard(board.id)}
+                thumbnailUrl={board.thumbnailFileId ? thumbnailUrls.data?.[board.thumbnailFileId] : null} matches={board.matches}
+                onRename={() => setBoardDialog({ board, mode: 'rename' })}
+                onDelete={() => setBoardDialog({ board, mode: 'delete' })}
+              />
             </li>
           ))}
         </ul>
       ) : null}
 
       <CreateBoardDialog open={open} onOpenChange={setOpen} onSubmit={submit} pending={create.isPending} />
+      <BoardActionsDialogs
+        board={boardDialog.board}
+        mode={boardDialog.mode}
+        onClose={() => setBoardDialog({ board: null, mode: null })}
+      />
     </div>
   )
 }
