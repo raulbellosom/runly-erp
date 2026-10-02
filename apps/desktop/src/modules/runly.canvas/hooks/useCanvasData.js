@@ -39,6 +39,13 @@ export function useUpdatePage(boardId) {
     onSuccess: () => client.invalidateQueries({ queryKey: boardKey(boardId), exact: true }),
   })
 }
+export function useCreateLayer(boardId) {
+  const token = useToken(), client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ pageId, data }) => runly.canvas.createLayer(boardId, pageId, data, token),
+    onSuccess: () => client.invalidateQueries({ queryKey: boardKey(boardId), exact: true }),
+  })
+}
 export function useUpdateLayer(boardId) {
   const token = useToken(), client = useQueryClient()
   return useMutation({

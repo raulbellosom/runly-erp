@@ -1,7 +1,16 @@
 import { Button, cn } from '@runly/ui'
 import { Database, Eye, EyeOff, FileText, Image, Loader2, Lock, LockOpen, MapPin, Plus, Shapes } from 'lucide-react'
 
-const LAYER_ICONS = { vector: Shapes, hotspot: MapPin, data: Database, background: Image }
+// Layer names depend on the Board template ("Espacios", "Documento"…); the
+// kind is what decides behaviour, so the panel always shows it.
+const LAYER_KINDS = {
+  background: { icon: Image, label: 'Fondo', help: 'aquí quedan los planos, imágenes y PDF que insertas; bloquéala para que no se muevan.' },
+  vector: { icon: Shapes, label: 'Dibujo', help: 'formas, textos, flechas e imágenes.' },
+  hotspot: { icon: MapPin, label: 'Puntos', help: 'hotspots con información, archivos y registros vinculados (doble clic para abrir).' },
+  data: { icon: Database, label: 'Datos', help: 'formas conectadas a registros de Runly (inventario, vehículos…) que muestran su estado. Usa "Conectar a datos" en el inspector.' },
+}
+const KIND_ORDER = ['background', 'vector', 'hotspot', 'data']
+export const layerKind = (layer) => (layer.type === 'vector' && layer.metadata?.mediaTarget ? 'background' : LAYER_KINDS[layer.type] ? layer.type : 'vector')
 
 function SectionTitle({ children, action }) {
   return (
@@ -27,8 +36,11 @@ function RowIconButton({ label, onClick, disabled, children }) {
   )
 }
 
-export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLayerId, onLayerChange, onAddPage, addingPage, onToggleLayer, objectCounts, readOnly = false }) {
+export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLayerId, onLayerChange, onAddPage, addingPage, onToggleLayer, onAddDataLayer, addingLayer = false, objectCounts, readOnly = false }) {
   const layers = pages.find((page) => page.id === activePageId)?.layers ?? []
+  const kinds = new Set(layers.map(layerKind))
+  const activeKind = layerKind(layers.find((layer) => layer.id === activeLayerId) ?? {})
+  const missingData = !readOnly && layers.length > 0 && !kinds.has('data') && onAddDataLayer
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-3">
       <section aria-labelledby="canvas-pages-title">
@@ -68,7 +80,7 @@ export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLaye
         {layers.length ? (
           <ul className="space-y-0.5">
             {layers.map((layer) => {
-              const Icon = LAYER_ICONS[layer.type] ?? Shapes, active = layer.id === activeLayerId
+              const kind = LAYER_KINDS[layerKind(layer)], Icon = kind.icon, active = layer.id === activeLayerId
               const count = objectCounts?.[layer.id] ?? 0
               return (
                 <li
@@ -90,7 +102,10 @@ export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLaye
                     )}
                   >
                     <Icon className={cn('h-4 w-4 shrink-0', active && 'text-primary')} />
-                    <span className="truncate">{layer.name}</span>
+                    <span className="flex min-w-0 flex-col leading-tight">
+                      <span className="truncate">{layer.name}</span>
+                      <span className="truncate text-[11px] font-normal text-[hsl(var(--muted-foreground))]">{kind.label}</span>
+                    </span>
                     {count ? <span className="ml-auto text-xs tabular-nums text-[hsl(var(--muted-foreground))]">{count}</span> : null}
                   </button>
                   {readOnly ? (
@@ -116,12 +131,24 @@ export function PagesLayersPanel({ pages, activePageId, onPageChange, activeLaye
         ) : (
           <p className="px-1 text-xs text-[hsl(var(--muted-foreground))]">Esta página no tiene capas.</p>
         )}
+        {missingData ? (
+          <Button type="button" variant="outline" size="sm" className="mt-2 w-full" onClick={onAddDataLayer} disabled={addingLayer}>
+            {addingLayer ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : <Database />}Agregar capa de datos
+          </Button>
+        ) : null}
       </section>
 
-      <section aria-label="Ayuda de capas" className="mt-auto space-y-1.5 rounded-xl bg-[hsl(var(--muted)/0.5)] p-3 text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
-        <p><strong className="font-semibold text-[hsl(var(--foreground))]">Vectores:</strong> formas, textos, imágenes y PDF.</p>
-        <p><strong className="font-semibold text-[hsl(var(--foreground))]">Hotspots:</strong> puntos con información, archivos y registros vinculados (doble clic para abrir).</p>
-        <p><strong className="font-semibold text-[hsl(var(--foreground))]">Datos Runly:</strong> dibuja aquí lo que representa registros del ERP y vincúlalos desde el inspector.</p>
+      <section aria-label="Tipos de capa" className="mt-auto space-y-1.5 rounded-xl bg-[hsl(var(--muted)/0.5)] p-3 text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
+        <p>Los nombres cambian según la plantilla; el ícono y la etiqueta indican el <strong className="font-semibold text-[hsl(var(--foreground))]">tipo</strong> de cada capa:</p>
+        {KIND_ORDER.filter((key) => kinds.has(key)).map((key) => {
+          const { icon: KindIcon, label, help } = LAYER_KINDS[key]
+          return (
+            <p key={key} className={cn('flex gap-1.5', key === activeKind && 'text-[hsl(var(--foreground))]')}>
+              <KindIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span><strong className="font-semibold text-[hsl(var(--foreground))]">{label}:</strong> {help}</span>
+            </p>
+          )
+        })}
       </section>
     </div>
   )

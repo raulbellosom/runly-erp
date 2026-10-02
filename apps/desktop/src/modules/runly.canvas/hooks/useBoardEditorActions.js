@@ -4,7 +4,7 @@ import { buildObjectData, defaultBox } from '../lib/objectFactory.js'
 import { buildOperations, createHistory, snapshot } from '../lib/history.js'
 import { alignDeltas, distributeDeltas } from '../lib/arrange.js'
 import { screenToWorld } from '../engine/viewport.js'
-import { useCreateHotspot, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
+import { useCreateHotspot, useCreateLayer, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
 
 const DRAWABLE = new Set(['vector', 'data'])
@@ -43,7 +43,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   }, [setSelectedIds])
   const { mutation: batch, patchPending } = useObjectBatch(boardId, pageId, { onCreated })
   const hotspot = useCreateHotspot(boardId, pageId)
-  const createPage = useCreatePage(boardId), updateLayer = useUpdateLayer(boardId), upload = useUploadFile(boardId)
+  const createPage = useCreatePage(boardId), updateLayer = useUpdateLayer(boardId), upload = useUploadFile(boardId), createLayer = useCreateLayer(boardId)
 
   const fail = (error) => toast.error(error?.message ?? 'No se pudo guardar el cambio.')
   const layerById = (id) => layers.find((layer) => layer.id === id)
@@ -200,6 +200,10 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
   async function toggleLayer(layer, data) {
     try { await updateLayer.mutateAsync({ pageId, layerId: layer.id, data }) } catch (error) { fail(error) }
   }
+  // Boards created before their template had a data layer can add one.
+  async function addDataLayer() {
+    try { await createLayer.mutateAsync({ pageId, data: { name: 'Datos Runly', type: 'data' } }) } catch (error) { fail(error) }
+  }
   async function addPage(count) {
     try { return await createPage.mutateAsync({ name: `Página ${count + 1}` }) } catch (error) { fail(error); return null }
   }
@@ -235,7 +239,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
 
   return {
     batch, hotspot, createPage, updateLayer, ...media,
-    chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, undo, redo,
+    chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, addDataLayer, addingLayer: createLayer.isPending, undo, redo,
     connectData, disconnectData, insertData,
     canUndo: history.canUndo, canRedo: history.canRedo,
     undoLabel: history.peekUndo()?.label ?? null, redoLabel: history.peekRedo()?.label ?? null,

@@ -187,6 +187,7 @@ export default function BoardEditor() {
       pages={pages} activePageId={pageId} onPageChange={changePage} activeLayerId={layerId} onLayerChange={setLayerId}
       onAddPage={async () => { const page = await actions.addPage(pages.length); if (page?.id) changePage(page.id) }}
       addingPage={actions.createPage.isPending} onToggleLayer={actions.toggleLayer} objectCounts={objectCounts} readOnly={readOnly}
+      onAddDataLayer={actions.addDataLayer} addingLayer={actions.addingLayer}
     />
   )
   const inspectorPanel = (
