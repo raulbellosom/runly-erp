@@ -32,5 +32,24 @@ describe('Runly Canvas routes', () => {
       assert.ok(permissions.includes(key), `missing ${key}`)
     }
   })
+
+  it('serves the template catalog behind canvas.view', async () => {
+    const permissions = []
+    const requirePermission = (key) => { permissions.push(key); return async (_c, next) => next() }
+    const app = createCanvasRouter({ requirePermission, service: {} })
+    const response = await app.request('http://localhost/canvas/templates')
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.data.length, 6)
+    assert.equal(body.data[1].key, 'plan')
+    assert.ok(permissions.includes('canvas.view'))
+  })
+
+  it('MirAI board types mirror the catalog', async () => {
+    const { BOARD_TYPES } = await import('../canvas-mirai-queries.js')
+    const { CANVAS_TEMPLATES } = await import('../canvas-templates.js')
+    assert.deepEqual(BOARD_TYPES.map((type) => type.templateType), CANVAS_TEMPLATES.map((template) => template.key))
+    assert.equal(BOARD_TYPES[1].uso, CANVAS_TEMPLATES[1].useWhen)
+  })
 })
 

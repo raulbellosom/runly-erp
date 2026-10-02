@@ -4,18 +4,13 @@
 // active company that the caller owns or collaborates on (same rule as
 // canvas-service.js listBoards/assertBoardAccess). Counts are computed in SQL
 // and returned as exact numbers; lists return `total` plus at most 30 rows.
+import { CANVAS_TEMPLATES } from './canvas-templates.js'
+
 const LIST_MAX = 30
 const TEXT_MAX = 200
 const DAY_MS = 86_400_000
 
-export const BOARD_TYPES = [
-  { templateType: 'blank', label: 'En blanco', uso: 'Lienzo libre para bocetos, ideas o cualquier uso que no encaje en otro tipo.' },
-  { templateType: 'plan', label: 'Plano', uso: 'Plantas de oficinas, bodegas, locales o casas: inserta el plano (imagen o PDF) y marca areas y puntos.' },
-  { templateType: 'technical-map', label: 'Mapa tecnico', uso: 'Instalaciones y redes (electricidad, agua, datos, maquinaria) con hotspots vinculados a inventario o vehiculos.' },
-  { templateType: 'diagram', label: 'Diagrama', uso: 'Procesos, flujos y organigramas con rectangulos, rombos de decision, flechas y textos.' },
-  { templateType: 'layout', label: 'Distribucion', uso: 'Acomodo de espacios y mobiliario: mesas, estantes, puestos de trabajo, eventos o reubicaciones.' },
-  { templateType: 'pdf-review', label: 'Revision de PDF', uso: 'Insertar paginas de un PDF y marcar observaciones encima con hotspots, formas y textos.' },
-]
+export const BOARD_TYPES = CANVAS_TEMPLATES.map((template) => ({ templateType: template.key, label: template.label, uso: template.useWhen, incluye: template.includes }))
 export const HOTSPOT_STATUS = { ACTIVE: 'Activo', REVIEW: 'En revision', RESOLVED: 'Resuelto', INACTIVE: 'Inactivo' }
 const TYPE_LABEL = Object.fromEntries(BOARD_TYPES.map((t) => [t.templateType, t.label]))
 
@@ -36,7 +31,7 @@ export function createCanvasMiraiQueries({ prisma }) {
       parameters: { type: 'object', properties: {} },
     },
     async run() {
-      return { tipos: BOARD_TYPES, nota: 'Todas las herramientas (formas, textos, hotspots, imagenes y PDF) funcionan igual en cualquier tipo.' }
+      return { tipos: BOARD_TYPES, nota: 'Cada tipo prepara capas, cuadricula y herramienta inicial; todas las herramientas (formas, textos, hotspots, imagenes y PDF) funcionan en cualquier tipo.' }
     },
   }
 

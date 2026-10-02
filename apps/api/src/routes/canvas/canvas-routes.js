@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { UserAccessError, createUserAccessService } from '../../services/user-access-service.js'
 import { CanvasServiceError, createCanvasService } from './canvas-service.js'
 import { createCanvasPublicLinksService } from './canvas-public.js'
+import { CANVAS_TEMPLATES } from './canvas-templates.js'
 
 const actorId = (c) => c.get('userContext')?.profile?.id ?? null
 const companyId = (c) => c.get('companyId') ?? null
@@ -23,6 +24,8 @@ export function createCanvasRouter({ prisma, requirePermission, broadcaster = nu
   const access = prisma ? createUserAccessService({ prisma }) : null
   const publicLinks = prisma ? createCanvasPublicLinksService({ prisma, canvas }) : null
   const changed = (boardId, action, payload = {}) => broadcaster?.broadcastToChannel?.(`canvas:board:${boardId}`, 'canvas.changed', { boardId, action, ...payload }).catch(() => {})
+
+  app.get('/canvas/templates', requirePermission('canvas.view'), (c) => c.json({ data: CANVAS_TEMPLATES }))
 
   app.get('/canvas/boards', requirePermission('canvas.view'), async (c) => {
     try { return c.json(await canvas.listBoards(companyId(c), actorId(c))) }
