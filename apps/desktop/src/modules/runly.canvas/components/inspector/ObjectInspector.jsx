@@ -1,6 +1,6 @@
 import { Badge, Button, Switch, Textarea } from '@runly/ui'
 import { ArrowDownToLine, ArrowUpToLine, Copy, Lock, MapPin, Pencil, Trash2 } from 'lucide-react'
-import { boxOf, canRotate, centerOf, isLinear } from '../../engine/geometry.js'
+import { boxOf, canResize, canRotate, centerOf, isLinear } from '../../engine/geometry.js'
 import { CANVAS_COLORS, objectLabel } from '../../lib/objectFactory.js'
 import { measureTextHeight } from '../../engine/text.js'
 import { Choice, ColorSwatches, FieldLabel, NumberInput, Section } from './fields.jsx'
@@ -16,7 +16,7 @@ const RADIUS = [0, 8, 16, 32].map((value) => ({ value, label: String(value), ari
 const FONT_SIZES = [14, 18, 24, 36, 48].map((value) => ({ value, label: String(value), ariaLabel: `${value} px` }))
 
 function GeometryFields({ object, onPatch }) {
-  const b = boxOf(object), linear = isLinear(object), fixedSize = object.type === 'hotspot'
+  const b = boxOf(object), linear = isLinear(object), fixedSize = !canResize(object)
   // Width/height edits keep the visual center where it is, like design tools.
   const setSize = (key, value) => {
     if (linear) return onPatch({ geometry: { [key === 'width' ? 'x2' : 'y2']: value } })
