@@ -30,6 +30,72 @@ function writeOpen(value) {
   try { localStorage.setItem(LS_KEY, value ? "1" : "0"); } catch { /* ignore */ }
 }
 
+// Edge-tab position: snapped to the left or right edge, vertical position as a
+// viewport fraction so it survives window resizes.
+const TAB_POS_KEY = "mirai.tab.position";
+const TAB_MARGIN = 56;
+
+function readTabPos() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TAB_POS_KEY));
+    if (raw && (raw.side === "left" || raw.side === "right") && Number.isFinite(raw.y)) return raw;
+  } catch { /* ignore */ }
+  return { side: "right", y: 0.5 };
+}
+function writeTabPos(pos) {
+  try { localStorage.setItem(TAB_POS_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+}
+function clampTabY(px) {
+  const h = window.innerHeight;
+  return Math.min(Math.max(px, TAB_MARGIN), h - TAB_MARGIN);
+}
+
+// Click opens; dragging past a small threshold moves the tab and on release it
+// snaps to the nearest side edge.
+function useDraggableTab(onClick) {
+  const [pos, setPos] = useState(readTabPos);
+  const [drag, setDrag] = useState(null);
+  const startRef = useRef(null);
+  const movedRef = useRef(false);
+
+  function onPointerDown(e) {
+    if (e.button !== 0) return;
+    startRef.current = { x: e.clientX, y: e.clientY, type: e.pointerType };
+    movedRef.current = false;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e) {
+    const start = startRef.current;
+    if (!start) return;
+    const threshold = start.type === "touch" ? 12 : 6;
+    if (!movedRef.current && Math.hypot(e.clientX - start.x, e.clientY - start.y) < threshold) return;
+    movedRef.current = true;
+    setDrag({ x: e.clientX, y: clampTabY(e.clientY) });
+  }
+  function onPointerUp(e) {
+    if (!startRef.current) return;
+    startRef.current = null;
+    if (movedRef.current) {
+      const next = {
+        side: e.clientX < window.innerWidth / 2 ? "left" : "right",
+        y: clampTabY(e.clientY) / window.innerHeight,
+      };
+      setPos(next);
+      writeTabPos(next);
+      setDrag(null);
+    } else {
+      onClick();
+    }
+  }
+  function onPointerCancel() {
+    startRef.current = null;
+    movedRef.current = false;
+    setDrag(null);
+  }
+
+  return { pos, drag, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } };
+}
+
 function threadMeta(thread) {
   const when = thread.lastMessageAt
     ? new Date(thread.lastMessageAt).toLocaleDateString("es-MX", { day: "numeric", month: "short" })
@@ -71,7 +137,13 @@ export function MiraiSidebarHost() {
 
   const coarse = useCoarsePointer();
   const { prefs } = useChatPreferences();
+  const tab = useDraggableTab(() => setOpen(true));
   if (!visible) return null;
+
+  const left = tab.pos.side === "left";
+  const tabStyle = tab.drag
+    ? { left: tab.drag.x, top: tab.drag.y, right: "auto", transform: "translate(-50%, -50%)" }
+    : { top: `${tab.pos.y * 100}%` };
 
   const panel = openedOnce && <MiraiPanel open={open} coarse={coarse} onClose={coarse ? undefined : () => setOpen(false)} />;
 
@@ -81,8 +153,19 @@ export function MiraiSidebarHost() {
         <Button
           variant="outline"
           aria-label="Abrir MirAI"
-          onClick={() => setOpen(true)}
-          className="group fixed right-0 top-1/2 z-40 -translate-y-1/2 justify-start gap-0 overflow-hidden rounded-l-full rounded-r-none border-r-0 bg-[hsl(var(--background))]/90 px-3 text-[hsl(var(--muted-foreground))] shadow-md backdrop-blur transition-all duration-200 hover:gap-2 hover:bg-[hsl(var(--muted))] hover:px-4 hover:text-[hsl(var(--foreground))] hover:shadow-lg motion-reduce:transition-none"
+          title="Abrir MirAI (arrastra para moverlo)"
+          {...tab.handlers}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
+          style={tabStyle}
+          className={[
+            "group fixed z-40 touch-none select-none justify-start gap-0 overflow-hidden bg-[hsl(var(--background))]/90 px-3 text-[hsl(var(--muted-foreground))] shadow-md backdrop-blur hover:gap-2 hover:bg-[hsl(var(--muted))] hover:px-4 hover:text-[hsl(var(--foreground))] hover:shadow-lg",
+            tab.drag
+              ? "cursor-grabbing rounded-full shadow-xl"
+              : [
+                "-translate-y-1/2 transition-all duration-200 motion-reduce:transition-none",
+                left ? "left-0 flex-row-reverse rounded-l-none rounded-r-full border-l-0" : "right-0 rounded-l-full rounded-r-none border-r-0",
+              ].join(" "),
+          ].join(" ")}
         >
           <Sparkles className="h-4 w-4 shrink-0" />
           <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover:max-w-24 group-hover:opacity-100 motion-reduce:transition-none">
