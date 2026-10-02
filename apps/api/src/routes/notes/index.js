@@ -325,8 +325,10 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
       const { userId } = getAuth(c)
       const noteId = c.req.param('id')
       const body = await c.req.json()
-      const { state } = body
-      const data = await ydoc.saveState(noteId, userId, state)
+      // `state` may be a full snapshot or an incremental update; the service
+      // merges either into the stored doc. `stateVector` asks for a catch-up diff.
+      const { state, stateVector } = body
+      const data = await ydoc.saveState(noteId, userId, state, { stateVectorBase64: stateVector ?? null })
       return c.json(data)
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)
@@ -445,6 +447,17 @@ export function createNotesRouter({ prisma, supabaseAdmin, authMiddleware, requi
       const noteId = c.req.param('id')
       const shareId = c.req.param('shareId')
       const data = await shares.revokeShare(shareId, userId)
+      return c.json(data)
+    } catch (e) {
+      return c.json({ error: e.message }, e.status ?? 500)
+    }
+  })
+
+  // POST /notes/:id/leave — a collaborator removes a note shared with them
+  internal.post('/:id/leave', requirePermission('notes.notes.read'), async (c) => {
+    try {
+      const { userId } = getAuth(c)
+      const data = await shares.leaveNote(c.req.param('id'), userId)
       return c.json(data)
     } catch (e) {
       return c.json({ error: e.message }, e.status ?? 500)

@@ -157,6 +157,20 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     return { ok: true }
   }
 
+  // A collaborator removes the note from their own lists by dropping their
+  // share. The note itself (and everyone else's access) is untouched — only
+  // the owner can trash it.
+  async function leaveNote(noteId, userId) {
+    const rows = await prisma.$queryRaw`
+      DELETE FROM note_shares
+      WHERE note_id = ${noteId}::uuid
+        AND shared_with_user_id = ${userId}::uuid
+      RETURNING id
+    `
+    if (!rows.length) throw new SharesServiceError('Esta nota no esta compartida contigo', 404)
+    return { ok: true }
+  }
+
   async function publishNote(noteId, userId) {
     const rows = await prisma.$queryRaw`
       SELECT id, is_public, public_slug FROM notes
@@ -246,5 +260,5 @@ export function createSharesService({ prisma, broadcaster, notificationService }
     return { ...note, collaborators }
   }
 
-  return { listShares, listShareableUsers, shareNote, updateShare, revokeShare, publishNote, unpublishNote, getPublicNote }
+  return { listShares, listShareableUsers, shareNote, updateShare, revokeShare, leaveNote, publishNote, unpublishNote, getPublicNote }
 }

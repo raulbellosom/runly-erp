@@ -17,7 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { classifyError } from "../lib/classifyError.js";
-import { requestBugReport } from "@runly/ui";
+import { requestBugReport, hasBugReportListener } from "@runly/ui";
 
 // ─── Per-type config ──────────────────────────────────────────────────────────
 const ERROR_CONFIG = {
@@ -253,8 +253,14 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, com
     }
   }
 
+  // Checked once at mount: BugReportHost lives above the inner ErrorBoundary,
+  // but a crash caught by the outermost boundary unmounts it as well.
+  const [canReport] = useState(hasBugReportListener);
+
+  // z-40, not higher: the bug-report Dialog (and its overlay) render at z-50
+  // in a body portal and must open on top of this screen, not behind it.
   const wrapperClass = fullScreen
-    ? "fixed inset-0 z-[300] flex flex-col items-center justify-center overflow-hidden"
+    ? "fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden"
     : "flex min-h-[60dvh] flex-col items-center justify-center";
 
   return (
@@ -389,7 +395,7 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, com
         </motion.div>
 
         {/* Report bug — opens the BugReportHost dialog mounted at app root */}
-        <motion.button
+        {canReport && <motion.button
           onClick={() => requestBugReport({ context, message: summary, stack: fullDetails })}
           className="text-xs font-medium transition-opacity duration-150 hover:opacity-80"
           style={{ color: "hsl(var(--muted-foreground))" }}
@@ -398,7 +404,7 @@ export function ApiErrorScreen({ error, onRetry, fullScreen = true, context, com
           transition={{ duration: 0.3, delay: 0.38 }}
         >
           Reportar bug
-        </motion.button>
+        </motion.button>}
 
         {/* Technical details toggle */}
         <motion.div

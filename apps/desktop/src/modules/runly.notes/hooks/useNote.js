@@ -37,6 +37,22 @@ export function useTrashNote() {
   })
 }
 
+// A collaborator drops a note shared with them (the note itself stays intact).
+export function useLeaveNote() {
+  const token = useToken()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (noteId) => runly.notes.leave(noteId, token),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notes'] }),
+  })
+}
+
+export function isNoteOwner(note, userId) {
+  if (!note) return false
+  if (typeof note.is_owner === 'boolean') return note.is_owner
+  return Boolean(userId) && note.owner_user_id === userId
+}
+
 export function useRestoreNote() {
   const token = useToken()
   const qc = useQueryClient()

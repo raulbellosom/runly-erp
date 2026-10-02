@@ -11,6 +11,12 @@ export function requestBugReport(payload) {
   listeners.forEach((fn) => fn(payload));
 }
 
+// Lets a caller hide its "Reportar bug" entry point when nothing would answer
+// it (e.g. the outermost ErrorBoundary, where BugReportHost was torn down too).
+export function hasBugReportListener() {
+  return listeners.size > 0;
+}
+
 export function onBugReportRequest(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);

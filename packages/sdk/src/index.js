@@ -2671,11 +2671,12 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/notes/${encodeURIComponent(id)}`, {
           headers: withAuthHeaders(token),
         }),
-      update: (id, data, token) =>
+      update: (id, data, token, { keepalive } = {}) =>
         request(`/notes/${encodeURIComponent(id)}`, {
           method: "PATCH",
           headers: withAuthHeaders(token),
           body: JSON.stringify(data),
+          ...(keepalive ? { keepalive: true, onlineOnly: true } : {}),
         }),
       trash: (id, token) =>
         request(`/notes/${encodeURIComponent(id)}`, {
@@ -2696,11 +2697,21 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/notes/${encodeURIComponent(id)}/ydoc`, {
           headers: withAuthHeaders(token),
         }),
-      saveYDoc: (id, stateBase64, token) =>
+      // stateBase64 is a full Y.js state or an incremental update — the API
+      // merges it. stateVector (base64) asks for the `missing` catch-up diff;
+      // keepalive lets the request outlive a page unload.
+      saveYDoc: (id, stateBase64, token, { stateVector, keepalive } = {}) =>
         request(`/notes/${encodeURIComponent(id)}/ydoc`, {
           method: "PUT",
           headers: withAuthHeaders(token),
-          body: JSON.stringify({ state: stateBase64 }),
+          body: JSON.stringify(stateVector ? { state: stateBase64, stateVector } : { state: stateBase64 }),
+          ...(keepalive ? { keepalive: true, onlineOnly: true } : {}),
+        }),
+      leave: (id, token) =>
+        request(`/notes/${encodeURIComponent(id)}/leave`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          onlineOnly: true,
         }),
       getCanvas: (id, token) =>
         request(`/notes/${encodeURIComponent(id)}/canvas`, {

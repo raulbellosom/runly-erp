@@ -12,7 +12,10 @@ import {
 } from '@runly/ui'
 import { NoteIcon } from './noteIcons.jsx'
 import { useNotes, useCreateNote } from './hooks/useNotes.js'
-import { useNote, useUpdateNote, useTrashNote, useRestoreNote, usePermanentDeleteNote } from './hooks/useNote.js'
+import {
+  useNote, useUpdateNote, useTrashNote, useLeaveNote, useRestoreNote, usePermanentDeleteNote, isNoteOwner,
+} from './hooks/useNote.js'
+import { useAuth } from '../../auth/AuthProvider'
 import { usePublishNote, useUnpublishNote } from './hooks/useNoteShares.js'
 import { useIsDark } from './hooks/useIsDark.js'
 import { DARK_BG_MAP } from './lib/noteColors.js'
@@ -73,6 +76,10 @@ export default function NotesScreen() {
   const [restoreOpen, setRestoreOpen]   = useState(false)
   const [deleteOpen, setDeleteOpen]     = useState(false)
   const [noteToAction, setNoteToAction] = useState(null)
+  const [removeTarget, setRemoveTarget] = useState(null)
+  const { session } = useAuth()
+  const userId = session?.user?.id ?? null
+  const removeTargetIsOwned = isNoteOwner(removeTarget, userId)
   const [mobileView, setMobileView]     = useState('list')
   const [listCollapsed, setListCollapsed] = useState(getListCollapsed)
   const [isDesktop, setIsDesktop] = useState(
@@ -134,6 +141,7 @@ export default function NotesScreen() {
   const createNote      = useCreateNote()
   const updateNote      = useUpdateNote()
   const trashNote       = useTrashNote()
+  const leaveNote       = useLeaveNote()
   const restoreNote     = useRestoreNote()
   const permanentDelete = usePermanentDeleteNote()
   const publishNote     = usePublishNote()
@@ -190,18 +198,21 @@ export default function NotesScreen() {
     )
   }, [selectedNote, updateNote])
 
-  function handleTrash(note) {
+  function clearIfSelected(target) {
+    if (selectedNote?.id === target.id) {
+      setSelectedNote(null)
+      setNoteParam(null)
+      setMobileView('list')
+    }
+  }
+
+  // Already-confirmed removal: the owner trashes the note; a collaborator only
+  // leaves it (drops their share) — they must never delete the owner's note.
+  function handleRemove(note) {
     const target = note ?? selectedNote
     if (!target) return
-    trashNote.mutate(target.id, {
-      onSuccess: () => {
-        if (selectedNote?.id === target.id) {
-          setSelectedNote(null)
-          setNoteParam(null)
-          setMobileView('list')
-        }
-      },
-    })
+    const mutation = isNoteOwner(target, userId) ? trashNote : leaveNote
+    mutation.mutate(target.id, { onSuccess: () => clearIfSelected(target) })
   }
 
   function selectNote(note) {
@@ -273,7 +284,7 @@ export default function NotesScreen() {
               notes={notes}
               selectedNoteId={selectedNote?.id}
               onSelect={selectNote}
-              onTrash={!isTrashView ? handleTrash : undefined}
+              onTrash={!isTrashView ? setRemoveTarget : undefined}
               isLoading={isLoading}
               showTrash={isTrashView}
               search={search}
@@ -413,9 +424,25 @@ export default function NotesScreen() {
           onUpdate={handleUpdateNote}
           onPublish={() => publishNote.mutate(selectedNote.id, { onSuccess: r => r?.note && setSelectedNote(r.note) })}
           onUnpublish={() => unpublishNote.mutate(selectedNote.id, { onSuccess: r => r?.note && setSelectedNote(r.note) })}
-          onTrash={() => { setSettingsOpen(false); handleTrash(selectedNote) }}
+          isOwner={isNoteOwner(selectedNote, userId)}
+          onTrash={() => { setSettingsOpen(false); handleRemove(selectedNote) }}
         />
       )}
+
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={removeTargetIsOwned ? 'Enviar nota a papelera' : 'Salir de la nota'}
+        description={removeTargetIsOwned
+          ? 'La nota se movera a la papelera para ti y para todos con quienes la compartiste. Puedes restaurarla desde alli.'
+          : 'La nota dejara de aparecer en tu lista. No se elimina para su propietario ni para los demas colaboradores.'}
+        confirmLabel={removeTargetIsOwned ? 'Mover a papelera' : 'Salir de la nota'}
+        onConfirm={() => {
+          const target = removeTarget
+          setRemoveTarget(null)
+          handleRemove(target)
+        }}
+      />
 
       <ConfirmDialog
         open={restoreOpen}

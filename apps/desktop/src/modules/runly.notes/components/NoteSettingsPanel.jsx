@@ -26,7 +26,7 @@ function Section({ label, children }) {
   )
 }
 
-export function NoteSettingsPanel({ open, onOpenChange, note, onUpdate, onPublish, onUnpublish, onTrash }) {
+export function NoteSettingsPanel({ open, onOpenChange, note, onUpdate, onPublish, onUnpublish, onTrash, isOwner = true }) {
   const { session } = useAuth()
   const [exporting, setExporting] = useState(false)
   const { data: foldersData } = useNoteFolders()
@@ -389,7 +389,7 @@ export function NoteSettingsPanel({ open, onOpenChange, note, onUpdate, onPublis
               onClick={() => setTrashOpen(true)}
               className="w-full text-xs text-destructive hover:bg-destructive/5 py-2.5 rounded-lg border border-destructive/20 transition-colors font-medium"
             >
-              Enviar a papelera
+              {isOwner ? 'Enviar a papelera' : 'Salir de la nota'}
             </button>
           </div>
 
@@ -398,9 +398,11 @@ export function NoteSettingsPanel({ open, onOpenChange, note, onUpdate, onPublis
         <ConfirmDialog
           open={trashOpen}
           onOpenChange={setTrashOpen}
-          title="Enviar nota a papelera"
-          description="La nota se movera a la papelera. Puedes restaurarla desde alli."
-          confirmLabel="Mover a papelera"
+          title={isOwner ? 'Enviar nota a papelera' : 'Salir de la nota'}
+          description={isOwner
+            ? 'La nota se movera a la papelera para ti y para todos con quienes la compartiste. Puedes restaurarla desde alli.'
+            : 'La nota dejara de aparecer en tu lista. No se elimina para su propietario ni para los demas colaboradores.'}
+          confirmLabel={isOwner ? 'Mover a papelera' : 'Salir de la nota'}
           onConfirm={() => { setTrashOpen(false); onTrash?.() }}
         />
       </SheetContent>

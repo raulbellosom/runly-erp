@@ -8,6 +8,39 @@ export class NotesServiceError extends Error {
   }
 }
 
+// [payload key, column, value the UPDATE writes when the payload value is nullish]
+const UPDATABLE_FIELDS = [
+  ["title", "title", ""],
+  ["content", "content", ""],
+  ["contentText", "content_text", ""],
+  ["icon", "icon", ""],
+  ["backgroundColor", "background_color", null],
+  ["backgroundImageUrl", "background_image_url", null],
+  ["paperStyle", "paper_style", "none"],
+  ["paperMargin", "paper_margin", false],
+  ["paperTexture", "paper_texture", false],
+  ["paperShadow", "paper_shadow", false],
+  ["showPublicCollaborators", "show_public_collaborators", true],
+  ["coverUrl", "cover_url", null],
+  ["folderId", "folder_id", null],
+  ["isPinned", "is_pinned", null],
+  ["isArchived", "is_archived", null],
+  ["wordCount", "word_count", null],
+];
+
+function comparable(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+export function hasNoteChanges(current, data) {
+  return UPDATABLE_FIELDS.some(([key, column, fallback]) => {
+    if (data[key] === undefined) return false;
+    return comparable(data[key] ?? fallback) !== comparable(current[column]);
+  });
+}
+
 export function createNotesService({ prisma, broadcaster = null }) {
   const folders = createFoldersService({ prisma });
   // ------------------------------------------------------------------
@@ -306,6 +339,11 @@ export function createNotesService({ prisma, broadcaster = null }) {
       throw new NotesServiceError('Mostrar colaboradores debe ser verdadero o falso.', 400);
     }
 
+    // Opening a note re-sends the same content/title (editor normalization,
+    // autosave flush); that must not bump updated_at and reorder "Recientes".
+    const [current] = await prisma.$queryRaw`SELECT * FROM notes WHERE id = ${noteId} LIMIT 1`;
+    const changed = current ? hasNoteChanges(current, data) : true;
+
     const rows = await prisma.$queryRaw`
       UPDATE notes
       SET
@@ -389,7 +427,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
                                  THEN ${data.wordCount ?? null}::integer
                                  ELSE word_count
                                END,
-        updated_at           = NOW()
+        updated_at           = CASE WHEN ${changed}::boolean THEN NOW() ELSE updated_at END
       WHERE id = ${noteId}
         AND deleted_at IS NULL
       RETURNING *
@@ -398,6 +436,7 @@ export function createNotesService({ prisma, broadcaster = null }) {
     if (!rows.length) {
       throw new NotesServiceError("Nota no encontrada.", 404);
     }
+    if (!changed) return rows[0];
 
     // Broadcast to every collaborator so metadata (cover, icon, background,
     // title, folder...) shows up live for them — the note body syncs through

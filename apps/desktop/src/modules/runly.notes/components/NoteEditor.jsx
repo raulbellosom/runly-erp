@@ -4,6 +4,7 @@ import { EditorProvider } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import * as Y from 'yjs'
+import { isChangeOrigin } from '@tiptap/extension-collaboration'
 import { NotebookPen } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider'
@@ -11,7 +12,8 @@ import { useIsDark } from '../hooks/useIsDark.js'
 import { NoteSheet } from './NoteSheet.jsx'
 import { runly } from '../../../lib/runly'
 import { supabase } from '../../../lib/supabase'
-import { SupabaseYjsProvider, bytesToBase64 } from '../lib/SupabaseYjsProvider.js'
+import { SupabaseYjsProvider } from '../lib/SupabaseYjsProvider.js'
+import { buildYDocSave, applyServerCatchUp } from '../lib/ydocPersistence.js'
 import { buildExtensions } from '../lib/editor-extensions.js'
 import { usePresence } from '../hooks/usePresence.js'
 import { shouldFocusDocumentEnd } from '../lib/clickBelowContent.js'
@@ -28,6 +30,9 @@ import { DrawingBlock } from '../lib/extensions/DrawingBlock.jsx'
 import { AnnotatableImage } from '../lib/extensions/AnnotatableImage.jsx'
 
 const AUTOSAVE_DELAY = 1500
+// Browsers reject keepalive bodies past 64 KB (shared by all in-flight
+// keepalive requests); leave room for the Y.js update sent alongside.
+const KEEPALIVE_CONTENT_LIMIT = 24_000
 
 // Fixed palette for per-collaborator cursor/avatar color — distinct from the
 // amber brand accent so collaborators don't blend into UI chrome, and from
@@ -242,53 +247,110 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
   // update (not inside the timeout) means an unmount flush always has the
   // freshest content even if the debounce never fired.
   const pendingRef = useRef(null)
+  // Local Y.js changes not yet acknowledged by the server.
+  const ydocDirtyRef = useRef(false)
   const savingRef = useRef(false)
+  const rerunRef = useRef(false)
   const saveTimerRef = useRef(null)
 
   const flushSave = useCallback(async () => {
     if (readOnly || !note?.id || !token) return
+    if (savingRef.current) {
+      rerunRef.current = true
+      return
+    }
+    // Build both payloads synchronously: on note switch the engine's Y.Doc is
+    // destroyed right after this unmount flush starts, so nothing may be read
+    // from it after the first await.
     const snap = pendingRef.current
-    if (!snap || savingRef.current) return
+    const ydocSave = ydoc && provider && ydocDirtyRef.current
+      ? buildYDocSave(ydoc, provider.serverStateVector)
+      : null
+    if (!snap && !ydocSave) return
     savingRef.current = true
     pendingRef.current = null
+    ydocDirtyRef.current = false
     try {
-      try {
-        await runly.notes.update(note.id, snap, token)
-        queryClient.invalidateQueries({ queryKey: ['notes'] })
-        queryClient.invalidateQueries({ queryKey: ['notes', note.id] })
-      } catch (err) {
-        console.warn('[NoteEditor] content autosave failed:', err?.message)
-        // Keep the snapshot so the next edit (or the unmount flush) retries.
-        if (!pendingRef.current) pendingRef.current = snap
-        return
-      }
-      // Persist the Y.js state separately — a failure here (NOT a content
-      // failure) is exactly why a note can reload blank in the collaborative
-      // editor, so surface it loudly instead of hiding it.
-      if (ydoc) {
+      // The Y.js state goes first: it is the collaborative source of truth
+      // (the HTML column is a derived preview). The server MERGES it, so this
+      // save can never erase a collaborator's work.
+      if (ydocSave) {
         try {
-          const stateB64 = bytesToBase64(Y.encodeStateAsUpdate(ydoc))
-          await runly.notes.saveYDoc(note.id, stateB64, token)
+          const res = await runly.notes.saveYDoc(note.id, ydocSave.update, token, {
+            stateVector: ydocSave.stateVector,
+          })
+          provider.serverStateVector = ydocSave.sentStateVector
+          applyServerCatchUp(ydoc, res)
         } catch (err) {
-          console.error(
-            '[NoteEditor] Y.js state save FAILED — note will reload blank:',
-            err?.message ?? err,
-          )
+          ydocDirtyRef.current = true
+          console.error('[NoteEditor] Y.js state save failed:', err?.message ?? err)
+        }
+      }
+      if (snap) {
+        try {
+          await runly.notes.update(note.id, snap, token)
+          queryClient.invalidateQueries({ queryKey: ['notes'] })
+          queryClient.invalidateQueries({ queryKey: ['notes', note.id] })
+        } catch (err) {
+          console.warn('[NoteEditor] content autosave failed:', err?.message)
+          // Keep the snapshot so the next edit (or the unmount flush) retries.
+          if (!pendingRef.current) pendingRef.current = snap
         }
       }
     } finally {
       savingRef.current = false
-      // Switching to view can flush while a previous request is in flight.
-      // Drain any newer snapshot once it finishes, even without another edit.
-      if (pendingRef.current && pendingRef.current !== snap) {
+      // A flush requested while this one was in flight (switch to view, a new
+      // debounce) runs now, even without another edit.
+      if (rerunRef.current) {
+        rerunRef.current = false
         queueMicrotask(() => flushRef.current())
       }
     }
-  }, [note?.id, token, readOnly, ydoc, queryClient])
+  }, [note?.id, token, readOnly, ydoc, provider, queryClient])
+
+  // A reload or closed tab kills in-flight fetches and never runs the unmount
+  // flush. keepalive requests survive the unload; the Y.js part is an
+  // incremental update, so it stays under the browser's 64 KB keepalive cap.
+  useEffect(() => {
+    if (readOnly || !note?.id || !token) return
+    function flushOnExit() {
+      clearTimeout(saveTimerRef.current)
+      if (ydoc && provider && ydocDirtyRef.current) {
+        const s = buildYDocSave(ydoc, provider.serverStateVector)
+        ydocDirtyRef.current = false
+        runly.notes.saveYDoc(note.id, s.update, token, { keepalive: true })
+          .then(() => { provider.serverStateVector = s.sentStateVector })
+          .catch(() => { ydocDirtyRef.current = true })
+      }
+      const snap = pendingRef.current
+      if (snap && snap.content.length < KEEPALIVE_CONTENT_LIMIT) {
+        pendingRef.current = null
+        runly.notes.update(note.id, snap, token, { keepalive: true })
+          .catch(() => { if (!pendingRef.current) pendingRef.current = snap })
+      }
+    }
+    function onVisibility() {
+      if (document.visibilityState === 'hidden') flushOnExit()
+    }
+    window.addEventListener('pagehide', flushOnExit)
+    window.addEventListener('beforeunload', flushOnExit)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flushOnExit)
+      window.removeEventListener('beforeunload', flushOnExit)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [readOnly, note?.id, token, ydoc, provider])
 
   const handleUpdate = useCallback(
     ({ editor, transaction }) => {
       if (!transaction?.docChanged || viewing || !note?.id || !token) return
+      // Changes that arrived through Y.js (initial load, a collaborator's
+      // edit, the server catch-up) are not this user's edits: their author
+      // persists them. Saving here is what made merely opening a note count
+      // as an update and jump it to the top of "Recientes".
+      if (isChangeOrigin(transaction)) return
+      ydocDirtyRef.current = Boolean(ydoc)
       // First paragraph text becomes the note title (Apple Notes pattern).
       // Always send it — an empty string clears a stale "Nueva nota".
       const firstChild = editor.state.doc.firstChild
@@ -300,7 +362,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(flushSave, AUTOSAVE_DELAY)
     },
-    [note?.id, token, viewing, flushSave],
+    [note?.id, token, viewing, ydoc, flushSave],
   )
 
   useEffect(() => {
@@ -466,6 +528,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
     // Persist the migrated Y.js state immediately (skip the 1.5s autosave
     // debounce) so a guest opening the note right after sees the state and
     // never runs its own seed.
+    ydocDirtyRef.current = true
     clearTimeout(saveTimerRef.current)
     flushSave()
   }

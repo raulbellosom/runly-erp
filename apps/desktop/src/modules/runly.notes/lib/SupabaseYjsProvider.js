@@ -51,6 +51,10 @@ export class SupabaseYjsProvider {
     // false, the note's content still lives only in the legacy `notes.content`
     // HTML column and the editor must seed the empty ydoc from it once.
     this.hadServerState = false
+    // State vector of what the server is known to hold. Saves send only the
+    // diff past it (small enough for a keepalive request on page unload); null
+    // means "unknown", so the next save sends the full state.
+    this.serverStateVector = null
     this.awareness = new awarenessProtocol.Awareness(ydoc)
     this._supabase = authorizeRealtimeClient(supabase)
     this._readOnly = readOnly
@@ -82,7 +86,9 @@ export class SupabaseYjsProvider {
         : await runly.notes.getYDoc(this.noteId, token)
       const serverState = extractServerYState(res)
       if (serverState) {
-        Y.applyUpdate(this.ydoc, base64ToBytes(serverState), 'server-load')
+        const bytes = base64ToBytes(serverState)
+        Y.applyUpdate(this.ydoc, bytes, 'server-load')
+        this.serverStateVector = Y.encodeStateVectorFromUpdate(bytes)
         this.hadServerState = true
         console.debug(
           `[notes/yjs] loaded server state (${serverState.length} b64 chars), ` +

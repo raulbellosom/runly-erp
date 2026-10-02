@@ -242,7 +242,7 @@ export { ShareLinkDialog } from "./components/ShareLinkDialog.jsx";
 export { PublicLinkFrame } from "./components/PublicLinkFrame.jsx";
 export { ThemedEmojiPicker } from "./components/ThemedEmojiPicker.jsx";
 export { BugReportDialog } from "./components/BugReportDialog.jsx";
-export { requestBugReport, onBugReportRequest } from "./lib/bugReportBus.js";
+export { requestBugReport, onBugReportRequest, hasBugReportListener } from "./lib/bugReportBus.js";
 export { ContactPicker } from "./components/ContactPicker.jsx";
 export { FileCard } from "./components/FileCard.jsx";
 export { DistDropZone } from "./components/DistDropZone.jsx";

@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Trash2, Shapes, FileText } from 'lucide-react'
+import { Trash2, LogOut, Shapes, FileText } from 'lucide-react'
 import { NoteIcon } from '../noteIcons.jsx'
 
 export function NoteCard({ note, isSelected, onClick, onTrash }) {
@@ -84,12 +84,15 @@ export function NoteCard({ note, isSelected, onClick, onTrash }) {
         </div>
 
         {onTrash && (
+          // List rows carry is_owner; a shared note offers "leave", never delete.
           <button
             onClick={e => { e.stopPropagation(); onTrash(note) }}
             className="opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 p-1 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-all"
-            title="Enviar a papelera"
+            title={note.is_owner === false ? 'Salir de la nota' : 'Enviar a papelera'}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            {note.is_owner === false
+              ? <LogOut className="w-3.5 h-3.5" />
+              : <Trash2 className="w-3.5 h-3.5" />}
           </button>
         )}
       </div>
