@@ -6,7 +6,7 @@ Canvas Fase 5 — páginas sobre mapa (OpenStreetMap) e importación de planos D
 
 ## 2. Status
 
-Approved (decisión delegada por el usuario, 2026-10-01).
+Complete — Verified: 2026-10-02 (node --test API 57/57 y desktop 71/71, eslint de archivos tocados, build:web con chunks diferidos de maplibre-gl y dxf-parser). Smoke manual pendiente.
 
 ## 3. Context
 
