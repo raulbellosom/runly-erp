@@ -96,8 +96,9 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       error.details = details;
       throw error;
     }
-    const data = await response.json();
     assertCurrentCompany(options.headers);
+    if (response.status === 204 || response.status === 205) return null;
+    const data = await response.json();
     return data;
   }
 
