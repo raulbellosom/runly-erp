@@ -200,20 +200,23 @@ describe('Runly Canvas service', () => {
     assert.ok(JSON.stringify(boardWhere).includes('bound-board'))
   })
 
-  it('only accepts thumbnails uploaded for the Board and disables the previous one', async () => {
-    const disabled = []
+  it('only accepts thumbnails uploaded for the Board and removes every other one', async () => {
+    const removed = []
     const prisma = {
       canvasBoard: { findFirst: async () => accessibleBoard({ thumbnailFileId: 'old' }), update: async ({ data }) => ({ id: BOARD, ...data }) },
       fileAsset: {
-        findFirst: async ({ where }) => (where.id === 'mine' && where.entityId === BOARD && where.moduleKey === 'runly.canvas' ? { id: 'mine' } : null),
-        updateMany: async ({ where }) => { disabled.push(where.id); return { count: 1 } },
+        // Files stores entityId = company and the Board in metadata.sourceEntityId.
+        findFirst: async ({ where }) => (where.id === 'mine' && where.entityId === COMPANY && where.entityType === 'CanvasThumbnail' && where.metadata?.equals === BOARD ? { id: 'mine' } : null),
       },
       auditLog: { create: async () => ({}) },
     }
-    const service = createCanvasService({ prisma })
+    const service = createCanvasService({ prisma, removeFiles: async (where) => { removed.push(where) } })
     await assert.rejects(() => service.updateBoard(COMPANY, USER, BOARD, { thumbnailFileId: 'foreign' }), (error) => error.status === 404)
     await service.updateBoard(COMPANY, USER, BOARD, { thumbnailFileId: 'mine' })
-    assert.deepEqual(disabled, ['old'])
+    assert.equal(removed.length, 1)
+    assert.deepEqual(removed[0].id, { not: 'mine' })
+    assert.equal(removed[0].entityId, COMPANY)
+    assert.equal(removed[0].metadata.equals, BOARD)
   })
 
   it('prevents deleting the final Page in a Board', async () => {

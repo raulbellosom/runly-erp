@@ -39,7 +39,14 @@ const ALLOWED_FILE_ENTITY_TYPES = [
   "CanvasBoard",
   // runly.canvas: SVG icons uploaded into a library for reuse across Boards.
   "CanvasLibrary",
+  // runly.canvas: generated Board covers. Signable like any Canvas file, but
+  // derived data: never listed in Files (see LISTED_FILE_ENTITY_TYPES).
+  "CanvasThumbnail",
 ];
+// Entity types shown in the Files listing (generated Canvas covers are not).
+const LISTED_FILE_ENTITY_TYPES = ALLOWED_FILE_ENTITY_TYPES.filter((type) => type !== "CanvasThumbnail");
+// Covers uploaded before they had their own entity type.
+const LEGACY_CANVAS_COVER = { moduleKey: "runly.canvas", entityType: "CanvasBoard", originalName: "miniatura.png" };
 const ALLOWED_EXACT_MIME_TYPES = new Set([
   ...Object.values(OFFICE_FORMATS).map(format => format.mimeType),
   "application/pdf",
@@ -468,10 +475,10 @@ export function createFilesService({ prisma, supabaseAdmin }) {
 
       const where = {
         entityId: companyId,
-        entityType: { in: ALLOWED_FILE_ENTITY_TYPES },
+        entityType: { in: LISTED_FILE_ENTITY_TYPES },
       };
 
-      where.AND = [await visibility.listWhere(context)];
+      where.AND = [await visibility.listWhere(context), { NOT: LEGACY_CANVAS_COVER }];
       const workspace = String(query.workspace ?? "");
       const filesOriginWhere = { entityType: "AtlasFile", OR: [{ moduleKey: null }, { moduleKey: { in: FILES_ORIGIN_MODULES } }] };
       if (workspace === "mine") where.AND.push({ uploadedById: context.profileId });

@@ -41,9 +41,9 @@ export function objectsDelta(results) {
   return JSON.stringify(delta).length <= DELTA_MAX_CHARS ? delta : { refetch: true }
 }
 
-export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder(), search = null, librariesService = null }) {
+export function createCanvasRouter({ prisma, requirePermission, broadcaster = null, entityResolver = null, service = null, dataSources = null, geocoder = createGeocoder(), search = null, librariesService = null, removeFiles = null }) {
   const app = new Hono()
-  const canvas = service ?? createCanvasService({ prisma, entityResolver })
+  const canvas = service ?? createCanvasService({ prisma, entityResolver, ...(removeFiles ? { removeFiles } : {}) })
   const libraries = librariesService ?? (prisma ? createCanvasLibrariesService({ prisma }) : null)
   const canvasSearch = search ?? (prisma ? createCanvasSearch({ prisma }) : null)
   const access = prisma ? createUserAccessService({ prisma }) : null

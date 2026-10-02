@@ -52,7 +52,7 @@ export function useBoardThumbnail({ boardId, enabled, rows, saving, board = null
       const form = new FormData()
       form.append('file', new File([blob], 'miniatura.png', { type: 'image/png' }))
       form.append('moduleKey', 'runly.canvas')
-      form.append('entityType', 'CanvasBoard')
+      form.append('entityType', 'CanvasThumbnail')
       form.append('entityId', currentBoardId)
       const asset = unwrap(await runly.files.upload(form, currentToken))
       const metadata = { ...(boardRef.current?.metadata ?? {}), thumbnailAt: new Date().toISOString() }

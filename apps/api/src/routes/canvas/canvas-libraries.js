@@ -1,4 +1,5 @@
 import { CanvasServiceError, validateCanvasObject } from './canvas-service.js'
+import { canvasFileWhere } from './canvas-files.js'
 
 const SCOPES = new Set(['PERSONAL', 'COMPANY'])
 const SOURCES = new Set(['custom', 'excalidraw', 'svg', 'mixed'])
@@ -106,7 +107,7 @@ export function createCanvasLibrariesService({ prisma }) {
     })
   }
 
-  async function buildItemData(libraryId, actorId, item) {
+  async function buildItemData(companyId, libraryId, actorId, item) {
     const name = cleanText(item?.name, 200) ?? 'Elemento'
     const kind = item?.kind
     if (!ITEM_KINDS.has(kind)) throw new CanvasServiceError('Tipo de elemento no soportado.', 400)
@@ -123,9 +124,9 @@ export function createCanvasLibrariesService({ prisma }) {
     } else {
       const fileAssetId = item?.fileAssetId
       if (!fileAssetId) throw new CanvasServiceError('El elemento de imagen requiere un archivo.', 400)
-      // Only an enabled file uploaded for this exact library (Files tags
-      // Canvas library uploads with runly.canvas/CanvasLibrary/<libraryId>).
-      const file = await prisma.fileAsset.findFirst({ where: { id: fileAssetId, enabled: true, moduleKey: 'runly.canvas', entityType: 'CanvasLibrary', entityId: libraryId }, select: { id: true } })
+      // Only an enabled file uploaded for this exact library (Files keeps the
+      // library id in metadata.sourceEntityId; entityId is the company).
+      const file = await prisma.fileAsset.findFirst({ where: { id: fileAssetId, ...canvasFileWhere(companyId, 'CanvasLibrary', libraryId) }, select: { id: true } })
       if (!file) throw new CanvasServiceError('Archivo no encontrado para esta biblioteca.', 400)
       data.fileAssetId = fileAssetId
     }
@@ -141,7 +142,7 @@ export function createCanvasLibrariesService({ prisma }) {
     const existingCount = await prisma.canvasLibraryItem.count({ where: { libraryId } })
     if (existingCount + inputItems.length > MAX_ITEMS_PER_LIBRARY) throw new CanvasServiceError('La biblioteca no puede superar 500 elementos.', 400)
     const rows = []
-    for (const item of inputItems) rows.push(await buildItemData(libraryId, actorId, item))
+    for (const item of inputItems) rows.push(await buildItemData(companyId, libraryId, actorId, item))
     return prisma.$transaction(async (tx) => {
       const created = []
       for (let index = 0; index < rows.length; index += 1) {

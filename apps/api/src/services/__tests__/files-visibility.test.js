@@ -26,6 +26,7 @@ function fakePrisma({ memberBoards = [], shares = [], queryRows = [] } = {}) {
       findMany: async () => (memberBoards.length ? [{ id: HOTSPOT }] : []),
       findFirst: async ({ where }) => (memberBoards.length && where.id === HOTSPOT ? { id: HOTSPOT } : null),
     },
+    canvasLibrary: { findMany: async () => [], findFirst: async () => null },
     task: { findMany: async () => [], findFirst: async () => null },
     $queryRaw: async (strings, ...values) => {
       calls.push(values);

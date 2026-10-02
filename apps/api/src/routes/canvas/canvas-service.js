@@ -3,6 +3,7 @@ import { isDataSource } from './canvas-data-sources.js'
 import { normalizeCalibration } from './canvas-calibration.js'
 import { isValidConnect } from './canvas-connect.js'
 import { pageGeoPatch } from './canvas-background.js'
+import { THUMBNAIL_ENTITY_TYPE, canvasFileWhere, staleThumbnailsWhere } from './canvas-files.js'
 
 const ROLE_RANK = { VIEWER: 1, COMMENTER: 2, EDITOR: 3, OWNER: 4 }
 const LAYER_TYPES = new Set(['vector', 'hotspot', 'data'])
@@ -90,7 +91,9 @@ function objectPatch(data, actorId) {
   return patch
 }
 
-export function createCanvasService({ prisma, entityResolver = null }) {
+// `removeFiles(where)` deletes FileAssets for real (wired to storage in the
+// API); without it, replaced thumbnails are only disabled.
+export function createCanvasService({ prisma, entityResolver = null, removeFiles = (where) => prisma.fileAsset.updateMany({ where, data: { enabled: false } }) }) {
   async function audit(db, { companyId, actorId, action, entityType, entityId, before = null, after = null, metadata = null }) {
     return db.auditLog.create({ data: { companyId, actorId, moduleKey: 'runly.canvas', action, entityType, entityId, before: jsonValue(before), after: jsonValue(after), metadata: jsonValue(metadata) } })
   }
@@ -169,16 +172,18 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     if (data.settings !== undefined) patch.settings = boardSettings(data.settings, effectiveBoardSettings(board))
     if (data.thumbnailFileId !== undefined) {
       const next = data.thumbnailFileId || null
-      // Only an enabled file uploaded for this Board (Files tags Canvas
-      // uploads with runly.canvas/CanvasBoard/<boardId>).
-      if (next && !(await prisma.fileAsset.findFirst({ where: { id: next, enabled: true, moduleKey: 'runly.canvas', entityType: 'CanvasBoard', entityId: boardId }, select: { id: true } }))) {
+      // Only an enabled thumbnail uploaded for this Board.
+      if (next && !(await prisma.fileAsset.findFirst({ where: { id: next, ...canvasFileWhere(companyId, THUMBNAIL_ENTITY_TYPE, boardId) }, select: { id: true } }))) {
         throw new CanvasServiceError('Archivo no encontrado.', 404)
       }
       patch.thumbnailFileId = next
     }
     const updated = await prisma.canvasBoard.update({ where: { id: boardId }, data: patch })
-    if (patch.thumbnailFileId !== undefined && board.thumbnailFileId && board.thumbnailFileId !== patch.thumbnailFileId) {
-      await prisma.fileAsset.updateMany({ where: { id: board.thumbnailFileId, moduleKey: 'runly.canvas', entityId: boardId }, data: { enabled: false } })
+    // One thumbnail per Board: every previous one (and legacy leftovers) goes.
+    if (patch.thumbnailFileId) {
+      try { await removeFiles(staleThumbnailsWhere(companyId, boardId, patch.thumbnailFileId)) } catch (error) {
+        if (process.env.NODE_ENV !== 'production') console.warn('[runly.canvas] thumbnail cleanup failed', error?.message)
+      }
     }
     if (Object.keys(data).some((key) => key !== 'thumbnailFileId')) {
       await audit(prisma, { companyId, actorId, action: 'BOARD_UPDATED', entityType: 'CanvasBoard', entityId: boardId, before: board, after: updated })

@@ -84,6 +84,34 @@ export const FILE_ACCESS_RULES = {
         select: { id: true },
       }),
   },
+  // Generated Board covers: visible to whoever can open the Board.
+  CanvasThumbnail: {
+    kind: "records",
+    ids: (prisma, { companyId, profileId }) =>
+      prisma.canvasBoard.findMany({
+        where: { companyId, ...boardMemberWhere(profileId) },
+        select: { id: true },
+      }),
+    can: (prisma, { companyId, profileId }, id) =>
+      prisma.canvasBoard.findFirst({
+        where: { id, companyId, ...boardMemberWhere(profileId) },
+        select: { id: true },
+      }),
+  },
+  // Library icons: company libraries, plus the caller's personal ones.
+  CanvasLibrary: {
+    kind: "records",
+    ids: (prisma, { companyId, profileId }) =>
+      prisma.canvasLibrary.findMany({
+        where: { companyId, OR: [{ scope: "COMPANY" }, { ownerId: profileId }] },
+        select: { id: true },
+      }),
+    can: (prisma, { companyId, profileId }, id) =>
+      prisma.canvasLibrary.findFirst({
+        where: { id, companyId, OR: [{ scope: "COMPANY" }, { ownerId: profileId }] },
+        select: { id: true },
+      }),
+  },
   CanvasHotspot: {
     kind: "records",
     ids: (prisma, { companyId, profileId }) =>
