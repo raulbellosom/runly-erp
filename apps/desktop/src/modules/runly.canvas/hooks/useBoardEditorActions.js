@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { buildObjectData, defaultBox } from '../lib/objectFactory.js'
 import { buildOperations, createHistory, snapshot } from '../lib/history.js'
+import { alignDeltas, distributeDeltas } from '../lib/arrange.js'
 import { screenToWorld } from '../engine/viewport.js'
 import { useCreateHotspot, useCreatePage, useObjectBatch, useUpdateLayer, useUploadFile } from './useCanvasData.js'
 import { useMediaInsert } from './useMediaInsert.js'
@@ -154,6 +155,18 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
     applyUpdates(entries, 'Desplazar', { coalesce: 'nudge' })
   }
 
+  // Moves editable rows by per-object deltas (align/distribute), one undo step.
+  function moveBy(objects, deltas, label) {
+    const entries = editable(objects).map((row) => {
+      const d = deltas.get(row.id)
+      if (!d || (!d.dx && !d.dy)) return null
+      return { row, data: { transform: { ...row.transform, x: (row.transform?.x ?? 0) + d.dx, y: (row.transform?.y ?? 0) + d.dy } } }
+    }).filter(Boolean)
+    applyUpdates(entries, label)
+  }
+  const align = (objects, mode) => moveBy(objects, alignDeltas(editable(objects), mode), 'Alinear')
+  const distribute = (objects, axis) => moveBy(objects, distributeDeltas(editable(objects), axis), 'Distribuir')
+
   async function replay(direction) {
     const entry = direction === 'undo' ? history.takeUndo() : history.takeRedo()
     if (!entry) return
@@ -215,7 +228,7 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
 
   return {
     batch, hotspot, createPage, updateLayer, ...media,
-    chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, toggleLayer, addPage, undo, redo,
+    chooseTool, create, commit, patch, remove, duplicate, arrange, nudge, align, distribute, toggleLayer, addPage, undo, redo,
     connectData, disconnectData, insertData,
     canUndo: history.canUndo, canRedo: history.canRedo,
     undoLabel: history.peekUndo()?.label ?? null, redoLabel: history.peekRedo()?.label ?? null,

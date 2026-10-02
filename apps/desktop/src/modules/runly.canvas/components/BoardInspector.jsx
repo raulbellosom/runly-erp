@@ -51,6 +51,8 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           onDelete={() => actions.remove(selectedRows)}
           onDuplicate={() => actions.duplicate(selectedRows)}
           onArrange={(where) => actions.arrange(selectedRows, where)}
+          onAlign={(mode) => actions.align(selectedRows, mode)}
+          onDistribute={(axis) => actions.distribute(selectedRows, axis)}
         />
       ) : (
         <>
