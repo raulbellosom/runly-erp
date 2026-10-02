@@ -6,7 +6,7 @@ Canvas Fase 4b — flechas y líneas conectadas a formas; páginas PDF nítidas 
 
 ## 2. Status
 
-Approved (decisión delegada por el usuario, 2026-10-01).
+Complete — Verified: 2026-10-01 (node --test API 51/51 y desktop 65/65, eslint de archivos tocados, build:web). Smoke manual pendiente.
 
 ## 3. Context
 
