@@ -143,12 +143,26 @@ export function createCanvasService({ prisma, entityResolver = null }) {
       patch.name = cleanText(data.name, 200)
       if (!patch.name) throw new CanvasServiceError('El nombre del Board es requerido.', 400)
     }
-    for (const key of ['description', 'metadata', 'thumbnailFileId']) {
+    for (const key of ['description', 'metadata']) {
       if (data[key] !== undefined) patch[key] = key === 'description' ? cleanText(data[key]) : data[key]
     }
     if (data.settings !== undefined) patch.settings = boardSettings(data.settings, effectiveBoardSettings(board))
+    if (data.thumbnailFileId !== undefined) {
+      const next = data.thumbnailFileId || null
+      // Only an enabled file uploaded for this Board (Files tags Canvas
+      // uploads with runly.canvas/CanvasBoard/<boardId>).
+      if (next && !(await prisma.fileAsset.findFirst({ where: { id: next, enabled: true, moduleKey: 'runly.canvas', entityType: 'CanvasBoard', entityId: boardId }, select: { id: true } }))) {
+        throw new CanvasServiceError('Archivo no encontrado.', 404)
+      }
+      patch.thumbnailFileId = next
+    }
     const updated = await prisma.canvasBoard.update({ where: { id: boardId }, data: patch })
-    await audit(prisma, { companyId, actorId, action: 'BOARD_UPDATED', entityType: 'CanvasBoard', entityId: boardId, before: board, after: updated })
+    if (patch.thumbnailFileId !== undefined && board.thumbnailFileId && board.thumbnailFileId !== patch.thumbnailFileId) {
+      await prisma.fileAsset.updateMany({ where: { id: board.thumbnailFileId, moduleKey: 'runly.canvas', entityId: boardId }, data: { enabled: false } })
+    }
+    if (Object.keys(data).some((key) => key !== 'thumbnailFileId')) {
+      await audit(prisma, { companyId, actorId, action: 'BOARD_UPDATED', entityType: 'CanvasBoard', entityId: boardId, before: board, after: updated })
+    }
     return updated
   }
 
@@ -437,28 +451,40 @@ export function createCanvasService({ prisma, entityResolver = null }) {
     await prisma.canvasCollaborator.deleteMany({ where: { boardId, userId } })
   }
 
+  const VERSION_LIMIT = 100
+  async function snapshotVersion(tx, companyId, actorId, boardId, { name = null, description = null, automatic = false } = {}) {
+    const board = await tx.canvasBoard.findFirst({ where: { id: boardId, companyId } })
+    const pages = await tx.canvasPage.findMany({ where: { boardId }, include: { layers: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } })
+    const objects = await tx.canvasObject.findMany({ where: { boardId, companyId, deletedAt: null }, orderBy: { createdAt: 'asc' } })
+    const hotspots = await tx.canvasHotspot.findMany({ where: { boardId, companyId, archivedAt: null } })
+    const links = await tx.canvasEntityLink.findMany({ where: { boardId, companyId } })
+    const last = await tx.canvasVersion.findFirst({ where: { boardId }, orderBy: { number: 'desc' }, select: { number: true } })
+    const version = await tx.canvasVersion.create({ data: {
+      boardId, number: (last?.number ?? 0) + 1, name: cleanText(name, 200), description: cleanText(description),
+      snapshot: jsonValue({ schemaVersion: 1, board, pages, objects, hotspots, links }), objectCount: objects.length, createdById: actorId,
+    } })
+    await audit(tx, { companyId, actorId, action: 'BOARD_VERSION_CREATED', entityType: 'CanvasVersion', entityId: version.id, after: { number: version.number, objectCount: version.objectCount }, metadata: automatic ? { automatic: true } : null })
+    // Retention: keep the newest VERSION_LIMIT versions (never the current one).
+    const stale = await tx.canvasVersion.findMany({ where: { boardId, ...(board?.currentVersionId ? { id: { not: board.currentVersionId } } : {}) }, orderBy: { number: 'desc' }, skip: VERSION_LIMIT, select: { id: true } })
+    if (stale.length) await tx.canvasVersion.deleteMany({ where: { id: { in: stale.map((row) => row.id) } } })
+    return version
+  }
+
   async function createVersion(companyId, actorId, boardId, data = {}) {
     await assertBoardAccess(companyId, actorId, boardId, 'EDITOR')
     return prisma.$transaction(async (tx) => {
-      const board = await tx.canvasBoard.findFirst({ where: { id: boardId, companyId } })
-      const pages = await tx.canvasPage.findMany({ where: { boardId }, include: { layers: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } })
-      const objects = await tx.canvasObject.findMany({ where: { boardId, companyId, deletedAt: null }, orderBy: { createdAt: 'asc' } })
-      const hotspots = await tx.canvasHotspot.findMany({ where: { boardId, companyId, archivedAt: null } })
-      const links = await tx.canvasEntityLink.findMany({ where: { boardId, companyId } })
-      const last = await tx.canvasVersion.findFirst({ where: { boardId }, orderBy: { number: 'desc' }, select: { number: true } })
-      const version = await tx.canvasVersion.create({ data: {
-        boardId, number: (last?.number ?? 0) + 1, name: cleanText(data.name, 200), description: cleanText(data.description),
-        snapshot: jsonValue({ schemaVersion: 1, board, pages, objects, hotspots, links }), objectCount: objects.length, createdById: actorId,
-      } })
+      const version = await snapshotVersion(tx, companyId, actorId, boardId, data)
       await tx.canvasBoard.update({ where: { id: boardId }, data: { currentVersionId: version.id, updatedById: actorId } })
-      await audit(tx, { companyId, actorId, action: 'BOARD_VERSION_CREATED', entityType: 'CanvasVersion', entityId: version.id, after: { number: version.number, objectCount: version.objectCount } })
       return version
     })
   }
 
   async function listVersions(companyId, actorId, boardId) {
     await assertBoardAccess(companyId, actorId, boardId)
-    return prisma.canvasVersion.findMany({ where: { boardId }, select: { id: true, number: true, name: true, description: true, objectCount: true, createdById: true, restoredAt: true, createdAt: true }, orderBy: { number: 'desc' } })
+    const rows = await prisma.canvasVersion.findMany({ where: { boardId }, select: { id: true, number: true, name: true, description: true, objectCount: true, createdById: true, restoredAt: true, createdAt: true }, orderBy: { number: 'desc' } })
+    const people = await prisma.userProfile.findMany({ where: { id: { in: [...new Set(rows.map((row) => row.createdById))] } }, select: { id: true, displayName: true } })
+    const names = new Map(people.map((person) => [person.id, person.displayName]))
+    return rows.map((row) => ({ ...row, createdByName: names.get(row.createdById) ?? 'Usuario' }))
   }
 
   async function restoreVersion(companyId, actorId, boardId, versionId) {
@@ -467,6 +493,7 @@ export function createCanvasService({ prisma, entityResolver = null }) {
       const version = await tx.canvasVersion.findFirst({ where: { id: versionId, boardId } })
       if (!version?.snapshot || version.snapshot.schemaVersion !== 1) throw new CanvasServiceError('Versión no encontrada o incompatible.', 404)
       const snapshot = version.snapshot
+      await snapshotVersion(tx, companyId, actorId, boardId, { name: `Antes de restaurar la versión ${version.number}`, automatic: true })
       await tx.canvasEntityLink.deleteMany({ where: { boardId, companyId } })
       await tx.canvasHotspot.deleteMany({ where: { boardId, companyId } })
       await tx.canvasObject.deleteMany({ where: { boardId, companyId } })

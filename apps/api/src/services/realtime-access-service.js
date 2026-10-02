@@ -43,8 +43,12 @@ export function createRealtimeAccessService({ prisma, broadcaster }) {
     if (!(await allowed(topic, actorId, note || canvas))) return false;
     const user = await prisma.userProfile.findFirst({ where: { id: actorId, enabled: true }, select: { displayName: true } });
     if (!user) return false;
-    await broadcaster.broadcastToChannel(topic, event, typing ? { isTyping: Boolean(payload?.isTyping), userId: actorId, displayName: user.displayName } : payload,
-      { authorize: () => allowed(topic, actorId, note || canvas) });
+    // Canvas peers identify cursors by the authenticated actor, never by a
+    // client-supplied id.
+    const outgoing = typing
+      ? { isTyping: Boolean(payload?.isTyping), userId: actorId, displayName: user.displayName }
+      : canvas ? { ...(payload ?? {}), actorId } : payload;
+    await broadcaster.broadcastToChannel(topic, event, outgoing, { authorize: () => allowed(topic, actorId, note || canvas) });
     return true;
   }
 

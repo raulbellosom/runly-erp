@@ -172,6 +172,22 @@ describe('Runly Canvas service', () => {
     assert.throws(() => validateCanvasObject({ type: 'polygon', transform: {}, geometry: { points: [{ x: 1, y: 2 }] } }), /puntos/)
   })
 
+  it('only accepts thumbnails uploaded for the Board and disables the previous one', async () => {
+    const disabled = []
+    const prisma = {
+      canvasBoard: { findFirst: async () => accessibleBoard({ thumbnailFileId: 'old' }), update: async ({ data }) => ({ id: BOARD, ...data }) },
+      fileAsset: {
+        findFirst: async ({ where }) => (where.id === 'mine' && where.entityId === BOARD && where.moduleKey === 'runly.canvas' ? { id: 'mine' } : null),
+        updateMany: async ({ where }) => { disabled.push(where.id); return { count: 1 } },
+      },
+      auditLog: { create: async () => ({}) },
+    }
+    const service = createCanvasService({ prisma })
+    await assert.rejects(() => service.updateBoard(COMPANY, USER, BOARD, { thumbnailFileId: 'foreign' }), (error) => error.status === 404)
+    await service.updateBoard(COMPANY, USER, BOARD, { thumbnailFileId: 'mine' })
+    assert.deepEqual(disabled, ['old'])
+  })
+
   it('prevents deleting the final Page in a Board', async () => {
     const prisma = {
       canvasBoard: { findFirst: async () => accessibleBoard() },
