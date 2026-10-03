@@ -3589,6 +3589,7 @@ model InvCustomField {
   fieldType  String   @db.VarChar(30) @map("field_type")
   options    Json?
   required   Boolean  @default(false)
+  onDemand   Boolean  @default(false) @map("on_demand")
   sortOrder  Int      @default(0) @map("sort_order")
   enabled    Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")

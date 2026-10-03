@@ -235,8 +235,9 @@ export function createInventoryCatalogService({ prisma }) {
 
   // ── Custom Fields ──────────────────────────────────────────────────────────
 
-  // categoryId: a type id (its fields + global ones), 'all' (every field) or
-  // empty (global fields only).
+  // categoryId: a type id (its fields + global ones), 'all' (every field —
+  // the library the item form searches) or empty (global fields only).
+  // On-demand fields are never part of a type's automatic set.
   async function listCustomFields(companyId, categoryId) {
     assertCompany(companyId);
     const where = { companyId, enabled: true };
@@ -244,18 +245,23 @@ export function createInventoryCatalogService({ prisma }) {
       // no type filter
     } else if (categoryId) {
       where.OR = [{ categoryId }, { categoryId: null }];
+      where.onDemand = false;
     } else {
       where.categoryId = null;
+      where.onDemand = false;
     }
     return prisma.invCustomField.findMany({ where, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] });
   }
 
   async function createCustomField(data, companyId) {
     assertCompany(companyId);
-    const { label, fieldKey, fieldType, categoryId, options, required, sortOrder } = data;
+    const { label, fieldKey, fieldType, categoryId, options, required, sortOrder, onDemand } = data;
     await assertRefInCompany('invCategory', categoryId, companyId, 'El tipo');
     const createData = { companyId, label, fieldKey, fieldType };
-    if (categoryId !== undefined) createData.categoryId = categoryId;
+    // An on-demand field belongs to no type: it is added per item.
+    if (onDemand !== undefined) createData.onDemand = Boolean(onDemand);
+    if (createData.onDemand) createData.categoryId = null;
+    if (categoryId !== undefined && !createData.onDemand) createData.categoryId = categoryId;
     if (options !== undefined) createData.options = options;
     if (required !== undefined) createData.required = required;
     if (sortOrder !== undefined) createData.sortOrder = sortOrder;
@@ -266,9 +272,10 @@ export function createInventoryCatalogService({ prisma }) {
     assertCompany(companyId);
     const existing = await prisma.invCustomField.findFirst({ where: { id, companyId, enabled: true } });
     if (!existing) throw new InventoryServiceError('Custom field not found', 404);
-    const { label, fieldKey, fieldType, categoryId, options, required, sortOrder } = data;
+    const { label, fieldKey, fieldType, categoryId, options, required, sortOrder, onDemand } = data;
     await assertRefInCompany('invCategory', categoryId, companyId, 'El tipo');
     const updateData = {};
+    if (onDemand !== undefined) updateData.onDemand = Boolean(onDemand);
     if (label !== undefined) updateData.label = label;
     if (fieldKey !== undefined) updateData.fieldKey = fieldKey;
     if (fieldType !== undefined) updateData.fieldType = fieldType;
@@ -276,6 +283,7 @@ export function createInventoryCatalogService({ prisma }) {
     if (options !== undefined) updateData.options = options;
     if (required !== undefined) updateData.required = required;
     if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+    if (updateData.onDemand) updateData.categoryId = null;
     return prisma.invCustomField.update({ where: { id }, data: updateData });
   }
 

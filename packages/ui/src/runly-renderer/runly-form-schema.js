@@ -16,6 +16,7 @@ export function normalizeField(fieldLike) {
       typeof fieldLike.hint === "string" && fieldLike.hint.trim()
         ? fieldLike.hint.trim()
         : null,
+    icon: typeof fieldLike.icon === "string" && fieldLike.icon.trim() ? fieldLike.icon.trim() : null,
     options: fieldLike.options,
     relation: fieldLike.relation,
     visibleWhen: fieldLike.visibleWhen ?? null,
@@ -160,6 +161,10 @@ export function normalizeSections(schema, fieldMap) {
               typeof cfg.apiPath === "string" && cfg.apiPath.trim()
                 ? cfg.apiPath.trim()
                 : null,
+            // POST endpoint to create definitions inline (CustomFieldCreator).
+            ...(typeof cfg.createPath === "string" && cfg.createPath.trim()
+              ? { createPath: cfg.createPath.trim() }
+              : {}),
             categoryField:
               typeof cfg.categoryField === "string" && cfg.categoryField.trim()
                 ? cfg.categoryField.trim()
@@ -240,6 +245,7 @@ export function normalizeSections(schema, fieldMap) {
                 : (existing?.options ?? []),
             relation:
               fieldDef.field.relation ?? existing?.relation ?? undefined,
+            icon: fieldDef.field.icon ?? existing?.icon ?? null,
             visibleWhen:
               fieldDef.field.visibleWhen ?? existing?.visibleWhen ?? null,
             hiddenWhen:

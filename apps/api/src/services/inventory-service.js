@@ -87,6 +87,14 @@ export function createInventoryService({ prisma, activityBridge }) {
 
   const assertRefInCompany = createRefGuard(prisma);
 
+  // Custom field ids from a request that really belong to this company.
+  async function companyFieldIds(db, companyId, values) {
+    const ids = [...new Set((values ?? []).map((cv) => cv?.fieldId).filter((v) => typeof v === 'string'))];
+    if (!ids.length) return new Set();
+    const rows = await db.invCustomField.findMany({ where: { id: { in: ids }, companyId }, select: { id: true } });
+    return new Set(rows.map((row) => row.id));
+  }
+
   // ── Resolve Supabase auth UUID → UserProfile.id ───────────────────────────
   async function resolveProfileId(authUserId) {
     if (!authUserId) return null;
@@ -238,7 +246,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         createdBy: { select: { id: true, firstName: true, lastName: true } },
         customValues: {
           include: {
-            field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true } },
+            field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true, categoryId: true, onDemand: true } },
           },
         },
         // full file list intentionally omitted here — fetched separately by
@@ -260,6 +268,8 @@ export function createInventoryService({ prisma, activityBridge }) {
       coverImageFileId,
       // Drives the read-only "Datos de compra heredados" detail section.
       hasLegacyPurchaseData: Boolean(item.purchaseDate || item.purchasePrice != null || item.vendorName || item.invoiceNumber),
+      // Drives the detail's "Campos personalizados" section.
+      hasCustomValues: (item.customValues ?? []).some((cv) => cv.value !== null && cv.value !== ''),
     };
   }
 
@@ -355,7 +365,9 @@ export function createInventoryService({ prisma, activityBridge }) {
         try {
           created = await prisma.$transaction(async (tx) => {
             const item = await tx.invItem.create({ data: itemData });
+            const allowed = await companyFieldIds(tx, companyId, customValues);
             for (const cv of customValues) {
+              if (!allowed.has(cv.fieldId)) continue;
               await tx.invCustomFieldValue.create({
                 data: { itemId: item.id, fieldId: cv.fieldId, value: cv.value ?? null },
               });
@@ -367,7 +379,7 @@ export function createInventoryService({ prisma, activityBridge }) {
                 category: { select: { id: true, name: true, icon: true, color: true } },
                 brand: { select: { id: true, name: true } },
                 location: { select: { id: true, name: true } },
-                customValues: { include: { field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true } } } },
+                customValues: { include: { field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true, categoryId: true, onDemand: true } } } },
               },
             });
           });
@@ -384,7 +396,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       }
       await bridge.logAndPublish({
         auditEntry: {
-          actorId: creatorProfileId ?? 'system',
+          actorId: creatorProfileId ?? null,
           moduleKey: 'runly.inventory',
           entityType: 'InvItem',
           entityId: created.id,
@@ -422,7 +434,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     }
     await bridge.logAndPublish({
       auditEntry: {
-        actorId: creatorProfileId ?? 'system',
+        actorId: creatorProfileId ?? null,
         moduleKey: 'runly.inventory',
         entityType: 'InvItem',
         entityId: created.id,
@@ -435,8 +447,10 @@ export function createInventoryService({ prisma, activityBridge }) {
     return created;
   }
 
-  async function updateItem(id, data, companyId, { afterWrite = null } = {}) {
+  // actorAuthId: the editor's auth user id (audit trail actor).
+  async function updateItem(id, data, companyId, { afterWrite = null, actorAuthId = null } = {}) {
     assertCompany(companyId);
+    const actorProfileId = await resolveProfileId(actorAuthId);
     const existing = await prisma.invItem.findFirst({
       where: { id, companyId, enabled: true },
       include: {
@@ -478,6 +492,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       licenseSeats,
       notes,
       customValues,
+      removedCustomFieldIds,
     } = data;
 
     const updateData = {};
@@ -517,10 +532,18 @@ export function createInventoryService({ prisma, activityBridge }) {
     if (licenseSeats !== undefined) updateData.licenseSeats = licenseSeats;
     if (notes !== undefined) updateData.notes = notes;
 
-    if (customValues && Array.isArray(customValues) && customValues.length > 0) {
+    // Fields detached from this item (form's "Quitar"): drop their values.
+    const removedIds = Array.isArray(removedCustomFieldIds) ? removedCustomFieldIds.filter((v) => typeof v === 'string') : [];
+    const hasCustomValues = Array.isArray(customValues) && customValues.length > 0;
+    if (hasCustomValues || removedIds.length > 0) {
       const result = await prisma.$transaction(async (tx) => {
         await tx.invItem.update({ where: { id }, data: updateData });
-        for (const cv of customValues) {
+        if (removedIds.length > 0) {
+          await tx.invCustomFieldValue.deleteMany({ where: { itemId: id, fieldId: { in: removedIds } } });
+        }
+        const allowed = await companyFieldIds(tx, companyId, hasCustomValues ? customValues : []);
+        for (const cv of hasCustomValues ? customValues : []) {
+          if (removedIds.includes(cv.fieldId) || !allowed.has(cv.fieldId)) continue;
           await tx.invCustomFieldValue.upsert({
             where: { itemId_fieldId: { itemId: id, fieldId: cv.fieldId } },
             update: { value: cv.value ?? null },
@@ -534,13 +557,13 @@ export function createInventoryService({ prisma, activityBridge }) {
             category: { select: { id: true, name: true, icon: true, color: true } },
             brand: { select: { id: true, name: true } },
             location: { select: { id: true, name: true } },
-            customValues: { include: { field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true } } } },
+            customValues: { include: { field: { select: { id: true, label: true, fieldKey: true, fieldType: true, options: true, categoryId: true, onDemand: true } } } },
           },
         });
       });
       await bridge.logAndPublish({
         auditEntry: {
-          actorId: 'system',
+          actorId: actorProfileId ?? null,
           moduleKey: 'runly.inventory',
           entityType: 'InvItem',
           entityId: id,
@@ -565,7 +588,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     }));
     await bridge.logAndPublish({
       auditEntry: {
-        actorId: 'system',
+        actorId: actorProfileId ?? null,
         moduleKey: 'runly.inventory',
         entityType: 'InvItem',
         entityId: id,
@@ -579,14 +602,15 @@ export function createInventoryService({ prisma, activityBridge }) {
     return updated;
   }
 
-  async function deleteItem(id, companyId) {
+  async function deleteItem(id, companyId, actorAuthId = null) {
     assertCompany(companyId);
+    const actorProfileId = await resolveProfileId(actorAuthId);
     const existing = await prisma.invItem.findFirst({ where: { id, companyId, enabled: true } });
     if (!existing) throw new InventoryServiceError('Item not found', 404);
     const updated = await prisma.invItem.update({ where: { id }, data: { enabled: false } });
     await bridge.logAndPublish({
       auditEntry: {
-        actorId: 'system',
+        actorId: actorProfileId ?? null,
         moduleKey: 'runly.inventory',
         entityType: 'InvItem',
         entityId: id,
@@ -631,7 +655,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     });
     await bridge.logAndPublish({
       auditEntry: {
-        actorId: actorProfileId ?? 'system',
+        actorId: actorProfileId ?? null,
         moduleKey: 'runly.inventory',
         entityType: 'InvItem',
         entityId: itemId,
@@ -646,6 +670,7 @@ export function createInventoryService({ prisma, activityBridge }) {
 
   async function returnItem(itemId, assignedById, notes, companyId) {
     assertCompany(companyId);
+    const actorProfileId = await resolveProfileId(assignedById);
     const item = await prisma.invItem.findFirst({ where: { id: itemId, companyId, enabled: true } });
     if (!item) throw new InventoryServiceError('Item not found', 404);
     const activeAssignment = await prisma.invAssignment.findFirst({
@@ -672,7 +697,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     });
     await bridge.logAndPublish({
       auditEntry: {
-        actorId: 'system',
+        actorId: actorProfileId ?? null,
         moduleKey: 'runly.inventory',
         entityType: 'InvItem',
         entityId: itemId,
