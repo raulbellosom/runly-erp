@@ -246,9 +246,9 @@ No FK to the target (polymorphic); consistency comes from 10.3 and 10.4.
 
 ### 10.3 Source tables (custom module side)
 
-- `fields` kind: the source entity table gets a `target_id uuid NOT NULL` column with
-  `UNIQUE (company_id, target_id)` and a real FK `REFERENCES <target table>(id) ON DELETE CASCADE`.
-- `related` kind: the existing external relation column (`targetExternal`) gets a real FK with the
+- `fields` kind: the source entity's `targetField` column (a relation field declared in the model) gets
+  `UNIQUE (company_id, <targetField>)` and a real FK `REFERENCES <target table>(id) ON DELETE CASCADE`.
+- `related` kind: the `targetField` relation column gets a real FK with the
   action derived from the relation's `onDisable`/`onTargetDelete` policy:
   `cascade` → `ON DELETE CASCADE`, `setNull` → `ON DELETE SET NULL`, `restrict` → `ON DELETE RESTRICT`.
 - Runly ORM creates these FKs only when the table/column is created for a connection (additive);
@@ -373,6 +373,9 @@ connections: [{
   target: 'inventory_item',
   kind: 'fields',                 // 'fields' | 'related'
   entity: 'calibracion',
+  targetField: 'articulo',        // relation field of `entity` holding the core record id
+                                  // (models do not carry targetExternal, so it is explicit;
+                                  // the Builder generates it for 'fields' connections)
   label: 'Calibración',
   fields: [                       // offered set (D4); omitted fields are never shown in core
     { field: 'fecha_calibracion', form: true,  detail: true, column: true,  search: false },

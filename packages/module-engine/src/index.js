@@ -51,3 +51,6 @@ export { MODULE_KINDS, BLUEPRINT_KINDS,
 export { SQL_TYPE_MAP }                  from './field-types.js'
 export { MODULE_ICON_NAMES,
          isModuleIconName }              from './module-icons.js'
+export { CONNECTION_KINDS, CONNECTION_DELETE_POLICIES, CONNECTION_SURFACES,
+         validateConnections, normalizeConnection,
+         validateConnectionsAgainstModels }        from './manifest-connections.js'
