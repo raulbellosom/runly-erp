@@ -4622,3 +4622,50 @@ model ModulePublicLink {
   @@index([companyId, moduleKey, recordId])
   @@map("module_public_link")
 }
+
+// ─── RME3 Connections (spec 2026-10-03-rme3-module-platform-v2 §10) ─────────
+// Registry + per-company config of a custom module's connection to a core
+// entity (inventory_item, contact...). FK to company lives in the migration.
+model ModuleConnection {
+  id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  moduleKey      String   @map("module_key")
+  connectionKey  String   @map("connection_key")
+  kind           String
+  targetType     String   @map("target_type")
+  sourceEntity   String   @map("source_entity")
+  sourceTable    String   @map("source_table")
+  status         String   @default("pending")
+  fieldConfig    Json     @default("[]") @map("field_config")
+  sortOrder      Int      @default(0) @map("sort_order")
+  offeredVersion String?  @map("offered_version")
+  needsReview    Boolean  @default(false) @map("needs_review")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, moduleKey, connectionKey])
+  @@index([companyId, targetType, status])
+  @@map("module_connection")
+}
+
+// Central index of connected values, maintained by per-connection triggers on
+// the source tables (never written by application code). `data` holds every
+// offered field; reads filter by ModuleConnection.fieldConfig.
+model ConnectionRecord {
+  id             String                   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  companyId      String                   @map("company_id") @db.Uuid
+  moduleKey      String                   @map("module_key")
+  connectionKey  String                   @map("connection_key")
+  targetType     String                   @map("target_type")
+  targetId       String                   @map("target_id") @db.Uuid
+  sourceRecordId String                   @map("source_record_id") @db.Uuid
+  enabled        Boolean                  @default(true)
+  data           Json                     @default("{}")
+  searchText     Unsupported("tsvector")? @map("search_text")
+  updatedAt      DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([moduleKey, connectionKey, sourceRecordId])
+  @@index([companyId, targetType, targetId])
+  @@index([moduleKey, connectionKey])
+  @@map("connection_record")
+}
