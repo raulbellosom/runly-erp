@@ -50,10 +50,25 @@ const HINTS = {
 }
 const hintFor = (tool) => HINTS[tool] ?? (SHAPES[tool] ? `Arrastra para dibujar: ${SHAPES[tool].label.toLowerCase()} · Shift mantiene proporción` : null)
 
-function DesktopPanel({ side, label, children }) {
+// Always mounted so opening and closing can animate: the outer width
+// transitions to 0 while the inner column keeps its fixed width and slides
+// in/out from the panel's own edge.
+function DesktopPanel({ side, label, open, children }) {
+  const width = side === 'left' ? 'w-72' : 'w-80'
   return (
-    <aside aria-label={label} className={cn('shrink-0 border-[hsl(var(--border))] bg-[hsl(var(--card))]', side === 'left' ? 'w-72 border-r' : 'w-80 border-l')}>
-      {children}
+    <aside
+      // `inert` alone: it hides the closed panel from assistive tech and
+      // drops focus from it. aria-hidden on top would be applied while the
+      // panel's own close button is still focused (Chrome blocks that).
+      aria-label={label} inert={!open}
+      className={cn(
+        'relative shrink-0 overflow-hidden bg-[hsl(var(--card))] transition-[width] duration-200 ease-out motion-reduce:transition-none',
+        open ? cn(width, side === 'left' ? 'border-r border-[hsl(var(--border))]' : 'border-l border-[hsl(var(--border))]') : 'w-0',
+      )}
+    >
+      <div className={cn('absolute inset-y-0 flex flex-col transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none', width, side === 'left' ? 'left-0' : 'right-0', open ? 'translate-x-0 opacity-100' : cn('opacity-0', side === 'left' ? '-translate-x-4' : 'translate-x-4'))}>
+        {children}
+      </div>
     </aside>
   )
 }
@@ -228,11 +243,14 @@ export default function BoardEditor() {
   })
 
   const leftOpen = isDesktop ? desktopPanels.left : mobileSheet === 'left'
-  const rightOpen = isDesktop ? desktopPanels.right : mobileSheet === 'right'
+  // The docked library shares the Inspector's column on desktop.
+  const rightOpen = isDesktop ? desktopPanels.right && !libraryOpen : mobileSheet === 'right'
   const togglePanel = (side) => {
-    if (isDesktop) setDesktopPanels((current) => ({ ...current, [side]: !current[side] }))
+    if (isDesktop && side === 'right' && libraryOpen) { setLibraryOpen(false); setDesktopPanels((current) => ({ ...current, right: true })) }
+    else if (isDesktop) setDesktopPanels((current) => ({ ...current, [side]: !current[side] }))
     else setMobileSheet((current) => current === side ? null : side)
   }
+  const insertFromLibrary = (item) => actions.insertLibraryItem(item, screenToWorld({ x: size.width / 2, y: size.height / 2 }, viewport))
 
   const pagesPanel = board.isLoading ? <LayersPanelSkeleton /> : (
     <LayersPanel
@@ -304,7 +322,7 @@ export default function BoardEditor() {
         myRole={myRole} onRenameBoard={() => setBoardDialogMode('rename')} onDeleteBoard={() => { selfDeleteRef.current = true; setBoardDialogMode('delete') }}
       />
       <div className="flex min-h-0 flex-1">
-        {isDesktop && leftOpen ? <DesktopPanel side="left" label="Páginas y capas">{pagesPanel}</DesktopPanel> : null}
+        {isDesktop ? <DesktopPanel side="left" label="Páginas y capas" open={leftOpen}>{pagesPanel}</DesktopPanel> : null}
         <div className="@container relative min-w-0 flex-1 overflow-hidden bg-[hsl(var(--muted)/0.4)]" onDragOver={onLibraryDragOver} onDrop={onLibraryDrop}>
           {board.isLoading || objects.isLoading ? <CanvasLoadingSkeleton /> : null}
           <MapBackdrop background={activePage?.background} viewport={viewport} size={size} config={pageMap.config} />
@@ -377,7 +395,16 @@ export default function BoardEditor() {
             onChange={(event) => { actions.handleFile(event.target.files?.[0]); event.target.value = '' }}
           />
         </div>
-        {isDesktop && rightOpen ? <DesktopPanel side="right" label="Inspector">{inspectorPanel}</DesktopPanel> : null}
+        {/* On desktop the library docks in the Inspector's column while open,
+            so the board stays interactive (drag tiles onto it). */}
+        {isDesktop ? (
+          <>
+            <DesktopPanel side="right" label="Biblioteca" open={libraryOpen}>
+              <LibraryPanel docked open={libraryOpen} onOpenChange={setLibraryOpen} onInsert={insertFromLibrary} />
+            </DesktopPanel>
+            <DesktopPanel side="right" label="Inspector" open={rightOpen}>{inspectorPanel}</DesktopPanel>
+          </>
+        ) : null}
       </div>
 
       {!isDesktop ? (
@@ -400,10 +427,9 @@ export default function BoardEditor() {
         canCreate={!readOnly} canRestore={myRole === 'OWNER'}
         onRestored={() => { setSelectedIds([]); setPageId(null); fittedPageRef.current = null }}
       />
-      <LibraryPanel
-        open={libraryOpen} onOpenChange={setLibraryOpen}
-        onInsert={(item) => actions.insertLibraryItem(item, screenToWorld({ x: size.width / 2, y: size.height / 2 }, viewport))}
-      />
+      {/* The Sheet covers the board: close it after inserting so the new
+          element is visible. */}
+      {!isDesktop ? <LibraryPanel open={libraryOpen} onOpenChange={setLibraryOpen} onInsert={(item) => { setLibraryOpen(false); insertFromLibrary(item) }} /> : null}
       <SaveToLibraryDialog open={dialog?.kind === 'save-library'} rows={saveToLibraryRows} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <TextEditDialog object={dialog?.kind === 'text' ? dialogObject : null} onSave={saveText} onOpenChange={(open) => { if (!open) setDialog(null) }} />
       <DataBindingDialog

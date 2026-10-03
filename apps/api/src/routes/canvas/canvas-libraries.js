@@ -24,6 +24,21 @@ function jsonValue(value) {
 // access and audit conventions of canvas-service.js, kept in its own file so
 // neither module grows past the 800-line soft limit.
 export function createCanvasLibrariesService({ prisma }) {
+  // Inserting an image item places a Board object that points at the very
+  // same file, so removing the item must not disable a file a Board still
+  // uses. Soft-deleted objects count too: undo can bring them back.
+  async function disableUnusedFiles(db, companyId, fileIds) {
+    if (!fileIds.length) return
+    const used = await db.$queryRaw`
+      SELECT DISTINCT properties->>'fileId' AS "fileId"
+      FROM canvas_object
+      WHERE company_id = ${companyId}::uuid AND type = 'image' AND properties->>'fileId' = ANY(${fileIds}::text[])
+    `
+    const usedIds = new Set(used.map((row) => row.fileId))
+    const unused = fileIds.filter((id) => !usedIds.has(id))
+    if (unused.length) await db.fileAsset.updateMany({ where: { id: { in: unused } }, data: { enabled: false } })
+  }
+
   async function audit(db, { companyId, actorId, action, entityType, entityId, before = null, after = null, metadata = null }) {
     return db.auditLog.create({ data: { companyId, actorId, moduleKey: 'runly.canvas', action, entityType, entityId, before: jsonValue(before), after: jsonValue(after), metadata: jsonValue(metadata) } })
   }
@@ -101,8 +116,7 @@ export function createCanvasLibrariesService({ prisma }) {
     return prisma.$transaction(async (tx) => {
       const imageItems = await tx.canvasLibraryItem.findMany({ where: { libraryId, kind: 'image', fileAssetId: { not: null } }, select: { fileAssetId: true } })
       await tx.canvasLibrary.delete({ where: { id: libraryId } })
-      const fileIds = imageItems.map((item) => item.fileAssetId)
-      if (fileIds.length) await tx.fileAsset.updateMany({ where: { id: { in: fileIds } }, data: { enabled: false } })
+      await disableUnusedFiles(tx, companyId, imageItems.map((item) => item.fileAssetId))
       await audit(tx, { companyId, actorId, action: 'LIBRARY_DELETED', entityType: 'CanvasLibrary', entityId: libraryId, before: library })
     })
   }
@@ -169,7 +183,7 @@ export function createCanvasLibrariesService({ prisma }) {
     const item = await prisma.canvasLibraryItem.findFirst({ where: { id: itemId, libraryId } })
     if (!item) throw new CanvasServiceError('Elemento no encontrado.', 404)
     await prisma.canvasLibraryItem.delete({ where: { id: itemId } })
-    if (item.kind === 'image' && item.fileAssetId) await prisma.fileAsset.updateMany({ where: { id: item.fileAssetId }, data: { enabled: false } })
+    if (item.kind === 'image' && item.fileAssetId) await disableUnusedFiles(prisma, companyId, [item.fileAssetId])
   }
 
   return { list, items, create, update, remove, addItems, renameItem, removeItem }

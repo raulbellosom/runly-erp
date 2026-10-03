@@ -123,6 +123,8 @@ export function useBoardEditorActions({ boardId, pageId, rows, layers, layerId, 
       if (!row) return null
       const data = { transform: next.transform, geometry: next.geometry }
       if (next.properties !== prev.properties) data.properties = next.properties
+      // Group resize scales text font sizes too.
+      if (next.style !== prev.style) data.style = next.style
       return { row, data }
     }).filter(Boolean)
     applyUpdates(entries, LABELS[mode] ?? 'Editar')

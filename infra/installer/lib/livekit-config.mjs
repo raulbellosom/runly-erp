@@ -143,7 +143,7 @@ export function resolveLiveKitConfig({
   }
   if (mode === "external" && tlsMode === "managed") {
     throw new Error(
-      "LIVEKIT_MODE=external requires LIVEKIT_TLS_MODE=external because Atlas does not manage the remote proxy.",
+      "LIVEKIT_MODE=external requires LIVEKIT_TLS_MODE=external because Runly does not manage the remote proxy.",
     );
   }
 

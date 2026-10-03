@@ -134,14 +134,48 @@ export function useReorderLayers(boardId) {
 export function useObjectBatch(boardId, pageId, { onCreated } = {}) {
   const token = useToken(), client = useQueryClient(), key = objectsKey(boardId, pageId)
   const queuedRef = useRef(new Map()), selfRef = useRef(null), onCreatedRef = useRef(onCreated)
+  // Batches go out one at a time. Each carries the revision the cache had
+  // when it was made; when a quick drag or delete is still saving, that
+  // revision is outdated by the time the next batch is sent, and the
+  // server would report a false conflict. So each batch waits for the
+  // previous one and picks up the newest revision the server returned.
+  const chainRef = useRef(Promise.resolve()), revisionsRef = useRef(new Map())
+  // In-flight batch count per object id: a result is only merged when no
+  // newer batch for that object is still queued (see mergeBatchResults).
+  const inFlightRef = useRef(new Map())
+  const trackInFlight = (operations, delta) => {
+    for (const operation of operations) {
+      if (!operation.id) continue
+      const count = (inFlightRef.current.get(operation.id) ?? 0) + delta
+      if (count > 0) inFlightRef.current.set(operation.id, count)
+      else inFlightRef.current.delete(operation.id)
+    }
+  }
   useEffect(() => { onCreatedRef.current = onCreated })
   const mutation = useMutation({
-    mutationFn: (operations) => runly.canvas.batchObjects(boardId, toServerOperations(operations), token),
+    mutationFn: (operations) => {
+      const run = chainRef.current.then(async () => {
+        const current = operations.map((operation) => {
+          const known = revisionsRef.current.get(operation.id)
+          if ((operation.op !== 'update' && operation.op !== 'delete') || known == null || operation.expectedRevision == null) return operation
+          return { ...operation, expectedRevision: Math.max(Number(operation.expectedRevision), known) }
+        })
+        const response = await runly.canvas.batchObjects(boardId, toServerOperations(current), token)
+        for (const result of unwrap(response) ?? []) {
+          if (result.object?.id && Number.isInteger(result.object.revision)) revisionsRef.current.set(result.object.id, result.object.revision)
+        }
+        return response
+      })
+      chainRef.current = run.catch(() => {})
+      return run
+    },
     onMutate: (operations) => {
+      trackInFlight(operations, 1)
       client.cancelQueries({ queryKey: key })
       client.setQueryData(key, (rows) => applyOperations(rows, operations))
     },
     onSuccess: (response) => {
+      const supersededIds = new Set([...inFlightRef.current].filter(([, count]) => count > 1).map(([id]) => id))
       const followUps = []
       const results = (unwrap(response) ?? []).map((result) => {
         if (result.op !== 'create' || !result.object) return result
@@ -152,12 +186,13 @@ export function useObjectBatch(boardId, pageId, { onCreated } = {}) {
         followUps.push({ op: 'update', id: result.object.id, expectedRevision: result.object.revision, data: queued })
         return { ...result, object: { ...result.object, ...queued } }
       })
-      client.setQueryData(key, (rows) => mergeBatchResults(rows, results))
+      client.setQueryData(key, (rows) => mergeBatchResults(rows, results, { supersededIds }))
       const conflicts = results.filter((result) => result.op === 'conflict').length
       if (conflicts) toast.warning(conflicts === 1 ? 'Otra persona cambió un elemento; se cargó su versión más reciente.' : `Otra persona cambió ${conflicts} elementos; se cargó su versión más reciente.`)
       if (followUps.length) selfRef.current?.mutate(followUps)
     },
     onError: () => client.invalidateQueries({ queryKey: key }),
+    onSettled: (_response, _error, operations) => trackInFlight(operations, -1),
   })
   useEffect(() => { selfRef.current = mutation })
   const patchPending = useCallback((clientId, data) => {

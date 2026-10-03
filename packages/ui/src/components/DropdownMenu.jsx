@@ -3,6 +3,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronRight, Circle } from 'lucide-react'
 import { cn, mergeRefs } from '../lib/utils.js'
 import { useIsolatedScrollRef } from '../hooks/useIsolatedScroll.js'
+import { keepFocusInOpenDialog } from '../lib/menuFocus.js'
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
@@ -55,9 +56,10 @@ const DropdownMenuSubContent = forwardRef(function DropdownMenuSubContent(
 })
 
 const DropdownMenuContent = forwardRef(function DropdownMenuContent(
-  { className, sideOffset = 4, ...props },
+  { className, sideOffset = 4, onCloseAutoFocus, ...props },
   ref
 ) {
+  const handleCloseAutoFocus = keepFocusInOpenDialog(onCloseAutoFocus)
   // Keep wheel/touch scrolling alive for long menus opened from inside a
   // Dialog/Sheet. See useIsolatedScroll for the full explanation.
   const scrollRef = useIsolatedScrollRef()
@@ -67,6 +69,7 @@ const DropdownMenuContent = forwardRef(function DropdownMenuContent(
       <DropdownMenuPrimitive.Content
         ref={mergeRefs(ref, scrollRef)}
         sideOffset={sideOffset}
+        onCloseAutoFocus={handleCloseAutoFocus}
         className={cn(
           'z-50 min-w-[8rem] overflow-hidden rounded-xl glass-strong p-1 shadow-lg',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',

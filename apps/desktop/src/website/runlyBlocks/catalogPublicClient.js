@@ -4,11 +4,11 @@
 // (GET /public/catalog/*), shared by ProductsGridRenderer and
 // ProductCardRenderer. These blocks render both inside the Website
 // Builder's own live preview and on the actual published site, so this
-// reads window.ATLAS_CONFIG exactly like the storefront IIFE does — see
-// docs/ai-context/runly-storefront-sdk.md.
+// reads window.RUNLY_CONFIG (window.ATLAS_CONFIG as legacy fallback) exactly
+// like the storefront IIFE does — see docs/ai-context/runly-storefront-sdk.md.
 export function readAtlasConfig() {
   if (typeof window === 'undefined') return null
-  return window.ATLAS_CONFIG ?? null
+  return window.RUNLY_CONFIG ?? window.ATLAS_CONFIG ?? null
 }
 
 export async function fetchPublicCatalog(path, params = {}) {

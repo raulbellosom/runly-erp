@@ -1,5 +1,6 @@
 import { boxOf, canEditVertices, centerOf, handlesOf, hitObject, isLinear, objectBounds, polygonHandles, ROTATE_HANDLE_OFFSET, rotatePoint } from './geometry.js'
 import { readCanvasTheme } from './theme.js'
+import { GROUP_PAD_PX, groupHandles } from './groupResize.js'
 import { drawPin, pinGeometry } from './drawPin.js'
 import { labelsOverlap, pinOf } from './pins.js'
 import { TEXT_LINE_HEIGHT, textFont, wrapLines } from './text.js'
@@ -67,7 +68,7 @@ export class Canvas2DRenderer {
     // Handles only make sense for a single object; a group gets outlines
     // plus one dashed box around everything.
     for (const object of selected) this.drawSelection(ctx, object, viewport.zoom, interactive && selected.length === 1, editVertices)
-    if (selected.length > 1) this.drawGroupBox(ctx, selected, viewport.zoom)
+    if (selected.length > 1) this.drawGroupBox(ctx, selected, viewport.zoom, interactive)
     for (const cursor of remote) {
       for (const object of objects) if (cursor.selectedIds?.includes(object.id)) this.drawRemoteSelection(ctx, object, viewport.zoom, cursor.color)
     }
@@ -367,11 +368,20 @@ export class Canvas2DRenderer {
     ctx.restore()
   }
 
-  drawGroupBox(ctx, objects, zoom) {
-    const b = sceneBounds(objects), pad = 6 / zoom
+  drawGroupBox(ctx, objects, zoom, interactive = false) {
+    const b = sceneBounds(objects), pad = GROUP_PAD_PX / zoom
     ctx.save()
     ctx.setLineDash([6 / zoom, 4 / zoom]); ctx.lineWidth = 1 / zoom; ctx.strokeStyle = this.theme.primary
     ctx.strokeRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2)
+    // Corner handles scale the whole selection (see engine/groupResize.js).
+    if (interactive) {
+      const size = 8 / zoom
+      ctx.setLineDash([]); ctx.lineWidth = 1.5 / zoom; ctx.fillStyle = this.theme.surface
+      for (const handle of groupHandles(b, zoom)) {
+        ctx.fillRect(handle.x - size / 2, handle.y - size / 2, size, size)
+        ctx.strokeRect(handle.x - size / 2, handle.y - size / 2, size, size)
+      }
+    }
     ctx.restore()
   }
 

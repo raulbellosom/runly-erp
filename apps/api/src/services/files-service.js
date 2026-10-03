@@ -670,7 +670,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
         compressionOptions: { level: 6 },
       });
 
-      const zipFileName = `atlas-archivos-${toLocalIso()}.zip`;
+      const zipFileName = `runly-archivos-${toLocalIso()}.zip`;
       const zipObjectKey = `${BULK_ZIP_FOLDER}/${sanitizeSegment(companyId, "company")}/${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 10)}.zip`;

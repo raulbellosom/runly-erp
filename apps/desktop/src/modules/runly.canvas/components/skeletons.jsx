@@ -39,9 +39,9 @@ export function TemplateCardSkeleton() {
 // Mirrors LibraryItemTile: 96 px thumbnail + one-line name.
 export function LibraryTileSkeleton() {
   return (
-    <div aria-hidden className="flex flex-col items-center gap-1 rounded-xl border border-[hsl(var(--border))] p-2">
-      <Skeleton className="h-24 w-full rounded-lg" />
-      <Skeleton className="h-3.5 w-3/4" />
+    <div aria-hidden className="flex flex-col items-center gap-1 p-1">
+      <Skeleton className="aspect-square w-full rounded-md" />
+      <Skeleton className="h-3 w-3/4" />
     </div>
   )
 }

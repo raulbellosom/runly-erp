@@ -25,7 +25,11 @@ export function toServerOperations(operations) {
 }
 
 // Replaces optimistic rows with the authoritative ones returned by the batch.
-export function mergeBatchResults(rows = [], results = []) {
+// `supersededIds` are objects with a newer local edit still in flight: their
+// update result is older than what the cache shows, and applying it would
+// replay a quick drag step by step (the object jumps back to each
+// intermediate position as the queued batches resolve).
+export function mergeBatchResults(rows = [], results = [], { supersededIds } = {}) {
   let next = rows
   for (const result of results) {
     if (result.op === 'create' && result.object) {
@@ -43,6 +47,7 @@ export function mergeBatchResults(rows = [], results = []) {
       const restored = { ...result.object, hotspot: result.object.hotspot ?? existing?.hotspot }
       next = existing ? next.map((row) => row.id === restored.id ? restored : row) : [...next, restored]
     } else if (result.op === 'update' && result.object) {
+      if (supersededIds?.has(result.object.id)) continue
       next = next.map((row) => row.id === result.object.id ? { ...result.object, hotspot: row.hotspot } : row)
     } else if (result.op === 'conflict') {
       next = result.object

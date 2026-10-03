@@ -5,6 +5,13 @@ import { applyOperations, mergeBatchResults } from './optimistic.js'
 describe('Canvas optimistic batch', () => {
   const rows = [{ id: 'a', revision: 3, transform: { x: 0, y: 0 }, hotspot: { id: 'h' } }, { id: 'b', revision: 1 }]
 
+  it('keeps the newest optimistic position when an older update result arrives', () => {
+    const moved = applyOperations(rows, [{ op: 'update', id: 'a', data: { transform: { x: 30, y: 0 } } }])
+    const stale = [{ op: 'update', object: { id: 'a', revision: 4, transform: { x: 10, y: 0 } } }]
+    assert.equal(mergeBatchResults(moved, stale, { supersededIds: new Set(['a']) })[0].transform.x, 30)
+    assert.equal(mergeBatchResults(moved, stale)[0].transform.x, 10)
+  })
+
   it('applies updates with the revision the server will assign, plus creates and deletes', () => {
     const next = applyOperations(rows, [
       { op: 'update', id: 'a', data: { transform: { x: 10, y: 5 } } },

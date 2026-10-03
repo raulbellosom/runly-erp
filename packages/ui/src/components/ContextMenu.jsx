@@ -3,6 +3,7 @@ import * as ContextMenuPrimitive from '@radix-ui/react-context-menu'
 import { Check, ChevronRight, Circle } from 'lucide-react'
 import { cn, mergeRefs } from '../lib/utils.js'
 import { useIsolatedScrollRef } from '../hooks/useIsolatedScroll.js'
+import { keepFocusInOpenDialog } from '../lib/menuFocus.js'
 
 // Right-click / long-press context menu. Same visual language as DropdownMenu
 // (glass-strong surface, rounded-lg items, muted focus), but anchored at the
@@ -57,7 +58,7 @@ const ContextMenuSubContent = forwardRef(function ContextMenuSubContent(
 })
 
 const ContextMenuContent = forwardRef(function ContextMenuContent(
-  { className, ...props },
+  { className, onCloseAutoFocus, ...props },
   ref
 ) {
   // Keep wheel/touch scrolling alive when the menu opens from inside a
@@ -68,6 +69,7 @@ const ContextMenuContent = forwardRef(function ContextMenuContent(
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
         ref={mergeRefs(ref, scrollRef)}
+        onCloseAutoFocus={keepFocusInOpenDialog(onCloseAutoFocus)}
         className={cn(
           'z-50 min-w-[9rem] overflow-hidden rounded-xl glass-strong p-1 shadow-lg',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',

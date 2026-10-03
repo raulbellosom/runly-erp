@@ -309,12 +309,19 @@ export function createCanvasService({ prisma, entityResolver = null, removeFiles
       // (null = gone) instead of aborting the whole batch.
       const currentRow = (id) => tx.canvasObject.findFirst({ where: { id, companyId, boardId, deletedAt: null }, include: { hotspot: true } })
       const conflict = async (id) => results.push({ op: 'conflict', id, object: await currentRow(id) })
+      // Library inserts send hundreds of creates on the same layer; check each
+      // layer once instead of once per object.
+      const checkedLayers = new Set()
       for (const operation of operations) {
         if (operation.op === 'create') {
           const data = operation.data ?? {}
           validateCanvasObject(data)
-          const layer = await tx.canvasLayer.findFirst({ where: { id: data.layerId, pageId: data.pageId, page: { boardId } }, select: { id: true } })
-          if (!layer) throw new CanvasServiceError('Capa no encontrada.', 404)
+          const layerKey = `${data.pageId}:${data.layerId}`
+          if (!checkedLayers.has(layerKey)) {
+            const layer = await tx.canvasLayer.findFirst({ where: { id: data.layerId, pageId: data.pageId, page: { boardId } }, select: { id: true } })
+            if (!layer) throw new CanvasServiceError('Capa no encontrada.', 404)
+            checkedLayers.add(layerKey)
+          }
           const row = await tx.canvasObject.create({ data: {
             companyId, boardId, pageId: data.pageId, layerId: data.layerId, type: data.type, position: data.position ?? 0,
             transform: data.transform ?? { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }, geometry: data.geometry ?? {},
@@ -360,7 +367,9 @@ export function createCanvasService({ prisma, entityResolver = null, removeFiles
       }
       await tx.canvasBoard.update({ where: { id: boardId }, data: { updatedById: actorId, updatedAt: new Date() } })
       return results
-    })
+    // Up to 500 sequential statements against a remote database outlast
+    // Prisma's 5 s interactive-transaction default.
+    }, { maxWait: 10_000, timeout: 60_000 })
   }
 
   async function createHotspot(companyId, actorId, boardId, data) {

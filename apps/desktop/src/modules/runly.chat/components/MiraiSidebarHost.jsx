@@ -184,7 +184,10 @@ export function MiraiSidebarHost() {
       ) : (
         <aside
           aria-label="MirAI"
-          aria-hidden={!open}
+          // inert (not aria-hidden): hides the collapsed panel from assistive
+          // tech and keeps Tab out of it, without Chrome blocking aria-hidden
+          // while its close button still has focus.
+          inert={!open}
           className={[
             "h-full min-h-0 shrink-0 overflow-hidden bg-[hsl(var(--background))] transition-[width] duration-200 ease-out motion-reduce:transition-none",
             open ? "w-[390px] border-l border-[hsl(var(--border))]" : "w-0",

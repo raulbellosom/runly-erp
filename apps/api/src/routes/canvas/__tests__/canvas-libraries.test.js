@@ -138,10 +138,12 @@ describe('Runly Canvas libraries service', () => {
     )
   })
 
-  it('deletes a library, disables its image FileAssets and writes LIBRARY_DELETED', async () => {
+  it('deletes a library, disables image FileAssets no Board uses and writes LIBRARY_DELETED', async () => {
     const calls = []
     const tx = {
-      canvasLibraryItem: { findMany: async () => [{ fileAssetId: 'file-1' }, { fileAssetId: 'file-2' }] },
+      canvasLibraryItem: { findMany: async () => [{ fileAssetId: 'file-1' }, { fileAssetId: 'file-2' }, { fileAssetId: 'file-3' }] },
+      // file-3 was inserted into a Board, so it must stay enabled.
+      $queryRaw: async () => [{ fileId: 'file-3' }],
       canvasLibrary: { delete: async ({ where }) => calls.push(['delete', where.id]) },
       fileAsset: { updateMany: async ({ where, data }) => calls.push(['disable', where.id.in, data.enabled]) },
       auditLog: { create: async ({ data }) => calls.push(['audit', data.action]) },

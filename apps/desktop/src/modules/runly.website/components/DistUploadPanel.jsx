@@ -210,13 +210,13 @@ export function DistUploadPanel({
 
   const GUIDE_SNIPPETS = {
     sdk: `// npm install @raulbellosom/runly-sdk
-// Atlas inyecta window.ATLAS_CONFIG automaticamente en tu HTML.
+// Runly inyecta window.RUNLY_CONFIG automaticamente en tu HTML.
 
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 
 const sdk = createStorefrontClient({
-  baseUrl: window.ATLAS_CONFIG.apiUrl,
-  company: window.ATLAS_CONFIG.company,
+  baseUrl: window.RUNLY_CONFIG.apiUrl,
+  company: window.RUNLY_CONFIG.company,
 })
 
 // Auth de clientes storefront
@@ -225,17 +225,17 @@ const user = await sdk.auth.me()
 await sdk.auth.logout()
 
 // Pagos con Stripe (si configuraste la clave en el sitio)
-const stripe = Stripe(window.ATLAS_CONFIG.stripePublishableKey)`,
+const stripe = Stripe(window.RUNLY_CONFIG.stripePublishableKey)`,
 
     react: `// npm install @raulbellosom/runly-sdk
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 import { useEffect, useState, useMemo } from 'react'
 
-// Crea el cliente una vez — lee config inyectada por Atlas al servir el HTML
+// Crea el cliente una vez — lee config inyectada por Runly al servir el HTML
 function useSdk() {
   return useMemo(() => createStorefrontClient({
-    baseUrl: window.ATLAS_CONFIG?.apiUrl ?? '',
-    company: window.ATLAS_CONFIG?.company ?? '',
+    baseUrl: window.RUNLY_CONFIG?.apiUrl ?? '',
+    company: window.RUNLY_CONFIG?.company ?? '',
   }), [])
 }
 
@@ -254,8 +254,8 @@ export function useStorefrontUser() {
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 
 export const sdk = createStorefrontClient({
-  baseUrl: typeof window !== 'undefined' ? window.ATLAS_CONFIG?.apiUrl ?? '' : '',
-  company: typeof window !== 'undefined' ? window.ATLAS_CONFIG?.company ?? '' : '',
+  baseUrl: typeof window !== 'undefined' ? window.RUNLY_CONFIG?.apiUrl ?? '' : '',
+  company: typeof window !== 'undefined' ? window.RUNLY_CONFIG?.company ?? '' : '',
 })
 
 // app/login/page.tsx
@@ -286,8 +286,8 @@ export default function LoginPage() {
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 
 const sdk = createStorefrontClient({
-  baseUrl: window.ATLAS_CONFIG.apiUrl,
-  company: window.ATLAS_CONFIG.company,
+  baseUrl: window.RUNLY_CONFIG.apiUrl,
+  company: window.RUNLY_CONFIG.company,
 })
 
 document.getElementById('login-root').innerHTML = \`
@@ -311,7 +311,6 @@ document.getElementById('sf-login').addEventListener('submit', async (e) => {
     erp: `// Detecta si el visitante tiene sesion activa como usuario de Runly ERP
 // (ej. un admin o empleado que navega el sitio publico)
 // window.RunlyERP esta disponible automaticamente — no requiere instalacion.
-// (window.AtlasERP sigue apuntando al mismo objeto, por compatibilidad.)
 
 const erpSession = await window.RunlyERP.auth.getSession()
 if (erpSession) {
@@ -331,7 +330,7 @@ const { supabaseUrl, supabaseAnonKey } = window.RUNLY_CONFIG
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 const { data: { session } } = await supabase.auth.getSession()`,
 
-    config: `// window.ATLAS_CONFIG es inyectado por Runly en cada respuesta HTML del dist.
+    config: `// window.RUNLY_CONFIG es inyectado por Runly en cada respuesta HTML del dist.
 // Todos los campos disponibles:
 
 {
@@ -348,8 +347,8 @@ const { data: { session } } = await supabase.auth.getSession()`,
 // Uso rapido con el SDK:
 import { createStorefrontClient } from '@raulbellosom/runly-sdk'
 const sdk = createStorefrontClient({
-  baseUrl: window.ATLAS_CONFIG.apiUrl,
-  company: window.ATLAS_CONFIG.company,
+  baseUrl: window.RUNLY_CONFIG.apiUrl,
+  company: window.RUNLY_CONFIG.company,
 })`,
   };
 
@@ -589,7 +588,7 @@ const sdk = createStorefrontClient({
               Usa{" "}
               <code className="bg-muted px-1 py-0.5 rounded text-[11px] font-mono">@raulbellosom/runly-sdk</code>{" "}
               en tu frontend. Runly inyecta{" "}
-              <code className="bg-muted px-1 py-0.5 rounded text-[11px] font-mono">window.ATLAS_CONFIG</code>{" "}
+              <code className="bg-muted px-1 py-0.5 rounded text-[11px] font-mono">window.RUNLY_CONFIG</code>{" "}
               automaticamente con{" "}
               <code className="bg-muted px-1 py-0.5 rounded text-[11px] font-mono">apiUrl</code>,{" "}
               <code className="bg-muted px-1 py-0.5 rounded text-[11px] font-mono">company</code>{" "}

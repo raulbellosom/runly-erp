@@ -14,7 +14,7 @@ export function createAuthNamespace({ supabase, request, session }) {
         { code: 'UNAUTHORIZED', status: 401 }
       )
     }
-    // Fetch Atlas role/profile — best-effort, ERP users may get 403 which is fine
+    // Fetch Runly role/profile — best-effort, ERP users may get 403 which is fine
     let user = null
     try {
       const profileRes = await request('GET', '/public/storefront/auth/me')

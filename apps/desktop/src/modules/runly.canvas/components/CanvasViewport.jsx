@@ -8,6 +8,7 @@ import { connectTargetAt, resolveConnectors } from '../lib/connectors.js'
 import { formatLength } from '../lib/measure.js'
 import { CREATION_TOOLS, draftObject } from '../lib/objectFactory.js'
 import { closesPolygonDraft, cursorForHandle } from '../lib/viewportPolygon.js'
+import { groupScale, hitGroupHandle, scaleObject } from '../engine/groupResize.js'
 
 const DRAG_THRESHOLD = 4
 const LONG_PRESS_MS = 450
@@ -223,6 +224,11 @@ export function CanvasViewport(props) {
     const single = p.selectedIds.length === 1 ? rows.find((row) => row.id === p.selectedIds[0]) : null
     const handle = single && !additive && hitHandle(world, single, p.viewport.zoom, touch ? 16 : 9, p.editVertices !== false)
     if (handle) { dragRef.current = { mode: handle === 'rotate' ? 'rotate' : 'resize', handle, screen, objects: [single], moved: false }; return }
+    // Multi-selection: the group box's corners scale everything together.
+    const groupRows = p.selectedIds.length > 1 && !additive ? rows.filter((row) => p.selectedIds.includes(row.id)) : []
+    const groupBounds = groupRows.length > 1 ? sceneBounds(groupRows) : null
+    const groupHandle = groupBounds && hitGroupHandle(world, groupBounds, p.viewport.zoom, touch ? 16 : 9)
+    if (groupHandle) { dragRef.current = { mode: 'group-resize', handle: groupHandle, screen, objects: groupRows, bounds: groupBounds, moved: false }; return }
 
     const hit = rendererRef.current?.hitTest(screen, rows, p.viewport, touch ? 14 : 6)
     if (hit && additive) { p.onSelect(toggle(p.selectedIds, hit.id)); return }
@@ -259,7 +265,9 @@ export function CanvasViewport(props) {
       }
       const world = screenToWorld(screen, p.viewport)
       const single = p.selectedIds.length === 1 ? selectable().find((row) => row.id === p.selectedIds[0]) : null
-      const handle = single && hitHandle(world, single, p.viewport.zoom, 9, p.editVertices !== false)
+      const groupRows = p.selectedIds.length > 1 ? selectable().filter((row) => p.selectedIds.includes(row.id)) : []
+      const handle = (single && hitHandle(world, single, p.viewport.zoom, 9, p.editVertices !== false))
+        || (groupRows.length > 1 && hitGroupHandle(world, sceneBounds(groupRows), p.viewport.zoom, 9))
       setCursor(handle ? cursorForHandle(handle, HANDLE_CURSORS) : rendererRef.current?.hitTest(screen, selectable(), p.viewport) ? 'move' : 'default')
       return
     }
@@ -294,6 +302,9 @@ export function CanvasViewport(props) {
       const { dx, dy } = snapMoveDelta(drag.bounds, world.x - drag.world.x, world.y - drag.world.y, snap)
       liveRef.current = { mode: 'move', objects: new Map(drag.objects.map((object) => [object.id, moveObject(object, dx, dy)])) }
       setCursor('grabbing')
+    } else if (drag.mode === 'group-resize') {
+      const { scale, origin } = groupScale(drag.bounds, drag.handle, world, p.viewport.zoom)
+      liveRef.current = { mode: 'resize', objects: new Map(drag.objects.map((object) => [object.id, scaleObject(object, origin, scale)])) }
     } else if (drag.handle?.startsWith('v:') || drag.handle?.startsWith('m:')) {
       const [object] = drag.objects
       const next = editVertex(object, drag.handle, snapPoint(world, snap))

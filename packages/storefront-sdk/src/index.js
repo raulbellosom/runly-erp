@@ -15,16 +15,16 @@ export { StorefrontError }
 
 /**
  * @param {object} options
- * @param {string} options.baseUrl        - Atlas ERP instance URL
+ * @param {string} options.baseUrl        - Runly ERP instance URL
  * @param {string} options.company        - Company slug (sent as X-Runly-Company on every request)
- * @param {string} options.supabaseUrl    - Supabase project URL (window.ATLAS_CONFIG.supabaseUrl in production)
- * @param {string} options.supabaseAnonKey - Supabase anon key (window.ATLAS_CONFIG.supabaseAnonKey in production)
+ * @param {string} options.supabaseUrl    - Supabase project URL (window.RUNLY_CONFIG.supabaseUrl in production)
+ * @param {string} options.supabaseAnonKey - Supabase anon key (window.RUNLY_CONFIG.supabaseAnonKey in production)
  * @param {string} [options.siteId]       - Website site ID for analytics and public forms
  * @param {function} [options.onSessionChange] - Called with session or null on every auth state change
  * @returns {{ auth, files, catalog, discovery, realtime, analytics, forms, request }}
  *
  * @example
- * const cfg = (typeof window !== 'undefined' && window.ATLAS_CONFIG) ? window.ATLAS_CONFIG : {}
+ * const cfg = (typeof window !== 'undefined' && window.RUNLY_CONFIG) ? window.RUNLY_CONFIG : {}
  * const sdk = createStorefrontClient({
  *   baseUrl:         cfg.apiUrl         ?? import.meta.env.VITE_ERP_URL,
  *   company:         cfg.company         ?? import.meta.env.VITE_ERP_COMPANY,
@@ -99,7 +99,7 @@ export function createStorefrontClient({
   const realtime  = createRealtimeNamespace({ request: _requestWithRefresh })
   const resolvedSiteId =
     siteId ??
-    (typeof window !== 'undefined' ? window.ATLAS_CONFIG?.siteId : null)
+    (typeof window !== 'undefined' ? (window.RUNLY_CONFIG ?? window.ATLAS_CONFIG)?.siteId : null)
   const analytics = createAnalyticsNamespace({
     request: _requestWithRefresh,
     baseUrl,
