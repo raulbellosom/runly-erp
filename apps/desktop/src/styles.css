@@ -638,7 +638,8 @@ body,
    of a mismatched neutral UI divider. Left as the neutral --border color
    on "En blanco" (no paper style), where there's no ruled pattern to match. */
 [data-paper-style="lined"] .tiptap > p:first-child,
-[data-paper-style="grid"] .tiptap > p:first-child {
+[data-paper-style="grid"] .tiptap > p:first-child,
+[data-paper-style="dots"] .tiptap > p:first-child {
   border-bottom-color: hsl(var(--note-paper-line));
 }
 
@@ -733,21 +734,33 @@ body,
   background-size: 100% var(--note-line), var(--note-line) 100%;
   background-position: 0 calc(-1 * var(--note-paper-phase, 0px) - var(--note-rule-lift, 0px)), 0 0;
 }
+/* Dot grid: one dot per line unit, centered on where the ruled lines
+   would cross (tile shifted half a unit), so text sits on the dot rows. */
+[data-paper-style="dots"] .note-sheet {
+  background-image: radial-gradient(circle, hsl(var(--note-paper-line)) 1.25px, transparent 1.75px);
+  background-size: var(--note-line) var(--note-line);
+  background-position:
+    calc(var(--note-line) / -2)
+    calc(var(--note-line) / 2 - var(--note-paper-phase, 0px) - var(--note-rule-lift, 0px));
+}
 /* On ruled/grid paper every text block advances by whole line units, so the
    text keeps sitting on the rules all the way down (a paragraph margin would
    drift it a few px per line). */
 [data-paper-style="lined"] .tiptap p,
-[data-paper-style="grid"] .tiptap p {
+[data-paper-style="grid"] .tiptap p,
+[data-paper-style="dots"] .tiptap p {
   margin-top: 0;
   margin-bottom: 0;
 }
 [data-paper-style="lined"] .tiptap h1,
-[data-paper-style="grid"] .tiptap h1 {
+[data-paper-style="grid"] .tiptap h1,
+[data-paper-style="dots"] .tiptap h1 {
   line-height: calc(var(--note-line) * 2);
   margin: 0;
 }
 [data-paper-style="lined"] .tiptap :is(h2, h3),
-[data-paper-style="grid"] .tiptap :is(h2, h3) {
+[data-paper-style="grid"] .tiptap :is(h2, h3),
+[data-paper-style="dots"] .tiptap :is(h2, h3) {
   line-height: var(--note-line);
   margin: 0;
 }
@@ -1397,4 +1410,20 @@ body {
 *::before,
 *::after {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Block drag grip in the sheet gutter (NoteBlockDragHandle placement="gutter"):
+   hidden until the block is hovered, like a classic block handle. Touch
+   screens have no hover, so it stays faintly visible there. */
+.note-block > .note-block-grip {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.note-block:hover > .note-block-grip,
+.note-block > .note-block-grip:focus-visible,
+.note-block > .note-block-grip:active {
+  opacity: 1;
+}
+@media (hover: none) {
+  .note-block > .note-block-grip { opacity: 0.6; }
 }

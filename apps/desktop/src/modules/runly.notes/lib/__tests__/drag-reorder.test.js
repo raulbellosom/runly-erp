@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeShiftMap, exceedsDragThreshold, DRAG_THRESHOLD_PX, findTableAtSelection,
-  computeIndicatorRect,
+  computeIndicatorRect, findCandidateIndex,
 } from '../dragReorder.js'
 
 // 6 blocks at indices 0-5, offsets deliberately uneven (not equal to index)
@@ -97,6 +97,26 @@ test('computeIndicatorRect: positions below the last block when dropping past th
   ]
   const rect = computeIndicatorRect(rects, 2, 80, 60)
   assert.deepEqual(rect, { top: 40, left: 0, width: 80, height: 60 })
+})
+
+test('computeIndicatorRect: with originalIndex, matches the gap computeShiftMap opens', () => {
+  const rects = BLOCK_RECTS.map((r) => ({ ...r, bottom: r.top + r.height, left: 0 }))
+  // No-op drops (own slot or right after it) show the block's own slot.
+  assert.equal(computeIndicatorRect(rects, 1, 80, 20, 1).top, 20)
+  assert.equal(computeIndicatorRect(rects, 2, 80, 20, 1).top, 20)
+  // Down: blocks 2-3 slid up 20px, so the gap ends at block 4's top.
+  assert.equal(computeIndicatorRect(rects, 4, 80, 20, 1).top, 60)
+  // Up: blocks 1-3 slid down, so the gap starts at block 1's top.
+  assert.equal(computeIndicatorRect(rects, 1, 80, 20, 4).top, 20)
+  // Past the end, dragging down.
+  assert.equal(computeIndicatorRect(rects, 6, 80, 20, 1).top, 100)
+})
+
+test('findCandidateIndex: uses the drag-start rects, slot by block midpoint', () => {
+  assert.equal(findCandidateIndex(BLOCK_RECTS, -5), 0)
+  assert.equal(findCandidateIndex(BLOCK_RECTS, 29), 1)
+  assert.equal(findCandidateIndex(BLOCK_RECTS, 31), 2)
+  assert.equal(findCandidateIndex(BLOCK_RECTS, 500), BLOCK_RECTS.length)
 })
 
 test('computeIndicatorRect: an empty document positions at the origin', () => {

@@ -3,27 +3,30 @@
 // dragging (e.g. moving an image within a note) is implemented manually
 // with pointer events instead, which work uniformly for mouse and touch.
 
-// Finds the top-level block boundary closest to clientY and returns the
-// document position to insert before. Falls back to the end of the doc.
-export function findDropPosition(view, clientY) {
-  const { doc } = view.state
-  let pos = doc.content.size
-  let found = false
-  doc.forEach((node, offset) => {
-    if (found) return
-    const dom = view.nodeDOM(offset)
-    if (!dom?.getBoundingClientRect) return
-    const rect = dom.getBoundingClientRect()
-    if (clientY < rect.top + rect.height / 2) {
-      pos = offset
-      found = true
-    }
-  })
-  return pos
+// Pure: drop slot for pointer `y` against the block rects measured when the
+// drag started (document order). Measuring live DOM instead would read the
+// siblings' own drag shifts back in and make the slot flip-flop, so the drop
+// landed somewhere other than where the indicator showed. Returns an index
+// into blockRects, or blockRects.length for "after the last block".
+export function findCandidateIndex(blockRects, y) {
+  for (let i = 0; i < blockRects.length; i++) {
+    const r = blockRects[i]
+    if (y < r.top + r.height / 2) return i
+  }
+  return blockRects.length
+}
+
+// Nearest scrollable ancestor (the note's scroll container), or null.
+export function findScrollParent(el) {
+  for (let node = el?.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) return node
+  }
+  return null
 }
 
 // Moves the node currently at fromPos to targetPos (a position computed
-// against the pre-move document, e.g. from findDropPosition). No-ops if
+// against the pre-move document, e.g. from findCandidateIndex). No-ops if
 // the target falls inside the node being moved.
 export function moveNode(editor, fromPos, targetPos) {
   const { state, view } = editor
@@ -102,19 +105,29 @@ export function computeShiftMap({ blockRects, originalIndex, candidateIndex, dra
 
 /**
  * Pure: given block rects (document order), the candidate drop array index
- * (from findDropPosition's array-index resolution), and the dragged block's
+ * (from findCandidateIndex), and the dragged block's
  * own width/height in px, returns the exact `{ top, left, width, height }`
  * rect a visible drop-zone indicator should occupy — at the candidate
  * block's own top-left, or below the last block when dropping past the end.
  */
-export function computeIndicatorRect(blockRects, candidateIndex, widthPx, heightPx) {
+// With `originalIndex` (the dragged block's index) the rect matches the gap
+// computeShiftMap actually opens: a no-op drop shows the block's own slot,
+// and a drop further DOWN sits `heightPx` above the candidate's original
+// top, because the blocks in between slid up by that much.
+export function computeIndicatorRect(blockRects, candidateIndex, widthPx, heightPx, originalIndex) {
+  if (originalIndex != null && blockRects[originalIndex] &&
+      (candidateIndex === originalIndex || candidateIndex === originalIndex + 1)) {
+    const r = blockRects[originalIndex]
+    return { top: r.top, left: r.left, width: widthPx, height: heightPx }
+  }
+  const lift = originalIndex != null && candidateIndex > originalIndex ? heightPx : 0
   if (candidateIndex < blockRects.length) {
     const r = blockRects[candidateIndex]
-    return { top: r.top, left: r.left, width: widthPx, height: heightPx }
+    return { top: r.top - lift, left: r.left, width: widthPx, height: heightPx }
   }
   const last = blockRects[blockRects.length - 1]
   return {
-    top: last ? last.bottom : 0,
+    top: last ? last.bottom - lift : 0,
     left: last ? last.left : 0,
     width: widthPx,
     height: heightPx,

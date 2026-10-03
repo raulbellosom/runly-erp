@@ -271,11 +271,9 @@ export function ImageAnnotationOverlay({ node, updateAttributes, editor, getPos,
     : { position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0 }
 
   return (
-    <NodeViewWrapper className="group/img relative my-2 block w-full">
+    <NodeViewWrapper className="group/img note-block relative my-2 block w-full">
       {editable && !inTableCell && !isEditing && (
-        <div contentEditable={false} className="mb-1 flex" data-html2canvas-ignore>
-          <NoteBlockDragHandle label="Mover imagen" drag={drag} />
-        </div>
+        <NoteBlockDragHandle label="Mover imagen" drag={drag} placement="gutter" />
       )}
       <div
         ref={boxRef}

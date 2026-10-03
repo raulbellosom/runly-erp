@@ -8,6 +8,7 @@ export const NOTE_PAPER_STYLES = [
   { value: 'none',  label: 'En blanco' },
   { value: 'lined', label: 'Rayado' },
   { value: 'grid',  label: 'Cuadriculado' },
+  { value: 'dots',  label: 'Punteado' },
 ]
 
 export function paperStylePreviewBackground(value) {
@@ -20,6 +21,12 @@ export function paperStylePreviewBackground(value) {
       backgroundImage:
         `repeating-linear-gradient(to bottom, transparent, transparent 9px, ${line}),` +
         `repeating-linear-gradient(to right, transparent, transparent 9px, ${line})`,
+    }
+  }
+  if (value === 'dots') {
+    return {
+      backgroundImage: 'radial-gradient(circle, hsl(var(--muted-foreground) / 0.55) 1px, transparent 1.5px)',
+      backgroundSize: '10px 10px',
     }
   }
   return {}

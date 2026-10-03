@@ -1,8 +1,21 @@
 import { useEffect, useRef } from 'react'
 import {
-  findDropPosition, moveNode, computeBlockRects, computeShiftMap,
+  moveNode, computeBlockRects, computeShiftMap, findCandidateIndex, findScrollParent,
   exceedsDragThreshold, LONG_PRESS_MS, computeIndicatorRect,
 } from '../lib/dragReorder.js'
+
+// Auto-scroll the note while dragging near the top/bottom of its viewport,
+// so a block can be moved past what is currently visible.
+const AUTOSCROLL_EDGE_PX = 56
+const AUTOSCROLL_STEP_PX = 14
+
+// Blocks taller than this are compacted while dragged (see startDrag): the
+// preview scales down to about COMPACT_PREVIEW_PX tall (never below
+// COMPACT_MIN_SCALE) and the slot collapses to COMPACT_SLOT_PX.
+const COMPACT_MIN_PX = 160
+const COMPACT_PREVIEW_PX = 140
+const COMPACT_MIN_SCALE = 0.25
+const COMPACT_SLOT_PX = 48
 
 const CLONE_LIFT_STYLE = {
   position: 'fixed',
@@ -63,6 +76,7 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       const dom = editor.view.nodeDOM(b.offset)
       if (dom?.style) dom.style.transform = ''
     }
+    if (d.slotEl && d.slotRestore) Object.assign(d.slotEl.style, d.slotRestore)
     d.cloneEl?.remove()
     d.indicatorEl?.remove()
     const boxEl = getBoxEl()
@@ -118,12 +132,32 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     if (!boxEl || !frameEl) return
     const view = editor.view
     const originalPos = getPos()
-    const blockRects = computeBlockRects(view)
-    const originalIndex = blockRects.findIndex((b) => b.offset === originalPos)
-    if (originalIndex === -1) return
+    if (!computeBlockRects(view).some((b) => b.offset === originalPos)) return
     const rect = frameEl.getBoundingClientRect()
     const layout = getComputedStyle(frameEl)
     const zoom = rect.width / parseFloat(layout.width) || 1
+
+    // Large blocks (big images, tables, drawings) are compacted while
+    // dragged: the floating preview shrinks and the block's slot collapses
+    // to a short strip, so moving it past its neighbours takes a short
+    // pointer travel instead of the block's whole height.
+    const compact = rect.height > COMPACT_MIN_PX
+    const scale = compact ? Math.max(COMPACT_MIN_SCALE, COMPACT_PREVIEW_PX / rect.height) : 1
+    const slotEl = view.nodeDOM(originalPos)
+    const slotRestore = compact && slotEl?.style
+      ? { height: slotEl.style.height, minHeight: slotEl.style.minHeight, overflow: slotEl.style.overflow }
+      : null
+    if (slotRestore) {
+      Object.assign(slotEl.style, { height: `${COMPACT_SLOT_PX}px`, minHeight: '0', overflow: 'hidden' })
+    }
+    // Measured after the collapse: this is the layout the drop math uses.
+    const blockRects = computeBlockRects(view)
+    const originalIndex = blockRects.findIndex((b) => b.offset === originalPos)
+    const slotRect = blockRects[originalIndex]
+    const draggedHeightPx = slotRestore ? slotRect.height : rect.height
+    // Keeps the pointer "inside" the collapsed slot at drag start even when
+    // the block was grabbed far below its new (short) height.
+    const pointerOffsetPx = slotRestore ? Math.max(0, e.clientY - slotRect.top - slotRect.height / 2) : 0
 
     const clone = frameEl.cloneNode(true)
     // cloneNode doesn't copy canvas pixels (drawing blocks).
@@ -133,14 +167,16 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     })
     clone.inert = true
     clone.setAttribute('aria-hidden', 'true')
+    const grabDX = (e.clientX - rect.left) * scale
+    const grabDY = (e.clientY - rect.top) * scale
     Object.assign(clone.style, CLONE_LIFT_STYLE, {
-      left: `${rect.left}px`,
-      top: `${rect.top}px`,
+      left: `${e.clientX - grabDX}px`,
+      top: `${e.clientY - grabDY}px`,
       // The preview lives outside the zoomed sheet. Scale its descendants
       // together so pixel-sized images keep filling their frame.
       width: layout.width,
       height: layout.height,
-      transform: `scale(${zoom * 1.03})`,
+      transform: `scale(${zoom * 1.03 * scale})`,
       transformOrigin: 'top left',
     })
     document.body.appendChild(clone)
@@ -148,25 +184,31 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     const indicator = document.createElement('div')
     Object.assign(indicator.style, INDICATOR_STYLE, {
       left: `${rect.left}px`,
-      top: `${rect.top}px`,
+      top: `${slotRect.top}px`,
       width: `${rect.width}px`,
-      height: `${rect.height}px`,
+      height: `${draggedHeightPx}px`,
     })
     document.body.appendChild(indicator)
 
     boxEl.style.opacity = '0'
+    const scroller = findScrollParent(view.dom)
 
     dragRef.current = {
+      scroller,
+      startScrollTop: scroller?.scrollTop ?? 0,
       pointerId: e.pointerId,
       originalPos,
       originalIndex,
       blockRects,
       draggedWidthPx: rect.width,
-      draggedHeightPx: rect.height,
+      draggedHeightPx,
+      pointerOffsetPx,
+      slotEl: slotRestore ? slotEl : null,
+      slotRestore,
       cloneEl: clone,
       indicatorEl: indicator,
-      grabDX: e.clientX - rect.left,
-      grabDY: e.clientY - rect.top,
+      grabDX,
+      grabDY,
       candidatePos: originalPos,
       cleanup: cleanupDrag,
     }
@@ -210,9 +252,19 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
     if (active && active.pointerId === e.pointerId) {
       e.preventDefault()
       const view = editor.view
-      const candidatePos = findDropPosition(view, e.clientY)
-      const rawCandidateIndex = active.blockRects.findIndex((b) => b.offset === candidatePos)
-      const candidateIndex = rawCandidateIndex === -1 ? active.blockRects.length : rawCandidateIndex
+      const { scroller } = active
+      if (scroller) {
+        const bounds = scroller.getBoundingClientRect()
+        if (e.clientY < bounds.top + AUTOSCROLL_EDGE_PX) scroller.scrollTop -= AUTOSCROLL_STEP_PX
+        else if (e.clientY > bounds.bottom - AUTOSCROLL_EDGE_PX) scroller.scrollTop += AUTOSCROLL_STEP_PX
+      }
+      // blockRects are viewport rects from drag start; translate the pointer
+      // into that frame so scrolling mid-drag doesn't skew the drop slot.
+      const scrolledPx = (scroller?.scrollTop ?? 0) - active.startScrollTop
+      const candidateIndex = findCandidateIndex(active.blockRects, e.clientY + scrolledPx - active.pointerOffsetPx)
+      const candidatePos = candidateIndex < active.blockRects.length
+        ? active.blockRects[candidateIndex].offset
+        : view.state.doc.content.size
       const shiftMap = computeShiftMap({
         blockRects: active.blockRects,
         originalIndex: active.originalIndex,
@@ -229,9 +281,9 @@ export function useBlockDragReorder({ editor, getPos, getBoxEl, getFrameEl, edit
       active.candidatePos = candidatePos
       active.cloneEl.style.left = `${e.clientX - active.grabDX}px`
       active.cloneEl.style.top = `${e.clientY - active.grabDY}px`
-      const indicatorRect = computeIndicatorRect(active.blockRects, candidateIndex, active.draggedWidthPx, active.draggedHeightPx)
+      const indicatorRect = computeIndicatorRect(active.blockRects, candidateIndex, active.draggedWidthPx, active.draggedHeightPx, active.originalIndex)
       active.indicatorEl.style.left = `${indicatorRect.left}px`
-      active.indicatorEl.style.top = `${indicatorRect.top}px`
+      active.indicatorEl.style.top = `${indicatorRect.top - scrolledPx}px`
       active.indicatorEl.style.width = `${indicatorRect.width}px`
       active.indicatorEl.style.height = `${indicatorRect.height}px`
       return

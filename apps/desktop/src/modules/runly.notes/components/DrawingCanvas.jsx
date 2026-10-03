@@ -189,11 +189,11 @@ export function DrawingCanvas({ node, updateAttributes, editor, deleteNode, getP
   })
 
   return (
-    <NodeViewWrapper className="my-4 select-none">
+    <NodeViewWrapper className="note-block relative my-4 select-none">
+      {editable && !inTableCell && <NoteBlockDragHandle label="Mover dibujo" drag={drag} placement="gutter" />}
       <div ref={blockRef} className="border border-[hsl(var(--border))] rounded-xl overflow-hidden shadow-sm">
         {editable && (
           <div className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))] flex-wrap">
-            {!inTableCell && <NoteBlockDragHandle label="Mover dibujo" drag={drag} />}
             <button onClick={() => setTool('pen')} className={`px-2 py-1 text-xs rounded font-medium ${tool === 'pen' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]'}`}>Lapiz</button>
             <button onClick={() => setTool('eraser')} className={`px-2 py-1 text-xs rounded font-medium ${tool === 'eraser' ? 'bg-[hsl(var(--muted-foreground)/0.2)]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted-foreground)/0.1)]'}`}>Borrador</button>
             <div className="h-4 w-px bg-[hsl(var(--border))]" />
