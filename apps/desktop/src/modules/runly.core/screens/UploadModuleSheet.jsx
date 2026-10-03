@@ -17,12 +17,7 @@ import { SearchCheck } from "lucide-react";
 import { useAuth } from "../../../auth/AuthProvider";
 import { ZipDropZone } from "../components/module-update/ZipDropZone";
 import { ModuleUpdateReview } from "../components/module-update/ModuleUpdateReview";
-
-function guessKeyFromFilename(filename) {
-  const base = filename.replace(/\.zip$/i, "");
-  const match = base.match(/^([a-z][a-z0-9]*\.[a-z][a-z0-9._-]*)/);
-  return match ? match[1] : base;
-}
+import { guessKeyFromFilename, readModuleKeyFromZip } from "../lib/module-zip-key.js";
 
 export function UploadModuleSheet({ open, onOpenChange, onSuccess, fixedModuleKey = null, title = "Subir módulo" }) {
   const { session } = useAuth();
@@ -36,7 +31,11 @@ export function UploadModuleSheet({ open, onOpenChange, onSuccess, fixedModuleKe
 
   function handleFile(selected) {
     setFile(selected);
-    if (!fixedModuleKey) setModuleKey(guessKeyFromFilename(selected.name));
+    if (fixedModuleKey) return;
+    // Quick guess from the file name, then the real key from the manifest
+    // inside the ZIP (Builder files are named <key>-<version>.zip).
+    setModuleKey(guessKeyFromFilename(selected.name));
+    readModuleKeyFromZip(selected).then((key) => { if (key) setModuleKey(key); });
   }
 
   function reset() {
