@@ -1365,6 +1365,13 @@ export const inventoryMap = createModuleManifest({
       layout: 'main',
       permissionKey: 'inventory.catalog.read',
     },
+    {
+      label: 'Conexiones',
+      path: '/inventory/connections',
+      icon: 'Plug',
+      layout: 'main',
+      permissionKey: 'inventory.connections.manage',
+    },
   ],
   permissions: [
     { key: 'inventory.access',             name: 'Acceder al modulo de inventario' },
@@ -1379,6 +1386,7 @@ export const inventoryMap = createModuleManifest({
     { key: 'inventory.catalog.read',       name: 'Ver catalogos de inventario' },
     { key: 'inventory.catalog.manage',     name: 'Gestionar catalogos de inventario' },
     { key: 'inventory.customfield.manage', name: 'Gestionar campos personalizados de inventario' },
+    { key: 'inventory.connections.manage', name: 'Gestionar conexiones de inventario' },
   ],
   acl: {
     module: 'inventory.access',
@@ -1394,6 +1402,7 @@ export const inventoryMap = createModuleManifest({
       'inventory.catalog.read':       'inventory.catalog.read',
       'inventory.catalog.manage':     'inventory.catalog.manage',
       'inventory.customfield.manage': 'inventory.customfield.manage',
+      'inventory.connections.manage': 'inventory.connections.manage',
     },
   },
   blueprints: [

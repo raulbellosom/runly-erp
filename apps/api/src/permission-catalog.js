@@ -1596,6 +1596,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "inventory",
     order: 50,
   },
+  "inventory.connections.manage": {
+    displayNameEs: "Gestionar conexiones de inventario",
+    descriptionEs: "Permite activar los módulos conectados a los artículos y elegir qué campos muestran, editan y buscan.",
+    groupKey: "inventory",
+    order: 51,
+  },
   // -----------------------------------------------------------------------
   // runly.purchases
   // -----------------------------------------------------------------------

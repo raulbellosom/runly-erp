@@ -104,6 +104,7 @@ import { createModuleAiCapability } from "./services/ai/module-ai-capability.js"
 import { createMiraiService } from "./routes/chat/mirai-service.js";
 import { createRelationTargetsService } from "./services/relation-targets-service.js";
 import { createRelationTargetsRouter } from "./routes/relation-targets-routes.js";
+import { createConnectionsRouter } from "./routes/connections-routes.js";
 import { createDistServeService } from "./services/dist-serve-service.js";
 import { createNotificationDeliveryWorker } from "./services/notification-delivery-worker.js";
 import { createNotificationService } from "./services/notification-service.js";
@@ -2360,6 +2361,7 @@ mountWithAuth(app, createContactsRouter({ prisma, requirePermission, supabaseAdm
 mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }));
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));
 mountWithAuth(app, createRelationTargetsRouter({ relationTargets, requirePermission, requireAnyPermission }));
+mountWithAuth(app, createConnectionsRouter({ prisma, requirePermission, requireAnyPermission }));
 mountWithAuth(app, createIdentityRouter({
   prisma,
   supabaseAdmin,
