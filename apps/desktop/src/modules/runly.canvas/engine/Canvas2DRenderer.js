@@ -5,7 +5,8 @@ import { drawPin, pinGeometry } from './drawPin.js'
 import { labelsOverlap, pinOf } from './pins.js'
 import { TEXT_LINE_HEIGHT, textFont, wrapLines } from './text.js'
 import { screenToWorld, worldToScreen } from './viewport.js'
-import { bindingKey } from '../lib/dataBindings.js'
+import { bindingKey, sourceIcon, statusTintOf } from '../lib/dataBindings.js'
+import { drawIconNode, getIconNode } from './icons.js'
 
 export { objectBounds }
 const GRID_STEP = 24
@@ -128,8 +129,10 @@ export class Canvas2DRenderer {
     const b = boxOf(object), style = object.style ?? {}
     const key = bindingKey(object.properties?.binding)
     const data = key ? bindings[key] : null
-    // Bound objects take their status colour unless the user opted out.
-    const tint = data && object.properties?.binding?.tint !== false ? this.theme.tones[data.tone] ?? this.theme.tones.neutral : null
+    // Bound objects with a real status take its colour unless the user opted
+    // out (see statusTintOf); otherwise the user's own colours apply.
+    const tone = statusTintOf(object.properties?.binding, data)
+    const tint = tone ? this.theme.tones[tone] ?? null : null
     const stroke = tint ?? this.strokeColor(object)
     ctx.save()
     ctx.globalAlpha = Number(style.opacity ?? 1)
@@ -157,9 +160,9 @@ export class Canvas2DRenderer {
     // Text keeps its own glyph (tinted colour) and hotspots already returned
     // above; other bound shapes get the title/summary label and data badge.
     if (data && object.type !== 'text' && object.type !== 'image') {
-      const badgeColor = tint ?? this.theme.tones.neutral
+      const badgeColor = tint ?? this.theme.tones[data.tone] ?? this.theme.tones.neutral
       this.drawDataLabel(ctx, data, x, y, w, h, zoom, badgeColor)
-      this.drawDataBadge(ctx, x + w, y, zoom, badgeColor)
+      this.drawDataBadge(ctx, x + w, y, zoom, badgeColor, sourceIcon(object.properties?.binding?.source))
     }
     ctx.restore()
   }
@@ -183,13 +186,16 @@ export class Canvas2DRenderer {
     ctx.restore()
   }
 
-  drawDataBadge(ctx, cx, cy, zoom, color) {
-    const r = 7 / zoom
+  // Screen-constant badge on the top-right corner: the source's own icon
+  // (task, vehicle, table…) in white on the status colour, with a ring in the
+  // surface colour so it separates from the shape's border.
+  drawDataBadge(ctx, cx, cy, zoom, color, iconName) {
+    const r = 10 / zoom
     ctx.save()
+    ctx.beginPath(); ctx.arc(cx, cy, r + 1.5 / zoom, 0, Math.PI * 2); ctx.fillStyle = this.theme.surface; ctx.fill()
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill()
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2 / zoom
-    // Tiny database glyph: two stacked ellipses.
-    for (const dy of [-2.2, 1.8]) { ctx.beginPath(); ctx.ellipse(cx, cy + dy / zoom, 3.2 / zoom, 1.4 / zoom, 0, 0, Math.PI * 2); ctx.stroke() }
+    const node = getIconNode(iconName) ?? getIconNode('database')
+    if (node) drawIconNode(ctx, node, cx, cy, 12 / zoom, '#ffffff', 2.25)
     ctx.restore()
   }
 

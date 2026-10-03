@@ -6,16 +6,21 @@ import { useAuth } from '../auth/AuthProvider'
 import { getApiUrl } from '../lib/runtimeConfig.js'
 
 // Module-scope so remounts and StrictMode double effects share one load per
-// bundle version instead of importing and registering it again.
+// bundle version instead of importing and registering it again. A load
+// without a known version is cached for the page session: a fresh
+// `?v=Date.now()` URL is a new ES module instance, whose components would
+// re-register as duplicates on every remount.
 const bundleLoads = new Map()
+const sessionVersion = String(Date.now())
 
 export function loadBundle(key, bundleVersion) {
-  const cacheKey = `${key}@${bundleVersion ?? ''}`
-  if (bundleVersion != null && bundleLoads.has(cacheKey)) return bundleLoads.get(cacheKey)
+  const version = String(bundleVersion ?? sessionVersion)
+  const cacheKey = `${key}@${version}`
+  if (bundleLoads.has(cacheKey)) return bundleLoads.get(cacheKey)
   const bundleUrl = new URL(`${getApiUrl()}/modules/${key}/bundle.js`)
   bundleUrl.searchParams.set('web_origin', window.location.origin)
   // Bust stale browser module cache entries after runtime rewriting changes.
-  bundleUrl.searchParams.set('v', String(bundleVersion ?? Date.now()))
+  bundleUrl.searchParams.set('v', version)
   const promise = (async () => {
     try {
       const mod = await import(/* @vite-ignore */ bundleUrl.toString())
@@ -29,7 +34,7 @@ export function loadBundle(key, bundleVersion) {
       return { key, loaded: false }
     }
   })()
-  if (bundleVersion != null) bundleLoads.set(cacheKey, promise)
+  bundleLoads.set(cacheKey, promise)
   return promise
 }
 

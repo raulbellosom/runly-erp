@@ -1,15 +1,20 @@
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@runly/ui'
+import { Button, SwitchField } from '@runly/ui'
+import * as LucideIcons from 'lucide-react'
 import { ExternalLink, Link2 } from 'lucide-react'
 import { useDataSources } from '../../hooks/useCanvasData.js'
+import { hasStatusTone, sourceIcon, statusTintOf } from '../../lib/dataBindings.js'
 import { Section } from './fields.jsx'
 
-const DOT = { ok: 'bg-emerald-500', info: 'bg-blue-500', warning: 'bg-amber-500', danger: 'bg-red-500', neutral: 'bg-slate-400' }
+const DOT = { ok: 'bg-emerald-500', info: 'bg-blue-500', warning: 'bg-amber-500', danger: 'bg-red-500', neutral: 'bg-slate-500' }
+// Same icon the canvas badge draws (lib/dataBindings.js SOURCE_ICONS), as a
+// React component; lucide is already in the bundle (see engine/icons.js).
+const getLucideIcon = (kebab) => LucideIcons[kebab.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join('')] ?? LucideIcons.Database
 
 // Shown for any bindable shape/text selected in the inspector (see
 // lib/dataBindings.js canBind). `data` is this object's binding resolution
 // from BoardEditor's useBindings() poll — undefined while it is still loading.
-export function DataBindingSection({ object, data, readOnly = false, locked = false, onConnect, onDisconnect }) {
+export function DataBindingSection({ object, data, readOnly = false, locked = false, onConnect, onDisconnect, onToggleTint }) {
   const navigate = useNavigate()
   const binding = object.properties?.binding
   const sources = useDataSources()
@@ -38,18 +43,32 @@ export function DataBindingSection({ object, data, readOnly = false, locked = fa
   }
 
   const unavailable = data.restricted || data.missing
+  const statusTone = !unavailable && hasStatusTone(data)
+  const tinted = Boolean(statusTintOf(binding, data))
+  const SourceIcon = getLucideIcon(sourceIcon(binding.source))
 
   return (
     <Section title="Datos Runly">
       <div className="space-y-1.5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2.5">
-        <div className="flex items-start gap-2">
-          {!unavailable ? <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${DOT[data.tone] ?? DOT.neutral}`} /> : null}
+        <div className="flex items-start gap-2.5">
+          <span aria-hidden className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-white ${unavailable ? 'bg-slate-400' : DOT[data.tone] ?? DOT.neutral}`}>
+            {SourceIcon ? <SourceIcon className="size-4" /> : null}
+          </span>
           <div className="min-w-0 flex-1">
             <p className={`truncate text-sm font-semibold ${unavailable ? 'text-[hsl(var(--muted-foreground))]' : ''}`}>{data.title}</p>
             {sourceLabel ? <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">{sourceLabel}</p> : null}
             {data.summary ? <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">{data.summary}</p> : null}
           </div>
         </div>
+        {statusTone ? (
+          <div className="border-t border-[hsl(var(--border))] pt-2">
+            <SwitchField
+              label="Color según el estado"
+              description={tinted ? 'El borde y el relleno muestran el estado del registro.' : 'La forma usa los colores que elijas en Apariencia.'}
+              checked={tinted} disabled={!editable} onChange={onToggleTint}
+            />
+          </div>
+        ) : null}
         {data.metrics?.length ? (
           <dl className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 text-xs">
             {data.metrics.map((metric) => (

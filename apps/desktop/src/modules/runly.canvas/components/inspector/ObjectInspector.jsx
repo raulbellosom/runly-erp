@@ -1,5 +1,5 @@
 import { Badge, Button, Switch, Textarea } from '@runly/ui'
-import { ArrowDownToLine, ArrowUpToLine, Copy, Library, Lock, MapPin, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpToLine, Copy, Library, Lock, MapPin, Palette, Pencil, Trash2 } from 'lucide-react'
 import { boxOf, canResize, canRotate, centerOf, isLinear } from '../../engine/geometry.js'
 import { CANVAS_COLORS, objectLabel } from '../../lib/objectFactory.js'
 import { measureTextHeight } from '../../engine/text.js'
@@ -66,7 +66,21 @@ function GeometryFields({ object, onPatch }) {
 
 export const hotspotColor = (object) => object.hotspot?.color || object.style?.stroke || '#ef4444'
 
-function StyleFields({ object, onPatch, onHotspotChange }) {
+// Replaces the colour pickers while the linked record's status colours the
+// shape, so they never look broken; one click hands colour back to the user.
+function StatusColorNotice({ onUseOwnColors }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.5)] p-2.5">
+      <Palette className="mt-0.5 size-4 shrink-0 text-[hsl(var(--muted-foreground))]" aria-hidden />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="text-xs leading-snug text-[hsl(var(--muted-foreground))]">El color lo define el estado del registro vinculado y cambia cuando el estado cambia.</p>
+        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={onUseOwnColors}>Usar mis colores</Button>
+      </div>
+    </div>
+  )
+}
+
+function StyleFields({ object, onPatch, onHotspotChange, statusColor }) {
   const style = object.style ?? {}, setStyle = (patch) => onPatch({ style: patch })
   if (object.type === 'hotspot') {
     // The pin color lives on the hotspot record (same field as its sheet),
@@ -124,15 +138,17 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
           Negrita
           <Switch checked={style.fontWeight === 'bold'} onCheckedChange={(checked) => setFont({ fontWeight: checked ? 'bold' : 'normal' })} />
         </label>
-        <ColorSwatches label="Color" value={style.textColor ?? '#0f172a'} colors={CANVAS_COLORS} onChange={(textColor) => setStyle({ textColor })} />
+        {statusColor
+          ? <StatusColorNotice onUseOwnColors={statusColor.onUseOwnColors} />
+          : <ColorSwatches label="Color" value={style.textColor ?? '#0f172a'} colors={CANVAS_COLORS} onChange={(textColor) => setStyle({ textColor })} />}
       </Section>
     )
   }
   const linear = isLinear(object), closed = !linear && object.type !== 'hotspot'
   return (
     <Section title="Apariencia">
-      <ColorSwatches label={linear ? 'Color' : 'Borde'} value={style.stroke ?? '#3b82f6'} colors={CANVAS_COLORS} onChange={(stroke) => setStyle({ stroke })} />
-      {closed ? (
+      {statusColor ? <StatusColorNotice onUseOwnColors={statusColor.onUseOwnColors} /> : <ColorSwatches label={linear ? 'Color' : 'Borde'} value={style.stroke ?? '#3b82f6'} colors={CANVAS_COLORS} onChange={(stroke) => setStyle({ stroke })} />}
+      {closed && !statusColor ? (
         <>
           <ColorSwatches label="Relleno" value={style.fill ?? style.stroke ?? '#3b82f6'} colors={CANVAS_COLORS} allowNone noneLabel="Sin relleno" onChange={(fill) => setStyle({ fill })} />
           {style.fill !== 'none' ? <Choice label="Intensidad del relleno" value={Number(style.fillOpacity ?? (style.fill ? 1 : 0.12))} options={FILL_OPACITY} onChange={(fillOpacity) => setStyle({ fillOpacity })} /> : null}
@@ -146,7 +162,7 @@ function StyleFields({ object, onPatch, onHotspotChange }) {
   )
 }
 
-export function ObjectInspector({ object, layerName, locked, readOnly = false, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, onConvert, onSaveToLibrary, children }) {
+export function ObjectInspector({ object, layerName, locked, readOnly = false, statusColor = null, onPatch, onHotspotChange, onDelete, onDuplicate, onArrange, onOpenHotspot, onEditText, onConvert, onSaveToLibrary, children }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-2 px-0.5">
@@ -170,7 +186,7 @@ export function ObjectInspector({ object, layerName, locked, readOnly = false, o
         <>
           <GeometryFields object={object} onPatch={onPatch} />
           <ShapeField object={object} onConvert={onConvert} />
-          <StyleFields object={object} onPatch={onPatch} onHotspotChange={onHotspotChange} />
+          <StyleFields object={object} onPatch={onPatch} onHotspotChange={onHotspotChange} statusColor={statusColor} />
           <Section title="Organizar">
             <div className="grid grid-cols-3 gap-1.5">
               <Button type="button" variant="outline" size="sm" className="h-11 flex-col gap-0.5 px-1 text-[11px] sm:h-12" onClick={onDuplicate}><Copy />Duplicar</Button>

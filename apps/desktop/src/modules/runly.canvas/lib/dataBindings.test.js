@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { BINDABLE_TYPES, bindingKey, bindingRefs, canBind, chunk } from './dataBindings.js'
+import { BINDABLE_TYPES, bindingKey, bindingRefs, canBind, chunk, statusTintOf } from './dataBindings.js'
 
 describe('Canvas data bindings', () => {
   const rows = [
@@ -22,5 +22,12 @@ describe('Canvas data bindings', () => {
   })
   it('splits refs into batches', () => {
     assert.deepEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])
+  })
+
+  it('colours by status only for a real status the user did not opt out of', () => {
+    assert.equal(statusTintOf({ source: 'pos_table', id: '1' }, { tone: 'warning' }), 'warning')
+    assert.equal(statusTintOf({ source: 'task', id: '1' }, { tone: 'neutral' }), null)
+    assert.equal(statusTintOf({ source: 'pos_table', id: '1', tint: false }, { tone: 'warning' }), null)
+    assert.equal(statusTintOf({ source: 'pos_table', id: '1' }, undefined), null)
   })
 })

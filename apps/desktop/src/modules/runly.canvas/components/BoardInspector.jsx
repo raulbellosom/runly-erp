@@ -1,5 +1,5 @@
 import { MousePointerClick, Users } from 'lucide-react'
-import { bindingKey, canBind } from '../lib/dataBindings.js'
+import { bindingKey, canBind, statusTintOf } from '../lib/dataBindings.js'
 import { DataBindingSection } from './inspector/DataBindingSection.jsx'
 import { EntityLinksSection } from './inspector/EntityLinksSection.jsx'
 import { MeasuresSection } from './inspector/MeasuresSection.jsx'
@@ -12,6 +12,10 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
   const single = selectedRows.length === 1 ? selectedRows[0] : null
   const linkTarget = single && single.type !== 'hotspot' && !single.pending ? { targetType: 'OBJECT', targetId: single.id } : null
   const dataKey = single ? bindingKey(single.properties?.binding) : null
+  const setTint = (tint) => actions.patch([single], { properties: { binding: { ...single.properties.binding, tint } } }, tint ? 'Color según el estado' : 'Usar mis colores')
+  // While a record's status colours the shape, Apariencia says so instead of
+  // offering colour pickers that would seem to do nothing.
+  const statusColor = single && statusTintOf(single.properties?.binding, dataKey ? bindings?.[dataKey] : null) ? { onUseOwnColors: () => setTint(false) } : null
   return (
     <div className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain p-3 pb-6">
       {single ? (
@@ -20,6 +24,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
           layerName={layers.find((layer) => layer.id === single.layerId)?.name}
           locked={lockedLayerIds.has(single.layerId)}
           readOnly={readOnly}
+          statusColor={statusColor}
           onPatch={(change) => actions.patch([single], change)}
           onHotspotChange={(data) => actions.hotspotChange(single, data)}
           onDelete={() => actions.remove([single])}
@@ -39,6 +44,7 @@ export function BoardInspector({ boardId, selectedRows, layers, lockedLayerIds, 
               locked={lockedLayerIds.has(single.layerId)}
               onConnect={() => actions.openDataDialog(single)}
               onDisconnect={() => actions.disconnectData(single)}
+              onToggleTint={setTint}
             />
           ) : null}
           {linkTarget ? <EntityLinksSection boardId={boardId} links={links} readOnly={readOnly} {...linkTarget} /> : null}

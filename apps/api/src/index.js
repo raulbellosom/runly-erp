@@ -1921,6 +1921,7 @@ app.get("/blueprints", authMiddleware, async (c) => {
           version: true,
           manifest: true,
           hasBundle: true,
+          bundleHash: true,
           core: true,
         },
       }),
@@ -1980,6 +1981,8 @@ app.get("/blueprints", authMiddleware, async (c) => {
         status: moduleRow.status,
         enabled: moduleRow.enabled,
         has_bundle: moduleRow.hasBundle ?? false,
+        bundle_hash: moduleRow.bundleHash ?? null,
+        version: moduleRow.version ?? null,
       },
     });
   }

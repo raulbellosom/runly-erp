@@ -14,6 +14,21 @@ export function bindingRefs(rows) {
   return [...seen.values()]
 }
 
+// Lucide icon (kebab name, see engine/icons.js) per data source, drawn in
+// the object's data badge so the record type reads at a glance.
+export const SOURCE_ICONS = Object.freeze({
+  task: 'list-checks', project: 'folder-kanban', contact: 'contact', hr_employee: 'user-round', vehicle: 'car',
+  inventory_item: 'package', inventory_location: 'warehouse', calendar_event: 'calendar', ledger_account: 'wallet',
+  file: 'file-text', pos_table: 'utensils',
+})
+export const sourceIcon = (source) => SOURCE_ICONS[source] ?? 'database'
+
+// Only a real status (inventory, POS…) colours the shape; sources that
+// report no status resolve as 'neutral', and painting them grey would just
+// override the user's colours. The user can also opt out (binding.tint).
+export const hasStatusTone = (data) => Boolean(data?.tone && data.tone !== 'neutral')
+export const statusTintOf = (binding, data) => (binding?.tint !== false && hasStatusTone(data) ? data.tone : null)
+
 export function chunk(list, size) {
   const out = []
   for (let index = 0; index < list.length; index += size) out.push(list.slice(index, index + size))
