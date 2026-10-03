@@ -20,6 +20,6 @@ import { compileModule } from './compiler.js'
 export function classifyModulePackage({ key, files, manifest }) {
   return classifyPackage({ key, files, manifest, compile: compileModule })
 }
-export { EXTERNAL_RELATION_TARGETS, externalTarget, isExternalRelation } from './external-relations.js'
+export { EXTERNAL_RELATION_TARGETS, connectionTarget, connectionsManagePermission, externalTarget, isExternalRelation, targetTypeFromRecordContext } from './external-relations.js'
 export { reviewComponentSources } from './design-review.js'
 export { EXAMPLES_DIR, goldenScreenFiles } from './templates/golden-screens.js'
