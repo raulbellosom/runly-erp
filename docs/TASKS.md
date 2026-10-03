@@ -1735,5 +1735,20 @@ Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · P
 - Decision: the `crud-custom` scaffold `ModuleDashboard.jsx` is NOT regenerated with the kit — changing a generated template makes existing mixed-mode projects look modified on their next upload (Builder regenerates and compares) and would flip them to developer mode. The golden screens cover the need.
 - [ ] Owner: open an existing CUSTOM view (unchanged) and a screen built with `EntityTable`/`EntityForm` in a running instance.
 
-### Phase 3 — Connections · Phase 4 — Safe schema evolution · Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
-- [ ] See plan tasks 3.1–6.5
+### Phase 3 — Connections
+- [x] 3.1 `module_connection` + `connection_record` (migration `20261003120000_module_connections`). Verified: 2026-10-03 (applied by owner; tables present)
+- [x] 3.2 Connection metadata in the shared target registry. Verified: 2026-10-03 (tables match Prisma @@map, 3/3)
+- [x] 3.3 Manifest `connections` validation (shape + against models; `targetField` added to the spec). Verified: 2026-10-03 (module-engine 128/128)
+- [x] 3.4 SQL generator (FK, 1:1 index, index trigger, backfill, drop). Verified: 2026-10-03 (unit 5/5 + deletion matrix 9/9 against PostgreSQL in a rolled-back transaction: soft/hard deletes, cascade/setNull/restrict incl. atomic bulk, source deletes, 1:1, search, backfill, drop; no leftovers)
+- [x] 3.5 Lifecycle: sync after install and after publishing an installed module; uninstall (3 modes), reset and hard purge in the same transaction. Verified: 2026-10-03 (unit 5/5; API services 705/706 and routes 41/41 — only the pre-existing sendBugReport failure)
+- [x] 3.6/3.7 Read service (sections, columns, prefix search) and atomic write service (module Zod schemas, permissions, typed casts, optimistic concurrency). Verified: 2026-10-03 (unit 4/4 + integration 1/1 against PostgreSQL, rolled back)
+- [x] 3.8 `/connections` routes, `inventory.connections.manage` + Inventario > Conexiones nav, SDK `connections`. Verified: 2026-10-03 (live API: 401 without token; manifest tests: only the pre-existing atlas.growth failure)
+- [x] 3.9 Inventory: atomic save with connection sections, connected-field search, Conexiones screen, detail sections, form section. Verified: 2026-10-03 (inventory tests 160/160, lint, `pnpm build:web`)
+- [ ] Owner E2E with the fixture ZIP `custom.calibraciones-1.0.0.zip`: upload + install → Inventario > Conexiones → activate → edit an item (Calibración section) → detail shows it → search by certificate → delete flows.
+- [ ] 3.10 Rollout to contacts (hard delete → 409 restrict), hr, projects.
+- [ ] 3.11 Record-context button for screens without a slot.
+- [ ] 3.12 Builder: "Conectar a un módulo del sistema" + `docs/developers/conexiones.md`.
+- Note: no hard company deletion path exists in the API today; `onCompanyRemoved` is ready for when one is added.
+
+### Phase 4 — Safe schema evolution · Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
+- [ ] See plan tasks 4.1–6.5
