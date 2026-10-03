@@ -1,14 +1,9 @@
-import { ActionMenu, Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn, useIsMobile } from '@runly/ui'
+import { ActionMenu, Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn, useIsMobile, PersonAvatar } from '@runly/ui'
 import { ArrowLeft, Check, Eye, History, Loader2, Maximize2, Minimize2, PanelLeft, PanelRight, Pencil, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
 import { canEditBoard } from '../lib/roles.js'
 import { ToolButton } from './CanvasToolbar.jsx'
 import { ExportMenu } from './ExportMenu.jsx'
 import { MobileEditorMenu } from './MobileEditorMenu.jsx'
-
-function initials(name = '') {
-  const parts = name.replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean)
-  return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase()
-}
 
 function PresenceStack({ users }) {
   if (!users.length) return null
@@ -18,9 +13,7 @@ function PresenceStack({ users }) {
       <TooltipTrigger asChild>
         <div className="flex -space-x-2" aria-label={`${users.length} colaborador(es) conectados`} role="img">
           {visible.map((user) => (
-            <span key={user.id} className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[hsl(var(--card))] bg-[hsl(var(--muted))] text-[11px] font-semibold text-[hsl(var(--foreground))]">
-              {initials(user.name)}
-            </span>
+            <PersonAvatar key={user.id} name={user.name} src={user.avatarUrl ?? null} size="md" className="h-8 w-8 ring-2 ring-[hsl(var(--card))]" />
           ))}
           {extra > 0 ? <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[hsl(var(--card))] bg-[hsl(var(--muted))] text-[11px] font-semibold tabular-nums">+{extra}</span> : null}
         </div>

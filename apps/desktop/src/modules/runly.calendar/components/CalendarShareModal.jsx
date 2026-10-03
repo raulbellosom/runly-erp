@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Trash2, UserRound, Crown } from 'lucide-react'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-  SearchInput, Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  SearchInput,
+  Button,
+  PersonAvatar,
 } from '@runly/ui'
 import { useShareCalendar, useUpdateShare, useDeleteShare, useUserSearch } from '../hooks/useCalendarData'
 import { useAuth } from '../../../auth/AuthProvider'
@@ -21,22 +30,15 @@ function userLabel(u) {
   return name || u.email || ''
 }
 
-function initials(u) {
-  if (!u) return '?'
-  const name = u.displayName || `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()
-  if (name) return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
-  return (u.email?.[0] ?? '?').toUpperCase()
-}
-
 function UserAvatar({ user, color, size = 'md' }) {
-  const dim = size === 'sm' ? 'w-7 h-7 text-[10px]' : 'w-9 h-9 text-xs'
   return (
-    <div
-      className={`${dim} rounded-full shrink-0 flex items-center justify-center font-semibold text-white select-none`}
-      style={{ backgroundColor: color || '#6B46C1' }}
-    >
-      {initials(user)}
-    </div>
+    <PersonAvatar
+      name={userLabel(user) || '?'}
+      src={user?.avatarUrl ?? null}
+      size={size === 'sm' ? 'sm' : 'md'}
+      className={color ? 'ring-2 ring-offset-1 ring-offset-[hsl(var(--card))]' : undefined}
+      style={color ? { '--tw-ring-color': color } : undefined}
+    />
   )
 }
 

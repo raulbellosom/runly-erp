@@ -1,8 +1,5 @@
+import { PersonAvatar } from '@runly/ui'
 import { Users } from 'lucide-react'
-
-function initials(name) {
-  return (name ?? '?').trim()[0]?.toUpperCase() ?? '?'
-}
 
 // Static footer, rendered OUTSIDE the note card, listing who has access to
 // the note (the owner + everyone it's shared with) — display name only, see
@@ -22,9 +19,7 @@ export function PublicNoteCollaborators({ collaborators = [] }) {
             key={i}
             className="inline-flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-600 shadow-sm"
           >
-            <span className="w-5 h-5 shrink-0 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-semibold">
-              {initials(c.display_name)}
-            </span>
+            <PersonAvatar name={c.display_name || 'Usuario'} size="xs" />
             {c.display_name || 'Usuario'}
             {c.is_owner && <span className="text-gray-400">· Autor</span>}
           </span>

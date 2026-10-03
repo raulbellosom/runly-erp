@@ -16,7 +16,7 @@ function createCanvasRealtimeSession({ boardId, user, onChanged, onCursor, onPre
     onPresence(Object.values(channel.presenceState()).flat().map((item) => item.user).filter(Boolean))
   })
   channel.subscribe((status) => {
-    if (status === 'SUBSCRIBED') channel.track({ user: { id: user.id, name: user.displayName ?? user.email } })
+    if (status === 'SUBSCRIBED') channel.track({ user: { id: user.id, name: user.displayName ?? user.email, avatarUrl: user.avatarUrl ?? null } })
   })
   return { channel, destroy: () => supabase.removeChannel(channel) }
 }

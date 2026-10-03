@@ -909,11 +909,12 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/files/${encodeURIComponent(id)}/signed-url${toQueryString({ variant: options.variant })}`, {
           headers: withAuthHeaders(token),
         }),
-      batchSignedUrls: (fileIds, token) =>
+      // options.variant: resized copy for images ("card", "preview", ...).
+      batchSignedUrls: (fileIds, token, options = {}) =>
         request("/files/batch-signed-urls", {
           method: "POST",
           headers: withAuthHeaders(token),
-          body: JSON.stringify({ fileIds }),
+          body: JSON.stringify({ fileIds, ...(options.variant ? { variant: options.variant } : {}) }),
         }),
       rename: (id, data, token) =>
         request(`/files/${encodeURIComponent(id)}`, {

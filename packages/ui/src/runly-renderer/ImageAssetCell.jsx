@@ -48,10 +48,12 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
   const [activeIndex, setActiveIndex] = useState(0);
 
   const resolveSignedUrl = useCallback(
-    async (assetId) => {
+    async (assetId, size = null) => {
       if (!assetId) return null;
+      const base = String(column?.signedUrlPath ?? "/files/:id/signed-url").replace(":id", encodeURIComponent(assetId));
+      const path = size ? `${base}${base.includes("?") ? "&" : "?"}variant=${encodeURIComponent(size)}` : base;
       try {
-        const res = await fetch(joinUrl(apiBaseUrl, String(column?.signedUrlPath ?? "/files/:id/signed-url").replace(":id", encodeURIComponent(assetId))), {
+        const res = await fetch(joinUrl(apiBaseUrl, path), {
           headers: buildApiHeaders(token, companyId),
         });
         if (!res.ok) return null;
@@ -73,8 +75,10 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
       };
     }
     setThumbLoading(true);
+    // Cells/rows get the 96px "card" variant, card covers the medium
+    // "preview"; the original only loads when the viewer opens.
     const resolve = fileAssetId
-      ? resolveSignedUrl(fileAssetId)
+      ? resolveSignedUrl(fileAssetId, variant === "cover" ? "preview" : "card")
       : fetchUserAvatarSignedUrl(apiBaseUrl, token, avatarUserId, companyId, "thumb");
     resolve.then((url) => {
       if (!cancelled) {
@@ -85,7 +89,7 @@ export function ImageAssetCell({ value, row, token, apiBaseUrl, companyId, colum
     return () => {
       cancelled = true;
     };
-  }, [fileAssetId, avatarUserId, resolveSignedUrl, apiBaseUrl, token, companyId]);
+  }, [fileAssetId, avatarUserId, resolveSignedUrl, apiBaseUrl, token, companyId, variant]);
 
   const handleOpen = useCallback(async () => {
     if (!fileAssetId) {

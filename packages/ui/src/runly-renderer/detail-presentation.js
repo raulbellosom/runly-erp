@@ -95,6 +95,8 @@ export function resolveHeroModel(schema, record, fieldMap = null) {
       hero.statusMap && typeof hero.statusMap === "object"
         ? hero.statusMap
         : null,
+    // [{ value, label, color }]: renders the status as a colored pill.
+    statusOptions: Array.isArray(hero.statusOptions) ? hero.statusOptions : null,
     imageAssetId: isEmpty(imageRaw) ? null : String(imageRaw),
     signedUrlPath:
       typeof hero.signedUrlPath === "string" && hero.signedUrlPath.trim()
@@ -149,6 +151,7 @@ export function resolveKpis(schema, record) {
         rawValue: raw === undefined ? null : raw,
         type: def.type ? String(def.type) : "text",
         options: Array.isArray(def.options) ? def.options : null,
+        emphasis: def.emphasis === true,
         icon:
           typeof def.icon === "string" && def.icon.trim() ? def.icon.trim() : null,
         href,

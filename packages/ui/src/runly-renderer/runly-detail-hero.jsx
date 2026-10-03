@@ -41,11 +41,15 @@ function extractArrayPayload(payload) {
 
 // `pathTemplate` lets RME3 modules resolve through their own module-scoped
 // route (`/<slug>/<entities>/files/:id/signed-url`) instead of /files.
-export async function fetchSignedUrl(apiBaseUrl, token, fileAssetId, companyId = null, pathTemplate = "/files/:id/signed-url") {
+// `variant` ("thumb" | "card" | "preview" | ...): resized copy served by the
+// storage image proxy; omitted, the original file.
+export async function fetchSignedUrl(apiBaseUrl, token, fileAssetId, companyId = null, pathTemplate = "/files/:id/signed-url", variant = null) {
   if (!fileAssetId) return null;
+  const base = String(pathTemplate ?? "/files/:id/signed-url").replace(":id", encodeURIComponent(fileAssetId));
+  const path = variant ? `${base}${base.includes("?") ? "&" : "?"}variant=${encodeURIComponent(variant)}` : base;
   try {
     const res = await fetch(
-      joinUrl(apiBaseUrl, String(pathTemplate).replace(":id", encodeURIComponent(fileAssetId))),
+      joinUrl(apiBaseUrl, path),
       { headers: buildApiHeaders(token, companyId) },
     );
     if (!res.ok) return null;
@@ -110,9 +114,12 @@ export function initialsFromName(name) {
 }
 
 function HeroStatus({ heroModel, data, renderValue }) {
-  const { statusValue, statusMap } = heroModel;
+  const { statusValue, statusMap, statusOptions } = heroModel;
   if (statusValue === null || statusValue === undefined || statusValue === "") {
     return null;
+  }
+  if (statusOptions) {
+    return renderValue({ type: "select", options: statusOptions }, statusValue, data);
   }
   if (statusMap) {
     const key = String(statusValue);
@@ -195,13 +202,22 @@ export function HeroContainer({
         }
         return;
       }
-      const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId, heroModel.signedUrlPath ?? undefined);
-      if (!cancelled) {
-        setImageUrl(url);
-        setOwnAssetId(assetId);
-        setAvatarUserId(null);
-        setImageLoading(false);
-      }
+      // Progressive: paint the tiny "card" variant first, then swap in the
+      // "preview" size once fully loaded; the original only loads in the viewer.
+      const pathTemplate = heroModel.signedUrlPath ?? undefined;
+      const cardUrl = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId, pathTemplate, "card");
+      if (cancelled) return;
+      setImageUrl(cardUrl);
+      setOwnAssetId(assetId);
+      setAvatarUserId(null);
+      setImageLoading(false);
+      const previewUrl = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId, pathTemplate, "preview");
+      if (cancelled || !previewUrl) return;
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) setImageUrl(previewUrl);
+      };
+      img.src = previewUrl;
     }
     load();
     return () => {
@@ -222,7 +238,7 @@ export function HeroContainer({
     label: item.label,
     icon: item.icon,
     href: item.href,
-    value: renderValue({ type: item.type, options: item.options }, item.rawValue, data),
+    value: renderValue({ type: item.type, options: item.options, emphasis: item.emphasis }, item.rawValue, data),
   }));
 
   return (

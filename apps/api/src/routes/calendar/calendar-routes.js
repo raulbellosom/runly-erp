@@ -1,3 +1,4 @@
+import { attachUserAvatarUrls } from '../../lib/attach-user-avatars.js';
 import { Hono } from "hono";
 import {
   createCalendarService,
@@ -33,7 +34,7 @@ function handleError(c, err, fallback) {
   return c.json({ error: fallback }, 500);
 }
 
-export function createCalendarRouter({ prisma, requirePermission, google, broadcaster = null }) {
+export function createCalendarRouter({ prisma, requirePermission, google, broadcaster = null, supabaseAdmin = null }) {
   const app = new Hono();
   const svc = createCalendarService({ prisma });
   const eventSvc = createCalendarEventService({ prisma });
@@ -57,6 +58,7 @@ export function createCalendarRouter({ prisma, requirePermission, google, broadc
         const userId = getUserId(c);
         await svc.ensureDefaultCalendar(userId, getCompanyId(c));
         const result = await svc.listCalendars(userId, getCompanyId(c));
+        await attachUserAvatarUrls(result.owned.flatMap((cal) => (cal.shares ?? []).map((share) => share.user)), { prisma, supabaseAdmin });
         return c.json(result);
       } catch (err) {
         return handleError(c, err, "No se pudieron obtener los calendarios.");

@@ -2381,7 +2381,7 @@ mountWithAuth(app, createSearchRouter({ prisma, getUserContext: getOrLoadUserCon
 mountWithAuth(app, createFleetRouter({ prisma, requirePermission, enrichFilesWithSignedUrls: filesService.enrichFilesWithSignedUrls.bind(filesService) }));
 mountWithAuth(app, createCatalogRouter({ prisma, requirePermission, requireAnyPermission, supabaseAdmin }));
 mountWithAuth(app, createPosRouter({ prisma, requirePermission, broadcaster }));
-mountWithAuth(app, createCalendarRouter({ prisma, requirePermission, broadcaster }));
+mountWithAuth(app, createCalendarRouter({ prisma, requirePermission, broadcaster, supabaseAdmin }));
 mountWithAuth(app, createProjectsRouter({ prisma, requirePermission, notificationService, enrichFileAssets: filesService.enrichFileAssets.bind(filesService), broadcaster }));
 mountWithAuth(app, createCanvasRouter({ prisma, requirePermission, broadcaster, entityResolver: resolveCanvasEntityLink, dataSources: createCanvasDataSources({ prisma, relationTargets }), removeFiles: createCanvasFileRemover({ prisma, supabaseAdmin }) }));
 mountWithAuth(app, createActivityRouter({ prisma, requirePermission, supabaseAdmin }));

@@ -210,7 +210,7 @@ export function createFilesService({ prisma, supabaseAdmin }) {
   async function getCompanyAssets({ authUserId, activeContext, fileIds }) {
     const context = await getUserCompanyContext(authUserId, activeContext);
       const { companyId } = context;
-    return prisma.fileAsset.findMany({ where: { id: { in: fileIds }, entityId: companyId, enabled: true, entityType: { in: ALLOWED_FILE_ENTITY_TYPES }, AND: [await visibility.listWhere(context)] }, select: { id: true, bucket: true, objectKey: true } });
+    return prisma.fileAsset.findMany({ where: { id: { in: fileIds }, entityId: companyId, enabled: true, entityType: { in: ALLOWED_FILE_ENTITY_TYPES }, AND: [await visibility.listWhere(context)] }, select: { id: true, bucket: true, objectKey: true, mimeType: true } });
   }
   // activeContext: { profileId, companyId, isAdmin, permissionSet } already
   // resolved by the API's tenant middleware (c.get("userId") /

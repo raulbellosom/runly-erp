@@ -1,8 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, PublicLinksPanel, SearchInput, SelectField,
-  Tabs, TabsContent, TabsList, TabsTrigger, cn,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  PublicLinksPanel,
+  SearchInput,
+  SelectField,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  cn,
+  PersonAvatar,
 } from '@runly/ui'
 import { Crown, Eye, Globe, Info, Loader2, Lock, MessageSquare, Pencil, UserPlus, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,7 +34,6 @@ const ROLE_TONES = {
   VIEWER: 'bg-slate-100 text-slate-800 ring-slate-300 dark:bg-slate-400/15 dark:text-slate-200 dark:ring-slate-400/30',
 }
 const ROLE_OPTIONS = ASSIGNABLE_ROLES.map((role) => ({ value: role, label: BOARD_ROLES[role].label, icon: ROLE_ICONS[role] }))
-const initials = (name = '') => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?'
 
 function RoleBadge({ role }) {
   const Icon = ROLE_ICONS[role] ?? Eye
@@ -32,9 +45,7 @@ function RoleBadge({ role }) {
 }
 
 function Avatar({ name, url }) {
-  return url
-    ? <img src={url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
-    : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--muted))] text-xs font-semibold text-[hsl(var(--foreground))]" aria-hidden>{initials(name)}</span>
+  return <PersonAvatar name={name} src={url ?? null} size="md" />
 }
 
 function useDebounced(value, delay = 250) {

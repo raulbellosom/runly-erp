@@ -2,11 +2,12 @@
 // and bulk), an item's administrative record and the summary dashboard.
 // The route guard is read access; each action checks its own permission
 // (see ADMIN_TRANSITIONS in inventory-admin-service.js).
+import { attachUserAvatarUrls } from '../../lib/attach-user-avatars.js';
 import { Hono } from 'hono';
 import { createInventoryAdminService } from '../../services/inventory-admin-service.js';
 import { createInventoryDashboardService } from '../../services/inventory-dashboard-service.js';
 
-export function createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc }) {
+export function createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc, supabaseAdmin = null }) {
   const router = new Hono();
   const admin = createInventoryAdminService({ prisma, notifier: inventoryNotifSvc });
   const dashboards = createInventoryDashboardService({ prisma });
@@ -20,7 +21,19 @@ export function createInventoryAdminRouter({ prisma, requirePermission, Inventor
   };
 
   router.get('/inventory/dashboard', read, async (c) => {
-    try { return c.json({ data: await dashboards.dashboard(c.get('companyId'), { months: c.req.query('months') }) }); }
+    try {
+      const data = await dashboards.dashboard(c.get('companyId'), { months: c.req.query('months') });
+      // Holder photos (an employee shows its linked user's avatar).
+      const holders = data?.top?.holders ?? [];
+      if (holders.length) {
+        const employees = await prisma.hrEmployee.findMany({ where: { id: { in: holders.map((h) => h.id) }, companyId: c.get('companyId') }, select: { id: true, userProfileId: true } });
+        const profileOf = new Map(employees.map((e) => [e.id, e.userProfileId]));
+        for (const holder of holders) holder.userProfileId = profileOf.get(holder.id) ?? null;
+        await attachUserAvatarUrls(holders, { prisma, supabaseAdmin });
+        for (const holder of holders) delete holder.userProfileId;
+      }
+      return c.json({ data });
+    }
     catch (err) { return fail(c, err, 'No se pudo cargar el dashboard.'); }
   });
 

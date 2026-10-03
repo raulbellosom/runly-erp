@@ -124,6 +124,9 @@ export default function FilesScreen() {
   const [renameValue, setRenameValue] = useState("");
   const [previewMap, setPreviewMap] = useState(() => new Map());
   const signedUrlCacheRef = useRef(new Map());
+  // Grid/card/table thumbnails: resized "preview" URLs, kept apart from the
+  // full-resolution cache that opening/downloading a file uses.
+  const thumbUrlCacheRef = useRef(new Map());
   const previewFetchPendingRef = useRef(new Set());
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadQueue, setUploadQueue] = useState([]);
@@ -362,7 +365,7 @@ export default function FilesScreen() {
     // Apply cached URLs immediately without a network request.
     for (const file of imageFiles) {
       if (!file?.id) continue;
-      const cached = signedUrlCacheRef.current.get(file.id);
+      const cached = thumbUrlCacheRef.current.get(file.id);
       if (cached) {
         setPreviewMap((prev) => {
           if (prev.get(file.id) === cached) return prev;
@@ -377,7 +380,7 @@ export default function FilesScreen() {
       .filter(
         (f) =>
           f?.id &&
-          !signedUrlCacheRef.current.has(f.id) &&
+          !thumbUrlCacheRef.current.has(f.id) &&
           !previewFetchPendingRef.current.has(f.id),
       )
       .map((f) => f.id);
@@ -387,14 +390,14 @@ export default function FilesScreen() {
     for (const id of uncachedIds) previewFetchPendingRef.current.add(id);
 
     runly.files
-      .batchSignedUrls(uncachedIds, token)
+      .batchSignedUrls(uncachedIds, token, { variant: "preview" })
       .then((response) => {
         const urlMap = response?.data ?? {};
         setPreviewMap((prev) => {
           const next = new Map(prev);
           for (const [id, url] of Object.entries(urlMap)) {
             if (url) {
-              signedUrlCacheRef.current.set(id, url);
+              thumbUrlCacheRef.current.set(id, url);
               next.set(id, url);
             }
           }

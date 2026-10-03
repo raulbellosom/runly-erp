@@ -54,6 +54,7 @@ export function createCalendarService({ prisma }) {
                 firstName: true,
                 lastName: true,
                 email: true,
+                avatarFileId: true,
               },
             },
           },
