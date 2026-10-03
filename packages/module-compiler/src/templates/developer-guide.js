@@ -287,8 +287,9 @@ Para que tu pantalla se vea y se comporte como el resto de Runly:
 
 - Toda pantalla empieza con \`PageHeader\`. Usa \`Skeleton\` mientras carga, \`EmptyState\` si no hay datos y \`ErrorState\` si algo falla; nunca texto suelto.
 - **Textos en español**, sin emojis.
-- **Estilos con Tailwind** usando los colores del tema para que funcione en modo claro y oscuro: \`bg-[hsl(var(--card))]\`, \`text-[hsl(var(--muted-foreground))]\`, \`border-[hsl(var(--border))]\`; el color de marca es \`var(--brand-primary)\`. Evita colores fijos como \`bg-white\`.
-- **Diseño adaptable**: pensado primero para celular (\`grid-cols-1 md:grid-cols-3\`), sin desplazamiento horizontal.
+- **Props y ejemplos de cada componente**: \`docs/componentes.md\`. **Iconos** por uso (lucide-react): \`docs/iconos.md\`. Usa iconos en títulos de sección, botones, indicadores y estados vacíos.
+- **Cualquier clase de Tailwind funciona** (Runly genera el CSS de tu módulo al instalarlo). Usa los tokens del tema para modo claro y oscuro: \`bg-card\`, \`bg-muted\`, \`text-foreground\`, \`text-muted-foreground\`, \`border-border\`, \`bg-primary\`. Evita colores fijos como \`bg-white\`.
+- **Diseño adaptable**: pensado primero para celular; formularios por secciones en \`grid grid-cols-1 gap-4 md:grid-cols-2\` (no un campo debajo de otro), indicadores en \`grid gap-4 sm:grid-cols-2 lg:grid-cols-4\`, sin desplazamiento horizontal.
 - En modales y hojas laterales, el encabezado y el pie quedan fijos; solo el contenido central se desplaza.
 - Mensajes de éxito o error con \`toast\` de \`sonner\`.
 
@@ -331,7 +332,7 @@ Este paquete es un módulo de Runly generado por el Constructor de módulos. Ant
 3. Componentes en \`.jsx\` (sin TypeScript), runtime JSX automático, hooks con import nombrado (\`import { useState } from 'react'\`, nunca \`React.useState\`). Sin APIs de Node en el navegador.
 4. Registra cada componente en \`components/index.js\` con la clave \`${config.key}:<Componente>\`; la vista CUSTOM usa esa clave en \`schema.component\` y la URL completa \`/app/m/${config.key}/...\` en \`schema.path\`.
 5. Llama a la API con \`fetch(apiBaseUrl + '/${slug}/...', { headers: buildApiHeaders(token, companyId) })\` usando las props del componente (\`token\`, \`companyId\`, \`apiBaseUrl\`). Datos de otros módulos: \`/relation-targets/<tipo>/search\` y \`/resolve\`.
-6. UI con \`@runly/ui\` (PageHeader, SelectField, TextField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton…), nunca \`window.confirm/alert/prompt\` ni controles nativos si existe el componente. Textos en español, sin emojis. Tailwind con tokens del tema (\`hsl(var(--card))\`, \`var(--brand-primary)\`).
+6. Antes de escribir pantallas lee \`docs/componentes.md\` (props y ejemplos) y \`docs/iconos.md\`. UI con \`@runly/ui\` (PageHeader, Card, SelectField, TextField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton, StatCard…), nunca \`window.confirm/alert/prompt\` ni controles nativos. Iconos de \`lucide-react\` en títulos, botones e indicadores. Formularios por secciones con rejilla responsiva (\`grid grid-cols-1 gap-4 md:grid-cols-2\`). Textos en español, sin emojis. Cualquier clase de Tailwind funciona; usa tokens del tema (\`bg-card\`, \`text-muted-foreground\`, \`border-border\`, \`bg-primary\`).
 7. Solo usa las librerías listadas en la guía (sección *Librerías disponibles*) con esas versiones.
 8. Páginas para personas sin cuenta: usa enlaces públicos (\`publicResources\` + vista CUSTOM \`public: true\` en \`/p/...\` + \`api/public.js\`), nunca abras rutas de \`api/index.js\` sin sesión. Filtra por \`publicLink.companyId\`/\`recordId\` y expón solo campos explícitos. Ver \`docs/enlaces-publicos.md\` (en línea: ${DEVELOPER_DOCS_URL}/enlaces-publicos).
 9. Sube la versión en \`module.manifest.js\` antes de entregar. La persona sube el ZIP en Runly con "Subir actualización": Runly lo valida y muestra una vista previa antes de aplicar.

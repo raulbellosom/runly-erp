@@ -16,7 +16,7 @@
       "name": "@runly/ui",
       "version": "0.1.0",
       "category": "shared",
-      "imports": "PageHeader, Card, Button, TextField, SelectField, DatePickerField, RunlyTable, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton, Badge, Tabs, buildApiHeaders ..."
+      "imports": "Props y ejemplos en docs/componentes.md: PageHeader, Card, Button, TextField, SelectField, ComboboxField, DatePickerField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton, StatCard, Badge, Tabs, buildApiHeaders ..."
     },
     {
       "name": "@runly/sdk",
@@ -32,7 +32,7 @@
     },
     {
       "name": "@tanstack/react-query",
-      "version": "5.104.0",
+      "version": "5.104.1",
       "category": "shared",
       "imports": "useQuery, useMutation, useQueryClient"
     },
@@ -56,9 +56,9 @@
     },
     {
       "name": "lucide-react",
-      "version": "1.48.0",
+      "version": "1.50.0",
       "category": "shared",
-      "imports": "Iconos: Plus, Pencil, Trash2, Search, Calendar ..."
+      "imports": "Iconos por uso en docs/iconos.md: Plus, Pencil, Trash2, Search, Calendar ..."
     },
     {
       "name": "recharts",

@@ -87,13 +87,15 @@ Usa siempre `buildApiHeaders(token, companyId)` en tus `fetch`: sin el encabezad
 
 ## Reglas de diseño de Runly
 
-- Primero `@runly/ui`: `SelectField`/`ComboboxField` en lugar de `<select>`, `TextField`/`TextareaField` en lugar de inputs, `CheckboxField`/`SwitchField`, `DatePickerField`, `DataTable`/`RunlyTable`, `Dialog`/`Sheet`, y `ConfirmDialog` en lugar de `window.confirm/alert/prompt` (prohibidos).
+- Primero `@runly/ui`: props y ejemplos de cada componente en **[Componentes de @runly/ui](/documentacion/desarrolladores/componentes)**. `SelectField`/`ComboboxField` en lugar de `<select>`, `TextField`/`TextareaField` en lugar de inputs, `CheckboxField`/`SwitchField`, `DatePickerField`, `DataTable`/`RunlyTable`, `Dialog`/`Sheet`, y `ConfirmDialog` en lugar de `window.confirm/alert/prompt` (prohibidos).
 - Toda pantalla empieza con `PageHeader`; `Skeleton` al cargar, `EmptyState` si no hay datos, `ErrorState` si algo falla.
-- Textos en español y sin emojis.
-- Tailwind con los tokens del tema, para modo claro y oscuro: `bg-[hsl(var(--card))]`, `text-[hsl(var(--muted-foreground))]`, `border-[hsl(var(--border))]`; color de marca `var(--brand-primary)`. Evita colores fijos como `bg-white`.
-- Pensado primero para celular (`grid-cols-1 md:grid-cols-3`), sin desplazamiento horizontal.
+- Iconos de `lucide-react` en títulos de sección, botones, indicadores y estados vacíos: lista por uso en **[Iconos](/documentacion/desarrolladores/iconos)**. Textos en español y sin emojis.
+- **Cualquier clase de Tailwind funciona**: al instalar el módulo Runly genera el CSS de las clases que usan tus componentes, con el tema de Runly. Usa los tokens del tema para que funcione en modo claro y oscuro: `bg-card`, `bg-background`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`, `text-primary`. Evita colores fijos como `bg-white` o `bg-[#fff]`.
+- Pensado primero para celular: formularios en `grid grid-cols-1 gap-4 md:grid-cols-2`, indicadores en `grid gap-4 sm:grid-cols-2 lg:grid-cols-4`, sin desplazamiento horizontal.
+- Formularios por secciones (`Card` con título e icono), no una lista de campos uno debajo de otro.
 - En modales y hojas laterales el encabezado y el pie quedan fijos; solo el contenido se desplaza.
 - Notificaciones con `toast` de `sonner`.
+- Al subir el ZIP, la **Revisión de diseño** del reporte lista archivo y línea de lo que no cumple estas reglas; con **Copiar para la IA** se lo pasas a tu asistente para que lo corrija.
 
 ## Problemas frecuentes
 

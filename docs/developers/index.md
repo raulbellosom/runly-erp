@@ -11,6 +11,8 @@ Esta documentación está pensada para personas desarrolladoras **y para asisten
 
 - [**Flujo con ZIP y modos de edición**](/documentacion/desarrolladores/flujo-zip): descargar el paquete, modo visual, modo mixto y modo desarrollador, revisión y vista previa antes de aplicar, volver al modo visual.
 - [**Pantallas React**](/documentacion/desarrolladores/pantallas-react): vistas `CUSTOM`, registro de componentes, props, llamadas a la API y reglas de diseño.
+- [**Componentes de @runly/ui**](/documentacion/desarrolladores/componentes): props, valores y ejemplos de cada componente que usan tus pantallas, y patrones de formulario e indicadores responsivos.
+- [**Iconos**](/documentacion/desarrolladores/iconos): iconos de lucide recomendados por uso, con su nombre en español, y la lista completa.
 - [**API de los módulos**](/documentacion/desarrolladores/api-modulos): endpoints que genera el Constructor para cada entidad, formatos de respuesta, filtros, errores y archivos.
 - [**Relaciones**](/documentacion/desarrolladores/relaciones): relaciones entre entidades del módulo y con módulos del sistema (Flotilla, Inventario, Contactos…), integridad y búsqueda.
 - [**Enlaces y páginas públicas**](/documentacion/desarrolladores/enlaces-publicos): compartir una ficha o un formulario con personas sin cuenta; lo que genera el Constructor, `publicResources`, `api/public.js` y reglas de seguridad.

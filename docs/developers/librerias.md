@@ -9,14 +9,14 @@ Estas son las librerías que un componente de `components/` puede importar. Las 
 |---|---|---|---|
 | `react` | 19.3.0 | Incluida en la app (no pesa en tu módulo) | useState, useEffect, useMemo, useCallback, useRef, useContext, createContext, forwardRef, memo, Fragment |
 | `react-dom` | 19.3.0 | Incluida en la app (no pesa en tu módulo) | createPortal, flushSync |
-| `@runly/ui` | 0.1.0 | Incluida en la app (no pesa en tu módulo) | PageHeader, Card, Button, TextField, SelectField, DatePickerField, RunlyTable, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton, Badge, Tabs, buildApiHeaders ... |
+| `@runly/ui` | 0.1.0 | Incluida en la app (no pesa en tu módulo) | Props y ejemplos en docs/componentes.md: PageHeader, Card, Button, TextField, SelectField, ComboboxField, DatePickerField, DataTable, Dialog, Sheet, ConfirmDialog, EmptyState, ErrorState, Skeleton, StatCard, Badge, Tabs, buildApiHeaders ... |
 | `@runly/sdk` | 0.1.0 | Incluida en la app (no pesa en tu módulo) | createRunlyClient |
 | `@runly/validators` | 0.1.0 | Incluida en la app (no pesa en tu módulo) | Esquemas Zod compartidos |
-| `@tanstack/react-query` | 5.104.0 | Incluida en la app (no pesa en tu módulo) | useQuery, useMutation, useQueryClient |
+| `@tanstack/react-query` | 5.104.1 | Incluida en la app (no pesa en tu módulo) | useQuery, useMutation, useQueryClient |
 | `react-router-dom` | 7.18.3 | Incluida en la app (no pesa en tu módulo) | useNavigate, useParams, useLocation, Link |
 | `zustand` | 5.0.15 | Incluida en la app (no pesa en tu módulo) | create |
 | `sonner` | 2.0.7 | Incluida en la app (no pesa en tu módulo) | toast |
-| `lucide-react` | 1.48.0 | Incluida en la app (no pesa en tu módulo) | Iconos: Plus, Pencil, Trash2, Search, Calendar ... |
+| `lucide-react` | 1.50.0 | Incluida en la app (no pesa en tu módulo) | Iconos por uso en docs/iconos.md: Plus, Pencil, Trash2, Search, Calendar ... |
 | `recharts` | 3.8.1 | Incluida en la app (no pesa en tu módulo) | ResponsiveContainer, BarChart, LineChart, PieChart, AreaChart, Tooltip, Legend |
 | `qrcode` | 1.5.4 | Incluida en la app (no pesa en tu módulo) | QRCode (default), create, toCanvas, toDataURL, toString para generar códigos QR |
 | `@zxing/browser` | 0.2.1 | Incluida en la app (no pesa en tu módulo) | BrowserQRCodeReader, BrowserMultiFormatReader para leer códigos QR desde cámara, imagen o video |
