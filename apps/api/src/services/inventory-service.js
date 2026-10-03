@@ -693,8 +693,8 @@ export function createInventoryService({ prisma, activityBridge }) {
     return prisma.invAssignment.findMany({
       where: { itemId },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
-        assignedBy: { select: { id: true, firstName: true, lastName: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, userProfileId: true } },
+        assignedBy: { select: { id: true, firstName: true, lastName: true, avatarFileId: true } },
       },
       orderBy: { assignedAt: 'desc' },
     });

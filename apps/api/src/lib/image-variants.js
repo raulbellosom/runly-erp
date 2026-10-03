@@ -15,6 +15,9 @@ export const IMAGE_VARIANTS = Object.freeze({
   // crop and no letterbox. Use for arbitrary-aspect content images where
   // cropping to a fixed box would cut off real content.
   content: Object.freeze({ width: 1600, quality: 80 }),
+  // Medium, aspect-preserving: record hero/cover images and form previews
+  // (~300-500px boxes). The original is only fetched when a viewer opens it.
+  preview: Object.freeze({ width: 640, quality: 75 }),
   full: null,
 })
 

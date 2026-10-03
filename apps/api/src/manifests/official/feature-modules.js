@@ -157,6 +157,13 @@ export const hrMap = createModuleManifest({
       layout: "main",
       permissionKey: "hr.department.read",
     },
+    {
+      label: "Conexiones",
+      path: "/hr/connections",
+      icon: "Plug",
+      layout: "main",
+      permissionKey: "hr.connections.manage",
+    },
   ],
   permissions: [
     { key: "hr.access", name: "Access HR" },
@@ -176,6 +183,7 @@ export const hrMap = createModuleManifest({
     { key: "hr.org_chart.create", name: "Create HR Org Chart" },
     { key: "hr.org_chart.update", name: "Update HR Org Chart" },
     { key: "hr.org_chart.delete", name: "Delete HR Org Chart" },
+    { key: "hr.connections.manage", name: "Gestionar conexiones de colaboradores" },
   ],
   acl: {
     module: "hr.access",
@@ -184,6 +192,7 @@ export const hrMap = createModuleManifest({
       "hr.employee.create": "hr.employee.create",
       "hr.employee.update": "hr.employee.update",
       "hr.employee.delete": "hr.employee.delete",
+      "hr.connections.manage": "hr.connections.manage",
       "hr.employee.enable": "hr.employee.update",
       "hr.employee.disable": "hr.employee.update",
       "hr.employee.file.attach": "hr.employee.update",
@@ -809,6 +818,13 @@ export const projectsMap = createModuleManifest({
       layout: 'main',
       permissionKey: 'projects.access',
     },
+    {
+      label: 'Conexiones',
+      path: '/connections',
+      icon: 'Plug',
+      layout: 'main',
+      permissionKey: 'projects.connections.manage',
+    },
   ],
   acl: {
     module: 'projects.access',
@@ -816,6 +832,7 @@ export const projectsMap = createModuleManifest({
       'projects.project.read':   'projects.project.read',
       'projects.project.create': 'projects.project.create',
       'projects.task.read':      'projects.task.read',
+      'projects.connections.manage': 'projects.connections.manage',
     },
     models: {},
   },
@@ -830,6 +847,7 @@ export const projectsMap = createModuleManifest({
     { key: 'projects.task.update',     name: 'Editar tareas' },
     { key: 'projects.task.delete',     name: 'Eliminar tareas' },
     { key: 'projects.member.manage',   name: 'Gestionar miembros' },
+    { key: 'projects.connections.manage', name: 'Gestionar conexiones de proyectos' },
   ],
   exposes: {
     createTask: 'function',

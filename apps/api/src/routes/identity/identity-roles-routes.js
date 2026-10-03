@@ -97,7 +97,7 @@ export function createIdentityRolesRouter({ prisma, supabaseAdmin, requirePermis
                 },
               },
             },
-            _count: { select: { memberships: { where: { enabled: true } } } },
+            _count: { select: { memberships: { where: { enabled: true, user: { isBot: false } } } } },
           },
           orderBy: { name: "asc" },
         });
@@ -329,6 +329,7 @@ export function createIdentityRolesRouter({ prisma, supabaseAdmin, requirePermis
           roleId: id,
           enabled: true,
           companyId: tenant.companyId,
+          user: { isBot: false },
         };
         const memberships = await prisma.membership.findMany({
           where,

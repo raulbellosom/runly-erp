@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RunlyForm, PageHeader, LoadingState, ErrorState, Button, ConfirmDialog } from '@runly/ui'
+import { PageHeader, LoadingState, ErrorState, Button, ConfirmDialog } from '@runly/ui'
 import { Eye, ShieldBan } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { runly } from '../../../lib/runly'
 import { HR_EMPLOYEE_FORM } from '../blueprints/hr-employee-form.blueprint.js'
+import { ConnectedRunlyForm } from '../../../shell/connections/ConnectedRunlyForm.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -80,7 +81,9 @@ export default function HrEmployeeForm({ employeeId }) {
         description={isEdit ? undefined : 'Completa la información del colaborador'}
       />
       <div className="mt-6">
-        <RunlyForm
+        <ConnectedRunlyForm
+          targetType="hr_employee"
+          targetId={employeeId}
           blueprint={HR_EMPLOYEE_FORM}
           initialData={isEdit ? editEmployee : {}}
           mode={isEdit ? 'edit' : 'create'}

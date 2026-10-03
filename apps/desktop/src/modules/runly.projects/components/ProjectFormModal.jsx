@@ -8,6 +8,8 @@ import { CalendarCheck, CalendarX, RefreshCw, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCreateProject, useUpdateProject, useArchiveProject, useProject, useSyncProjectCalendar } from '../hooks/useProjectsData'
 import { PROJECT_ICONS, getProjectIcon } from '../lib/projectIcons.js'
+import { useConnectionForm } from '../../../shell/connections/useConnectionForm.js'
+import { ConnectionFormSections } from '../../../shell/connections/ConnectionFormSections.jsx'
 
 const TEMPLATE_OPTIONS = [
   { value: 'general',    label: 'General' },
@@ -30,6 +32,12 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
   const archiveProject = useArchiveProject()
   const { data: projectDetail } = useProject(isEdit && open ? project?.id : null)
   const syncCalendar = useSyncProjectCalendar(project?.id)
+  // Connected modules' sections, saved atomically with the project (Connections D3).
+  const connectionForm = useConnectionForm({ targetType: 'project', targetId: isEdit ? project?.id : null })
+  const onSaveError = (fallback) => (err) => {
+    connectionForm.applyErrorResponse(err?.details)
+    toast.error(err?.details?.error ?? fallback)
+  }
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -58,25 +66,25 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
 
     if (isEdit) {
       updateProject.mutate(
-        { name: trimmed, description: description.trim() || null, color, icon },
+        { name: trimmed, description: description.trim() || null, color, icon, connections: connectionForm.payload() ?? undefined },
         {
           onSuccess: () => {
             toast.success('Proyecto actualizado')
             onOpenChange(false)
           },
-          onError: () => toast.error('No se pudo actualizar el proyecto'),
+          onError: onSaveError('No se pudo actualizar el proyecto'),
         },
       )
     } else {
       createProject.mutate(
-        { name: trimmed, description: description.trim() || null, color, icon, template },
+        { name: trimmed, description: description.trim() || null, color, icon, template, connections: connectionForm.payload() ?? undefined },
         {
           onSuccess: (data) => {
             toast.success('Proyecto creado')
             onOpenChange(false)
             onCreated?.(data?.data ?? data)
           },
-          onError: () => toast.error('No se pudo crear el proyecto'),
+          onError: onSaveError('No se pudo crear el proyecto'),
         },
       )
     }
@@ -242,6 +250,8 @@ export default function ProjectFormModal({ open, onOpenChange, project, onCreate
               </Button>
             </div>
           )}
+
+          <ConnectionFormSections form={connectionForm} variant="plain" />
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
             {isEdit && (

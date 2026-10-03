@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { RunlyForm, PageHeader, LoadingState, ErrorState, Button, ConfirmDialog } from '@runly/ui'
+import { PageHeader, LoadingState, ErrorState, Button, ConfirmDialog } from '@runly/ui'
 import { Eye, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
@@ -13,9 +13,7 @@ import { inventoryFormComponents } from '../components/InventoryItemClassificati
 import { InventoryCaptureTools } from '../components/InventoryCaptureTools.jsx'
 import { MAX_BULK_SERIALS, bulkUnitName, canPinField, captureStorageKey, loadCapture, parseSerials } from '../lib/capture.js'
 import { intakeRequest } from '../lib/intake.js'
-import { buildApiHeaders } from '@runly/ui'
-import { useConnectionForm } from '../../../shell/connections/useConnectionForm.js'
-import { CONNECTIONS_FORM_COMPONENT, ConnectionFormProvider, ConnectionFormSlot } from '../../../shell/connections/ConnectionFormContext.jsx'
+import { ConnectedRunlyForm } from '../../../shell/connections/ConnectedRunlyForm.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -72,38 +70,12 @@ export default function InventoryItemForm() {
     return { data: result, bulk: true }
   }
 
-  // Connected modules' sections, saved atomically with the item (Connections D3).
-  const connectionForm = useConnectionForm({ targetType: 'inventory_item', targetId: id })
-  const hasConnections = connectionForm.sections.length > 0
-  const formComponents = useMemo(() => ({
-    resolve: (key) => (key === CONNECTIONS_FORM_COMPONENT ? ConnectionFormSlot : inventoryFormComponents.resolve(key)),
-  }), [])
-
-  async function submitWithConnections({ payload, recordId, mode }) {
-    const editing = mode === 'edit' && recordId
-    const response = await fetch(`${API_BASE}/inventory/items${editing ? `/${encodeURIComponent(recordId)}` : ''}`, {
-      method: editing ? 'PATCH' : 'POST',
-      headers: buildApiHeaders(token, activeCompanyId, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ ...payload, connections: connectionForm.payload() ?? undefined }),
-    })
-    const body = await response.json().catch(() => null)
-    if (!response.ok) {
-      connectionForm.applyErrorResponse(body)
-      throw new Error(body?.error ?? 'No se pudo guardar el activo.')
-    }
-    void queryClient.invalidateQueries({ queryKey: ['connections'] })
-    return body
-  }
-
   const itemQuery = useInventoryItem(isEdit ? id : null)
   const editItem = itemQuery.data?.data ?? itemQuery.data ?? null
   // Legacy purchase fields only stay editable on items that already carry them;
   // new commercial data is recorded in Compras.
   const showLegacyPurchase = Boolean(isEdit && editItem?.hasLegacyPurchaseData)
-  const blueprint = useMemo(
-    () => buildItemFormBlueprint(isEdit, { showLegacyPurchase, connectionsComponent: hasConnections ? CONNECTIONS_FORM_COMPONENT : null }),
-    [isEdit, showLegacyPurchase, hasConnections],
-  )
+  const blueprint = useMemo(() => buildItemFormBlueprint(isEdit, { showLegacyPurchase }), [isEdit, showLegacyPurchase])
   const deleteItem = useDeleteInventoryItem()
 
   if (isEdit && itemQuery.isLoading) {
@@ -126,13 +98,14 @@ export default function InventoryItemForm() {
         title={isEdit ? (editItem?.name || 'Editar activo') : 'Nuevo activo'}
         description={isEdit ? undefined : 'Completa la información del activo'}
       />
-      <ConnectionFormProvider form={connectionForm}>
       <div className="mt-6">
-        <RunlyForm
+        <ConnectedRunlyForm
+          targetType="inventory_item"
+          targetId={id}
           key={isEdit ? 'edit' : `create-${formKey}`}
           blueprint={blueprint}
           initialData={isEdit ? editItem : createInitial}
-          submitRequest={!isEdit && settings.multi ? submitBulk : (hasConnections ? submitWithConnections : null)}
+          submitRequest={!isEdit && settings.multi ? submitBulk : null}
           fieldPins={isEdit ? null : {
             pinned: settings.pinned,
             visible: settings.pinMode,
@@ -150,7 +123,7 @@ export default function InventoryItemForm() {
           token={token}
           companyId={activeCompanyId}
           apiBaseUrl={API_BASE}
-          componentRegistry={formComponents}
+          componentRegistry={inventoryFormComponents}
           asideActions={
             isEdit && editItem?.id ? (
               <div className="glass-shell-flat flex flex-col gap-2 rounded-2xl p-3 sm:flex-row sm:items-stretch xl:flex-col">
@@ -189,7 +162,6 @@ export default function InventoryItemForm() {
           onCancel={() => navigate(-1)}
         />
       </div>
-      </ConnectionFormProvider>
 
       {isEdit && editItem ? (
         <ConfirmDialog

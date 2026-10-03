@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { runly } from '../../../lib/runly'
+import { COMMENTS_LIVE_QUERY_OPTIONS } from '../../../lib/createCommentHooks'
 
 function loadingMutation(msg) {
   return {
@@ -429,6 +430,7 @@ export function useTaskComments(projectId, taskId) {
     queryFn: () => runly.projects.listTaskComments(projectId, taskId, {}, token),
     enabled: Boolean(projectId && taskId && token),
     select: (res) => res?.data ?? res ?? [],
+    ...COMMENTS_LIVE_QUERY_OPTIONS,
   })
 }
 

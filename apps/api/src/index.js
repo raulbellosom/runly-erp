@@ -2384,7 +2384,7 @@ mountWithAuth(app, createPosRouter({ prisma, requirePermission, broadcaster }));
 mountWithAuth(app, createCalendarRouter({ prisma, requirePermission, broadcaster }));
 mountWithAuth(app, createProjectsRouter({ prisma, requirePermission, notificationService, enrichFileAssets: filesService.enrichFileAssets.bind(filesService), broadcaster }));
 mountWithAuth(app, createCanvasRouter({ prisma, requirePermission, broadcaster, entityResolver: resolveCanvasEntityLink, dataSources: createCanvasDataSources({ prisma, relationTargets }), removeFiles: createCanvasFileRemover({ prisma, supabaseAdmin }) }));
-mountWithAuth(app, createActivityRouter({ prisma, requirePermission }));
+mountWithAuth(app, createActivityRouter({ prisma, requirePermission, supabaseAdmin }));
 mountWithAuth(app, createNotificationsRouter({ prisma, requirePermission }));
 mountWithAuth(app, createGrowthRouter({ prisma, requirePermission, notificationService, enrichFileAssets: filesService.enrichFileAssets.bind(filesService) }));
 mountWithAuth(
@@ -2404,6 +2404,7 @@ mountWithAuth(
     CommentsServiceError,
     filesService,
     enrichFilesWithSignedUrls: filesService.enrichFilesWithSignedUrls.bind(filesService),
+    supabaseAdmin,
   }),
 );
 mountWithAuth(app, createPurchasesRouter({ prisma, requirePermission, requireAnyPermission, broadcaster, inventoryService, supabaseAdmin }));

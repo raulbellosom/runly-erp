@@ -6,6 +6,7 @@ import {
   hrEmployeeUpdateSchema,
 } from "@runly/validators";
 import { createActivityService } from "./activity-service.js";
+import { withAfterWrite } from "./connections/after-write.js";
 import { createActivityBridge } from "./activity-bridge.js";
 
 class HrServiceError extends Error {
@@ -82,11 +83,13 @@ function normalizeEmployeePayload(data) {
   };
 }
 
-function buildSearchWhere(search) {
+// connectionMatchIds: employees matched by connected fields (Connections).
+function buildSearchWhere(search, connectionMatchIds = []) {
   const query = String(search ?? "").trim();
   if (!query) return {};
   return {
     OR: [
+      ...(connectionMatchIds.length ? [{ id: { in: connectionMatchIds } }] : []),
       { firstName: { contains: query, mode: "insensitive" } },
       { lastName: { contains: query, mode: "insensitive" } },
       { employeeCode: { contains: query, mode: "insensitive" } },
@@ -379,6 +382,7 @@ export function createHrService({ prisma, activityBridge }) {
       authUserId,
       companyId: activeCompanyId,
       search,
+      connectionMatchIds = [],
       status,
       enabled,
       limit,
@@ -407,7 +411,7 @@ export function createHrService({ prisma, activityBridge }) {
           companyId,
           ...(enabled === undefined ? {} : { enabled: Boolean(enabled) }),
           ...(status ? { status } : {}),
-          ...buildSearchWhere(search),
+          ...buildSearchWhere(search, connectionMatchIds),
         };
         const [rows, total] = await Promise.all([
           prisma.hrEmployee.findMany({ where, orderBy, take, skip }),
@@ -459,7 +463,7 @@ export function createHrService({ prisma, activityBridge }) {
           companyId,
           ...(enabled === undefined ? {} : { enabled: Boolean(enabled) }),
           ...(status ? { status } : {}),
-          ...buildSearchWhere(search),
+          ...buildSearchWhere(search, connectionMatchIds),
         },
         include: {
           supervisor: { select: { id: true, firstName: true, lastName: true } },
@@ -547,7 +551,8 @@ export function createHrService({ prisma, activityBridge }) {
       };
     },
 
-    async createEmployee({ authUserId, companyId: activeCompanyId, payload }) {
+    // afterWrite(tx, employee): connection sections saved in the same transaction.
+    async createEmployee({ authUserId, companyId: activeCompanyId, payload, afterWrite = null }) {
       const { actorId, companyId } = await getUserContext(authUserId, activeCompanyId);
       const parsed = hrEmployeeCreateSchema.parse(payload);
       const normalized = normalizeEmployeePayload(parsed);
@@ -586,13 +591,13 @@ export function createHrService({ prisma, activityBridge }) {
         supervisorEmployeeId: normalized.supervisorEmployeeId,
         companyId,
       });
-      const created = await prisma.hrEmployee.create({
+      const created = await withAfterWrite(prisma, afterWrite, (db) => db.hrEmployee.create({
         data: {
           ...normalized,
           ...denormalized,
           companyId,
         },
-      });
+      }));
 
       await logAudit({
         actorId,
@@ -606,7 +611,7 @@ export function createHrService({ prisma, activityBridge }) {
       return created;
     },
 
-    async updateEmployee({ authUserId, companyId: activeCompanyId, id, payload }) {
+    async updateEmployee({ authUserId, companyId: activeCompanyId, id, payload, afterWrite = null }) {
       const { actorId, companyId } = await getUserContext(authUserId, activeCompanyId);
       await assertEmployee({ id, companyId });
       const before = await prisma.hrEmployee.findUnique({ where: { id } });
@@ -655,10 +660,10 @@ export function createHrService({ prisma, activityBridge }) {
         supervisorEmployeeId: normalized.supervisorEmployeeId,
         companyId,
       });
-      const updated = await prisma.hrEmployee.update({
+      const updated = await withAfterWrite(prisma, afterWrite, (db) => db.hrEmployee.update({
         where: { id },
         data: { ...normalized, ...denormalized },
-      });
+      }));
       await logAudit({
         actorId,
         entityId: id,

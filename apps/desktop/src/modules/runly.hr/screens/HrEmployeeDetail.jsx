@@ -11,6 +11,7 @@ import { runly } from '../../../lib/runly'
 import { HR_EMPLOYEE_DETAIL } from '../blueprints/hr-employee-detail.blueprint.js'
 import { componentRegistry } from '../../../lib/moduleComponentRegistry.js'
 import { useMiraiRecordContext } from '../../runly.chat/lib/miraiPageContext'
+import { ConnectionSections } from '../../../shell/connections/ConnectionSections.jsx'
 
 const API_BASE = getApiUrl()
 
@@ -114,6 +115,7 @@ export default function HrEmployeeDetail({ employeeId }) {
           />
         }
       />
+      <ConnectionSections targetType="hr_employee" targetId={employeeId} />
 
       <ConfirmDialog
         open={enabledConfirm}

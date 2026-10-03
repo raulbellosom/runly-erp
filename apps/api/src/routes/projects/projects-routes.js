@@ -8,6 +8,8 @@ import { createProjectsNotificationService } from './projects-notification-servi
 import { createProjectsTaskEffects } from './projects-task-effects.js'
 import { publishActivityFromContext } from '../../services/activity-publisher.js'
 import { parseMentionIds } from '../../lib/mention-utils.js'
+import { createCoreTargetConnections } from '../../services/connections/core-target-connections.js'
+import { ConnectionWriteError } from '../../services/connections/connection-write-service.js'
 import { createCommentsService, CommentsServiceError } from '../../services/comments-service.js'
 import { createFileAccess } from '../../services/files/access.js'
 import { taskFileScope } from './project-files.js'
@@ -28,6 +30,9 @@ function getActorName(c) {
 
 
 function handleError(c, err, fallback) {
+  if (err instanceof ConnectionWriteError) {
+    return c.json({ error: err.message, code: err.code, fields: err.fields ?? null, connectionId: err.connectionId ?? null }, err.status)
+  }
   if (
     err instanceof ProjectServiceError ||
     err instanceof TaskServiceError ||
@@ -43,6 +48,7 @@ function handleError(c, err, fallback) {
 export function createProjectsRouter({ prisma, requirePermission, notificationService, enrichFileAssets = null, broadcaster = null }) {
   const app = new Hono()
   const projectsSvc = createProjectsService({ prisma })
+  const projectConnections = createCoreTargetConnections({ prisma, targetType: 'project' })
   const tasksSvc = createTasksService({ prisma })
   const depsSvc = createDependenciesService({ prisma })
   const fieldsSvc = createFieldsService({ prisma })
@@ -164,8 +170,8 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
 
   app.post('/projects', requirePermission('projects.project.create'), async (c) => {
     try {
-      const body = await c.req.json()
-      const project = await projectsSvc.createProject(getCompanyId(c), getUserId(c), body)
+      const { data: body, afterWrite } = await projectConnections.prepare(c, await c.req.json())
+      const project = await projectsSvc.createProject(getCompanyId(c), getUserId(c), body, { afterWrite })
       await bridge.syncProjectCalendar(project)
       broadcastCalendarSync(c)
       return c.json(project, 201)
@@ -182,8 +188,8 @@ export function createProjectsRouter({ prisma, requirePermission, notificationSe
   app.patch('/projects/:id', requirePermission('projects.project.update'), requireProjectAccess('OWNER'), async (c) => {
     try {
       const projectId = c.req.param('id')
-      const body = await c.req.json()
-      const project = await projectsSvc.updateProject(projectId, getUserId(c), body)
+      const { data: body, afterWrite } = await projectConnections.prepare(c, await c.req.json(), projectId)
+      const project = await projectsSvc.updateProject(projectId, getUserId(c), body, { afterWrite })
       await bridge.syncProjectCalendar(project)
       broadcastCalendarSync(c)
       broadcastProjectMetaEvent(projectId, 'updated')

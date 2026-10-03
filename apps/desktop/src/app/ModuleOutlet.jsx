@@ -393,6 +393,8 @@ const SCREEN_MAP = {
   // Conexiones of connectable core modules (shell/connections/ModuleConnectionsScreen.jsx).
   "runly.inventory:/inventory/connections": lazy(() => import("../shell/connections/ModuleConnectionsScreen.jsx")),
   "runly.contacts:/contacts/connections": lazy(() => import("../shell/connections/ModuleConnectionsScreen.jsx")),
+  "runly.hr:/hr/connections": lazy(() => import("../shell/connections/ModuleConnectionsScreen.jsx")),
+  "runly.projects:/connections": lazy(() => import("../shell/connections/ModuleConnectionsScreen.jsx")),
   "runly.inventory:/inventory/catalogs": lazy(
     () => import("../modules/runly.inventory/screens/InventoryCatalogsScreen.jsx"),
   ),

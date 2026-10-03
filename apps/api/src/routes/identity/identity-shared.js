@@ -22,10 +22,12 @@ export const PROTECTED_IDENTITY_ROLE_KEYS = new Set(["runly.admin", "system.admi
 // in `companyId`. Every /identity/users/:id* route must call this before
 // reading or mutating a specific user — without it, a caller with
 // identity.users.* in Company A could act on any user UUID in the instance.
+// Bot profiles (MirAI, is_bot = true) are never administrable users: treating
+// them as "not found" here hides their profile and blocks every mutation.
 export async function assertUserInCompany(id, companyId, { prisma }) {
   if (!companyId || !id) return false;
   const row = await prisma.userProfile.findFirst({
-    where: { id, memberships: { some: { companyId } } },
+    where: { id, isBot: false, memberships: { some: { companyId } } },
     select: { id: true },
   });
   return Boolean(row);

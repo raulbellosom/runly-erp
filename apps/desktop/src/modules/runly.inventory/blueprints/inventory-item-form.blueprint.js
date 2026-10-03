@@ -205,9 +205,7 @@ export const INVENTORY_ITEM_FORM = {
 // in the status options so an assigned item still shows its status.
 // Legacy purchase fields only appear when `showLegacyPurchase` (edit of an
 // item that already has them).
-// connectionsComponent: registry key of the connected-modules section (only
-// added when the company has active connections with form fields).
-export function buildItemFormBlueprint(isEdit, { showLegacyPurchase = false, connectionsComponent = null } = {}) {
+export function buildItemFormBlueprint(isEdit, { showLegacyPurchase = false } = {}) {
   const sections = INVENTORY_ITEM_FORM.schema.sections
     .filter((section) => showLegacyPurchase || section.id !== LEGACY_PURCHASE_SECTION_ID)
     .map((section) => {
@@ -217,9 +215,6 @@ export function buildItemFormBlueprint(isEdit, { showLegacyPurchase = false, con
         .map((f) => (f.field === 'status' && !isEdit ? { ...f, options: CREATE_STATUS_OPTIONS } : f))
       return { ...section, fields }
     })
-  if (connectionsComponent) {
-    sections.push({ id: 'connections', type: 'component', component: connectionsComponent, label: 'Módulos conectados', icon: 'Plug', collapsible: true, fields: [] })
-  }
   return { ...INVENTORY_ITEM_FORM, schema: { ...INVENTORY_ITEM_FORM.schema, sections } }
 }
 

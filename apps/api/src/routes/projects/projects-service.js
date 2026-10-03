@@ -1,4 +1,5 @@
 import { createUserAccessService } from '../../services/user-access-service.js'
+import { withAfterWrite } from '../../services/connections/after-write.js'
 export class ProjectServiceError extends Error {
   constructor(message, status = 500) {
     super(message)
@@ -92,7 +93,8 @@ export function createProjectsService({ prisma }) {
     return { ...project, calendarLinked }
   }
 
-  async function createProject(companyId, ownerId, { name, description, color, icon, template = 'general' }) {
+  // afterWrite(tx, project): connection sections saved in the same transaction.
+  async function createProject(companyId, ownerId, { name, description, color, icon, template = 'general' }, { afterWrite = null } = {}) {
     if (!name?.trim()) throw new ProjectServiceError('El nombre es requerido.', 400)
     const templateStatuses = STATUS_TEMPLATES[template] ?? STATUS_TEMPLATES.general
     // Project + its default statuses + the owner membership are created together.
@@ -120,11 +122,12 @@ export function createProjectsService({ prisma }) {
       await tx.projectMember.create({
         data: { projectId: project.id, userId: ownerId, role: 'OWNER' },
       })
+      if (afterWrite) await afterWrite(tx, project)
       return project
     })
   }
 
-  async function updateProject(projectId, userId, data) {
+  async function updateProject(projectId, userId, data, { afterWrite = null } = {}) {
     const project = await prisma.project.findFirst({ where: { id: projectId } })
     if (!project) throw new ProjectServiceError('Proyecto no encontrado.', 404)
     if (project.ownerId !== userId) {
@@ -134,7 +137,7 @@ export function createProjectsService({ prisma }) {
       if (!ownerMember) throw new ProjectServiceError('Sin permiso para editar este proyecto.', 403)
     }
     const { name, description, color, icon, startDate, dueDate } = data
-    return prisma.project.update({
+    return withAfterWrite(prisma, afterWrite, (db) => db.project.update({
       where: { id: projectId },
       data: {
         ...(name?.trim() ? { name: name.trim() } : {}),
@@ -144,7 +147,7 @@ export function createProjectsService({ prisma }) {
         ...(startDate !== undefined ? { startDate: startDate ? new Date(startDate) : null } : {}),
         ...(dueDate !== undefined ? { dueDate: dueDate ? new Date(dueDate) : null } : {}),
       },
-    })
+    }))
   }
 
   async function archiveProject(projectId, userId) {

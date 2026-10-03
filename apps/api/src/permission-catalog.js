@@ -713,6 +713,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "hr",
     order: 23,
   },
+  "hr.connections.manage": {
+    displayNameEs: "Gestionar conexiones de colaboradores",
+    descriptionEs: "Permite activar los módulos conectados a los colaboradores y elegir qué campos muestran, editan y buscan.",
+    groupKey: "hr",
+    order: 24,
+  },
   "hr.department.read": {
     displayNameEs: "Ver departamentos",
     descriptionEs: "Permite consultar departamentos.",
@@ -1439,6 +1445,12 @@ export const PERMISSION_CATALOG = {
     descriptionEs: "Permite archivar o eliminar proyectos.",
     groupKey: "projects",
     order: 50,
+  },
+  "projects.connections.manage": {
+    displayNameEs: "Gestionar conexiones de proyectos",
+    descriptionEs: "Permite activar los módulos conectados a los proyectos y elegir qué campos muestran, editan y buscan.",
+    groupKey: "projects",
+    order: 51,
   },
   "projects.task.read": {
     displayNameEs: "Ver tareas",

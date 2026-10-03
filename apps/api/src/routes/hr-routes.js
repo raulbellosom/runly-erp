@@ -19,10 +19,12 @@ import { toLocalIso } from "@runly/core";
 import { createHrService, HrServiceError } from "../services/hr-service.js";
 import { buildEmployeesExcelBuffer } from "../services/hr-export-service.js";
 import { buildAvatarUrlMapByFileIds } from "../lib/avatar-url-map.js";
+import { createCoreTargetConnections } from "../services/connections/core-target-connections.js";
 
 export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
   const app = new Hono();
   const hrService = createHrService({ prisma });
+  const employeeConnections = createCoreTargetConnections({ prisma, targetType: "hr_employee" });
 
   app.get(
     "/hr/employees/export",
@@ -226,6 +228,7 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
           authUserId,
           companyId: c.get("companyId"),
           search,
+          connectionMatchIds: await employeeConnections.searchIds(c, search),
           status,
           enabled,
           limit,
@@ -282,7 +285,8 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
     async (c) => {
       try {
         const authUserId = c.get("authUserId");
-        const parsed = hrEmployeeCreateSchema.safeParse(await c.req.json());
+        const { data: body, afterWrite } = await employeeConnections.prepare(c, await c.req.json());
+        const parsed = hrEmployeeCreateSchema.safeParse(body);
         if (!parsed.success) {
           return c.json(
             { error: parsed.error.errors?.[0]?.message ?? "Datos invalidos." },
@@ -293,9 +297,12 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
           authUserId,
           companyId: c.get("companyId"),
           payload: parsed.data,
+          afterWrite,
         });
         return c.json({ data: row }, 201);
       } catch (err) {
+        const connectionError = employeeConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err instanceof HrServiceError) {
           return c.json({ error: err.message }, err.status);
         }
@@ -311,7 +318,8 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
       try {
         const authUserId = c.get("authUserId");
         const id = c.req.param("id");
-        const parsed = hrEmployeeUpdateSchema.safeParse(await c.req.json());
+        const { data: body, afterWrite } = await employeeConnections.prepare(c, await c.req.json(), id);
+        const parsed = hrEmployeeUpdateSchema.safeParse(body);
         if (!parsed.success) {
           return c.json(
             { error: parsed.error.errors?.[0]?.message ?? "Datos invalidos." },
@@ -323,9 +331,12 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
           companyId: c.get("companyId"),
           id,
           payload: parsed.data,
+          afterWrite,
         });
         return c.json({ data: row });
       } catch (err) {
+        const connectionError = employeeConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err instanceof HrServiceError) {
           return c.json({ error: err.message }, err.status);
         }
@@ -345,7 +356,8 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
       try {
         const authUserId = c.get("authUserId");
         const id = c.req.param("id");
-        const parsed = hrEmployeeUpdateSchema.safeParse(await c.req.json());
+        const { data: body, afterWrite } = await employeeConnections.prepare(c, await c.req.json(), id);
+        const parsed = hrEmployeeUpdateSchema.safeParse(body);
         if (!parsed.success) {
           return c.json(
             { error: parsed.error.errors?.[0]?.message ?? "Datos invalidos." },
@@ -357,9 +369,12 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
           companyId: c.get("companyId"),
           id,
           payload: parsed.data,
+          afterWrite,
         });
         return c.json({ data: row });
       } catch (err) {
+        const connectionError = employeeConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err instanceof HrServiceError) {
           return c.json({ error: err.message }, err.status);
         }
@@ -494,9 +509,12 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
           companyId: c.get("companyId"),
           id,
           payload: parsed.data,
+          afterWrite,
         });
         return c.json({ data: row });
       } catch (err) {
+        const connectionError = employeeConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err instanceof HrServiceError) {
           return c.json({ error: err.message }, err.status);
         }
@@ -610,9 +628,12 @@ export function createHrRouter({ prisma, supabaseAdmin, requirePermission }) {
           companyId: c.get("companyId"),
           id,
           payload: parsed.data,
+          afterWrite,
         });
         return c.json({ data: row });
       } catch (err) {
+        const connectionError = employeeConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err instanceof HrServiceError) {
           return c.json({ error: err.message }, err.status);
         }
