@@ -351,3 +351,18 @@ export { ConflictDialog } from "./components/ConflictDialog.jsx";
 export { OfficeDocumentEditor } from "./components/OfficeDocumentEditor.jsx";
 export { OfficeAttachmentAction } from "./components/OfficeAttachmentAction.jsx";
 export { OfficeActionsContext, useOfficeActions } from "./components/office-actions-context.js";
+
+// Module kit for RME3 CUSTOM screens (spec 2026-10-03-rme3-module-platform-v2 §5.4)
+export { ModulePage } from "./components/module-kit/ModulePage.jsx";
+export { FormSection, FieldGrid } from "./components/module-kit/FormSection.jsx";
+export { DetailHeader } from "./components/module-kit/DetailHeader.jsx";
+export { EntityTable, EntityForm, EntityDetail } from "./components/module-kit/EntityViews.jsx";
+export { ModuleRuntimeProvider, useModuleRuntime } from "./lib/module-runtime/ModuleRuntimeContext.jsx";
+export { useEntityList, useEntityRecord, useEntityMutations } from "./lib/module-runtime/useEntity.js";
+export {
+  findEntityBlueprint,
+  entityApiPath,
+  entityFields,
+  listModuleEntities,
+  extractBlueprintFields,
+} from "./lib/module-runtime/entity-helpers.js";

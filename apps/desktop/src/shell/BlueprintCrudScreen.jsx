@@ -19,6 +19,7 @@ import {
   Skeleton,
   normalizeSpanishLabel,
   shouldUsePageMode,
+  extractBlueprintFields,
 } from "@runly/ui";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
@@ -31,6 +32,7 @@ import { componentRegistry } from "../lib/moduleComponentRegistry";
 import { resolveBlueprintPresentation } from "./blueprint-layout-resolver.js";
 import { normalizePath } from '../lib/pathUtils'
 import { useRecordShareAction } from "./useRecordShareAction.jsx";
+import { CustomViewHost } from "./CustomViewHost.jsx";
 
 const API_BASE_URL = getApiUrl();
 
@@ -269,53 +271,8 @@ function selectBlueprints({ moduleRows, routeInfo }) {
   return { tableBlueprint, formBlueprint, detailBlueprint };
 }
 
-function extractFields(tableBlueprint, formBlueprint, detailBlueprint) {
-  const candidates = [tableBlueprint, formBlueprint, detailBlueprint];
-
-  // Fast path: top-level fields array on any blueprint
-  for (const blueprint of candidates) {
-    if (Array.isArray(blueprint?.fields) && blueprint.fields.length > 0)
-      return blueprint.fields;
-    if (
-      Array.isArray(blueprint?.schema?.fields) &&
-      blueprint.schema.fields.length > 0
-    )
-      return blueprint.schema.fields;
-  }
-
-  // Fallback: collect field definitions from sections across all blueprints.
-  // This captures types like "markdown" that are only stored inside sections
-  // (e.g. from applyMainEntityFormPatches in the form blueprint).
-  // Form blueprint is processed last so its explicit types win over table/detail defaults.
-  const fieldTypeMap = new Map();
-  for (const blueprint of [detailBlueprint, tableBlueprint, formBlueprint]) {
-    const sections = blueprint?.schema?.sections;
-    if (!Array.isArray(sections)) continue;
-    for (const section of sections) {
-      if (!Array.isArray(section?.fields)) continue;
-      for (const f of section.fields) {
-        if (!f || typeof f !== "object") continue;
-        const name = String(f.field ?? f.name ?? f.key ?? "").trim();
-        if (!name) continue;
-        const existing = fieldTypeMap.get(name);
-        const newType = typeof f.type === "string" ? f.type : "text";
-        // Prefer explicit non-"text" types; keep existing non-"text" type if new is just the default
-        if (!existing) {
-          fieldTypeMap.set(name, {
-            name,
-            label: f.label ?? name,
-            type: newType,
-            options: f.options ?? null,
-          });
-        } else if (newType !== "text") {
-          fieldTypeMap.set(name, { ...existing, type: newType });
-        }
-      }
-    }
-  }
-
-  return fieldTypeMap.size > 0 ? [...fieldTypeMap.values()] : undefined;
-}
+// Shared with the module runtime (@runly/ui extractBlueprintFields).
+const extractFields = extractBlueprintFields;
 
 function resolveNavItem(module, moduleRoutePath, collectionPath, entitySegment) {
   const nav = module?.navigation ?? module?.manifest?.navigation ?? [];
@@ -955,15 +912,15 @@ export function BlueprintCrudScreen() {
     }
 
     return (
-      <div className="h-full min-h-0 w-full overflow-auto">
-        <CustomComponent
-          token={token}
-          companyId={activeCompanyId}
-          apiBaseUrl={API_BASE_URL}
-          navigate={navigate}
-          moduleKey={moduleKey}
-        />
-      </div>
+      <CustomViewHost
+        component={CustomComponent}
+        moduleKey={moduleKey}
+        token={token}
+        companyId={activeCompanyId}
+        apiBaseUrl={API_BASE_URL}
+        navigate={navigate}
+        blueprints={moduleRows}
+      />
     )
   }
 
