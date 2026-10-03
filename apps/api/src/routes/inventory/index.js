@@ -11,6 +11,7 @@ import { createInventoryModelsRouter } from './models-routes.js';
 import { createInventoryImportRouter } from './import-routes.js';
 import { createInventoryAdminRouter } from './admin-routes.js';
 import { createInventoryModelService } from '../../services/inventory-model-service.js';
+import { createItemConnections } from './item-connections.js';
 
 export function createInventoryRouter({
   prisma,
@@ -24,6 +25,7 @@ export function createInventoryRouter({
   filesService,
 }) {
   const router = new Hono();
+  const itemConnections = createItemConnections({ prisma });
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
   router.route('/', createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc }));
@@ -38,7 +40,8 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { search, categoryId, brandId, locationId, conditionId, adminStatus, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, page, limit, pageSize, sortBy, sortDir } = c.req.query();
-      const result = await inventoryService.listItems({ companyId, search, categoryId, brandId, locationId, conditionId, adminStatus, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
+      const connectionMatchIds = await itemConnections.searchIds(c, search);
+      const result = await inventoryService.listItems({ companyId, search, connectionMatchIds, categoryId, brandId, locationId, conditionId, adminStatus, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo, sortBy, sortDir, page: Number(page) || 1, limit: Number(pageSize ?? limit) || 50 });
       // `pagination` is the shape RunlyTable reads for its page footer.
       return c.json({ ...result, pagination: { page: result.page, pageSize: result.limit, total: result.total } });
     } catch (err) {
@@ -51,10 +54,13 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const authUserId = c.get("authUserId");
-      const data = await modelDefaults.applyModelDefaults(await c.req.json(), companyId);
-      const item = await inventoryService.createItem(data, companyId, authUserId);
+      const { data: body, afterWrite } = await itemConnections.prepare(c, await c.req.json());
+      const data = await modelDefaults.applyModelDefaults(body, companyId);
+      const item = await inventoryService.createItem(data, companyId, authUserId, { afterWrite });
       return c.json({ data: item }, 201);
     } catch (err) {
+      const connectionError = itemConnections.errorResponse(c, err);
+      if (connectionError) return connectionError;
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
       return c.json({ error: "No se pudo crear el item." }, 500);
     }
@@ -88,10 +94,13 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { id } = c.req.param();
-      const data = await modelDefaults.applyModelDefaults(await c.req.json(), companyId);
-      const item = await inventoryService.updateItem(id, data, companyId);
+      const { data: body, afterWrite } = await itemConnections.prepare(c, await c.req.json(), id);
+      const data = await modelDefaults.applyModelDefaults(body, companyId);
+      const item = await inventoryService.updateItem(id, data, companyId, { afterWrite });
       return c.json({ data: item });
     } catch (err) {
+      const connectionError = itemConnections.errorResponse(c, err);
+      if (connectionError) return connectionError;
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
       return c.json({ error: "No se pudo actualizar el item." }, 500);
     }
@@ -104,10 +113,13 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { id } = c.req.param();
-      const data = await modelDefaults.applyModelDefaults(await c.req.json(), companyId);
-      const item = await inventoryService.updateItem(id, data, companyId);
+      const { data: body, afterWrite } = await itemConnections.prepare(c, await c.req.json(), id);
+      const data = await modelDefaults.applyModelDefaults(body, companyId);
+      const item = await inventoryService.updateItem(id, data, companyId, { afterWrite });
       return c.json({ data: item });
     } catch (err) {
+      const connectionError = itemConnections.errorResponse(c, err);
+      if (connectionError) return connectionError;
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
       return c.json({ error: "No se pudo actualizar el item." }, 500);
     }

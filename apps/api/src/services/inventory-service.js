@@ -110,6 +110,9 @@ export function createInventoryService({ prisma, activityBridge }) {
   async function listItems({
     companyId,
     search,
+    // Item ids matched by connected fields (Connections search); OR-ed with
+    // the item's own search while every other filter still applies.
+    connectionMatchIds = [],
     categoryId,
     brandId,
     locationId,
@@ -131,10 +134,13 @@ export function createInventoryService({ prisma, activityBridge }) {
     const take = normalizeLimit(limit);
     const skip = (normalizePage(page) - 1) * take;
 
-    const where = buildInventoryWhere(companyId, {
-      search, categoryId, brandId, locationId, conditionId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo,
+    const filters = {
+      categoryId, brandId, locationId, conditionId, status, assignedToId, modelId, createdFrom, createdTo, purchaseFrom, purchaseTo,
       adminStatus: adminStatus === 'all' ? undefined : (adminStatus || DEFAULT_LISTED_ADMIN_STATUSES),
-    });
+    };
+    const where = search && connectionMatchIds.length
+      ? { AND: [buildInventoryWhere(companyId, filters), { OR: [buildInventoryWhere(companyId, { ...filters, search }), { id: { in: connectionMatchIds } }] }] }
+      : buildInventoryWhere(companyId, { ...filters, search });
 
     const [data, total] = await Promise.all([
       prisma.invItem.findMany({
@@ -257,7 +263,18 @@ export function createInventoryService({ prisma, activityBridge }) {
     };
   }
 
-  async function createItem(data, companyId, creatorId) {
+  // afterWrite(tx, item): extra writes that must commit together with the item
+  // (connection sections from the item form, spec 2026-10-03-rme3-module-platform-v2 D3).
+  async function writeWith(afterWrite, op) {
+    if (!afterWrite) return op(prisma);
+    return prisma.$transaction(async (tx) => {
+      const result = await op(tx);
+      await afterWrite(tx, result);
+      return result;
+    }, { timeout: 30_000 });
+  }
+
+  async function createItem(data, companyId, creatorId, { afterWrite = null } = {}) {
     assertCompany(companyId);
     await assertRefInCompany('invCategory', data.categoryId, companyId, 'El tipo');
     await assertRefInCompany('invBrand', data.brandId, companyId, 'La marca');
@@ -343,6 +360,7 @@ export function createInventoryService({ prisma, activityBridge }) {
                 data: { itemId: item.id, fieldId: cv.fieldId, value: cv.value ?? null },
               });
             }
+            if (afterWrite) await afterWrite(tx, item);
             return tx.invItem.findFirst({
               where: { id: item.id },
               include: {
@@ -383,14 +401,14 @@ export function createInventoryService({ prisma, activityBridge }) {
     let tagAttempt = 0;
     while (!created) {
       try {
-        created = await prisma.invItem.create({
+        created = await writeWith(afterWrite, (db) => db.invItem.create({
           data: itemData,
           include: {
             category: { select: { id: true, name: true, icon: true, color: true } },
             brand: { select: { id: true, name: true } },
             location: { select: { id: true, name: true } },
           },
-        });
+        }));
       } catch (err) {
         if (!data.assetTag && err.code === 'P2002' && err.meta?.target?.includes('asset_tag') && tagAttempt < 5) {
           tagAttempt++;
@@ -417,7 +435,7 @@ export function createInventoryService({ prisma, activityBridge }) {
     return created;
   }
 
-  async function updateItem(id, data, companyId) {
+  async function updateItem(id, data, companyId, { afterWrite = null } = {}) {
     assertCompany(companyId);
     const existing = await prisma.invItem.findFirst({
       where: { id, companyId, enabled: true },
@@ -509,6 +527,7 @@ export function createInventoryService({ prisma, activityBridge }) {
             create: { itemId: id, fieldId: cv.fieldId, value: cv.value ?? null },
           });
         }
+        if (afterWrite) await afterWrite(tx, { id });
         return tx.invItem.findFirst({
           where: { id },
           include: {
@@ -535,7 +554,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       return result;
     }
 
-    const updated = await prisma.invItem.update({
+    const updated = await writeWith(afterWrite, (db) => db.invItem.update({
       where: { id },
       data: updateData,
       include: {
@@ -543,7 +562,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         brand: { select: { id: true, name: true } },
         location: { select: { id: true, name: true } },
       },
-    });
+    }));
     await bridge.logAndPublish({
       auditEntry: {
         actorId: 'system',
