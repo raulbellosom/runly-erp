@@ -2,6 +2,7 @@ import { isOfficialCoreModuleKey } from './module-manifests-service.js'
 import { getPermissionPresentation } from '../permission-catalog.js'
 import { getModuleHandler } from './module-cleanup-registry.js'
 import { createModuleMigrationService } from './module-migration-service.js'
+import { createConnectionLifecycle } from './connections/connection-lifecycle.js'
 import { createModuleMetadataService } from './module-metadata-service.js'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -82,6 +83,7 @@ function isWithinPath(parentPath, childPath) {
 export function createModuleLifecycleService({ prisma }) {
   const migrationSvc = createModuleMigrationService({ prisma })
   const metadataSvc = createModuleMetadataService({ prisma })
+  const connectionLifecycle = createConnectionLifecycle({ prisma })
 
   // ── Permission helpers ────────────────────────────────────────────────────
 
@@ -869,6 +871,10 @@ export function createModuleLifecycleService({ prisma }) {
         lifecycleConfig: result?.lifecycleConfig ?? installManifest.lifecycle ?? null,
         actorId,
       })
+      // Connections to core entities (FK + index trigger + registry rows);
+      // after the module's tables exist. Fails the install with a clear
+      // CONNECTION_* error when declarations or existing data are invalid.
+      await connectionLifecycle.syncModuleConnections({ moduleKey: installManifest.key })
       await clearLastInstallError(installManifest.key)
       await runModuleSeed({ moduleKey: installManifest.key, actorId })
       return result
@@ -1171,6 +1177,8 @@ export function createModuleLifecycleService({ prisma }) {
         }
       }
 
+      await connectionLifecycle.onModuleUninstalled({ moduleKey: key, mode, companyId, db: tx })
+
       // Public links stop working when their module goes away.
       await tx.modulePublicLink.updateMany({
         where: { moduleKey: key, revokedAt: null },
@@ -1226,6 +1234,7 @@ export function createModuleLifecycleService({ prisma }) {
 
     return prisma.$transaction(async (tx) => {
       const rowsDeleted = await handler.purge({ tx, companyId })
+      await connectionLifecycle.onModuleReset({ moduleKey: key, companyId, db: tx })
       await tx.modulePublicLink.deleteMany({ where: { moduleKey: key, companyId } })
       await writeAuditLog(tx, {
         action: 'core.module.reset',

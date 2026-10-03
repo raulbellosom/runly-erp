@@ -12,6 +12,7 @@ import path from 'node:path'
 import { createModuleSchemaMigrationService } from './module-schema-migration-service.js'
 import { createModuleMetadataService } from './module-metadata-service.js'
 import { createModuleLifecycleService } from './module-lifecycle-service.js'
+import { createConnectionLifecycle } from './connections/connection-lifecycle.js'
 import { createModulePackageService } from './module-package-service.js'
 import { createModulePackageStagingService } from './module-package-staging-service.js'
 import { createModulePackagePurgeService } from './module-package-purge-service.js'
@@ -23,6 +24,7 @@ export function createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cac
   const schemaMigrationSvc = createModuleSchemaMigrationService({ prisma })
   const metadataSvc = createModuleMetadataService({ prisma })
   const lifecycleSvc = createModuleLifecycleService({ prisma })
+  const connectionLifecycle = createConnectionLifecycle({ prisma })
   const stagingSvc = createModulePackageStagingService()
   const purgeSvc = bundlerSvc
     ? createModulePackagePurgeService({ prisma, bundlerSvc, routeLoader, cacheDel })
@@ -67,6 +69,8 @@ export function createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cac
           // additive update that also touched a widget's display config.
           if (moduleRow?.status === 'INSTALLED') {
             await metadataSvc.syncModuleMetadata({ manifest: staged.manifest, models: staged.models, views: staged.views })
+            // Connections read the manifest/models just synced above.
+            await connectionLifecycle.syncModuleConnections({ moduleKey: key })
           }
           const syncResult = await syncDiscoveredModuleDependencies({ prisma, moduleKey: key, dependencies: staged.manifest.dependencies ?? [] })
           if (syncResult.error?.code === 'DEPENDENCY_CYCLE_DETECTED') {

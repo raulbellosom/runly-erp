@@ -59,6 +59,9 @@ function createFixture({ core = false, dependentInstalled = false, builderProjec
     userPermissionGrant: { findMany: async () => state.grants, deleteMany: deleteMany('grants') },
     companyModule: { findMany: async () => state.companyModules, deleteMany: deleteMany('companyModules') },
     moduleDependency: { findMany: async () => state.dependencies, deleteMany: deleteMany('dependencies') },
+    // Connections (connection-lifecycle onModulePurged): none declared here.
+    moduleConnection: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
+    connectionRecord: { deleteMany: async () => ({ count: 0 }) },
     auditLog: { create: async ({ data }) => { state.audit.push(data); return data } },
     moduleBuilderProject: {
       updateMany: async ({ where, data }) => {

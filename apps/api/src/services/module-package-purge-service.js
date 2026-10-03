@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { createConnectionLifecycle } from './connections/connection-lifecycle.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { createModuleResourceInventoryService } from './module-resource-inventory-service.js'
 import { purgeModuleFiles, resolveModulesDir } from './module-upload-service.js'
@@ -133,6 +134,8 @@ export function createModulePackagePurgeService({
           droppedTables.push(table.tableName)
           rowsDeleted += Number(table.rowCount ?? 0)
         }
+        // Connection functions, registry and index rows (tables are gone above).
+        await createConnectionLifecycle({ prisma }).onModulePurged({ moduleKey: initial.moduleKey, db: tx })
 
         if (permissionIds.length) {
           await tx.rolePermission.deleteMany({ where: { permissionId: { in: permissionIds } } })

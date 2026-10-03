@@ -56,6 +56,7 @@ import { registerRecordsViewRoutes } from "./module-records-view-routes.js";
 import { createBuilderPackageSync } from "../services/module-builder-package-sync.js";
 import { computeSourceHash } from "../services/module-bundler-service.js";
 import { createModuleCssCache } from "../services/module-css-service.js";
+import { createConnectionLifecycle } from "../services/connections/connection-lifecycle.js";
 
 const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
@@ -550,6 +551,7 @@ export function createModulesRouter({
   const app = new Hono();
   const svc = createModuleLifecycleService({ prisma });
   const moduleCss = createModuleCssCache({ computeSourceHash });
+  const connectionLifecycle = createConnectionLifecycle({ prisma });
 
   async function safeRouteReload(moduleKey) {
     if (!routeLoader) return null;
@@ -735,6 +737,8 @@ export function createModulesRouter({
               models: staged.models,
               views: staged.views,
             });
+            // Connections read the manifest/models just synced above.
+            await connectionLifecycle.syncModuleConnections({ moduleKey: key });
           }
           const syncResult = await syncDiscoveredModuleDependencies({
             prisma,
