@@ -475,7 +475,7 @@ export function createModulePackageService({
           if (built.built) {
             preview = { id: previewId }
             // Module utilities for the preview (served by /preview/:id/bundle.css).
-            const css = await compileModuleCss(path.join(staged.packageDir, 'components')).catch(() => '')
+            const css = await compileModuleCss(path.join(staged.packageDir, 'components'), { scope: key }).catch(() => '')
             await fs.writeFile(path.join(previewDir, 'bundle.css'), css)
           }
         } catch (error) {

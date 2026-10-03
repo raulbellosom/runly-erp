@@ -84,7 +84,7 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
           </TabsList>
         </Tabs>
       )}
-      <div className="max-h-[60vh] overflow-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))]">
+      <div className="max-h-[60vh] overflow-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))]" data-runly-module={moduleKey}>
         {View ? (
           <PreviewBoundary key={view.key}>
             <View

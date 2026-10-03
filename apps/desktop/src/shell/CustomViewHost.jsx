@@ -15,7 +15,8 @@ export function CustomViewHost({ component: CustomComponent, moduleKey, token, c
       navigate={navigate}
       blueprints={blueprints}
     >
-      <div className="h-full min-h-0 w-full overflow-auto">
+      {/* data-runly-module scopes the module's own Tailwind CSS (bundle.css). */}
+      <div className="h-full min-h-0 w-full overflow-auto" data-runly-module={moduleKey}>
         <CustomComponent
           token={token}
           companyId={companyId}

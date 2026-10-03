@@ -2495,7 +2495,7 @@ export function createModulesRouter({
     const modulesDir = await resolveModulesDir();
     if (!modulesDir) return c.body("");
     try {
-      return c.body(await moduleCss(path.join(modulesDir, key, "components")));
+      return c.body(await moduleCss(path.join(modulesDir, key, "components"), key));
     } catch (err) {
       console.error(`[modules] bundle.css for ${key} failed:`, err?.message ?? err);
       return c.body("");
