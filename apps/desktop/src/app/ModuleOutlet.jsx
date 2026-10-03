@@ -390,6 +390,9 @@ const SCREEN_MAP = {
   "runly.inventory:/inventory/:id": lazy(
     () => import("../modules/runly.inventory/screens/InventoryItemDetail.jsx"),
   ),
+  "runly.inventory:/inventory/connections": lazy(
+    () => import("../modules/runly.inventory/screens/InventoryConnectionsScreen.jsx"),
+  ),
   "runly.inventory:/inventory/catalogs": lazy(
     () => import("../modules/runly.inventory/screens/InventoryCatalogsScreen.jsx"),
   ),

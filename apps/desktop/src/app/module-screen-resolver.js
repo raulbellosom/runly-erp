@@ -172,6 +172,7 @@ export function resolveScreen(screenMap, requestedModuleKey, subPath, blueprintS
     if (subPath === "/inventory/assignments") return screenMap["runly.inventory:/inventory/assignments"] ?? null;
     if (subPath === "/inventory/catalogs") return screenMap["runly.inventory:/inventory/catalogs"] ?? null;
     if (subPath === "/inventory/summary") return screenMap["runly.inventory:/inventory/summary"] ?? null;
+    if (subPath === "/inventory/connections") return screenMap["runly.inventory:/inventory/connections"] ?? null;
     // Parameterized routes — must come after all static path checks
     if (/^\/inventory\/[^/]+\/edit$/.test(subPath)) return screenMap["runly.inventory:/inventory/new"] ?? null;
     if (/^\/inventory\/[^/]+$/.test(subPath)) return screenMap["runly.inventory:/inventory/:id"] ?? null;

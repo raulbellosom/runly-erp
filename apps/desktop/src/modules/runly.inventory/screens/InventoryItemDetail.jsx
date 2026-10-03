@@ -10,6 +10,7 @@ import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryI
 import { INVENTORY_ITEM_DETAIL } from '../blueprints/inventory-item-detail.blueprint.js'
 import { componentRegistry } from '../../../lib/moduleComponentRegistry.js'
 import { CanvasReferences } from '../../runly.canvas/components/CanvasReferences.jsx'
+import { ConnectionSections } from '../../../shell/connections/ConnectionSections.jsx'
 import { useMiraiRecordContext, openMiraiSidebar } from '../../runly.chat/lib/miraiPageContext.js'
 
 const API_BASE = getApiUrl()
@@ -88,6 +89,7 @@ export default function InventoryItemDetail() {
           />
         }
       />
+      <ConnectionSections targetType="inventory_item" targetId={id} />
       <CanvasReferences moduleKey="runly.inventory" entityType="inventory_item" entityId={id} />
 
       <ConfirmDialog
