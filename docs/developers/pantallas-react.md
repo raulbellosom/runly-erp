@@ -3,6 +3,11 @@ title: Pantallas React
 summary: Cómo crear una vista CUSTOM con un componente React, registrarla, agregarla al menú, llamar a la API y respetar el diseño de Runly.
 order: 2
 ---
+## Atajo: el kit y las pantallas de ejemplo
+
+- El ZIP que descargas del Constructor trae `docs/ejemplos/` con cuatro pantallas completas para tu primera entidad (listado, ficha, formulario por secciones y tablero). Copia la que necesites a `components/` y regístrala como se explica abajo.
+- Con el **kit de pantallas** (`ModulePage`, `EntityTable`, `EntityForm`, `EntityDetail`, `FormSection`, `useEntityList`…) no tienes que pasar `token`, `companyId` ni `apiBaseUrl`, y las tablas y formularios usan las vistas que diseñaste en el Constructor. Referencia: [Componentes de @runly/ui](/documentacion/desarrolladores/componentes).
+
 ## Receta (cuatro cambios)
 
 **1. El componente** — `components/Panel.jsx`

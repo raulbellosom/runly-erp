@@ -282,6 +282,8 @@ Recharts props or functions in the schema.
 
 Use CUSTOM when TABLE/FORM/DETAIL renderers are insufficient. Requires a component registered via the dynamic bundle. No SCREEN_MAP entry needed.
 
+**Module runtime and kit (2026-10-03, spec `2026-10-03-rme3-module-platform-v2`):** every CUSTOM component is rendered inside `ModuleRuntimeProvider` (`apps/desktop/src/shell/CustomViewHost.jsx`) carrying `moduleKey`, `token`, `companyId`, `apiBaseUrl`, `navigate` and the module's blueprints. Inside it, screens use `ModulePage`, `FormSection`/`FieldGrid`, `DetailHeader`, `EntityTable`/`EntityForm`/`EntityDetail` (thin wrappers over `RunlyTable`/`RunlyForm`/`RunlyDetail` fed with the entity's own TABLE/FORM/DETAIL blueprint) and `useEntityList`/`useEntityRecord`/`useEntityMutations` — no prop threading. Module components get their own Tailwind CSS (`GET /modules/:key/bundle.css`), so any utility class works. Public reference for authors: `docs/developers/componentes.md`; golden screens ship in the Builder ZIP under `docs/ejemplos/`.
+
 **Three files are always required together:**
 
 ```js

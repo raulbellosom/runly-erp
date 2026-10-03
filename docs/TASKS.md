@@ -1729,10 +1729,11 @@ Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · P
 - Note: `pnpm lint` reports 8 errors only in git-ignored generated bundles (`apps/api/bundles/`, `modules/custom/.previews|.staging/`); sources are clean.
 
 ### Phase 2 — UI building blocks and golden screens
-- [ ] Module runtime context + `useEntity*` hooks; `CustomViewHost` extracted from `BlueprintCrudScreen.jsx`
-- [ ] `ModulePage`, `FormSection`, `FieldGrid`, `FilterBar`, `DetailHeader` (reuse existing `StatCard`)
-- [ ] `EntityForm` + field icons
-- [ ] Golden screens in the ZIP (`docs/ejemplos/`) and real scaffold dashboard
+- [x] Module runtime (`ModuleRuntimeProvider` via `apps/desktop/src/shell/CustomViewHost.jsx`) + `useEntityList/Record/Mutations`; `extractBlueprintFields` shared with `BlueprintCrudScreen.jsx` (1179 → 1136 lines). Verified: 2026-10-03 (entity-helpers 5/5, `pnpm build:web`, shim `ext-atlas-ui` exposes the new names)
+- [x] Kit: `ModulePage`, `FormSection`/`FieldGrid`, `DetailHeader`, `EntityTable`/`EntityForm`/`EntityDetail` (wrappers over the blueprint renderers; existing `StatCard` and `FilterBar` reused). Documented in `componentes.md` (export test). Verified: 2026-10-03 (lint, build)
+- [x] Golden screens in the Builder ZIP (`docs/ejemplos/` Listado/Detalle/Formulario/Tablero + LEEME), ignored on upload. Verified: 2026-10-03 (golden-screens 3/3: zero design findings, esbuild compiles; module-compiler 59/59; builder service tests)
+- Decision: the `crud-custom` scaffold `ModuleDashboard.jsx` is NOT regenerated with the kit — changing a generated template makes existing mixed-mode projects look modified on their next upload (Builder regenerates and compares) and would flip them to developer mode. The golden screens cover the need.
+- [ ] Owner: open an existing CUSTOM view (unchanged) and a screen built with `EntityTable`/`EntityForm` in a running instance.
 
 ### Phase 3 — Connections · Phase 4 — Safe schema evolution · Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
 - [ ] See plan tasks 3.1–6.5

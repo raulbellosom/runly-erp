@@ -22,3 +22,4 @@ export function classifyModulePackage({ key, files, manifest }) {
 }
 export { EXTERNAL_RELATION_TARGETS, externalTarget, isExternalRelation } from './external-relations.js'
 export { reviewComponentSources } from './design-review.js'
+export { EXAMPLES_DIR, goldenScreenFiles } from './templates/golden-screens.js'

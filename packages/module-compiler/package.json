@@ -10,5 +10,8 @@
   "dependencies": {
     "@runly/module-engine": "workspace:*",
     "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

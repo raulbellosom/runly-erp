@@ -12,6 +12,140 @@ import { ClipboardList, Plus } from 'lucide-react'
 
 **Reglas rápidas:** nada de `<select>`, `<input>`, `<textarea>` ni `window.confirm/alert/prompt`; toda pantalla empieza con `PageHeader`; usa tokens de color (`bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`) en lugar de `bg-white` o colores hexadecimales; textos en español y sin emojis. Al subir el ZIP, la **Revisión de diseño** te dice archivo y línea de lo que no cumple.
 
+## Kit de pantallas de módulo
+
+La forma más corta de hacer una pantalla que se vea como Runly. Dentro de una pantalla de tu módulo no necesitas pasar `token`, `companyId` ni `apiBaseUrl`: el kit los toma solo.
+
+```jsx
+import { useState } from 'react'
+import { ModulePage, EntityTable, EntityForm, Sheet, SheetContent, SheetHeader, SheetTitle, Button } from '@runly/ui'
+import { CalendarCheck, Plus } from 'lucide-react'
+
+export default function Visitas() {
+  const [editing, setEditing] = useState(null) // null = cerrado, 'new' = crear, id = editar
+  return (
+    <ModulePage title="Visitas" icon={CalendarCheck} description="Agenda de visitas a clientes"
+      actions={<Button onClick={() => setEditing('new')}><Plus /> Nueva visita</Button>}>
+      <EntityTable entity="visita" onEdit={(row) => setEditing(row.id)} />
+      <Sheet open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)}>
+        <SheetContent side="right">
+          <SheetHeader><SheetTitle>{editing === 'new' ? 'Nueva visita' : 'Editar visita'}</SheetTitle></SheetHeader>
+          <EntityForm entity="visita" recordId={editing === 'new' ? undefined : editing} onSaved={() => setEditing(null)} onCancel={() => setEditing(null)} />
+        </SheetContent>
+      </Sheet>
+    </ModulePage>
+  )
+}
+```
+
+`entity` es el nombre de la entidad en el Constructor (`visita`). `EntityTable`, `EntityForm` y `EntityDetail` usan las vistas que diseñaste en el Constructor (columnas, secciones, tipos de campo, relaciones y validación), así que se ven y validan igual que el resto del módulo.
+
+### ModulePage
+
+Raíz de cada pantalla: `PageHeader` + contenedor responsivo.
+
+| Prop | Tipo | Qué hace |
+|---|---|---|
+| `title` | string | Título |
+| `description` | string | Texto bajo el título |
+| `icon` | componente lucide | Icono junto al título |
+| `actions` | ReactNode | Botones del encabezado |
+| `onBack` | función | Enlace "Volver" |
+
+### FormSection
+
+Sección con título e icono para agrupar campos, en rejilla responsiva (una columna en celular).
+
+| Prop | Tipo | Qué hace |
+|---|---|---|
+| `title` | string | Título de la sección |
+| `description` | string | Texto bajo el título |
+| `icon` | componente lucide | Icono del título |
+| `columns` | 1 · 2 · 3 · 4 | Columnas desde tablet (2) |
+| `actions` | ReactNode | Botones a la derecha del título |
+
+Un campo puede ocupar toda la fila con `className="md:col-span-2"`.
+
+```jsx
+<FormSection title="Datos generales" icon={ClipboardList}>
+  <TextField label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+  <DatePickerField label="Fecha" value={fecha} onChange={setFecha} />
+  <TextareaField label="Notas" className="md:col-span-2" value={notas} onChange={(e) => setNotas(e.target.value)} />
+</FormSection>
+```
+
+### FieldGrid
+
+La rejilla de `FormSection` sin la tarjeta. Prop `columns` (1–4).
+
+### DetailHeader
+
+Encabezado de la ficha de un registro.
+
+| Prop | Tipo | Qué hace |
+|---|---|---|
+| `title` / `subtitle` | string | Nombre y dato secundario |
+| `icon` | componente lucide | Icono en recuadro |
+| `badges` | ReactNode | Etiquetas de estado (`Badge`) |
+| `actions` | ReactNode | Botones |
+
+### FilterBar
+
+Filtros en forma de chips para listas.
+
+| Prop | Tipo | Qué hace |
+|---|---|---|
+| `filters` | `[{ key, label, options: [{ value, label }] }]` | Filtros (`type: 'daterange'` con `fromKey`/`toKey` para rangos de fecha) |
+| `value` | objeto | Valores activos `{ [key]: value }` |
+| `onChange` | `(nuevoValor) => void` | Recibe el objeto completo de filtros |
+
+### EntityTable
+
+Tabla paginada con búsqueda y filtros de una entidad, igual a la vista TABLE del Constructor.
+
+| Prop | Tipo | Qué hace |
+|---|---|---|
+| `entity` | string | Entidad (`visita`) |
+| `onCreate` | función | Botón "Crear" |
+| `onView` / `onEdit` | `(fila) => void` | Acciones de cada fila |
+| `refreshSignal` | number | Cámbialo para recargar |
+| `initialFilters` | objeto | Filtros iniciales |
+
+### EntityForm
+
+Formulario para crear (sin `recordId`) o editar un registro, con las secciones y campos del Constructor.
+
+| Prop | Tipo | Qué hace |
+|---|---|---|
+| `entity` | string | Entidad |
+| `recordId` | string | Id a editar; sin él, crea |
+| `initialData` | objeto | Valores iniciales (por ejemplo una relación preseleccionada) |
+| `onSaved` | `(registro) => void` | Después de guardar |
+| `onCancel` | función | Botón "Cancelar" |
+| `showFooter` | boolean | Mostrar botones Guardar/Cancelar (true) |
+
+### EntityDetail
+
+Ficha de solo lectura de un registro (secciones, adjuntos). Props: `entity`, `recordId`, `onEdit`, `onBack`, `heroActions`.
+
+### useEntityList
+
+`useEntityList(entity, { page, pageSize, search, filters })` → consulta de TanStack Query con `{ data, pagination }` de la API. Útil para indicadores y pantallas a la medida.
+
+```jsx
+const { data, isLoading } = useEntityList('visita', { pageSize: 5 })
+const total = data?.pagination?.total ?? 0
+const recientes = data?.data ?? []
+```
+
+### useEntityRecord
+
+`useEntityRecord(entity, id)` → el registro (`data`) o `undefined` mientras carga.
+
+### useEntityMutations
+
+`const { create, update, disable } = useEntityMutations('visita')` → mutaciones con avisos en español y recarga automática: `create.mutate(valores)`, `update.mutate({ id, values })`, `disable.mutate(id)`.
+
 ## Patrones
 
 ### Formulario por secciones, responsivo

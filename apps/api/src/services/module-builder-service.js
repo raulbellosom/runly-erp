@@ -13,6 +13,7 @@ import {
   compileModule,
   archiveModule,
   developerDocFiles,
+  goldenScreenFiles,
   normalizeModuleDefinition,
   validateModuleDefinition,
 } from '@runly/module-compiler'
@@ -256,8 +257,9 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
   async function exportPackage({ companyId, projectId }) {
     const project = await requireProject({ companyId, projectId })
     const compiled = compileDefinition(project.definition)
-    // The download also carries docs/ (offline developer docs); publish/install packages do not.
-    const buffer = await archiveModule({ ...compiled, files: [...compiled.files, ...developerDocFiles()] })
+    // The download also carries docs/ (offline developer docs) and docs/ejemplos/
+    // (golden screens for the first entity); publish/install packages do not.
+    const buffer = await archiveModule({ ...compiled, files: [...compiled.files, ...developerDocFiles(), ...goldenScreenFiles(compiled.definition)] })
     return { buffer, filename: `${project.moduleKey}-${compiled.definition.version}.zip`, packageHash: compiled.packageHash }
   }
 
