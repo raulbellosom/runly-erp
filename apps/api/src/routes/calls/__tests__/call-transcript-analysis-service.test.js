@@ -1,6 +1,34 @@
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { createCallTranscriptAnalysisService, CallTranscriptAnalysisError } from "../call-transcript-analysis-service.js";
+
+// contactsService.create/update write inside prisma.$transaction and sync
+// channel/collection rows; this gives a mock client both, with permissive
+// no-op models for anything the test does not care about.
+function withContactWrites(prisma) {
+  const noopModel = {
+    findMany: async () => [], findFirst: async () => null, findUnique: async () => null,
+    create: async ({ data }) => ({ id: "row-1", ...data }), update: async ({ where, data }) => ({ ...where, ...data }),
+    delete: async () => ({}), deleteMany: async () => ({ count: 0 }), createMany: async () => ({ count: 0 }), updateMany: async () => ({ count: 0 }),
+  };
+  let lastContact = null;
+  const contact = {
+    ...noopModel,
+    ...prisma.contact,
+    create: async (args) => { lastContact = await (prisma.contact?.create ?? noopModel.create)(args); return lastContact; },
+    update: async (args) => { const row = await (prisma.contact?.update ?? noopModel.update)(args); lastContact = { ...(lastContact ?? {}), ...row }; return row; },
+    findUnique: async (args) => (prisma.contact?.findUnique ? prisma.contact.findUnique(args) : (lastContact ?? { id: args.where.id })),
+  };
+  const client = new Proxy({ ...prisma, contact }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      if (typeof key === "string" && !key.startsWith("$")) return noopModel;
+      return undefined;
+    },
+  });
+  client.$transaction = async (fn) => fn(client);
+  return client;
+}
 import { verifyAiProof } from "../../../lib/ai-proof-token.js";
 
 const ENV = { GROQ_API_KEY: "test-key", AI_PROOF_SIGNING_SECRET: "test-secret" };
@@ -247,7 +275,7 @@ describe("call-transcript-analysis-service.commitProposals", () => {
       userPermissionGrant: { findMany: async () => [] },
     };
     const proofToken = signAiProof({ transcriptId: "t1", companyId: "c1", actorId: "u1" }, ENV);
-    const service = createCallTranscriptAnalysisService({ prisma, env: ENV, tasksService: {}, calendarService: {} });
+    const service = createCallTranscriptAnalysisService({ prisma: withContactWrites(prisma), env: ENV, tasksService: {}, calendarService: {} });
 
     const result = await service.commitProposals({
       transcriptId: "t1", profileId: "u1", proofToken,

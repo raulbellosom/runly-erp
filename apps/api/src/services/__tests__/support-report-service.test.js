@@ -71,9 +71,12 @@ describe("createSupportReportService.sendBugReport", () => {
     });
 
     const sent = sendMail.mock.calls[0].arguments[0];
-    assert.equal(sent.attachments.length, 2);
-    assert.deepEqual(sent.attachments[0], { filename: "captura.png", content: "AAAA", encoding: "base64" });
-    assert.deepEqual(sent.attachments[1], { filename: "log.txt", content: "QkJC", encoding: "base64" });
+    // The SMTP service also inlines the brand logo (cid attachment); only the
+    // report's own files matter here.
+    const files = sent.attachments.filter((attachment) => !attachment.cid);
+    assert.equal(files.length, 2);
+    assert.deepEqual(files[0], { filename: "captura.png", content: "AAAA", encoding: "base64" });
+    assert.deepEqual(files[1], { filename: "log.txt", content: "QkJC", encoding: "base64" });
     assert.ok(sent.text.includes("Adjuntos: log.txt"));
   });
 

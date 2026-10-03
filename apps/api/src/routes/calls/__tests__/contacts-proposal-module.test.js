@@ -3,6 +3,34 @@ import assert from "node:assert/strict";
 import { contactsProposalModule } from "../transcript-proposal-modules/contacts-proposal-module.js";
 
 const COMPANY = "c1";
+
+// contactsService.create/update write inside prisma.$transaction and sync
+// channel/collection rows; this gives a mock client both, with permissive
+// no-op models for anything the test does not care about.
+function withContactWrites(prisma) {
+  const noopModel = {
+    findMany: async () => [], findFirst: async () => null, findUnique: async () => null,
+    create: async ({ data }) => ({ id: "row-1", ...data }), update: async ({ where, data }) => ({ ...where, ...data }),
+    delete: async () => ({}), deleteMany: async () => ({ count: 0 }), createMany: async () => ({ count: 0 }), updateMany: async () => ({ count: 0 }),
+  };
+  let lastContact = null;
+  const contact = {
+    ...noopModel,
+    ...prisma.contact,
+    create: async (args) => { lastContact = await (prisma.contact?.create ?? noopModel.create)(args); return lastContact; },
+    update: async (args) => { const row = await (prisma.contact?.update ?? noopModel.update)(args); lastContact = { ...(lastContact ?? {}), ...row }; return row; },
+    findUnique: async (args) => (prisma.contact?.findUnique ? prisma.contact.findUnique(args) : (lastContact ?? { id: args.where.id })),
+  };
+  const client = new Proxy({ ...prisma, contact }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      if (typeof key === "string" && !key.startsWith("$")) return noopModel;
+      return undefined;
+    },
+  });
+  client.$transaction = async (fn) => fn(client);
+  return client;
+}
 const OTHER_COMPANY = "c2";
 const USER = "u1";
 const MODULE_ID = "mod-contacts";
@@ -151,7 +179,7 @@ describe("contactsProposalModule.commit", () => {
     let createArgs;
     const prisma = basePrisma({ contact: { ...basePrisma().contact, create: async (args) => { createArgs = args; return { id: "new-1", ...args.data }; } } });
     const result = await contactsProposalModule.commit({
-      prisma, profileId: USER, companyId: COMPANY,
+      prisma: withContactWrites(prisma), profileId: USER, companyId: COMPANY,
       proposal: { name: "Juan Pérez", matchedContactId: null, email: "juan@acme.com", phone: null, company: null },
       decision: { type: "customer" },
     });
@@ -172,7 +200,7 @@ describe("contactsProposalModule.commit", () => {
       },
     });
     const result = await contactsProposalModule.commit({
-      prisma, profileId: USER, companyId: COMPANY,
+      prisma: withContactWrites(prisma), profileId: USER, companyId: COMPANY,
       proposal: { name: "Juan Pérez", matchedContactId: "existing-1", email: "nuevo@acme.com", phone: null, company: null },
       decision: { type: "customer" },
     });
