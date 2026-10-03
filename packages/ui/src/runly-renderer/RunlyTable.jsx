@@ -29,6 +29,20 @@ import {
   stripMarkdown,
 } from "./renderer-adapters.js";
 import { resolveColorHex } from "./runly-form-utils.js";
+import { accentFor } from "./records-view-format.js";
+
+// Select value as a tinted pill: stable color per option (or option.color).
+function SelectBadge({ label, color }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium"
+      style={{ color, backgroundColor: `${color}1f` }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} aria-hidden />
+      {String(label)}
+    </span>
+  );
+}
 import { formatTableDate } from "../lib/utils.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { ImageAssetCell } from "./ImageAssetCell.jsx";
@@ -621,9 +635,11 @@ export function RunlyTable({
                     } else if (col.type === "select" && col.options) {
                       const str = String(value ?? "");
                       const opt = col.options.find(
-                        (o) => String(o.value) === str,
+                        (o) => String(o?.value ?? o) === str,
                       );
-                      cellContent = opt?.label ?? renderValue(value);
+                      cellContent = str ? (
+                        <SelectBadge label={opt?.label ?? opt ?? str} color={resolveColorHex(opt?.color) ?? accentFor(col, value)} />
+                      ) : renderValue(value);
                     } else if (col.type === "image" && (col.avatarUserField || col.avatarSignedUrlPath || col.avatarLabelField)) {
                       cellContent = (
                         <UserAvatarCell

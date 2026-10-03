@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { resolveRecordLabel } from "./record-label.js";
+import { withSelectColumnOptions } from "./table-select-columns.js";
 import { ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
 import { Button } from "../components/Button.jsx";
@@ -108,6 +109,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
   const currentDetailBlueprint = detailBlueprint ?? tableBlueprint;
   // Record titles from name keys / declared title field / first text field —
   // never the record id (record-label.js).
+  const tableWithSelects = useMemo(() => withSelectColumnOptions(tableBlueprint, formBlueprint), [tableBlueprint, formBlueprint]);
   const resolveRowLabel = (row) => resolveRecordLabel(row, [currentDetailBlueprint, currentFormBlueprint, tableBlueprint]);
   const formMode = useMemo(
     () => resolveFormMode(currentFormBlueprint?.schema),
@@ -564,7 +566,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
         <>
           <RunlyTable
             key={tableBlueprint?.key ?? tableApiPath}
-            blueprint={tableBlueprint}
+            blueprint={tableWithSelects}
             token={token}
                 companyId={companyId}
             apiBaseUrl={apiBaseUrl}
