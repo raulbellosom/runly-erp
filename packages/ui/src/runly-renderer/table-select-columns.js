@@ -2,6 +2,8 @@
 // view has them). Fill them from the form blueprint so the table shows the
 // option label as a colored badge instead of the raw stored value.
 
+import { accentFor } from './records-view-format.js'
+
 // "EN_PROCESO" -> "En proceso"; anything with lowercase is kept as written.
 function humanize(value) {
   const text = String(value)
@@ -26,6 +28,61 @@ function formFields(blueprint) {
     ...tabs.flatMap((tab) => (tab?.sections ?? []).flatMap((section) => section?.fields ?? [])),
     ...(Array.isArray(schema.fields) ? schema.fields : []),
   ].filter((field) => field && typeof field === 'object')
+}
+
+const KPI_TYPES = { date: 'date', datetime: 'datetime', decimal: 'currency', number: 'number', boolean: 'boolean' }
+
+function formFieldMap(formBlueprint) {
+  return new Map(formFields(formBlueprint).map((field) => [String(field.field ?? field.name ?? field.key), field]))
+}
+
+// Generated detail views name fields without display types: the hero subtitle
+// points at a relation's raw id, KPIs show ISO dates and the status is plain
+// text. Fill them from the form blueprint (relation -> `<field>__label`,
+// select -> labeled pill, date -> formatted date). Explicit values win.
+export function withDetailFieldTypes(detailBlueprint, formBlueprint) {
+  const schema = detailBlueprint?.schema
+  const fields = formFieldMap(formBlueprint)
+  if (!schema || fields.size === 0) return detailBlueprint
+  const select = (name) => {
+    const field = fields.get(name)
+    return field?.type === 'select' && Array.isArray(field.options) ? normalizeSelectOptions(field.options) : null
+  }
+  const next = { ...schema }
+  if (schema.hero && typeof schema.hero === 'object') {
+    const hero = { ...schema.hero }
+    if (Array.isArray(hero.subtitleFields)) {
+      hero.subtitleFields = hero.subtitleFields.map((name) => (fields.get(name)?.type === 'relation' ? `${name}__label` : name))
+    }
+    const statusOptions = hero.statusField && !hero.statusOptions && !hero.statusMap ? select(hero.statusField) : null
+    if (statusOptions) {
+      hero.statusOptions = statusOptions.map((option) => ({ ...option, color: option.color ?? accentFor({ options: statusOptions }, option.value) }))
+    }
+    next.hero = hero
+  }
+  if (Array.isArray(schema.kpis)) {
+    next.kpis = schema.kpis.map((kpi) => {
+      if (!kpi || typeof kpi !== 'object' || kpi.type) return kpi
+      const options = select(kpi.field)
+      if (options) return { ...kpi, type: 'select', options }
+      const type = KPI_TYPES[fields.get(kpi.field)?.type]
+      return type ? { ...kpi, type } : kpi
+    })
+  }
+  if (Array.isArray(schema.sections)) {
+    next.sections = schema.sections.map((section) => {
+      if (!Array.isArray(section?.fields)) return section
+      return {
+        ...section,
+        fields: section.fields.map((entry) => {
+          if (!entry || typeof entry !== 'object' || entry.type) return entry
+          const options = select(String(entry.field ?? entry.name ?? ''))
+          return options ? { ...entry, type: 'select', options } : entry
+        }),
+      }
+    })
+  }
+  return { ...detailBlueprint, schema: next }
 }
 
 export function withSelectColumnOptions(tableBlueprint, formBlueprint) {

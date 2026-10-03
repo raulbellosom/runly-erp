@@ -22,3 +22,25 @@ test('object options keep their label and color', () => {
   assert.deepEqual(normalizeSelectOptions([{ value: 'a', label: 'Abierto', color: '#10b981' }, { value: 'B' }]),
     [{ value: 'a', label: 'Abierto', color: '#10b981' }, { value: 'B', label: 'B' }])
 })
+
+test('detail views get relation labels, status pills, typed KPIs and select fields from the form', async () => {
+  const { withDetailFieldTypes } = await import('../table-select-columns.js')
+  const form = { schema: { sections: [{ fields: [
+    { field: 'persona', type: 'relation' },
+    { field: 'estado', type: 'select', options: ['PRESTADO', 'DEVUELTO'] },
+    { field: 'fecha_salida', type: 'date' },
+  ] }] } }
+  const detail = { schema: {
+    hero: { titleField: 'articulo', subtitleFields: ['persona'], statusField: 'estado' },
+    kpis: [{ field: 'fecha_salida', label: 'Salida' }, { field: 'estado', label: 'Estado', type: 'text' }],
+    sections: [{ id: 's', fields: [{ field: 'estado', label: 'Estado' }, { field: 'fecha_salida', type: 'date' }] }],
+  } }
+  const { schema } = withDetailFieldTypes(detail, form)
+  assert.deepEqual(schema.hero.subtitleFields, ['persona__label'])
+  assert.deepEqual(schema.hero.statusOptions.map((o) => o.label), ['Prestado', 'Devuelto'])
+  assert.ok(schema.hero.statusOptions.every((o) => /^#/.test(o.color)))
+  assert.equal(schema.kpis[0].type, 'date')
+  assert.equal(schema.kpis[1].type, 'text')
+  assert.equal(schema.sections[0].fields[0].type, 'select')
+  assert.equal(schema.sections[0].fields[1], detail.schema.sections[0].fields[1])
+})
