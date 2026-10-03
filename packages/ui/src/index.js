@@ -366,3 +366,5 @@ export {
   listModuleEntities,
   extractBlueprintFields,
 } from "./lib/module-runtime/entity-helpers.js";
+// Record title without ever falling back to an id (record-label.js).
+export { resolveRecordLabel } from "./runly-renderer/record-label.js";

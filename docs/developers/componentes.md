@@ -551,6 +551,16 @@ Selector de iconos con búsqueda en español y categorías. Ponlo dentro de un `
 
 ## Utilidades
 
+### resolveRecordLabel
+
+`resolveRecordLabel(registro, blueprints?)` devuelve el texto para el título de un registro y **nunca su id**. Primero busca campos de nombre comunes (`nombre`, `name`, `titulo`, `folio`, `codigo`…), luego el campo de título que declare la vista y, después, el primer campo de texto de las vistas de la entidad o la etiqueta de una relación. Si no encuentra nada, devuelve `null`: en ese caso usa el nombre de la entidad ("Calibración").
+
+```jsx
+const { blueprints } = useModuleRuntime()
+const titulo = resolveRecordLabel(registro, [findEntityBlueprint(blueprints, 'DETAIL', 'calibracion')]) ?? 'Calibración'
+<DetailHeader title={titulo} />
+```
+
 ### buildApiHeaders
 
 `buildApiHeaders(token, companyId, extra?)` arma los encabezados `Authorization` y `X-Runly-Company-Id` para tus `fetch`. Úsalo siempre:

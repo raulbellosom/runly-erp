@@ -84,7 +84,7 @@ export default function Listado${pascal(entity.key)}() {
 
 function detalle(entity, titleField) {
   return `import { useLocation } from 'react-router-dom'
-import { Badge, DetailHeader, EmptyState, EntityDetail, ModulePage, Skeleton, useEntityRecord } from '@runly/ui'
+import { Badge, DetailHeader, EmptyState, EntityDetail, ModulePage, Skeleton, findEntityBlueprint, resolveRecordLabel, useEntityRecord, useModuleRuntime } from '@runly/ui'
 import { FileText, SearchX } from 'lucide-react'
 
 // Ficha de un registro: encabezado propio + la vista DETAIL del Constructor.
@@ -92,6 +92,9 @@ import { FileText, SearchX } from 'lucide-react'
 export default function Detalle${pascal(entity.key)}({ navigate }) {
   const id = new URLSearchParams(useLocation().search).get('id')
   const { data: record, isLoading } = useEntityRecord(${s(entity.key)}, id)
+  const { blueprints } = useModuleRuntime()
+  // Title from a name/text field of the record — never its id.
+  const title = resolveRecordLabel(record, [findEntityBlueprint(blueprints, 'DETAIL', ${s(entity.key)}), findEntityBlueprint(blueprints, 'FORM', ${s(entity.key)})]) ?? ${s(entity.label)}
 
   if (!id) {
     return (
@@ -106,7 +109,7 @@ export default function Detalle${pascal(entity.key)}({ navigate }) {
       {isLoading ? <Skeleton className="h-24 w-full" /> : (
         <DetailHeader
           icon={FileText}
-          title={record?.${titleField} ?? ${s(entity.label)}}
+          title={title}
           subtitle={record?.created_at ? \`Creado el \${String(record.created_at).slice(0, 10)}\` : undefined}
           badges={record?.enabled === false ? <Badge variant="secondary">Inactivo</Badge> : <Badge variant="success">Activo</Badge>}
         />
@@ -173,8 +176,7 @@ ${selectField ? `function OptionStat({ value, label }) {
 }
 
 ` : ''}const columns = [
-  { accessorKey: ${s(titleField)}, header: ${s(entity.fields.find((f) => f.key === titleField)?.label ?? titleField)} },
-  { accessorKey: 'created_at', header: 'Creado', cell: ({ row }) => String(row.original.created_at ?? '').slice(0, 10) },
+${titleField ? `  { accessorKey: ${s(titleField)}, header: ${s(entity.fields.find((f) => f.key === titleField)?.label ?? titleField)} },\n` : ''}  { accessorKey: 'created_at', header: 'Creado', cell: ({ row }) => String(row.original.created_at ?? '').slice(0, 10) },
 ]
 
 // Tablero: indicadores + registros recientes.
@@ -235,7 +237,9 @@ export function goldenScreenFiles(definition) {
   const entity = definition?.entities?.[0]
   if (!entity) return []
   const fields = (entity.fields ?? []).filter((field) => SIMPLE_TYPES.has(field.type))
-  const titleField = (entity.fields ?? []).find((field) => field.type === 'text')?.key ?? entity.fields?.[0]?.key ?? 'id'
+  // Text column for the dashboard's recent list; never the id (falls back to
+  // the creation date only).
+  const titleField = (entity.fields ?? []).find((field) => ['text', 'email', 'phone', 'select'].includes(field.type))?.key ?? null
   const selectField = (entity.fields ?? []).find((field) => field.type === 'select' && field.options?.length)
   return [
     { path: `${EXAMPLES_DIR}/LEEME.md`, content: leeme(entity) },

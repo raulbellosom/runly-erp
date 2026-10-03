@@ -43,6 +43,10 @@ export function ConnectionSections({ targetType, targetId }) {
     queryKey: ['connections', 'records', targetType, targetId, 'detail', activeCompanyId],
     queryFn: async () => (await runly.connections.records(targetType, targetId, 'detail', token))?.data ?? [],
     enabled: Boolean(token && targetType && targetId),
+    // Connected data changes from other modules, which cannot invalidate
+    // this cache: always refetch when the screen opens.
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
   if (!sections.length) return null
 

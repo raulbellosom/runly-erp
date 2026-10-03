@@ -113,6 +113,10 @@ export function ConnectionsScreen({ targetType, title = 'Conexiones', descriptio
     queryKey,
     queryFn: async () => (await runly.connections.list(targetType, token))?.data ?? [],
     enabled: Boolean(token),
+    // Connected data changes from other modules, which cannot invalidate
+    // this cache: always refetch when the screen opens.
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
   const save = useMutation({
     mutationFn: ({ id, patch }) => runly.connections.update(id, patch, token),

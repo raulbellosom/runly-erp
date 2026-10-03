@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { resolveRecordLabel } from "./record-label.js";
 import { ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
 import { Button } from "../components/Button.jsx";
@@ -44,23 +45,6 @@ function resolveIdFromRow(row) {
   return row.id ?? row.recordId ?? row.uuid ?? row.ID ?? null;
 }
 
-function resolveRowLabel(row) {
-  if (!row || typeof row !== "object") return null;
-  return (
-    row.name ??
-    row.nombre ??
-    row.full_name ??
-    row.fullName ??
-    row.title ??
-    row.titulo ??
-    row.description ??
-    row.plate ??
-    row.placa ??
-    row.code ??
-    row.codigo ??
-    String(row.id ?? "este registro")
-  );
-}
 
 function replacePathTokens(pathTemplate, tokenMap) {
   let path = String(pathTemplate ?? "");
@@ -122,6 +106,9 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
 
   const currentFormBlueprint = formBlueprint ?? tableBlueprint;
   const currentDetailBlueprint = detailBlueprint ?? tableBlueprint;
+  // Record titles from name keys / declared title field / first text field —
+  // never the record id (record-label.js).
+  const resolveRowLabel = (row) => resolveRecordLabel(row, [currentDetailBlueprint, currentFormBlueprint, tableBlueprint]);
   const formMode = useMemo(
     () => resolveFormMode(currentFormBlueprint?.schema),
     [currentFormBlueprint],
@@ -414,7 +401,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
     );
   }
 
-  const deleteLabel = pendingDeleteRow ? resolveRowLabel(pendingDeleteRow) : "";
+  const deleteLabel = pendingDeleteRow ? (resolveRowLabel(pendingDeleteRow) ?? "este registro") : "";
 
   return (
     <div className="space-y-4">
@@ -504,9 +491,8 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                       null
                     }
                     title={
-                      recordData
-                        ? resolveRowLabel(recordData)
-                        : (currentDetailBlueprint?.schema?.title ??
+                      (recordData ? resolveRowLabel(recordData) : null)
+                        ?? (currentDetailBlueprint?.schema?.title ??
                           currentDetailBlueprint?.title ??
                           "Detalle")
                     }
@@ -541,7 +527,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
                   currentFormBlueprint?.title ??
                   null
                 }
-                title={recordData ? resolveRowLabel(recordData) : "Editar registro"}
+                title={(recordData ? resolveRowLabel(recordData) : null) ?? "Editar registro"}
                 actions={
                   <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" size="sm" onClick={goToList}>

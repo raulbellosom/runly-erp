@@ -20,6 +20,10 @@ export function useConnectionForm({ targetType, targetId = null }) {
     queryKey: ['connections', 'records', targetType, targetId ?? 'new', 'form', activeCompanyId],
     queryFn: async () => (await runly.connections.records(targetType, targetId ?? '00000000-0000-7000-8000-000000000000', 'form', token))?.data ?? [],
     enabled: Boolean(token && targetType),
+    // Connected data changes from other modules, which cannot invalidate
+    // this cache: always refetch when the screen opens.
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
   // A new record has no connected rows: every section starts empty.
   const sections = useMemo(
