@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BarChart3, ClipboardList, ContactRound, History, Pencil, ReceiptText } from 'lucide-react'
-import { Button, EmptyState, ErrorState, LoadingState, PageHeader, StatStrip } from '@runly/ui'
+import { Button, EmptyState, ErrorState, PageHeader, StatStrip, DetailSkeleton } from '@runly/ui'
 import { usePurchasesCan, useSupplier } from '../hooks/usePurchases.js'
 import { usePurchaseRoute } from '../hooks/usePurchaseRoute.js'
 import { HERO_GRADIENT, KINDS, ROOT, TONES, kindOf } from '../lib/purchases-constants.js'
@@ -20,7 +20,7 @@ export default function PurchaseSupplierDetail() {
   const query = useSupplier(id)
   const [editing, setEditing] = useState(false)
 
-  if (query.isLoading) return <div className="min-h-dvh p-4 md:p-6"><LoadingState /></div>
+  if (query.isLoading) return <div className="min-h-dvh p-4 md:p-6"><DetailSkeleton /></div>
   if (query.isError || !query.data) return <div className="min-h-dvh p-4 md:p-6"><ErrorState title="No se pudo cargar el proveedor" onRetry={() => query.refetch()} /></div>
 
   const data = query.data

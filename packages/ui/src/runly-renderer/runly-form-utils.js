@@ -268,3 +268,19 @@ export function computePartsCost(parts) {
     parts.reduce((acc, item) => acc + Number(item?.subtotal ?? 0), 0).toFixed(2),
   );
 }
+
+// True when `values` differs from `base` in any field outside `ignore`
+// (empty string, null, undefined and [] all count as the same "empty").
+export function formValuesChanged(base, values, ignore = new Set()) {
+  const a0 = base ?? {};
+  const b0 = values ?? {};
+  const empty = (v) => v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  for (const key of new Set([...Object.keys(a0), ...Object.keys(b0)])) {
+    if (ignore.has(key)) continue;
+    const a = a0[key];
+    const b = b0[key];
+    if (a === b || (empty(a) && empty(b))) continue;
+    if (JSON.stringify(a) !== JSON.stringify(b)) return true;
+  }
+  return false;
+}

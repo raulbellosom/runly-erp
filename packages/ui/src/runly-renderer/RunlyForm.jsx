@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as LucideIcons from "lucide-react";
+import { renderFormFieldControl } from "./runly-form-field-control.jsx";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
-import { Button } from "../components/Button.jsx";
 import {
   Dialog,
   DialogContent,
@@ -10,32 +10,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/Dialog.jsx";
-import {
-  TextField,
-  TextareaField,
-  SelectField,
-  PhoneField,
-  SwitchField,
-  RelationSelectField,
-  CurrencyField,
-  CarColorPickerField,
-  FieldWrapper,
-} from "../components/FormFields.jsx";
-import { MarkdownField } from "../components/MarkdownField.jsx";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.jsx";
-import { FileAssetField } from "../components/FileAssetField.jsx";
-import { DatePickerField } from "../components/DatePickerField.jsx";
 import { FormCompletionRing } from "../components/FormCompletionRing.jsx";
 import { FormPreviewPanel } from "../components/FormPreviewPanel.jsx";
 import { ReportPartsEditor } from "./ReportPartsEditor.jsx";
 import { CostsSummaryPanel } from "./CostsSummaryPanel.jsx";
-import { DynamicFieldsSection, buildCustomFieldsPayload } from "./DynamicFieldsSection.jsx";
-import { normalizeSpanishLabel, normalizeRelationDescriptor } from "./renderer-adapters.js";
+import { DynamicFieldsSection, buildCustomFieldsPayload, seedCustomFieldValues } from "./DynamicFieldsSection.jsx";
+import { normalizeSpanishLabel } from "./renderer-adapters.js";
 import { cn } from "../lib/utils.js";
+import { FormSaveBar } from "../components/FormSaveBar.jsx";
 import { useInsideOverlay } from "../components/overlay-surface-context.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import { normalizeField, normalizeSections } from "./runly-form-schema.js";
-import { formatDisplayValue, computeCompletion, computePreviewModel } from "./runly-form-preview.js";
+import { computeCompletion, computePreviewModel } from "./runly-form-preview.js";
 import { fetchFirstImageAssetId, fetchSignedUrl } from "./runly-detail-hero.jsx";
 import { firstTabWithError, resolveSchemaTabs, tabOfSection, tabsWithErrors } from "./schema-tabs.js";
 import { isElementVisible, matchesVisibilityRule, visibleSections } from "./visibility-rules.js";
@@ -43,10 +30,7 @@ import { SchemaTabBar } from "./SchemaTabBar.jsx";
 import { FieldPinButton, pinStateFor } from "./FieldPinButton.jsx";
 import { useRunlyFormRelations } from "./useRunlyFormRelations.js";
 import {
-  CAR_COLORS,
-  resolveColorName,
   joinUrl,
-  normalizeOptions,
   buildInitialValues,
   castValueByType,
   resolveRecordId,
@@ -54,6 +38,7 @@ import {
   toMoney,
   normalizeReportParts,
   computePartsCost,
+  formValuesChanged,
 } from "./runly-form-utils.js";
 
 const MAIN_SECTION_TYPES = new Set(["fields", "parts", "attachments", "custom-fields", "component"]);
@@ -98,6 +83,8 @@ function buildResetInitialDataToken(initialData, mode) {
     return "create:non-serializable";
   }
 }
+
+const DERIVED_FIELDS = new Set(["parts_cost", "total_cost"]);
 
 export function RunlyForm({
   blueprint,
@@ -202,6 +189,14 @@ export function RunlyForm({
   });
   const attachmentsControllersRef = useRef(new Map());
   const formValuesRef = useRef(formValues);
+  // Dirty tracking for the save bar: values as of the last reset, plus a flag
+  // set by user edits (derived cost totals never mark the form dirty).
+  const baselineRef = useRef(formValues);
+  const baselinePartsRef = useRef(null);
+  const [touched, setTouched] = useState(false);
+  // Files queued for upload per attachments section (create forms): they
+  // only save with the record, so they count as unsaved changes.
+  const [pendingAttachments, setPendingAttachments] = useState({});
   const fieldMapRef = useRef(fieldMap);
   const initialDataRef = useRef(initialData);
   const sectionsRef = useRef(sections);
@@ -258,8 +253,14 @@ export function RunlyForm({
     const fm = fieldMapRef.current;
     const id = initialDataRef.current;
     const sc = sectionsRef.current;
-    setFormValues(buildInitialValues(fm, id));
-    setReportParts(normalizeReportParts(id?.parts));
+    // Custom field values of the record join the flat form values.
+    const nextValues = seedCustomFieldValues(buildInitialValues(fm, id), sc, id);
+    baselineRef.current = nextValues;
+    setTouched(false);
+    setFormValues(nextValues);
+    const nextParts = normalizeReportParts(id?.parts);
+    baselinePartsRef.current = JSON.stringify(nextParts);
+    setReportParts(nextParts);
     setFieldErrors({});
     setRelationInlineErrors({});
     setSubmitError("");
@@ -291,6 +292,16 @@ export function RunlyForm({
 
   const recordId = resolvedRecordId;
   const isEditMode = mode === "edit";
+
+  // Edited and actually different from the last reset/save (reverting every
+  // change hides the save bar again). Derived cost totals are ignored.
+  const hasPendingAttachments = Object.values(pendingAttachments).some((count) => count > 0);
+  const isDirty = useMemo(() => {
+    if (hasPendingAttachments) return true;
+    if (!touched) return false;
+    if (baselinePartsRef.current !== null && JSON.stringify(reportParts) !== baselinePartsRef.current) return true;
+    return formValuesChanged(baselineRef.current, formValues, DERIVED_FIELDS);
+  }, [touched, formValues, reportParts, hasPendingAttachments]);
 
   const registerAttachmentsController = useCallback((sectionId, controller) => {
     if (!sectionId) return;
@@ -334,12 +345,14 @@ export function RunlyForm({
   }, []);
 
   const handleChange = (name, value) => {
+    setTouched(true);
     setFormValues((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => ({ ...prev, [name]: "" }));
     clearRelationInlineError(name);
   };
 
   const handlePartsChange = useCallback((nextParts) => {
+    setTouched(true);
     setReportParts(Array.isArray(nextParts) ? nextParts : []);
     setFieldErrors((prev) => ({ ...prev, parts: "" }));
   }, []);
@@ -421,12 +434,13 @@ export function RunlyForm({
     const customFieldsSection = sections.find((section) => section.type === "custom-fields");
     if (customFieldsSection) {
       const defs = customFieldDefs[customFieldsSection.id] ?? [];
-      const customValues = buildCustomFieldsPayload(
+      const { customValues, removedCustomFieldIds } = buildCustomFieldsPayload(
         formValues,
         defs,
         customFieldsSection.customFields?.valuePrefix,
       );
       if (customValues.length > 0) payload.customValues = customValues;
+      if (removedCustomFieldIds.length > 0) payload.removedCustomFieldIds = removedCustomFieldIds;
     }
     setSubmitting(true);
     try {
@@ -472,6 +486,8 @@ export function RunlyForm({
           ? { ...result, attachments: attachmentSync }
           : { data: result, attachments: attachmentSync };
 
+      baselineRef.current = formValuesRef.current;
+      setTouched(false);
       onSuccess?.(nextResult);
     } catch (err) {
       const message =
@@ -485,297 +501,8 @@ export function RunlyForm({
     }
   };
 
-  const renderFieldControl = (field) => {
-    const value = formValues[field.name];
-    const sharedProps = {
-      label: field.label,
-      required: field.required,
-      hint: field.hint ?? undefined,
-      error: fieldErrors[field.name],
-    };
-
-    if (field.readonly) {
-      const displayValue = formatDisplayValue(field, value) ?? "—";
-      return (
-        <div className="space-y-1.5">
-          <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-            {field.label}
-          </p>
-          <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 px-3 py-2 text-sm">
-            {displayValue}
-          </div>
-        </div>
-      );
-    }
-
-    if (field.type === "file" && field.file) {
-      return (
-        <FileAssetField
-          {...sharedProps}
-          {...field.file}
-          fieldName={field.name}
-          value={value ?? null}
-          onChange={(next) => handleChange(field.name, next)}
-          apiBaseUrl={apiBaseUrl}
-          token={token}
-          companyId={companyId}
-        />
-      );
-    }
-
-    switch (field.type) {
-      case "textarea":
-        return (
-          <TextareaField
-            {...sharedProps}
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-
-      case "markdown":
-        return (
-          <MarkdownField
-            {...sharedProps}
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e?.target?.value ?? "")}
-          />
-        );
-
-      case "select": {
-        const options = normalizeOptions(field.options);
-        return (
-          <SelectField
-            {...sharedProps}
-            value={value ?? ""}
-            options={options}
-            onValueChange={(val) => handleChange(field.name, val)}
-          />
-        );
-      }
-
-      case "boolean":
-        return (
-          <SwitchField
-            {...sharedProps}
-            checked={Boolean(value)}
-            onChange={(checked) => handleChange(field.name, Boolean(checked))}
-          />
-        );
-
-      case "phone":
-        return (
-          <PhoneField
-            {...sharedProps}
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-
-      case "number":
-        return (
-          <TextField
-            {...sharedProps}
-            type="number"
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-
-      case "decimal":
-        return (
-          <TextField
-            {...sharedProps}
-            type="number"
-            step="0.0001"
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-
-      case "currency":
-        return (
-          <CurrencyField
-            {...sharedProps}
-            value={value ?? 0}
-            onChange={(val) => handleChange(field.name, val)}
-            currency={field.currency ?? "MXN"}
-            locale={field.locale ?? "es-MX"}
-            allowNegative={field.allowNegative ?? false}
-          />
-        );
-
-      case "date":
-        return (
-          <DatePickerField
-            {...sharedProps}
-            value={value ?? ""}
-            onChange={(val) => handleChange(field.name, val ?? "")}
-          />
-        );
-
-      case "datetime":
-        return (
-          <TextField
-            {...sharedProps}
-            type="datetime-local"
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-
-      case "email":
-        return (
-          <TextField
-            {...sharedProps}
-            type="email"
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-
-      case "color": {
-        // Normalize legacy hex values to color names on first render
-        const colorValue =
-          value && String(value).startsWith("#")
-            ? (resolveColorName(String(value)) ?? value)
-            : value;
-        return (
-          <CarColorPickerField
-            key={field.name}
-            id={field.name}
-            label={field.label}
-            required={field.required}
-            hint={field.hint ?? undefined}
-            value={colorValue || ""}
-            onChange={(name) => handleChange(field.name, name || "")}
-            colors={CAR_COLORS}
-            clearable
-            error={fieldErrors[field.name]}
-          />
-        );
-      }
-
-      // hex-color: native browser color picker — stores a #rrggbb hex string.
-      // Use this instead of "color" when a vehicle palette is not appropriate.
-      case "hex-color": {
-        const hexValue =
-          value && String(value).startsWith("#") ? String(value) : "#000000";
-        return (
-          <FieldWrapper
-            label={field.label}
-            labelFor={field.name}
-            required={field.required}
-            hint={field.hint ?? undefined}
-            error={fieldErrors[field.name]}
-          >
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                id={field.name}
-                value={hexValue}
-                onChange={(e) => handleChange(field.name, e.target.value)}
-                className="h-10 w-16 rounded-lg border border-[hsl(var(--border))] bg-transparent cursor-pointer p-0.5"
-              />
-              <span className="text-sm font-mono text-[hsl(var(--muted-foreground))]">
-                {hexValue}
-              </span>
-            </div>
-          </FieldWrapper>
-        );
-      }
-
-      case "relation": {
-        const descriptor = normalizeRelationDescriptor(field);
-        const relationError =
-          fieldErrors[field.name] || relationInlineErrors[field.name] || "";
-        if (!descriptor) {
-          return (
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                {field.label}
-                {field.required ? " *" : ""}
-              </p>
-              <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
-                Relación no configurada
-              </div>
-              {relationError && (
-                <p className="text-xs text-[hsl(var(--destructive))]">
-                  {relationError}
-                </p>
-              )}
-            </div>
-          );
-        }
-        const rs = relationState[field.name] ?? {
-          options: [],
-          loading: false,
-          error: null,
-        };
-        const loadedOpts =
-          descriptor.source === "static" ? descriptor.options : rs.options;
-        // The saved value may not be in the first page of options (or come
-        // from another module): show its label from the record's
-        // <field>__label instead of an empty picker.
-        const savedLabel = initialData?.[`${field.name}__label`];
-        const staticOpts =
-          value && savedLabel && !loadedOpts.some((option) => String(option.value) === String(value))
-            ? [{ value: String(value), label: String(savedLabel) }, ...loadedOpts]
-            : loadedOpts;
-        const createActionLabel =
-          descriptor.create?.label ?? normalizeSpanishLabel("Crear nuevo");
-        const canInlineCreate =
-          Boolean(descriptor.create?.enabled) &&
-          allowInlineCreate &&
-          inlineCreateDepth < 2;
-        return (
-          <RelationSelectField
-            {...sharedProps}
-            error={relationError}
-            value={value ?? null}
-            options={staticOpts}
-            loading={descriptor.source === "remote" ? rs.loading : false}
-            loadError={descriptor.source === "remote" ? rs.error : null}
-            clearable={descriptor.clearable}
-            onRetry={() => loadRelationOptions(field.name, descriptor, "")}
-            onSearchChange={(search) =>
-              handleRelationSearch(field.name, descriptor, search)
-            }
-            onChange={(val) => handleChange(field.name, val)}
-            createActionLabel={createActionLabel}
-            createActionMode={descriptor.create?.allowedWhen ?? "always"}
-            createFromSearch={descriptor.create?.prefillFromSearch === true}
-            isCreating={quickCreatingField === field.name}
-            createDisabled={
-              !canInlineCreate ||
-              quickCreatingField === field.name ||
-              (inlineCreateState.open &&
-                inlineCreateState.fieldName === field.name)
-            }
-            onCreate={
-              canInlineCreate
-                ? descriptor.create.mode === "quick"
-                  ? (searchText) =>
-                      handleQuickCreate(field.name, descriptor, searchText)
-                  : (searchText) =>
-                      openInlineCreate(field.name, descriptor, searchText)
-                : undefined
-            }
-          />
-        );
-      }
-
-      default:
-        return (
-          <TextField
-            {...sharedProps}
-            type="text"
-            value={value ?? ""}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-          />
-        );
-    }
-  };
+  const renderFieldControl = (field) =>
+    renderFormFieldControl(field, { formValues, fieldErrors, handleChange, apiBaseUrl, token, companyId, relationState, relationInlineErrors, initialData, allowInlineCreate, inlineCreateDepth, quickCreatingField, inlineCreateState, loadRelationOptions, handleRelationSearch, handleQuickCreate, openInlineCreate });
 
   const mainSections = shownSections.filter(
     (section) =>
@@ -864,6 +591,9 @@ export function RunlyForm({
               registerAttachmentsController(section.id, controller)
             }
             onChange={onAttachmentsChange}
+            onPendingChange={(count) =>
+              setPendingAttachments((prev) => (prev[section.id] === count ? prev : { ...prev, [section.id]: count }))
+            }
           />
         );
       }
@@ -889,6 +619,7 @@ export function RunlyForm({
         return (
           <DynamicFieldsSection
             config={section.customFields}
+            initialEntries={initialData?.[section.customFields?.valuePrefix ?? "customValues"] ?? null}
             formValues={formValues}
             onFieldChange={handleChange}
             apiBaseUrl={apiBaseUrl}
@@ -923,6 +654,7 @@ export function RunlyForm({
             value={sectionValue}
             errors={sectionErrors}
             onChange={(patch) => {
+              setTouched(true);
               setFormValues((prev) => ({ ...prev, ...patch }));
               setFieldErrors((prev) => {
                 const next = { ...prev };
@@ -1029,7 +761,7 @@ export function RunlyForm({
         if (!cancelled) setPreviewImageUrl(null);
         return;
       }
-      const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId);
+      const url = await fetchSignedUrl(apiBaseUrl, token, assetId, companyId, undefined, "preview");
       if (!cancelled) setPreviewImageUrl(url);
     }
     loadPreviewImage();
@@ -1058,6 +790,7 @@ export function RunlyForm({
   return (
     <form id={id} className="space-y-6" onSubmit={handleSubmit}>
       {renderTools?.({ values: formValues, disabled: submitting, patchValues: (patch) => {
+        setTouched(true);
         setFormValues((prev) => ({ ...prev, ...patch }));
         setFieldErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !(key in patch))));
       } })}
@@ -1179,33 +912,14 @@ export function RunlyForm({
       </Dialog>
 
       {showFooter && (
-        <div
-          className={cn(
-            "sticky bottom-0 z-10 flex items-center justify-between gap-2",
-            // Inside a Dialog/Sheet the overlay is already the surface:
-            // keep only the buttons, no card behind them.
-            // On a full page it floats over scrolling content, so it gets the
-            // real glass surface (translucent + blur), not the solid card.
-            insideOverlay ? "pt-3" : "glass-strong rounded-xl px-4 py-3",
-          )}
-        >
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">
-            {submitting ? "Guardando..." : ""}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onCancel?.()}
-              disabled={submitting}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" loading={submitting} disabled={submitting}>
-              {submitting ? "Guardando..." : submitLabel}
-            </Button>
-          </div>
-        </div>
+        <FormSaveBar
+          floating={!insideOverlay}
+          dirty={isDirty}
+          submitting={submitting}
+          forceVisible={Boolean(submitError)}
+          submitLabel={submitLabel}
+          onCancel={() => onCancel?.()}
+        />
       )}
     </form>
   );

@@ -270,6 +270,9 @@ export function useAttachmentsController({
   readOnly = false,
   onChange,
   onError,
+  // (count) => void: called when the number of files queued for upload
+  // (not yet associated, e.g. on a create form) changes.
+  onPendingChange,
   // Pre-populated file list from a parallel query. Must be stable at mount time;
   // updates after mount are ignored (controller has already fetched or is fetching).
   prefetchedData,
@@ -284,6 +287,9 @@ export function useAttachmentsController({
   const [pendingItems, setPendingItems] = useState([]);
   const pendingItemsRef = useRef(pendingItems);
   useEffect(() => { pendingItemsRef.current = pendingItems; }, [pendingItems]);
+  const onPendingChangeRef = useRef(onPendingChange);
+  useLayoutEffect(() => { onPendingChangeRef.current = onPendingChange; }, [onPendingChange]);
+  useEffect(() => { onPendingChangeRef.current?.(pendingItems.length); }, [pendingItems.length]);
   const onErrorRef = useRef(onError);
   const onChangeRef = useRef(onChange);
   useLayoutEffect(() => {

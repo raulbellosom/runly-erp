@@ -54,10 +54,10 @@ export const INVENTORY_ITEM_FORM = {
         icon: 'IdCard',
         collapsible: true,
         fields: [
-          { field: 'name', label: 'Nombre', type: 'text', hint: 'Opcional. Si lo dejas vacío se genera con la marca y el modelo (p. ej. «Dell XPS 15»).' },
-          { field: 'assetTag', label: 'Etiqueta de activo', type: 'text', hint: 'Dejar vacío para auto-generar', hiddenWhen: { field: '__multi', truthy: true } },
-          { field: 'serialNumber', label: 'Número de serie', type: 'text', hiddenWhen: { field: '__multi', truthy: true } },
-          { field: 'partNumber', label: 'Número de parte', type: 'text' },
+          { field: 'name', label: 'Nombre', type: 'text', icon: 'Package', hint: 'Opcional. Si lo dejas vacío se genera con la marca y el modelo (p. ej. «Dell XPS 15»).' },
+          { field: 'assetTag', label: 'Número de activo', type: 'text', icon: 'Hash', hint: 'Dejar vacío para auto-generar', hiddenWhen: { field: '__multi', truthy: true } },
+          { field: 'serialNumber', label: 'Número de serie', type: 'text', icon: 'Barcode', hiddenWhen: { field: '__multi', truthy: true } },
+          { field: 'partNumber', label: 'Número de parte', type: 'text', icon: 'ScanLine' },
         ],
       },
       {
@@ -69,6 +69,7 @@ export const INVENTORY_ITEM_FORM = {
             field: 'locationId',
             label: 'Ubicación',
             type: 'relation',
+            icon: 'MapPin',
             relation: {
               apiPath: '/inventory/locations',
               labelField: 'name',
@@ -83,11 +84,12 @@ export const INVENTORY_ITEM_FORM = {
               },
             },
           },
-          { field: 'status', label: 'Disponibilidad', type: 'select', required: true, options: STATUS_OPTIONS },
+          { field: 'status', label: 'Disponibilidad', type: 'select', icon: 'CircleDot', required: true, options: STATUS_OPTIONS },
           {
             field: 'conditionId',
             label: 'Condición',
             type: 'relation',
+            icon: 'Activity',
             relation: {
               apiPath: '/inventory/conditions',
               labelField: 'name',
@@ -104,7 +106,7 @@ export const INVENTORY_ITEM_FORM = {
           },
           // Create only (removed by buildItemFormBlueprint on edit): later
           // changes go through the alta/baja actions in the item detail.
-          { field: 'adminStatus', label: 'Estado inicial', type: 'select', options: ADMIN_START_OPTIONS, hint: 'Pendiente de alta: el activo no se puede asignar hasta que alguien con permiso confirme su alta.' },
+          { field: 'adminStatus', label: 'Estado inicial', type: 'select', icon: 'ClipboardCheck', options: ADMIN_START_OPTIONS, hint: 'Pendiente de alta: el activo no se puede asignar hasta que alguien con permiso confirme su alta.' },
         ],
       },
       {
@@ -117,6 +119,7 @@ export const INVENTORY_ITEM_FORM = {
             field: 'acquisitionOrigin',
             label: 'Origen',
             type: 'select',
+            icon: 'Receipt',
             options: ACQUISITION_ORIGIN_OPTIONS,
             hint: 'Las órdenes, facturas y montos de compra se registran en Compras y se relacionan desde la ficha del activo.',
           },
@@ -132,10 +135,10 @@ export const INVENTORY_ITEM_FORM = {
         defaultCollapsed: true,
         description: 'Datos capturados antes de Compras. Los nuevos datos comerciales se administran desde Compras.',
         fields: [
-          { field: 'purchaseDate', label: 'Fecha de compra', type: 'date' },
-          { field: 'purchasePrice', label: 'Precio de compra', type: 'currency', currency: 'USD', locale: 'es-PE' },
-          { field: 'vendorName', label: 'Proveedor', type: 'text' },
-          { field: 'invoiceNumber', label: 'Número de factura', type: 'text' },
+          { field: 'purchaseDate', label: 'Fecha de compra', type: 'date', icon: 'CalendarDays' },
+          { field: 'purchasePrice', label: 'Precio de compra', type: 'currency', icon: 'Tag', currency: 'USD', locale: 'es-PE' },
+          { field: 'vendorName', label: 'Proveedor', type: 'text', icon: 'Building2' },
+          { field: 'invoiceNumber', label: 'Número de factura', type: 'text', icon: 'FileText' },
         ],
       },
       {
@@ -144,7 +147,7 @@ export const INVENTORY_ITEM_FORM = {
         collapsible: true,
         defaultCollapsed: true,
         fields: [
-          { field: 'warrantyExpiry', label: 'Vencimiento de garantía', type: 'date' },
+          { field: 'warrantyExpiry', label: 'Vencimiento de garantía', type: 'date', icon: 'ShieldCheck' },
           { field: 'warrantyNotes', label: 'Notas de garantía', type: 'markdown' },
         ],
       },
@@ -156,6 +159,7 @@ export const INVENTORY_ITEM_FORM = {
         collapsible: true,
         customFields: {
           apiPath: '/inventory/custom-fields',
+          createPath: '/inventory/custom-fields',
           categoryField: 'categoryId',
           valuePrefix: 'customValues',
           manageUrl: '/app/m/runly.inventory/inventory/catalogs?tab=custom-fields',

@@ -4,7 +4,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Lock, Save, Send } from 'lucide-react'
-import { AttachmentsPanel, Button, EmptyState, ErrorState, LoadingState, PageHeader, TextareaField } from '@runly/ui'
+import { AttachmentsPanel, Button, EmptyState, ErrorState, PageHeader, TextareaField, FormSkeleton } from '@runly/ui'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
@@ -127,7 +127,7 @@ export default function PurchaseDocumentEditor() {
   const backTo = isEdit ? `${ROOT}/${kind}/${id}` : `${ROOT}/${kind}`
   const shell = (node) => <div className="min-h-dvh p-4 md:p-6">{node}</div>
 
-  if (caps.isLoading || (isEdit && existing.isLoading) || (orderId && sourceOrder.isLoading)) return shell(<LoadingState />)
+  if (caps.isLoading || (isEdit && existing.isLoading) || (orderId && sourceOrder.isLoading)) return shell(<FormSkeleton sections={3} />)
   if (!caps.has(meta.capability)) {
     return shell(<EmptyState icon={meta.icon} title="Esta etapa no está activa" description="Tu flujo de compras no usa este tipo de documento." />)
   }

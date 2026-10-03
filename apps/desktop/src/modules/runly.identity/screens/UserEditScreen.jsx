@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   RunlyForm,
   PageHeader,
-  LoadingState,
   ErrorState,
   Button,
   Card,
@@ -17,6 +16,7 @@ import {
   ConfirmDialog,
   SelectField,
   SwitchField,
+  FormSkeleton,
 } from "@runly/ui";
 import { Camera, Eye, KeyRound, Send, Shield } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -136,7 +136,7 @@ export default function UserEditScreen() {
     onError: (err) => toast.error(err?.message || "No se pudo enviar el enlace"),
   });
 
-  if (userQuery.isLoading) return <LoadingState message="Cargando usuario..." />;
+  if (userQuery.isLoading) return <div className="p-4 md:p-6"><FormSkeleton sections={3} /></div>;
   if (userQuery.isError) return <ErrorState title="No se pudo cargar el usuario" />;
   if (!canSubmit) {
     return (

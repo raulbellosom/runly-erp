@@ -36,7 +36,7 @@ const COLUMNS = [
   { id: 'result', header: 'Resultado', accessorFn: (r) => RESULT[r.status].label,
     cell: ({ row }) => <Badge variant={RESULT[row.original.status].variant}>{RESULT[row.original.status].label}</Badge> },
   { id: 'item', header: 'Activo', accessorFn: (r) => r.data?.name ?? '', cell: ({ row }) => <ItemCell data={row.original.data} /> },
-  { id: 'ids', header: 'Serie / etiqueta', accessorFn: (r) => r.data?.serialNumber || r.data?.assetTag || '',
+  { id: 'ids', header: 'Serie / N.º de activo', accessorFn: (r) => r.data?.serialNumber || r.data?.assetTag || '',
     cell: ({ row }) => <span className="text-xs">{[row.original.data.serialNumber, row.original.data.assetTag].filter(Boolean).join(' · ') || '—'}</span> },
   { id: 'photos', header: 'Fotos', accessorFn: (r) => r.photoCount,
     cell: ({ row }) => row.original.photoCount ? <span className="inline-flex items-center gap-1 text-xs"><ImageIcon className="h-3.5 w-3.5" />{row.original.photoCount}</span> : <span className="text-xs text-[hsl(var(--muted-foreground))]">—</span> },

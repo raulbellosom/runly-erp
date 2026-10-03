@@ -9,7 +9,7 @@ const getRowId = unit => unit.id
 function IdentifierCell({ row, column }) {
   const { busy, updateUnit } = useContext(CaptureContext)
   const field = column.id
-  return <Input aria-label={`${field === 'serialNumber' ? 'Serie' : 'Etiqueta'} del equipo ${row.index + 1}`}
+  return <Input aria-label={`${field === 'serialNumber' ? 'Serie' : 'Número de activo'} del equipo ${row.index + 1}`}
     placeholder={field === 'assetTag' ? 'Automática' : ''} value={row.original[field]} disabled={busy}
     onChange={event => updateUnit(row.original.id, { [field]: event.target.value })} />
 }
@@ -35,7 +35,7 @@ function RemoveCell({ row }) {
 // Stable cell component identities keep an edited input mounted on each keystroke.
 const COLUMNS = [
   { header: 'Serie', accessorKey: 'serialNumber', cell: IdentifierCell, enableSorting: false },
-  { header: 'Etiqueta interna', accessorKey: 'assetTag', cell: IdentifierCell, enableSorting: false },
+  { header: 'Número de activo', accessorKey: 'assetTag', cell: IdentifierCell, enableSorting: false },
   { header: 'Revisión', id: 'confirmation', cell: ConfirmationCell },
   { header: 'Fotos', id: 'photos', cell: PhotosCell },
   { header: '', id: 'remove', cell: RemoveCell },
@@ -58,7 +58,7 @@ function MobileUnitCard({ unit, index }) {
         onChange={event => updateUnit(unit.id, { serialNumber: event.target.value })} />
     </div>
     <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground" htmlFor={`capture-tag-${unit.id}`}>Etiqueta interna</label>
+      <label className="text-xs font-medium text-muted-foreground" htmlFor={`capture-tag-${unit.id}`}>Número de activo</label>
       <Input id={`capture-tag-${unit.id}`} placeholder="Automática" value={unit.assetTag} disabled={busy}
         onChange={event => updateUnit(unit.id, { assetTag: event.target.value })} />
     </div>

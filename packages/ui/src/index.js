@@ -16,10 +16,11 @@ export {
 export { Badge, badgeVariants } from "./components/Badge.jsx";
 export { TypeBadge } from "./components/TypeBadge.jsx";
 export { Separator } from "./components/Separator.jsx";
-export { Skeleton } from "./components/Skeleton.jsx";
+export { Skeleton, FormSkeleton, DetailSkeleton } from "./components/Skeleton.jsx";
 export { ProgressBar } from "./components/ProgressBar.jsx";
 export { LoadingState } from "./components/LoadingState.jsx";
 export { Avatar, AvatarImage, AvatarFallback } from "./components/Avatar.jsx";
+export { PersonAvatar, personInitials } from "./components/PersonAvatar.jsx";
 export { AuthAtmosphere } from "./components/AuthAtmosphere.jsx";
 
 // Forms
@@ -305,6 +306,8 @@ export { useSwipeToReply, createSwipeController } from "./hooks/useSwipeToReply.
 
 // runly.activity
 export { ActivityTimeline } from "./components/ActivityTimeline.jsx";
+export { AuditTrail } from "./components/AuditTrail.jsx";
+export { FormSaveBar } from "./components/FormSaveBar.jsx";
 export { ActivityDrawer } from "./components/ActivityDrawer.jsx";
 export { ActivityBellTrigger } from "./components/ActivityBellTrigger.jsx";
 

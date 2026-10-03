@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CreatableComboboxField } from '@runly/ui'
+import { Boxes } from 'lucide-react'
 import { useInventoryModels, modelLabel } from '../hooks/useInventoryModels.js'
 import { InventoryBrandPicker, InventoryTypePicker } from './InventoryCatalogPickers.jsx'
 import { InventoryModelDialog } from './InventoryModelDialog.jsx'
@@ -38,6 +39,7 @@ export function InventoryItemClassification({ value, onChange, errors = {}, disa
         {renderPin?.(['modelId', 'model'], 'Modelo')}
         <CreatableComboboxField
           label="Modelo"
+          icon={Boxes}
           value={selected}
           options={options}
           error={errors.modelId || errors.model}

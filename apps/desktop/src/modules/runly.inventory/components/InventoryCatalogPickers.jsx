@@ -1,4 +1,5 @@
 import { CreatableComboboxField } from '@runly/ui'
+import { Layers, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   useInventoryBrands, useCreateInventoryBrand, useInventoryCategories, useCreateInventoryCategory,
@@ -23,7 +24,7 @@ export function typeOptions(types) {
   }))
 }
 
-export function InventoryTypePicker({ value, onChange, error, required, label = 'Tipo' }) {
+export function InventoryTypePicker({ value, onChange, error, required, label = 'Tipo', icon = Layers }) {
   const types = useTypeRows()
   const createType = useCreateInventoryCategory()
   async function handleCreate(name) {
@@ -35,13 +36,13 @@ export function InventoryTypePicker({ value, onChange, error, required, label = 
     } catch (err) { toast.error(err?.message || 'No se pudo crear el tipo.') }
   }
   return (
-    <CreatableComboboxField label={label} required={required} error={error} value={value ?? ''} options={typeOptions(types)}
+    <CreatableComboboxField label={label} icon={icon} required={required} error={error} value={value ?? ''} options={typeOptions(types)}
       onChange={onChange} onCreate={handleCreate} isCreating={createType.isPending}
       placeholder="Buscar o crear..." searchPlaceholder="Buscar tipo..." />
   )
 }
 
-export function InventoryBrandPicker({ value, onChange, error, required, label = 'Marca' }) {
+export function InventoryBrandPicker({ value, onChange, error, required, label = 'Marca', icon = Tag }) {
   const brands = useBrandRows()
   const createBrand = useCreateInventoryBrand()
   async function handleCreate(name) {
@@ -53,7 +54,7 @@ export function InventoryBrandPicker({ value, onChange, error, required, label =
     } catch (err) { toast.error(err?.message || 'No se pudo crear la marca.') }
   }
   return (
-    <CreatableComboboxField label={label} required={required} error={error} value={value ?? ''}
+    <CreatableComboboxField label={label} icon={icon} required={required} error={error} value={value ?? ''}
       options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
       onChange={onChange} onCreate={handleCreate} isCreating={createBrand.isPending}
       placeholder="Buscar o crear..." searchPlaceholder="Buscar marca..." />

@@ -571,6 +571,7 @@ export function AttachmentsPanel({
   className = "",
   onError,
   onChange,
+  onPendingChange,
   onControllerReady,
   canRemoveItem = () => true,
   prefetchedData,
@@ -586,6 +587,7 @@ export function AttachmentsPanel({
     readOnly,
     onError,
     onChange,
+    onPendingChange,
     prefetchedData,
   });
 

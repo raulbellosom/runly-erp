@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ActivityTimeline, AttachmentsPanel, EmptyState, ErrorState, LoadingState, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from '@runly/ui'
+import { AuditTrail, AttachmentsPanel, EmptyState, ErrorState, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger, DetailSkeleton } from '@runly/ui'
 import { FileX } from 'lucide-react'
 import { useAuth } from '../../../auth/AuthProvider.jsx'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider.jsx'
@@ -59,7 +59,7 @@ export default function PurchaseDocumentDetail() {
 
   const actions = useMemo(() => getDocumentActions(kind, doc, { has: caps.has, can }), [kind, doc, caps.has, can])
   const shell = (node) => <div className="min-h-dvh p-4 md:p-6">{node}</div>
-  if (query.isLoading || caps.isLoading) return shell(<LoadingState />)
+  if (query.isLoading || caps.isLoading) return shell(<DetailSkeleton kpis={4} mainCards={2} asideCards={1} />)
   if (query.isError) {
     return shell(query.error?.status === 404
       ? <EmptyState icon={FileX} title={`${meta.short} no encontrada`} description="Puede que se haya eliminado o pertenezca a otra empresa." />
@@ -130,8 +130,8 @@ export default function PurchaseDocumentDetail() {
           </TabsContent>
         ) : null}
         <TabsContent value="activity">
-          <ActivityTimeline sdk={runly} token={session?.access_token} entityType={meta.entityType} entityId={doc.id} limit={50}
-            heightClass="max-h-[520px]" emptyMessage="Sin actividad registrada para este documento." />
+          <AuditTrail apiBaseUrl={getApiUrl()} token={session?.access_token} companyId={activeCompanyId} entityType={meta.entityType} entityId={doc.id}
+            limit={15} emptyMessage="Sin actividad registrada para este documento." />
         </TabsContent>
       </Tabs>
 

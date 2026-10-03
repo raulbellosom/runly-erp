@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PageHeader, LoadingState, ErrorState, Button, ConfirmDialog } from '@runly/ui'
+import { PageHeader, ErrorState, Button, ConfirmDialog, FormSkeleton } from '@runly/ui'
 import { Eye, ShieldBan } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -58,7 +58,7 @@ export default function HrEmployeeForm({ employeeId }) {
   })
 
   if (isEdit && employeeQuery.isLoading) {
-    return <LoadingState message="Cargando colaborador..." />
+    return <div className="p-4 md:p-6"><FormSkeleton sections={4} /></div>
   }
   if (isEdit && employeeQuery.isError) {
     return <ErrorState message="No se pudo cargar el colaborador" />

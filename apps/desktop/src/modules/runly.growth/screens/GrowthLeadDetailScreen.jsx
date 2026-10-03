@@ -12,10 +12,10 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorState,
-  LoadingState,
   PageHeader,
   SelectField,
   TextareaField,
+  DetailSkeleton,
 } from "@runly/ui";
 import {
   ArrowLeft,
@@ -267,7 +267,7 @@ export default function GrowthLeadDetailScreen() {
   if (isLeadLoading) {
     return (
       <div className="p-4 md:p-6">
-        <LoadingState />
+        <DetailSkeleton />
       </div>
     );
   }

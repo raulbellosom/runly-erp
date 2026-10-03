@@ -474,6 +474,11 @@ For the visual identity rules (glass tiers, radius/z-index scales, brand-token u
 | `SectionCard` | Glass `Card` with a `title` (+ optional `description`, `action` slot) header and a body. Standardises the "titled card" pattern; `variant` passes through to `Card`. |
 | `ImportStepIndicator` | Multi-step wizard rail. `steps` (`{ key, label, icon }[]`), `current` (active step key). Vertical rail on desktop (`sm:` and up), compact icon-only horizontal strip on mobile — keeps wizard chrome from eating width from step content like a review table. |
 | `Avatar`, `AvatarImage`, `AvatarFallback` | User avatar with fallback initials |
+| `DetailSkeleton`, `FormSkeleton` | Page-level loading placeholders shaped like a record detail (hero + KPIs + two columns) or a sectioned form. Use instead of `LoadingState` while a detail/form screen loads its record |
+| `FormSaveBar` | Universal save/cancel bar for forms (RunlyForm uses it). `floating` (full page): sticky glass bar on phones; on `lg+` a bottom-right pill that slides in only while `dirty`/`submitting`/`forceVisible`. `floating={false}` inside Dialog/Sheet: always-visible buttons. Render inside the `<form>` |
+| Field `icon` (RunlyForm/RunlyDetail) | Blueprint fields accept `icon` (any lucide name, PascalCase or kebab-case): RunlyForm shows it inside the input, RunlyDetail next to the label. Without it, RunlyForm uses a default per type (date, email, phone, number, currency, url) |
+| `AuditTrail` | Record audit trail (who changed what and when, inline field diffs, category/person filters, "Ver historial completo" Sheet). Reads `GET /activity/entity/:entityType/:entityId` (`before`/`category`/`actorId`). Blueprint detail section `type: "audit"`; generated RME3 details include it |
+| `PersonAvatar` | Person photo (`src` = an API-embedded `avatarUrl`) with a name-colored initials bubble fallback; sizes `xs`/`sm`/`md`/`lg`. Use for every user/employee/actor mention. API side: `attachUserAvatarUrls` (`apps/api/src/lib/attach-user-avatars.js`) embeds `avatarUrl` from `avatarFileId` or a linked `userProfileId` |
 
 ### Forms
 

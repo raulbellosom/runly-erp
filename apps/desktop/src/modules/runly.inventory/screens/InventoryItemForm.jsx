@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { PageHeader, LoadingState, ErrorState, Button, ConfirmDialog } from '@runly/ui'
+import { PageHeader, ErrorState, Button, ConfirmDialog, FormSkeleton } from '@runly/ui'
 import { Eye, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
@@ -79,7 +79,7 @@ export default function InventoryItemForm() {
   const deleteItem = useDeleteInventoryItem()
 
   if (isEdit && itemQuery.isLoading) {
-    return <LoadingState message="Cargando activo..." />
+    return <div className="p-4 md:p-6"><FormSkeleton sections={4} /></div>
   }
   if (isEdit && itemQuery.isError) {
     return <ErrorState message="No se pudo cargar el activo" />

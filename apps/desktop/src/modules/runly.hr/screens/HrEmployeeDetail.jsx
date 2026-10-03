@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RunlyDetail, LoadingState, ErrorState, ConfirmDialog, DetailActionBar } from '@runly/ui'
+import { RunlyDetail, ErrorState, ConfirmDialog, DetailActionBar, DetailSkeleton } from '@runly/ui'
 import { ArrowLeft, ShieldBan } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -64,7 +64,7 @@ export default function HrEmployeeDetail({ employeeId }) {
   if (employeeQuery.isLoading) {
     return (
       <div className="p-4 md:p-6">
-        <LoadingState title="Cargando colaborador" />
+        <DetailSkeleton />
       </div>
     )
   }

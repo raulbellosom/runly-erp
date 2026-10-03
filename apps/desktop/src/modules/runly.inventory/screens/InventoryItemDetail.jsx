@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { RunlyDetail, LoadingState, ErrorState, ConfirmDialog, DetailActionBar, Button } from '@runly/ui'
+import { RunlyDetail, ErrorState, ConfirmDialog, DetailActionBar, Button, DetailSkeleton } from '@runly/ui'
 import { ArrowLeft, Trash2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
@@ -33,7 +33,7 @@ export default function InventoryItemDetail() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6">
-        <LoadingState />
+        <DetailSkeleton />
       </div>
     )
   }

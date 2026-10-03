@@ -19,7 +19,7 @@ export const INVENTORY_ITEM_DETAIL = {
       imageDocsPath: '/inventory/items/:id/files',
       fallbackIcon: 'Package',
       metaChips: [
-        { field: 'assetTag', label: 'Etiqueta', icon: 'Hash' },
+        { field: 'assetTag', label: 'N.º de activo', icon: 'Hash' },
         { field: 'categoryName', label: 'Tipo', icon: 'Layers' },
         { field: 'brandName', label: 'Marca', icon: 'Tag' },
         { field: 'conditionName', label: 'Condición', icon: 'Activity' },
@@ -49,7 +49,7 @@ export const INVENTORY_ITEM_DETAIL = {
         column: 'main',
         columns: 2,
         fields: [
-          { field: 'assetTag', label: 'Etiqueta de activo', icon: 'Hash' },
+          { field: 'assetTag', label: 'Número de activo', icon: 'Hash' },
           { field: 'serialNumber', label: 'Número de serie', icon: 'Hash' },
           { field: 'partNumber', label: 'Número de parte', icon: 'Hash' },
         ],
@@ -100,6 +100,15 @@ export const INVENTORY_ITEM_DETAIL = {
           { field: 'warrantyExpiry', label: 'Vencimiento de garantía', type: 'date', icon: 'CalendarDays' },
           { field: 'warrantyNotes', label: 'Notas de garantía', type: 'markdown', icon: 'FileText' },
         ],
+      },
+      {
+        id: 'custom-fields',
+        type: 'component',
+        label: 'Campos personalizados',
+        icon: 'SlidersHorizontal',
+        column: 'main',
+        visibleWhen: { field: 'hasCustomValues', truthy: true },
+        component: 'runly.inventory:CustomFieldsSection',
       },
       {
         label: 'Notas',
