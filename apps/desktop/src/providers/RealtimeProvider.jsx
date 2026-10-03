@@ -14,6 +14,7 @@ import { notificationKey, claimNotification } from '../lib/notificationDedup'
 import { trackToastHoverRead } from '../lib/toastHoverRead'
 import { getStoredWebPushSubscriptionId } from '../lib/webPush'
 import { runly } from '../lib/runly'
+import { isCommentsQuery } from '../lib/createCommentHooks'
 
 const RealtimeContext = createContext(null)
 
@@ -70,6 +71,9 @@ export function RealtimeProvider({ children }) {
       .channel(`user:${userProfile.id}:events`, { config: { private: true } })
       .on('broadcast', { event: 'notification.new' }, async ({ payload }) => {
         queryClient.invalidateQueries({ queryKey: ['notifications'] })
+        // A mention/comment notification means some thread changed; refresh
+        // any comment thread cached or on screen so its link opens fresh.
+        queryClient.invalidateQueries({ predicate: isCommentsQuery })
         dispatch('notification.new', payload)
         if (!payload?.title) return
         const isIncomingCall = payload.eventType === 'chat.call.incoming'

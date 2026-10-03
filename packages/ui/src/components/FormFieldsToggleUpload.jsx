@@ -29,7 +29,8 @@ export function CheckboxField({
       <label
         htmlFor={id}
         className={cn(
-          "flex items-start gap-3 select-none group",
+          // relative: contains the sr-only input below (see styles.css).
+          "relative flex items-start gap-3 select-none group",
           disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
         )}
       >

@@ -1,6 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+// Comment threads must never show a stale cache: other users write to them
+// and nothing invalidates this tab's cache except a notification (only the
+// mentioned/recipient user gets one). Always refetch on open/focus, and poll
+// lightly while the thread is on screen (paused in background tabs).
+export const COMMENTS_LIVE_QUERY_OPTIONS = {
+  staleTime: 0,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: true,
+  refetchInterval: 20 * 1000,
+}
+
+// Matches every comment-thread query (keys end in 'comments'), so a realtime
+// notification can refresh whichever thread is open.
+export const isCommentsQuery = (query) => query.queryKey?.[query.queryKey.length - 1] === 'comments'
+
 /**
  * Factory that returns 5 TanStack Query hooks for entity comments.
  *
@@ -19,7 +34,7 @@ export function createCommentHooks({ queryKey, sdk, useAuth }) {
       queryKey: commentsKey(entityId),
       queryFn: () => sdk.list(entityId, session?.access_token),
       enabled: Boolean(session?.access_token) && Boolean(entityId),
-      staleTime: 3 * 60 * 1000,
+      ...COMMENTS_LIVE_QUERY_OPTIONS,
       gcTime: 10 * 60 * 1000,
     })
   }

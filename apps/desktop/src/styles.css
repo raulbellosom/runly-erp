@@ -1396,3 +1396,18 @@ body {
 @media (hover: none) {
   .note-block > .note-block-grip { opacity: 0.6; }
 }
+
+/* Visually hidden form inputs (Tailwind `sr-only` = position:absolute) inside
+   the app's inner scroll containers have no positioned ancestor, so they are
+   laid out against the viewport at their deep static position: the document
+   itself grows taller than the screen and focusing the input (clicking its
+   label) scrolls the WHOLE app shell away — the "page breaks" bug after
+   ticking a checkbox. `fixed` never adds document overflow nor triggers a
+   focus scroll; the input stays visually hidden and accessible. */
+input.sr-only,
+select.sr-only,
+textarea.sr-only {
+  position: fixed;
+  top: 0;
+  left: 0;
+}
