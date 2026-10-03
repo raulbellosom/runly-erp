@@ -1745,7 +1745,8 @@ Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · P
 - [x] 3.8 `/connections` routes, `inventory.connections.manage` + Inventario > Conexiones nav, SDK `connections`. Verified: 2026-10-03 (live API: 401 without token; manifest tests: only the pre-existing atlas.growth failure)
 - [x] 3.9 Inventory: atomic save with connection sections, connected-field search, Conexiones screen, detail sections, form section. Verified: 2026-10-03 (inventory tests 160/160, lint, `pnpm build:web`)
 - [ ] Owner E2E with the fixture ZIP `custom.calibraciones-1.0.0.zip`: upload + install → Inventario > Conexiones → activate → edit an item (Calibración section) → detail shows it → search by certificate → delete flows.
-- [ ] 3.10 Rollout to contacts (hard delete → 409 restrict), hr, projects.
+- [x] Owner E2E (inventory, 2026-10-03): install of `custom.calibraciones`, Conexiones activate, connected-field search OK. Fixed from it: record titles fell back to the UUID (`resolveRecordLabel`), detail sections stale for 5 min (connection queries always refetch), Conexiones screen made collapsible.
+- [x] 3.10 Rollout: contacts (atomic save, search, hard/bulk delete → 409 via `isRestrictViolation`, verified against a real Prisma P2003), HR (atomic save, search, detail), projects (atomic save in the project modal). Shared `core-target-connections.js`, `withAfterWrite`, `ConnectedRunlyForm`, generic `ModuleConnectionsScreen`. Verified: 2026-10-03 (API services 782/783 — pre-existing sendBugReport; lint; `pnpm build:web`). Owner: "Sincronizar módulos" once so the new Conexiones menus/permissions appear.
 - [ ] 3.11 Record-context button for screens without a slot.
 - [ ] 3.12 Builder: "Conectar a un módulo del sistema" + `docs/developers/conexiones.md`.
 - Note: no hard company deletion path exists in the API today; `onCompanyRemoved` is ready for when one is added.
