@@ -83,3 +83,24 @@ export function formatRelativeTime(date, now = Date.now()) {
   if (days < 7) return `hace ${days} d`;
   return d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
 }
+
+// One-line plain preview of a value that may hold markdown: drops headings,
+// list/task markers, emphasis and link syntax, and collapses whitespace.
+export function plainPreview(text) {
+  return String(text ?? "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+(?:\[[ xX]\]\s+)?/gm, "")
+    .replace(/\[[ xX]\]\s*/g, "")
+    .replace(/(\*\*|__|\*|_|~~|`)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Long or markdown-looking text renders as markdown in the detail modal.
+export function isRichValue(value, meta = {}) {
+  if (meta?.type === "markdown" || meta?.type === "textarea" || meta?.type === "richtext") return true;
+  const str = String(value ?? "");
+  return str.includes("\n") || /(^|\s)(#{1,6}\s|[-*+]\s|\d+\.\s|\[[ xX]\]|\*\*)/.test(str);
+}

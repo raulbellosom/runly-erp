@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
-  ChevronDown,
+  ChevronRight,
   Info,
   MessageSquare,
   Paperclip,
@@ -20,8 +20,10 @@ import {
   fieldMetaFor,
   formatAuditValue,
   formatRelativeTime,
+  plainPreview,
   splitSummary,
 } from "./audit-trail-format.js";
+import { AuditEntryDialog } from "./AuditEntryDialog.jsx";
 
 // Record audit trail (spec 2026-10-03-audit-trail-design): who changed what
 // and when, with the field-level diff inline. Reads
@@ -43,7 +45,7 @@ const CATEGORY_META = {
   other: { label: "Otros", Icon: Info, cls: "text-slate-600 bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300" },
 };
 const FILTERS = ["all", "updated", "status", "assignment", "comment", "file", "created"];
-const VISIBLE_CHANGES = 3;
+const VISIBLE_CHANGES = 2;
 
 function joinUrl(base, path) {
   return `${String(base ?? "").replace(/\/+$/, "")}${path}`;
@@ -114,57 +116,58 @@ function useAuditEntries({ apiBaseUrl, token, companyId, entityType, entityId, p
 
 function ChangeRow({ change, changeLabels }) {
   const meta = fieldMetaFor(changeLabels, change.field);
+  const oldText = plainPreview(formatAuditValue(change.oldValue, meta));
+  const newText = plainPreview(formatAuditValue(change.newValue, meta));
   return (
-    <li className="break-words text-xs leading-5">
-      <span className="font-medium text-[hsl(var(--muted-foreground))]">{meta.label}:</span>{" "}
-      <span className="text-[hsl(var(--muted-foreground))] line-through decoration-[hsl(var(--muted-foreground))]/50">
-        {formatAuditValue(change.oldValue, meta)}
-      </span>
-      <ArrowRight className="mx-1 inline h-3 w-3 text-[hsl(var(--muted-foreground))]" aria-hidden />
-      <span className="font-semibold text-[hsl(var(--foreground))]">{formatAuditValue(change.newValue, meta)}</span>
+    <li className="flex min-w-0 items-center gap-1 text-xs leading-5">
+      <span className="shrink-0 font-medium text-[hsl(var(--muted-foreground))]">{meta.label}:</span>
+      <span className="min-w-0 max-w-[40%] truncate text-[hsl(var(--muted-foreground))] line-through decoration-[hsl(var(--muted-foreground))]/50">{oldText}</span>
+      <ArrowRight className="h-3 w-3 shrink-0 text-[hsl(var(--muted-foreground))]" aria-hidden />
+      <span className="min-w-0 flex-1 truncate font-semibold text-[hsl(var(--foreground))]">{newText}</span>
     </li>
   );
 }
 
-function AuditEntry({ entry, changeLabels }) {
-  const [expanded, setExpanded] = useState(false);
+// One compact row per entry: at most VISIBLE_CHANGES one-line diffs; the
+// whole row opens AuditEntryDialog with the complete change.
+function AuditEntry({ entry, changeLabels, onOpen }) {
   const meta = CATEGORY_META[entry.category] ?? CATEGORY_META.other;
   const name = actorDisplayName(entry.actor);
   const changes = Array.isArray(entry.payload?.changes) ? entry.payload.changes : [];
-  const shown = expanded ? changes : changes.slice(0, VISIBLE_CHANGES);
+  const shown = changes.slice(0, VISIBLE_CHANGES);
   const hidden = changes.length - shown.length;
   const created = new Date(entry.createdAt);
   return (
-    <li className="relative flex gap-3 py-3">
-      <div className="relative shrink-0">
-        <PersonAvatar name={name} src={entry.actor?.avatarUrl ?? null} size="md" />
-        <span className={cn("absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full ring-2 ring-[hsl(var(--card))]", meta.cls)}>
-          <meta.Icon className="h-2.5 w-2.5" aria-hidden />
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm leading-5 text-[hsl(var(--foreground))]">
-          <span className="font-semibold">{name}</span> {splitSummary(entry.summary, name)}
-        </p>
-        <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]" title={created.toLocaleString("es-MX")}>
-          {formatRelativeTime(created)} · {meta.label === "Otros" ? "Actividad" : meta.label}
-        </p>
-        {shown.length > 0 ? (
-          <ul className="mt-2 space-y-0.5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 px-2.5 py-1.5">
-            {shown.map((change) => <ChangeRow key={change.field} change={change} changeLabels={changeLabels} />)}
-          </ul>
-        ) : null}
-        {changes.length > VISIBLE_CHANGES ? (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-(--brand-primary) hover:underline"
-          >
-            <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
-            {expanded ? "Ver menos" : `${hidden} ${hidden === 1 ? "cambio" : "cambios"} más`}
-          </button>
-        ) : null}
-      </div>
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(entry)}
+        className="group relative flex w-full gap-3 rounded-xl px-1.5 py-3 text-left transition-colors hover:bg-[hsl(var(--muted))]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+      >
+        <div className="relative shrink-0">
+          <PersonAvatar name={name} src={entry.actor?.avatarUrl ?? null} size="md" />
+          <span className={cn("absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full ring-2 ring-[hsl(var(--card))]", meta.cls)}>
+            <meta.Icon className="h-2.5 w-2.5" aria-hidden />
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-sm leading-5 text-[hsl(var(--foreground))]">
+            <span className="font-semibold">{name}</span> {splitSummary(entry.summary, name)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]" title={created.toLocaleString("es-MX")}>
+            {formatRelativeTime(created)} · {meta.label === "Otros" ? "Actividad" : meta.label}
+          </p>
+          {shown.length > 0 ? (
+            <ul className="mt-2 space-y-0.5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 px-2.5 py-1.5">
+              {shown.map((change) => <ChangeRow key={change.field} change={change} changeLabels={changeLabels} />)}
+            </ul>
+          ) : null}
+          <p className="mt-1 flex items-center gap-1 text-xs font-medium text-(--brand-primary) opacity-80 group-hover:opacity-100">
+            {hidden > 0 ? `+${hidden} ${hidden === 1 ? "cambio" : "cambios"} · ` : ""}Ver detalle
+            <ChevronRight className="h-3 w-3" aria-hidden />
+          </p>
+        </div>
+      </button>
     </li>
   );
 }
@@ -192,6 +195,7 @@ function FilterChips({ value, onChange }) {
 }
 
 function EntryList({ query, changeLabels, emptyMessage }) {
+  const [openEntry, setOpenEntry] = useState(null);
   if (query.loading && query.items.length === 0) {
     return (
       <div className="space-y-3 py-2">
@@ -213,9 +217,18 @@ function EntryList({ query, changeLabels, emptyMessage }) {
     return <p className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">{emptyMessage}</p>;
   }
   return (
-    <ul className="divide-y divide-[hsl(var(--border))]/60">
-      {query.items.map((entry) => <AuditEntry key={entry.id} entry={entry} changeLabels={changeLabels} />)}
-    </ul>
+    <>
+      <ul className="divide-y divide-[hsl(var(--border))]/60">
+        {query.items.map((entry) => <AuditEntry key={entry.id} entry={entry} changeLabels={changeLabels} onOpen={setOpenEntry} />)}
+      </ul>
+      <AuditEntryDialog
+        entry={openEntry}
+        open={Boolean(openEntry)}
+        onOpenChange={(open) => { if (!open) setOpenEntry(null); }}
+        changeLabels={changeLabels}
+        categoryLabel={openEntry ? (CATEGORY_META[openEntry.category] ?? CATEGORY_META.other).label : ""}
+      />
+    </>
   );
 }
 

@@ -64,10 +64,10 @@ describe("activity-service", () => {
     );
   });
 
-  it("rejects payload larger than 4KB", async () => {
+  it("rejects payload larger than 32KB", async () => {
     const prisma = buildPrismaMock();
     const svc = createActivityService({ prisma });
-    const big = "x".repeat(5000);
+    const big = "x".repeat(40000);
     await assert.rejects(
       () =>
         svc.publish({

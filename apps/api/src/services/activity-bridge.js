@@ -215,10 +215,12 @@ const NEVER_DIFF_FIELDS = new Set([
   "company_id", "created_at", "updated_at", "metadata", "search_vector",
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CHANGE_VALUE_MAX = 140;
+// Values are kept (nearly) whole: the audit trail lists them clamped and
+// shows them complete in its detail modal.
+const CHANGE_VALUE_MAX = 4000;
 const CHANGES_MAX = 25;
-// Activity.payload is capped at 4096 bytes (@runly/validators); stay well below.
-const CHANGES_MAX_BYTES = 3200;
+// Activity.payload is capped at 32 KB (@runly/validators); stay below.
+const CHANGES_MAX_BYTES = 30000;
 
 const isUuidish = (v) => v === null || v === undefined || v === "" || (typeof v === "string" && UUID_RE.test(v));
 

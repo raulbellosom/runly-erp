@@ -342,18 +342,18 @@ describe("compactChanges", () => {
       { field: "department", oldValue: "Ventas", newValue: "Soporte" },
       { field: "metadata", oldValue: null, newValue: "x" },
       { field: "address", oldValue: { a: 1 }, newValue: { a: 2 } },
-      { field: "notes", oldValue: null, newValue: "a".repeat(500) },
+      { field: "notes", oldValue: null, newValue: "a".repeat(5000) },
       { field: "tags", oldValue: ["a"], newValue: ["a", "b"] },
     ]);
     assert.deepEqual(out.map((c) => c.field), ["department", "notes", "tags"]);
-    assert.ok(out[1].newValue.length <= 141);
+    assert.ok(out[1].newValue.length <= 4001);
     assert.equal(out[2].newValue, "a, b");
   });
 
   it("keeps the serialized diff under the payload cap", () => {
-    const many = Array.from({ length: 200 }, (_, i) => ({ field: `f${i}`, oldValue: "x".repeat(130), newValue: "y".repeat(130) }));
+    const many = Array.from({ length: 200 }, (_, i) => ({ field: `f${i}`, oldValue: "x".repeat(3000), newValue: "y".repeat(3000) }));
     const out = compactChanges(many);
-    assert.ok(JSON.stringify(out).length < 4096);
+    assert.ok(JSON.stringify(out).length < 32768);
     assert.ok(out.length <= 25);
   });
 });

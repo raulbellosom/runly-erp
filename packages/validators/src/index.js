@@ -636,7 +636,8 @@ export const moduleResetSchema = z
 // ---------------------------------------------------------------------------
 
 const ACTIVITY_SEVERITIES = ["info", "success", "warning", "critical"];
-const ACTIVITY_PAYLOAD_MAX_BYTES = 4096;
+// Room for full before/after text diffs (audit trail detail modal).
+const ACTIVITY_PAYLOAD_MAX_BYTES = 32768;
 
 export const activityPublishSchema = z
   .object({

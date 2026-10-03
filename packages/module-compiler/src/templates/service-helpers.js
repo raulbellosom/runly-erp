@@ -85,11 +85,11 @@ function auditValue(value) {
   if (Array.isArray(value)) value = value.map(String).join(', ')
   if (typeof value === 'object') return undefined
   const text = String(value)
-  return text.length > 140 ? text.slice(0, 140) + '…' : value
+  return text.length > 4000 ? text.slice(0, 4000) + '…' : value
 }
 
 // Field-level diff of two rows for the audit trail; capped to fit the
-// activity payload limit (4 KB).
+// activity payload limit (32 KB).
 export function auditChanges(before, after) {
   if (!before || !after) return []
   const out = []
@@ -104,7 +104,7 @@ export function auditChanges(before, after) {
     if (String(oldValue ?? '') === String(newValue ?? '')) continue
     const entry = { field, oldValue, newValue }
     const size = JSON.stringify(entry).length + 1
-    if (out.length >= 25 || bytes + size > 3200) break
+    if (out.length >= 25 || bytes + size > 30000) break
     out.push(entry)
     bytes += size
   }
