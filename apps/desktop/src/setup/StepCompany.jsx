@@ -1,7 +1,6 @@
 import { useState, forwardRef, useImperativeHandle, useMemo } from "react";
 import { Building2, FileText, Hash, MapPin } from "lucide-react";
-import { Country, State, City } from "country-state-city";
-import { TextField, SelectField, ComboboxField } from "@runly/ui";
+import { TextField, SelectField, ComboboxField, useGeoData } from "@runly/ui";
 
 const COMPANY_TYPES = [
   { value: "sa_de_cv", label: "SA de CV" },
@@ -77,35 +76,41 @@ export const StepCompany = forwardRef(function StepCompany(
 
   const slug = data.companyName ? toSlug(data.companyName) : "";
 
+  const { Country, State, City } = useGeoData({
+    cities: Boolean(data.country && data.state),
+  });
+
   const countryOptions = useMemo(
     () =>
-      Country.getAllCountries().map((c) => ({
-        value: c.isoCode,
-        label: c.name,
-      })),
-    [],
+      Country
+        ? Country.getAllCountries().map((c) => ({
+            value: c.isoCode,
+            label: c.name,
+          }))
+        : [],
+    [Country],
   );
 
   const stateOptions = useMemo(
     () =>
-      data.country
+      State && data.country
         ? State.getStatesOfCountry(data.country).map((s) => ({
             value: s.isoCode,
             label: s.name,
           }))
         : [],
-    [data.country],
+    [State, data.country],
   );
 
   const cityOptions = useMemo(
     () =>
-      data.country && data.state
+      City && data.country && data.state
         ? City.getCitiesOfState(data.country, data.state).map((c) => ({
             value: c.name,
             label: c.name,
           }))
         : [],
-    [data.country, data.state],
+    [City, data.country, data.state],
   );
 
   function handleCountryChange(val) {

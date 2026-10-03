@@ -66,6 +66,7 @@ import {
   Dumbbell,
   Gift,
 } from 'lucide-react'
+import { IconGlyph, cn, isKnownIcon } from '@runly/ui'
 
 export const NOTE_ICONS = {
   NotebookPen,
@@ -140,7 +141,11 @@ export function NoteIcon({ name, size = 14, className }) {
   if (!name) return null
   const Icon = NOTE_ICONS[name]
   if (Icon) return <Icon size={size} className={className} />
-  // Not a known Lucide key — treat as a literal emoji/glyph (see NoteSettingsPanel emoji tab)
+  // Current picker: kebab-case lucide name from the shared icon library.
+  if (isKnownIcon(name)) {
+    return <IconGlyph name={name} className={cn('shrink-0', className)} style={{ width: size, height: size }} />
+  }
+  // Legacy value: a literal emoji/glyph from the old emoji picker.
   return (
     <span className={className} style={{ fontSize: size * 1.1, lineHeight: 1 }}>
       {name}

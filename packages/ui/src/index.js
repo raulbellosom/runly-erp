@@ -216,6 +216,7 @@ export { StatCard } from "./components/StatCard.jsx";
 export { StatStrip } from "./components/StatStrip.jsx";
 export { DetailHero } from "./components/DetailHero.jsx";
 export { AddressFieldsSection } from "./components/AddressFieldsSection.jsx";
+export { useGeoData, loadGeoRegions, loadGeoCities } from "./lib/geoData.js";
 export { FormCompletionRing } from "./components/FormCompletionRing.jsx";
 export { FormPreviewPanel } from "./components/FormPreviewPanel.jsx";
 export { SwatchField, DEFAULT_SWATCHES } from "./components/SwatchField.jsx";
@@ -241,6 +242,17 @@ export { PublicLinksPanel, QrDialog, createPublicLinksApi, publicLinkUrl } from 
 export { ShareLinkDialog } from "./components/ShareLinkDialog.jsx";
 export { PublicLinkFrame } from "./components/PublicLinkFrame.jsx";
 export { ThemedEmojiPicker } from "./components/ThemedEmojiPicker.jsx";
+export { IconGlyph } from "./components/IconGlyph.jsx";
+export { IconLibraryPanel } from "./components/IconLibraryPanel.jsx";
+export {
+  allIconNames,
+  isKnownIcon,
+  getIconNode,
+  ICON_CATEGORIES as ICON_LIBRARY_CATEGORIES,
+  CURATED_ICONS,
+  iconLabel,
+  searchCurated,
+} from "./lib/icon-library/index.js";
 export { BugReportDialog } from "./components/BugReportDialog.jsx";
 export { requestBugReport, onBugReportRequest, hasBugReportListener } from "./lib/bugReportBus.js";
 export { ContactPicker } from "./components/ContactPicker.jsx";

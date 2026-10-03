@@ -4,7 +4,8 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./icons": "./src/lib/icon-library/index.js"
   },
   "dependencies": {
     "@atlas/core": "workspace:@runly/core@*",

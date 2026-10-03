@@ -1,7 +1,6 @@
 import { forwardRef, useImperativeHandle } from "react";
-import { Button } from "@runly/ui";
+import { Button, useGeoData } from "@runly/ui";
 import { Pencil } from "lucide-react";
-import { Country, State } from "country-state-city";
 import { RUNLY_DESKTOP_DOWNLOAD_URL } from "../lib/appConfig.js";
 
 const COMPANY_TYPE_LABELS = {
@@ -93,12 +92,13 @@ export const StepReview = forwardRef(function StepReview(
     },
   }));
 
+  const { Country, State } = useGeoData();
   const countryName = data.country
-    ? (Country.getCountryByCode(data.country)?.name ?? data.country)
+    ? (Country?.getCountryByCode(data.country)?.name ?? data.country)
     : "";
   const stateName =
     data.country && data.state
-      ? (State.getStateByCodeAndCountry(data.state, data.country)?.name ??
+      ? (State?.getStateByCodeAndCountry(data.state, data.country)?.name ??
         data.state)
       : "";
 

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { Country, State, City } from "country-state-city";
 import { MapPin } from "lucide-react";
 import { ComboboxField, TextField } from "./FormFields.jsx";
+import { useGeoData } from "../lib/geoData.js";
 
 // Reusable address field group: country -> state -> city cascade (via the
 // country-state-city package) plus colonia/calle/numeros/codigo postal as
@@ -17,18 +17,19 @@ export function AddressFieldsSection({ value = {}, errors = {}, onChange, disabl
   const country = value.country ?? "";
   const state = value.state ?? "";
   const city = value.city ?? "";
+  const { Country, State, City } = useGeoData({ cities: Boolean(country && state) });
 
   const countryOptions = useMemo(
-    () => Country.getAllCountries().map((c) => ({ value: c.isoCode, label: c.name })),
-    [],
+    () => (Country ? Country.getAllCountries().map((c) => ({ value: c.isoCode, label: c.name })) : []),
+    [Country],
   );
   const stateOptions = useMemo(
-    () => (country ? State.getStatesOfCountry(country).map((s) => ({ value: s.isoCode, label: s.name })) : []),
-    [country],
+    () => (State && country ? State.getStatesOfCountry(country).map((s) => ({ value: s.isoCode, label: s.name })) : []),
+    [State, country],
   );
   const cityOptions = useMemo(
-    () => (country && state ? City.getCitiesOfState(country, state).map((c) => ({ value: c.name, label: c.name })) : []),
-    [country, state],
+    () => (City && country && state ? City.getCitiesOfState(country, state).map((c) => ({ value: c.name, label: c.name })) : []),
+    [City, country, state],
   );
 
   return (

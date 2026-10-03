@@ -1,5 +1,4 @@
-import { Badge } from '@runly/ui'
-import { IconGlyph } from './IconGlyph.jsx'
+import { Badge, IconGlyph } from '@runly/ui'
 
 export const HOTSPOT_STATUS_LABELS = { ACTIVE: 'Activo', REVIEW: 'En revisión', RESOLVED: 'Resuelto', INACTIVE: 'Inactivo' }
 const STATUS_VARIANT = { ACTIVE: 'default', REVIEW: 'outline', RESOLVED: 'secondary', INACTIVE: 'outline' }

@@ -8,9 +8,9 @@ import {
   PageHeader,
   Skeleton,
   TextField,
+  useGeoData,
 } from "@runly/ui";
 import { MapPin, Hash, Globe, Navigation, Home } from "lucide-react";
-import { Country, State, City } from "country-state-city";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -59,35 +59,41 @@ export default function CompanyAddress() {
     }
   }, [data]);
 
+  const { Country, State, City } = useGeoData({
+    cities: Boolean(form.country && form.state),
+  });
+
   const countryOptions = useMemo(
     () =>
-      Country.getAllCountries().map((c) => ({
-        value: c.isoCode,
-        label: c.name,
-      })),
-    [],
+      Country
+        ? Country.getAllCountries().map((c) => ({
+            value: c.isoCode,
+            label: c.name,
+          }))
+        : [],
+    [Country],
   );
 
   const stateOptions = useMemo(
     () =>
-      form.country
+      State && form.country
         ? State.getStatesOfCountry(form.country).map((s) => ({
             value: s.isoCode,
             label: s.name,
           }))
         : [],
-    [form.country],
+    [State, form.country],
   );
 
   const cityOptions = useMemo(
     () =>
-      form.country && form.state
+      City && form.country && form.state
         ? City.getCitiesOfState(form.country, form.state).map((c) => ({
             value: c.name,
             label: c.name,
           }))
         : [],
-    [form.country, form.state],
+    [City, form.country, form.state],
   );
 
   function handleCountryChange(val) {

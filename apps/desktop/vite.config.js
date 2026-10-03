@@ -170,6 +170,8 @@ export default defineConfig({
       "@runly/core": resolve(__dirname, "../../packages/core/src/index.js"),
       "@runly/module-engine": resolve(__dirname, "../../packages/module-engine/src/index.js"),
       "@runly/sdk": resolve(__dirname, "../../packages/sdk/src/index.js"),
+      // Before "@runly/ui": aliases match by prefix, first entry wins.
+      "@runly/ui/icons": resolve(__dirname, "../../packages/ui/src/lib/icon-library/index.js"),
       "@runly/ui": resolve(__dirname, "../../packages/ui/src/index.js"),
       "@runly/validators": resolve(
         __dirname,

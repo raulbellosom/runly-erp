@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
-import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+
+// Loaded on first open: the library carries ~350 KB of emoji data that would
+// otherwise sit in the chunk shared by every screen.
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
 // Shared emoji picker (chat composer, reactions, channel avatar, note icons).
 //
@@ -67,19 +70,21 @@ export function ThemedEmojiPicker({ onEmojiClick, width = "100%", height = 360, 
   const isDark = useIsDark(dark);
   return (
     <div className={className} style={style} onWheel={stopScrollLock} onTouchMove={stopScrollLock}>
-      <EmojiPicker
-        onEmojiClick={onEmojiClick}
-        theme={isDark ? "dark" : "light"}
-        emojiStyle={EmojiStyle.NATIVE}
-        width={width}
-        height={height}
-        style={EPR_VARS}
-        searchPlaceholder="Buscar emoji..."
-        lazyLoadEmojis
-        skinTonesDisabled
-        autoFocusSearch={false}
-        previewConfig={{ showPreview: false }}
-      />
+      <Suspense fallback={<div style={{ width, height }} aria-busy="true" />}>
+        <EmojiPicker
+          onEmojiClick={onEmojiClick}
+          theme={isDark ? "dark" : "light"}
+          emojiStyle="native"
+          width={width}
+          height={height}
+          style={EPR_VARS}
+          searchPlaceholder="Buscar emoji..."
+          lazyLoadEmojis
+          skinTonesDisabled
+          autoFocusSearch={false}
+          previewConfig={{ showPreview: false }}
+        />
+      </Suspense>
     </div>
   );
 }
