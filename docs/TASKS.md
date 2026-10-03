@@ -1714,3 +1714,25 @@ Specs: `docs/superpowers/specs/2026-09-30-mirai-actions-design.md`, `2026-09-30-
 - Evidencia automatizada 2026-09-30: suites de chat, calendario, pfm, inventario, proyectos, notas, contactos, compras, ledger, hr, fleet, services y `miraiPageContext` verdes salvo 2 fallas preexistentes ajenas (`fallbacks do not recreate an old name...`, `createSupportReportService.sendBugReport`); `npx eslint` limpio en lo tocado; `pnpm build:web` OK.
 - **No verificado**: ningún flujo probado con el modelo real ni en la app (falta reiniciar la API y la aceptación manual de cada spec, sección "Acceptance"). Por eso nada se marca `[x]`.
 - Pendiente: módulos sin capacidad (archivos, documentos, punto de venta, sitio web, growth) y módulos RME3 personalizados; borrar con migración las tablas sin uso de los asistentes anteriores (hilos de PFM, `inventory_assistant_thread`) y el permiso `pfm.assistant.use` cuando el usuario lo confirme.
+
+## RME3 Module Platform v2 (2026-10-03)
+
+Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · Plan: `docs/superpowers/plans/2026-10-03-rme3-module-platform-v2.md`
+
+### Phase 1 — Module quality and AI authoring
+- [x] Shared Tailwind theme (`packages/ui/src/tailwind-theme.css`) used by the app and module CSS. Verified: 2026-10-03 (`pnpm build:web`, dark variant rules present)
+- [x] Per-module utilities CSS (`module-css-service.js`, `GET /modules/:key/bundle.css`, preview CSS, loader `<link>`). Verified: 2026-10-03 (unit tests 2/2; `custom.encuestas` real sources → 15 KB / 191 rules in 34 ms; flattened `@media`, no preflight)
+- [x] Design review (`@runly/module-compiler` `reviewComponentSources`) in upload reports + "Revisión de diseño" block with "Copiar para la IA". Verified: 2026-10-03 (tests 4/4 + report 4/4; 0 false positives on `custom.dispatch`, 1 legit warning each on `custom.encuestas`/`custom.qrinventario`; `pnpm build:web`)
+- [x] Component contract `docs/developers/componentes.md` (export test) and generated `docs/developers/iconos.md`; guide/AGENTS/runtime catalog updated; developer docs regenerated. Verified: 2026-10-03 (module-compiler 57/57, runtime-catalog test, component-docs test)
+- [ ] Owner: restart the API to pick up the new routes; upload a ZIP using `p-7 lg:col-span-3` and confirm styles + design review in the report.
+- [ ] Owner: `node scripts/sync-help-content.mjs` in `../runly-web` before the next runly.mx deploy (new pages Componentes/Iconos).
+- Note: `pnpm lint` reports 8 errors only in git-ignored generated bundles (`apps/api/bundles/`, `modules/custom/.previews|.staging/`); sources are clean.
+
+### Phase 2 — UI building blocks and golden screens
+- [ ] Module runtime context + `useEntity*` hooks; `CustomViewHost` extracted from `BlueprintCrudScreen.jsx`
+- [ ] `ModulePage`, `FormSection`, `FieldGrid`, `FilterBar`, `DetailHeader` (reuse existing `StatCard`)
+- [ ] `EntityForm` + field icons
+- [ ] Golden screens in the ZIP (`docs/ejemplos/`) and real scaffold dashboard
+
+### Phase 3 — Connections · Phase 4 — Safe schema evolution · Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
+- [ ] See plan tasks 3.1–6.5
