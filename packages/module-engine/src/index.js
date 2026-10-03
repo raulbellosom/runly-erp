@@ -54,3 +54,6 @@ export { MODULE_ICON_NAMES,
 export { CONNECTION_KINDS, CONNECTION_DELETE_POLICIES, CONNECTION_SURFACES,
          validateConnections, normalizeConnection,
          validateConnectionsAgainstModels }        from './manifest-connections.js'
+export { connectionObjectNames, buildConnectionSql, buildBackfillSql,
+         buildDropConnectionSql, buildOrphanCountSql,
+         isConnectionConstraint, CONNECTION_OBJECT_PREFIX } from './connection-sql.js'
