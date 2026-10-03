@@ -14,7 +14,7 @@ import {
   Skeleton,
 } from "@runly/ui";
 import { contactFormSchema } from "@runly/validators";
-import { AlertTriangle, ArrowLeft, AtSign, Eye, Paperclip, Building2, Landmark, MapPin, StickyNote, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, AtSign, Eye, Paperclip, Plug, Building2, Landmark, MapPin, StickyNote, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
@@ -28,6 +28,8 @@ import {
 } from "../components/form/ContactFormCollections";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { CONTACT_ATTACHMENTS_CONFIG } from "../lib/attachments";
+import { useConnectionForm } from "../../../shell/connections/useConnectionForm.js";
+import { ConnectionFormSections } from "../../../shell/connections/ConnectionFormSections.jsx";
 import { getApiUrl } from "../../../lib/runtimeConfig.js";
 
 const LIST_PATH = "/app/m/runly.contacts/contacts";
@@ -112,6 +114,8 @@ export default function ContactFormScreen() {
   const isEdit = Boolean(contactId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Connected modules' sections, saved atomically with the contact (Connections D3).
+  const connectionForm = useConnectionForm({ targetType: "contact", targetId: contactId ?? null });
   const { session, userProfile } = useAuth();
   const token = session?.access_token;
   const { activeCompanyId } = useActiveCompany();
@@ -152,10 +156,16 @@ export default function ContactFormScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async (formValues) => {
-      const payload = toPayload(formValues);
-      const saved = isEdit
-        ? await runly.contacts.update(contactId, payload, token)
-        : await runly.contacts.create(payload, token);
+      const payload = { ...toPayload(formValues), connections: connectionForm.payload() ?? undefined };
+      let saved;
+      try {
+        saved = isEdit
+          ? await runly.contacts.update(contactId, payload, token)
+          : await runly.contacts.create(payload, token);
+      } catch (err) {
+        connectionForm.applyErrorResponse(err?.details);
+        throw err;
+      }
       const id = saved?.data?.id ?? contactId;
       if (avatarPending instanceof File) {
         await runly.contacts.uploadAvatar(id, avatarPending, token).catch(() => {
@@ -174,6 +184,7 @@ export default function ContactFormScreen() {
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ["contact-profile", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["connections"] });
       toast.success(isEdit ? "Contacto actualizado" : "Contacto creado");
       navigate(detailPath(id));
     },
@@ -214,6 +225,7 @@ export default function ContactFormScreen() {
     { id: "cf-direcciones", label: "Direcciones", icon: MapPin, badge: values.addresses?.length || null },
     ...(showPeople ? [{ id: "cf-personas", label: "Personas clave", icon: Users, badge: values.persons?.length || null }] : []),
     { id: "cf-notas", label: "Notas", icon: StickyNote },
+    ...(connectionForm.sections.length ? [{ id: "cf-conexiones", label: "Módulos conectados", icon: Plug }] : []),
     ...(canReadFiles ? [{ id: "cf-archivos", label: "Archivos", icon: Paperclip }] : []),
   ];
 
@@ -312,6 +324,11 @@ export default function ContactFormScreen() {
                 <NotesSection form={form} />
               </SectionCard>
             </section>
+            {connectionForm.sections.length > 0 && (
+              <section id="cf-conexiones" className="scroll-mt-4">
+                <ConnectionFormSections form={connectionForm} />
+              </section>
+            )}
             {canReadFiles && (
               <section id="cf-archivos" className="scroll-mt-4">
                 <SectionCard
@@ -346,7 +363,7 @@ export default function ContactFormScreen() {
         <Button type="button" variant="outline" onClick={cancel} disabled={saveMutation.isPending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={saveMutation.isPending || (isEdit && !formState.isDirty && !avatarPending)}>
+        <Button type="submit" disabled={saveMutation.isPending || (isEdit && !formState.isDirty && !avatarPending && !connectionForm.payload())}>
           {saveMutation.isPending ? "Guardando..." : "Guardar contacto"}
         </Button>
       </footer>

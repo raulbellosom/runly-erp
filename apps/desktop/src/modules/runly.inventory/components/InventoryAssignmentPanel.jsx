@@ -13,8 +13,9 @@ import {
   SheetTitle,
   SheetFooter,
   EmptyState,
+  PersonAvatar,
 } from '@runly/ui'
-import { UserCheck, RotateCcw, Clock } from 'lucide-react'
+import { UserCheck, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { runly } from '../../../lib/runly'
@@ -33,13 +34,12 @@ function formatDate(str) {
 
 function AssignmentHistoryRow({ record }) {
   const active = !record.returnedAt
+  const name = [record.employee?.firstName, record.employee?.lastName].filter(Boolean).join(' ') || record.employeeName || '—'
   return (
     <div className="flex items-start gap-3 py-2 border-b border-[hsl(var(--border)/0.5)] last:border-0">
-      <Clock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+      <PersonAvatar name={name} src={record.employee?.avatarUrl} size="sm" className="mt-0.5" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
-          {[record.employee?.firstName, record.employee?.lastName].filter(Boolean).join(' ') || record.employeeName || '—'}
-        </p>
+        <p className="text-sm font-medium truncate">{name}</p>
         <p className="text-xs text-[hsl(var(--muted-foreground))]">
           {formatDate(record.assignedAt)}
           {record.returnedAt ? ` → ${formatDate(record.returnedAt)}` : ' — activo'}
@@ -145,11 +145,14 @@ export function InventoryAssignmentPanel({ item }) {
         </div>
 
         {isAssigned ? (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium">{assignedToName}</span>
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">
-              desde {formatDate(item.assignedAt)}
-            </span>
+          <div className="flex items-center gap-3">
+            <PersonAvatar name={assignedToName} src={item.assignedTo?.avatarUrl} size="md" />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-sm font-medium">{assignedToName}</span>
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                desde {formatDate(item.assignedAt)}
+              </span>
+            </div>
           </div>
         ) : (
           <p className="text-sm text-[hsl(var(--muted-foreground))]">Sin asignacion activa</p>

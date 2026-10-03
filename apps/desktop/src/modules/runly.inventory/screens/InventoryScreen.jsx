@@ -108,7 +108,7 @@ export default function InventoryScreen() {
           sortable: false,
           imagesApiPath: '/inventory/items/:id/files',
         },
-        { field: 'assetTag',       label: 'Tag',         sortable: true  },
+        { field: 'assetTag',       label: 'N.º de activo', sortable: true  },
         { field: 'name',           label: 'Nombre',      sortable: true,  link: true },
         { field: 'categoryName',   label: 'Tipo',        sortable: true  },
         { field: 'brandName',      label: 'Marca',       sortable: true  },

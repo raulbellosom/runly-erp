@@ -36,6 +36,13 @@ export const contactsMap = createModuleManifest({
       layout: "main",
       permissionKey: "contacts.contacts.read",
     },
+    {
+      label: "Conexiones",
+      path: "/contacts/connections",
+      icon: "Plug",
+      layout: "main",
+      permissionKey: "contacts.connections.manage",
+    },
   ],
   permissions: [
     { key: "contacts.access", name: "Access Contacts" },
@@ -43,6 +50,7 @@ export const contactsMap = createModuleManifest({
     { key: "contacts.contacts.create", name: "Create Contacts Feature" },
     { key: "contacts.contacts.update", name: "Update Contacts Feature" },
     { key: "contacts.contacts.delete", name: "Delete Contacts Feature" },
+    { key: "contacts.connections.manage", name: "Gestionar conexiones de contactos" },
   ],
   exposes: {
     contactPicker: true,
@@ -55,6 +63,7 @@ export const contactsMap = createModuleManifest({
       "contacts.contacts.create": "contacts.contacts.create",
       "contacts.contacts.update": "contacts.contacts.update",
       "contacts.contacts.delete": "contacts.contacts.delete",
+      "contacts.connections.manage": "contacts.connections.manage",
       "contacts.list": "contacts.contacts.read",
       "contacts.picker": "contacts.contacts.read",
       "contacts.enabled": "contacts.contacts.update",

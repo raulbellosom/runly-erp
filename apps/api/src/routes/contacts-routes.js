@@ -14,6 +14,7 @@ import { createContactsService, ContactsServiceError } from "../services/contact
 import { publishActivityFromContext, getActivityContext } from "../services/activity-publisher.js";
 import { registerContactsProfileRoutes } from "./contacts-profile-routes.js";
 import { createContactsEffects } from "./contacts/contacts-effects.js";
+import { createCoreTargetConnections } from "../services/connections/core-target-connections.js";
 
 function formatAddress(address) {
   if (!address) return "";
@@ -28,6 +29,7 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
   const contactsService = createContactsService({ prisma, supabaseAdmin, storageBucket });
   const effects = createContactsEffects({ prisma });
   registerContactsProfileRoutes(app, { prisma, requirePermission, contactsService });
+  const contactConnections = createCoreTargetConnections({ prisma, targetType: "contact" });
 
   app.get(
     "/contacts",
@@ -46,6 +48,7 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
           authUserId,
           companyId: c.get("companyId"),
           search,
+          connectionMatchIds: await contactConnections.searchIds(c, search),
           page,
           pageSize,
           sortBy,
@@ -106,11 +109,13 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
     async (c) => {
       try {
         const authUserId = c.get("authUserId");
-        const payload = await c.req.json();
-        const contact = await contactsService.create({ authUserId, companyId: c.get("companyId"), payload });
+        const { data: payload, afterWrite } = await contactConnections.prepare(c, await c.req.json());
+        const contact = await contactsService.create({ authUserId, companyId: c.get("companyId"), payload, afterWrite });
         await effects.afterCreate(c, contact);
         return c.json({ data: contact }, 201);
       } catch (err) {
+        const connectionError = contactConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err?.name === "ZodError") {
           return c.json(
             { error: (err.issues ?? err.errors)?.[0]?.message ?? "Datos de contacto invalidos." },
@@ -162,7 +167,13 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
       try {
         const authUserId = c.get("authUserId");
         const { ids } = await c.req.json();
-        await contactsService.bulkDelete({ authUserId, companyId: c.get("companyId"), ids });
+        try {
+          await contactsService.bulkDelete({ authUserId, companyId: c.get("companyId"), ids });
+        } catch (deleteError) {
+          const blocked = await contactConnections.restrictResponse(c, deleteError, Array.isArray(ids) ? ids : []);
+          if (blocked) return blocked;
+          throw deleteError;
+        }
         const { actorName } = getActivityContext(c);
         await publishActivityFromContext(prisma, c, {
           type: "contacts.contact.bulk_delete",
@@ -419,11 +430,13 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
       try {
         const authUserId = c.get("authUserId");
         const id = c.req.param("id");
-        const payload = await c.req.json();
-        const contact = await contactsService.update({ authUserId, companyId: c.get("companyId"), id, payload });
+        const { data: payload, afterWrite } = await contactConnections.prepare(c, await c.req.json(), id);
+        const contact = await contactsService.update({ authUserId, companyId: c.get("companyId"), id, payload, afterWrite });
         await effects.afterUpdate(c, contact);
         return c.json({ data: contact });
       } catch (err) {
+        const connectionError = contactConnections.errorResponse(c, err);
+        if (connectionError) return connectionError;
         if (err?.name === "ZodError") {
           return c.json(
             { error: (err.issues ?? err.errors)?.[0]?.message ?? "Datos de contacto invalidos." },
@@ -473,7 +486,13 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
       try {
         const authUserId = c.get("authUserId");
         const id = c.req.param("id");
-        await contactsService.delete({ authUserId, companyId: c.get("companyId"), id });
+        try {
+          await contactsService.delete({ authUserId, companyId: c.get("companyId"), id });
+        } catch (deleteError) {
+          const blocked = await contactConnections.restrictResponse(c, deleteError, [id]);
+          if (blocked) return blocked;
+          throw deleteError;
+        }
         await effects.afterDelete(c, id);
         return c.json({ ok: true });
       } catch (err) {

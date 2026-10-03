@@ -390,9 +390,9 @@ const SCREEN_MAP = {
   "runly.inventory:/inventory/:id": lazy(
     () => import("../modules/runly.inventory/screens/InventoryItemDetail.jsx"),
   ),
-  "runly.inventory:/inventory/connections": lazy(
-    () => import("../modules/runly.inventory/screens/InventoryConnectionsScreen.jsx"),
-  ),
+  // Conexiones of connectable core modules (shell/connections/ModuleConnectionsScreen.jsx).
+  "runly.inventory:/inventory/connections": lazy(() => import("../shell/connections/ModuleConnectionsScreen.jsx")),
+  "runly.contacts:/contacts/connections": lazy(() => import("../shell/connections/ModuleConnectionsScreen.jsx")),
   "runly.inventory:/inventory/catalogs": lazy(
     () => import("../modules/runly.inventory/screens/InventoryCatalogsScreen.jsx"),
   ),

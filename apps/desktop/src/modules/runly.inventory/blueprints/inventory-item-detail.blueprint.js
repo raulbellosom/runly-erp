@@ -1,4 +1,5 @@
-import { ACQUISITION_ORIGIN_OPTIONS } from '../lib/inventory-constants.js'
+import { ACQUISITION_ORIGIN_OPTIONS, ITEM_STATUSES } from '../lib/inventory-constants.js'
+import { ADMIN_STATUSES } from '../lib/admin-status.js'
 
 export const INVENTORY_ITEM_DETAIL = {
   key: 'inventory.item.detail',
@@ -11,7 +12,10 @@ export const INVENTORY_ITEM_DETAIL = {
     hero: {
       titleField: 'name',
       subtitleFields: ['categoryName', 'model'],
+      // Disponibilidad next to the title; the administrative Estado is the
+      // first, emphasized KPI below.
       statusField: 'status',
+      statusOptions: ITEM_STATUSES,
       imageDocsPath: '/inventory/items/:id/files',
       fallbackIcon: 'Package',
       metaChips: [
@@ -22,10 +26,10 @@ export const INVENTORY_ITEM_DETAIL = {
       ],
     },
     kpis: [
+      { label: 'Estado', field: 'adminStatus', type: 'select', options: ADMIN_STATUSES, emphasis: true, icon: 'ClipboardList' },
       { label: 'Asignado a', field: 'assignedToName', icon: 'UserCheck' },
       { label: 'Fecha de asignación', field: 'assignedAt', type: 'date', icon: 'CalendarDays' },
       { label: 'Vencimiento de garantía', field: 'warrantyExpiry', type: 'date', icon: 'ShieldCheck' },
-      { label: 'Valor de compra (heredado)', field: 'purchasePrice', type: 'currency', icon: 'Tag' },
     ],
     sections: [
       {
@@ -60,6 +64,16 @@ export const INVENTORY_ITEM_DETAIL = {
           { field: 'conditionName', label: 'Condición', icon: 'Activity' },
           { field: 'acquisitionOrigin', label: 'Origen de adquisición', type: 'select', options: ACQUISITION_ORIGIN_OPTIONS, icon: 'Receipt' },
         ],
+      },
+      {
+        // Main column: purchase documents read better wide, and keeping them
+        // out of the aside balances both column heights.
+        id: 'purchases',
+        type: 'component',
+        label: 'Compras relacionadas',
+        icon: 'ShoppingCart',
+        column: 'main',
+        component: 'runly.purchases:InventoryPurchaseSection',
       },
       {
         // Read-only pre-Compras purchase data; hidden when the item has none
@@ -117,14 +131,6 @@ export const INVENTORY_ITEM_DETAIL = {
         icon: 'ClipboardList',
         column: 'aside',
         component: 'runly.inventory:AdminSection',
-      },
-      {
-        id: 'purchases',
-        type: 'component',
-        label: 'Compras relacionadas',
-        icon: 'ShoppingCart',
-        column: 'aside',
-        component: 'runly.purchases:InventoryPurchaseSection',
       },
       {
         id: 'assignment',

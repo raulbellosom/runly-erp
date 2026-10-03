@@ -11,7 +11,8 @@ import { createInventoryModelsRouter } from './models-routes.js';
 import { createInventoryImportRouter } from './import-routes.js';
 import { createInventoryAdminRouter } from './admin-routes.js';
 import { createInventoryModelService } from '../../services/inventory-model-service.js';
-import { createItemConnections } from './item-connections.js';
+import { createCoreTargetConnections } from '../../services/connections/core-target-connections.js';
+import { attachUserAvatarUrls } from '../../lib/attach-user-avatars.js';
 
 export function createInventoryRouter({
   prisma,
@@ -23,9 +24,10 @@ export function createInventoryRouter({
   CommentsServiceError,
   enrichFilesWithSignedUrls,
   filesService,
+  supabaseAdmin = null,
 }) {
   const router = new Hono();
-  const itemConnections = createItemConnections({ prisma });
+  const itemConnections = createCoreTargetConnections({ prisma, targetType: "inventory_item" });
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
   router.route('/', createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc }));
@@ -83,6 +85,7 @@ export function createInventoryRouter({
       const companyId = c.get("companyId");
       const { id } = c.req.param();
       const item = await inventoryService.getItem(id, companyId);
+      await attachUserAvatarUrls([item.assignedTo], { prisma, supabaseAdmin });
       return c.json({ data: item });
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
@@ -170,6 +173,7 @@ export function createInventoryRouter({
       const companyId = c.get("companyId");
       const { id } = c.req.param();
       const history = await inventoryService.getAssignmentHistory(id, companyId);
+      await attachUserAvatarUrls(history.flatMap((row) => [row.employee, row.assignedBy]), { prisma, supabaseAdmin });
       return c.json({ data: history });
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);

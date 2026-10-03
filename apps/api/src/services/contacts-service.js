@@ -193,11 +193,16 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
   }
 
   return {
-    async list({ authUserId, companyId: activeCompanyId, search, page, pageSize, sortBy, sortDir, enabled = true, tag, type, createdFrom, createdTo }) {
+    // connectionMatchIds: contacts matched by connected fields (Connections
+    // search), OR-ed with the own search while every other filter applies.
+    async list({ authUserId, companyId: activeCompanyId, search, connectionMatchIds = [], page, pageSize, sortBy, sortDir, enabled = true, tag, type, createdFrom, createdTo }) {
       const companyId = await getCompanyContext(activeCompanyId);
       const parsedPage = Math.max(1, Number.parseInt(String(page ?? 1), 10) || 1);
       const parsedPageSize = Math.min(200, Math.max(1, Number.parseInt(String(pageSize ?? 20), 10) || 20));
-      const where = buildListWhere({ companyId, enabled, search, tag, type, createdFrom, createdTo });
+      let where = buildListWhere({ companyId, enabled, search, tag, type, createdFrom, createdTo });
+      if (search && connectionMatchIds.length) {
+        where = { OR: [where, { ...buildListWhere({ companyId, enabled, tag, type, createdFrom, createdTo }), id: { in: connectionMatchIds } }] };
+      }
       const dir = sortDir === "desc" ? "desc" : "asc";
       const orderBy = sortBy && LIST_SORT_FIELDS[sortBy]
         ? { [LIST_SORT_FIELDS[sortBy]]: dir }
@@ -260,7 +265,8 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
       };
     },
 
-    async create({ authUserId, companyId: activeCompanyId, payload }) {
+    // afterWrite(tx, contact): connection sections saved in the same transaction.
+    async create({ authUserId, companyId: activeCompanyId, payload, afterWrite = null }) {
       const companyId = await getCompanyContext(activeCompanyId);
       const data = contactUpsertSchema.parse(payload);
       const id = await prisma.$transaction(async (tx) => {
@@ -275,12 +281,13 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
             if (contact[kind]) await syncLegacyChannel(tx, { companyId, contactId: contact.id, kind, value: contact[kind] });
           }
         }
+        if (afterWrite) await afterWrite(tx, contact);
         return contact.id;
       }).catch(rethrowChildrenError);
       return prisma.contact.findUnique({ where: { id } });
     },
 
-    async update({ authUserId, companyId: activeCompanyId, id, payload }) {
+    async update({ authUserId, companyId: activeCompanyId, id, payload, afterWrite = null }) {
       const companyId = await getCompanyContext(activeCompanyId);
       await assertContactOwnership({ id, companyId });
       const data = contactUpsertSchema.partial().parse(payload);
@@ -293,6 +300,7 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
             if (kind in scalar) await syncLegacyChannel(tx, { companyId, contactId: id, kind, value: scalar[kind] });
           }
         }
+        if (afterWrite) await afterWrite(tx, { id });
       }).catch(rethrowChildrenError);
       return prisma.contact.findUnique({ where: { id } });
     },

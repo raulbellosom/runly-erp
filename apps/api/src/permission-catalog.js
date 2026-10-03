@@ -549,6 +549,12 @@ export const PERMISSION_CATALOG = {
     groupKey: "contacts",
     order: 50,
   },
+  "contacts.connections.manage": {
+    displayNameEs: "Gestionar conexiones de contactos",
+    descriptionEs: "Permite activar los módulos conectados a los contactos y elegir qué campos muestran, editan y buscan.",
+    groupKey: "contacts",
+    order: 51,
+  },
 
   "fleet.access": {
     displayNameEs: "Acceder a flota",

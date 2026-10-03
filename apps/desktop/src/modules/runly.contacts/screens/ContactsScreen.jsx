@@ -102,7 +102,7 @@ export default function ContactsScreen() {
       setRefreshSignal((s) => s + 1);
       toast.success("Contacto eliminado");
     },
-    onError: () => toast.error("No se pudo eliminar el contacto"),
+    onError: (err) => toast.error(err?.message || "No se pudo eliminar el contacto"),
   });
 
   const bulkEnabledMutation = useMutation({
@@ -123,7 +123,7 @@ export default function ContactsScreen() {
       setBulkState(null);
       toast.success("Contactos eliminados");
     },
-    onError: () => toast.error("No se pudieron eliminar los contactos"),
+    onError: (err) => toast.error(err?.message || "No se pudieron eliminar los contactos"),
   });
 
   const toggleEnabledMutation = useMutation({

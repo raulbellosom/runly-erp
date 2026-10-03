@@ -166,11 +166,16 @@ export function createConnectionWriteService({ prisma, loadValidators = null }) 
 
 // FK violation from a `restrict` related connection when a core record is
 // hard-deleted -> { code: 'connection_restrict', connections: [{ label, count }] }.
+// True when a write failed on a connection FK (any error shape: pg, Prisma
+// P2003, driver-adapter wrapped). Our FK names are runly_conn_<...>_fk.
+export function isRestrictViolation(error) {
+  const parts = [error?.message, error?.code, error?.constraint, error?.cause?.message, error?.cause?.constraint]
+  try { parts.push(JSON.stringify(error?.meta ?? {})) } catch { /* circular meta */ }
+  return /runly_conn_[a-z0-9_]+_fk/.test(parts.filter(Boolean).join(' '))
+}
+
 export async function mapRestrictViolation(prisma, error, { companyId, targetIds }) {
-  const pgError = error?.meta?.driverAdapterError?.cause ?? error?.cause ?? error
-  const constraint = pgError?.constraint ?? error?.meta?.constraint ?? String(error?.message ?? '').match(/"(runly_conn_[a-z0-9_]+)"/)?.[1]
-  const code = pgError?.code ?? pgError?.originalCode ?? error?.code
-  if (!String(constraint ?? '').startsWith('runly_conn_') && !(code === '23503' && /runly_conn_/.test(String(error?.message)))) return null
+  if (!isRestrictViolation(error)) return null
   const rows = await prisma.connectionRecord.groupBy({
     by: ['moduleKey', 'connectionKey'],
     where: { companyId, targetId: { in: targetIds } },

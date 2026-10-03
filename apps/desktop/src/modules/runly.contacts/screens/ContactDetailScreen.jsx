@@ -25,6 +25,7 @@ import { ContactHeroCard } from "../components/detail/ContactHeroCard";
 import { ContactPeopleTab, ContactSummaryTab } from "../components/detail/ContactSummaryTab";
 import { ContactActivityTab } from "../components/detail/ContactActivityTab";
 import { CONTACT_ATTACHMENTS_CONFIG } from "../lib/attachments";
+import { ConnectionSections } from "../../../shell/connections/ConnectionSections.jsx";
 
 const LIST_PATH = "/app/m/runly.contacts/contacts";
 const TABS = ["resumen", "actividad", "personas", "archivos", "historial"];
@@ -99,7 +100,7 @@ export default function ContactDetailScreen() {
       toast.success("Contacto eliminado");
       navigate(LIST_PATH);
     },
-    onError: () => toast.error("No se pudo eliminar el contacto"),
+    onError: (err) => toast.error(err?.message || "No se pudo eliminar el contacto"),
   });
 
   function setTab(next) {
@@ -180,7 +181,10 @@ export default function ContactDetailScreen() {
         </div>
 
         <TabsContent value="resumen" className="mt-5">
-          <ContactSummaryTab contact={contact} />
+          <div className="space-y-5">
+            <ContactSummaryTab contact={contact} />
+            <ConnectionSections targetType="contact" targetId={contact.id} />
+          </div>
         </TabsContent>
         <TabsContent value="actividad" className="mt-5">
           <ContactActivityTab
