@@ -4,6 +4,27 @@ import { createChecksum } from '@runly/module-engine'
 import { randomUUID } from 'node:crypto'
 import { computeSourceHash } from './module-bundler-service.js'
 import { compileModuleCss } from './module-css-service.js'
+import { reviewComponentSources } from '@runly/module-compiler'
+
+// components/**/*.{js,jsx,mjs} as [{ path: 'components/<relative>', content }]
+// for the design review (posix separators, dot folders skipped).
+async function readComponentFiles(packageDir) {
+  const root = path.join(packageDir, 'components')
+  const out = []
+  async function walk(dir) {
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) await walk(full)
+      else if (/\.(?:jsx?|mjs)$/.test(entry.name)) {
+        out.push({ path: `components/${path.relative(root, full).split(path.sep).join('/')}`, content: await fs.readFile(full, 'utf8') })
+      }
+    }
+  }
+  await walk(root)
+  return out
+}
 import { buildUpdateReport, invalidPackageReport } from './module-update-report.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { acquireModuleLock as acquireModuleLockWithRecovery, ModulePackageLockBusyError } from './module-package-lock-service.js'
@@ -461,7 +482,10 @@ export function createModulePackageService({
           preview = { error: error?.errors?.[0]?.text ?? error?.message ?? 'error de compilación' }
         }
       }
-      const report = buildUpdateReport({ staged, moduleRow, preflight, noChanges: currentHash === staged.packageHash, preview })
+      const designReview = staged.inspection.hasComponents
+        ? reviewComponentSources(await readComponentFiles(staged.packageDir)).slice(0, 200)
+        : []
+      const report = buildUpdateReport({ staged, moduleRow, preflight, noChanges: currentHash === staged.packageHash, preview, designReview })
       if (inspect) report.builder = await inspect(staged).catch(() => null)
       return report
     } finally {

@@ -31,7 +31,7 @@ export function describeOperation(operation) {
   }
 }
 
-export function buildUpdateReport({ staged, moduleRow, preflight, noChanges, preview }) {
+export function buildUpdateReport({ staged, moduleRow, preflight, noChanges, preview, designReview = [] }) {
   const blockers = [];
   const changes = [];
   const warnings = [];
@@ -76,6 +76,9 @@ export function buildUpdateReport({ staged, moduleRow, preflight, noChanges, pre
     inspection: staged.inspection,
     customViews,
     preview: preview?.id ? { id: preview.id } : null,
+    // Static design findings for components/ (module-compiler design-review);
+    // informative only, never blockers.
+    designReview,
   };
 }
 

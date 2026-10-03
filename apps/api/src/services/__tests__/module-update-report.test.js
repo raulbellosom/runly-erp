@@ -41,3 +41,11 @@ test("invalid packages and operation texts", () => {
   assert.match(report.blockers[0], /custom\.a.*custom\.b/);
   assert.equal(describeOperation({ type: "CREATE_TABLE", table: "x_nota" }), "Se creará la tabla x_nota.");
 });
+
+test("design review findings are passed through and never block", () => {
+  const finding = { file: "components/A.jsx", line: 3, rule: "native-select", severity: "error", message: "x" };
+  const report = buildUpdateReport({ staged, moduleRow: null, preflight: {}, noChanges: false, preview: null, designReview: [finding] });
+  assert.deepEqual(report.designReview, [finding]);
+  assert.equal(report.blocked, false);
+  assert.deepEqual(buildUpdateReport({ staged, moduleRow: null, preflight: {}, noChanges: false, preview: null }).designReview, []);
+});
