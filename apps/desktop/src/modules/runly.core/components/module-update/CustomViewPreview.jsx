@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { getApiUrl } from "../../../../lib/runtimeConfig.js";
 import { createModuleComponentRegistry } from "../../../../lib/module-component-registry-core.js";
 import { useActiveCompany } from "../../../../company/ActiveCompanyProvider";
+import { ensureModuleStylesheet } from "../../../../shell/ModuleBundleLoader.jsx";
 
 const API_BASE_URL = getApiUrl();
 
@@ -45,7 +46,9 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading", registry: null, error: null });
-    const url = `${API_BASE_URL}/modules/${encodeURIComponent(moduleKey)}/preview/${previewId}/bundle.js`;
+    const base = `${API_BASE_URL}/modules/${encodeURIComponent(moduleKey)}/preview/${previewId}`;
+    const url = `${base}/bundle.js`;
+    const stylesheet = ensureModuleStylesheet(`preview:${moduleKey}`, `${base}/bundle.css`);
     import(/* @vite-ignore */ url)
       .then(async (mod) => {
         const registry = createModuleComponentRegistry();
@@ -57,6 +60,7 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
       });
     return () => {
       cancelled = true;
+      stylesheet.remove();
     };
   }, [moduleKey, previewId]);
 

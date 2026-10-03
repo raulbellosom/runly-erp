@@ -13,10 +13,26 @@ import { getApiUrl } from '../lib/runtimeConfig.js'
 const bundleLoads = new Map()
 const sessionVersion = String(Date.now())
 
+// Module utilities CSS (spec 2026-10-03-rme3-module-platform-v2 §12.1): one
+// <link> per id, replaced when the href changes so a republished module gets
+// fresh CSS. Returns the element so a caller can remove it (previews).
+export function ensureModuleStylesheet(id, href) {
+  const existing = document.head.querySelector(`link[data-module-css="${CSS.escape(id)}"]`)
+  if (existing?.getAttribute('href') === href) return existing
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = href
+  link.dataset.moduleCss = id
+  if (existing) existing.replaceWith(link)
+  else document.head.appendChild(link)
+  return link
+}
+
 export function loadBundle(key, bundleVersion) {
   const version = String(bundleVersion ?? sessionVersion)
   const cacheKey = `${key}@${version}`
   if (bundleLoads.has(cacheKey)) return bundleLoads.get(cacheKey)
+  ensureModuleStylesheet(key, `${getApiUrl()}/modules/${key}/bundle.css?v=${encodeURIComponent(version)}`)
   const bundleUrl = new URL(`${getApiUrl()}/modules/${key}/bundle.js`)
   bundleUrl.searchParams.set('web_origin', window.location.origin)
   // Bust stale browser module cache entries after runtime rewriting changes.

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createChecksum } from '@runly/module-engine'
 import { randomUUID } from 'node:crypto'
 import { computeSourceHash } from './module-bundler-service.js'
+import { compileModuleCss } from './module-css-service.js'
 import { buildUpdateReport, invalidPackageReport } from './module-update-report.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { acquireModuleLock as acquireModuleLockWithRecovery, ModulePackageLockBusyError } from './module-package-lock-service.js'
@@ -448,8 +449,14 @@ export function createModulePackageService({
       if (staged.inspection.hasComponents && bundlerSvc?.buildBundleFromDirectory) {
         const previewId = randomUUID()
         try {
-          const built = await bundlerSvc.buildBundleFromDirectory(key, staged.packageDir, { outputDir: path.join(previewsDir, previewId) })
-          if (built.built) preview = { id: previewId }
+          const previewDir = path.join(previewsDir, previewId)
+          const built = await bundlerSvc.buildBundleFromDirectory(key, staged.packageDir, { outputDir: previewDir })
+          if (built.built) {
+            preview = { id: previewId }
+            // Module utilities for the preview (served by /preview/:id/bundle.css).
+            const css = await compileModuleCss(path.join(staged.packageDir, 'components')).catch(() => '')
+            await fs.writeFile(path.join(previewDir, 'bundle.css'), css)
+          }
         } catch (error) {
           preview = { error: error?.errors?.[0]?.text ?? error?.message ?? 'error de compilación' }
         }

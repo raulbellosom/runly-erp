@@ -54,6 +54,8 @@ import { createModuleDashboardQueryService } from "../services/module-dashboard-
 import { createModuleKanbanQueryService } from "../services/module-kanban-query-service.js";
 import { registerRecordsViewRoutes } from "./module-records-view-routes.js";
 import { createBuilderPackageSync } from "../services/module-builder-package-sync.js";
+import { computeSourceHash } from "../services/module-bundler-service.js";
+import { createModuleCssCache } from "../services/module-css-service.js";
 
 const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
@@ -547,6 +549,7 @@ export function createModulesRouter({
 }) {
   const app = new Hono();
   const svc = createModuleLifecycleService({ prisma });
+  const moduleCss = createModuleCssCache({ computeSourceHash });
 
   async function safeRouteReload(moduleKey) {
     if (!routeLoader) return null;
@@ -2470,6 +2473,31 @@ export function createModulesRouter({
     return c.body(content);
   });
 
+  // GET /modules/:key/bundle.css — utilities used by the module's components
+  // (spec 2026-10-03-rme3-module-platform-v2 §12.1). Like bundle.js it is
+  // fetched without auth headers (a <link>); it only exposes CSS derived from
+  // the same sources bundle.js already serves. Empty 200 when there is
+  // nothing to style, so the loader never logs a failed stylesheet.
+  app.get("/:key/bundle.css", async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    c.header("Content-Type", "text/css; charset=utf-8");
+    c.header("Cache-Control", "no-cache");
+    if (!/^[\w.-]+$/.test(key)) return c.body("");
+    const moduleRow = await prisma.runlyModule.findUnique({
+      where: { key },
+      select: { status: true, enabled: true, hasBundle: true },
+    });
+    if (!moduleRow || moduleRow.status !== "INSTALLED" || !moduleRow.enabled || !moduleRow.hasBundle) return c.body("");
+    const modulesDir = await resolveModulesDir();
+    if (!modulesDir) return c.body("");
+    try {
+      return c.body(await moduleCss(path.join(modulesDir, key, "components")));
+    } catch (err) {
+      console.error(`[modules] bundle.css for ${key} failed:`, err?.message ?? err);
+      return c.body("");
+    }
+  });
+
   // POST /modules/:key/upload/check — review a ZIP without applying it:
   // validation, structure plan vs the installed module and a preview bundle
   // of its React components (module-package-service.js#checkZip).
@@ -2521,6 +2549,20 @@ export function createModulesRouter({
     } catch {
       return c.json({ error: "Vista previa no encontrada." }, 404);
     }
+  });
+
+  // GET /modules/:key/preview/:previewId/bundle.css — utilities for the
+  // preview bundle, written next to it by /upload/check. Empty 200 if absent.
+  app.get("/:key/preview/:previewId/bundle.css", async (c) => {
+    const key = c.req.param("key");
+    const previewId = c.req.param("previewId");
+    c.header("Content-Type", "text/css; charset=utf-8");
+    c.header("Cache-Control", "no-store");
+    if (!/^[\w.-]+$/.test(key) || !/^[0-9a-f-]{36}$/i.test(previewId)) return c.body("");
+    const modulesDir = await resolveModulesDir();
+    if (!modulesDir) return c.body("");
+    const cssPath = path.join(path.dirname(previewBundlePath(modulesDir, key, previewId)), "bundle.css");
+    return c.body(await fs.readFile(cssPath, "utf8").catch(() => ""));
   });
 
   // POST /modules/:key/upload — extract a custom module ZIP to ATLAS_MODULES_DIR
