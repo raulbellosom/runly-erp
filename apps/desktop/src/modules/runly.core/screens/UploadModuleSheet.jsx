@@ -18,6 +18,7 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { ZipDropZone } from "../components/module-update/ZipDropZone";
 import { ModuleUpdateReview } from "../components/module-update/ModuleUpdateReview";
 import { guessKeyFromFilename, readModuleKeyFromZip } from "../lib/module-zip-key.js";
+import { StarterPackageCard } from "../components/module-update/StarterPackageCard";
 
 export function UploadModuleSheet({ open, onOpenChange, onSuccess, fixedModuleKey = null, title = "Subir módulo" }) {
   const { session } = useAuth();
@@ -118,6 +119,8 @@ export function UploadModuleSheet({ open, onOpenChange, onSuccess, fixedModuleKe
             <p className="rounded-lg border border-[hsl(var(--border))] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
               El código del ZIP se ejecuta en esta instancia. Solo sube módulos de fuentes de confianza.
             </p>
+
+            {!fixedModuleKey && <StarterPackageCard token={token} />}
           </div>
         )}
         </div>

@@ -81,7 +81,7 @@ test('rules are emitted on tabs, sections and fields; detail can use its own tre
   assert.deepEqual(form.sections[0].fields.find((field) => field.field === 'credito').visibleWhen, { field: 'tipo', equals: 'EMPRESA' })
   const detail = viewSchema(compiled, 'views/cliente.detail.js')
   assert.equal(detail.tabs, undefined)
-  assert.deepEqual(detail.sections.map((section) => section.id), ['todo', 'otros_datos'])
+  assert.deepEqual(detail.sections.map((section) => section.id), ['todo', 'otros_datos', 'audit'])
 })
 
 test('conditional required fields are optional in the validator and enforced by the routes', async () => {

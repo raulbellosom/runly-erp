@@ -23,6 +23,10 @@ Constructor ──► Descargar ZIP ──► Editar ──► Revisar ──►
 
 Las siguientes veces repites 3 → 6: al aplicar una actualización de un módulo instalado, el cambio queda activo de inmediato.
 
+### Empezar sin el Constructor: paquete base
+
+En **Módulos > Subir módulo**, abre **¿Vas a crear un módulo nuevo?**, escribe el nombre (la clave se propone sola, por ejemplo `custom.visitas`) y da **Descargar paquete base**. Recibes un módulo instalable con una entidad de ejemplo ("Registro"), sus vistas, su API y un tablero en React, más `GUIA_DESARROLLO_RUNLY.md`, `AGENTS.md`, esta documentación en `docs/` y pantallas de referencia en `docs/ejemplos/`. Dale el ZIP a tu asistente de IA junto con lo que necesitas ("cambia Registro por Visita con estos campos…"), y sube el resultado: Runly toma la clave del `module.manifest.js` del ZIP, así que el nombre del archivo puede llevar la versión (`custom.visitas-1.0.0.zip`).
+
 ### Lo que suele confundir
 
 | Ves esto | Significa |

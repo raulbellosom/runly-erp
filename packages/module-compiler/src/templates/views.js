@@ -145,6 +145,7 @@ export default defineView({
 ${fields}
         ],
       },
+      { id: 'audit', type: 'audit', label: 'Historial de cambios', icon: 'History', audit: { entityType: '${slug}.${entity.name}' } },
     ],
     actions: [
       { label: 'Editar',     permission: '${permKey(slug, entity.name, 'update')}' },

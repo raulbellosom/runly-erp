@@ -25,16 +25,16 @@ export function generateService(config, entity) {
     filterFields: entity.fields.filter(isSameModuleRelation),
   }
 
-  const importLine = `import { ${errorClass}, toScopedCompanyUuid, normalizeRecordId, normalizePagination, normalizeSearch, normalizeOptionalString, toCount, firstRow, withDbErrorMapping, isUniqueViolation } from './service-helpers.js'`
+  const importLine = `import { ${errorClass}, toScopedCompanyUuid, normalizeRecordId, normalizePagination, normalizeSearch, normalizeOptionalString, toCount, firstRow, withDbErrorMapping, isUniqueViolation, recordActivity } from './service-helpers.js'`
   const moduleKeyLine = `const MODULE_KEY = '${config.key}'`
     + (rel.filterFields.length ? '\nconst UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i' : '')
   const relationsImport = rel.module ? `\nimport { assertRelationTargets, beforeDisable } from './${entity.name}-relations.js'` : ''
 
   const listFn = buildListFn(pascal, table, entity, companyScoped, softDelete, firstTextField, selectFields, rel)
   const getByIdFn = buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorClass, rel)
-  const createFn = buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel)
-  const updateFn = buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields, rel)
-  const setEnabledFn = softDelete ? buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel) : null
+  const createFn = buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel, config)
+  const updateFn = buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields, rel, config)
+  const setEnabledFn = softDelete ? buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel, config) : null
 
   const returnedMethods = [`list${pascal}s`, `get${pascal}ById`, `create${pascal}`, `update${pascal}`]
   if (softDelete) returnedMethods.push(`set${pascal}Enabled`)
@@ -121,7 +121,18 @@ function buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorC
   return lines.join('\n')
 }
 
-function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel) {
+// Audit-trail Activity row next to each AuditLog write (spec
+// 2026-10-03-audit-trail-design §2.6). `rowVar`/`beforeVar` are the generated
+// local names; `verbExpr` is a JS expression yielding the verb.
+function activityCall(config, entity, { companyExpr, verbExpr, rowVar, beforeVar = 'null', indent = '    ' }) {
+  const slug = moduleSlug(config.key)
+  const titleField = entity.fields.find((f) => ['text', 'email', 'phone'].includes(f.type))
+  const title = titleField ? `${rowVar}?.${titleField.name} ?? null` : 'null'
+  const label = escSingle(entity.label ?? entity.name)
+  return `${indent}await recordActivity(prisma, { companyId: ${companyExpr}, actorId, type: '${slug}.${entity.name}.' + ${verbExpr}, verb: ${verbExpr}, entityType: '${slug}.${entity.name}', entityId: ${rowVar}?.id ?? null, entityLabel: '${label}', title: ${title}, before: ${beforeVar}, after: ${rowVar} })`
+}
+
+function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel, config) {
   const cols = companyScoped ? ['company_id', ...allFields] : allFields
   const vals = companyScoped
     ? ['${safeCompanyId}', ...allFields.map((f) => buildFieldValue(entity, f))]
@@ -141,6 +152,7 @@ function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFiel
   lines.push('      return firstRow(rows)')
   lines.push('    })')
   lines.push(`    await prisma.auditLog.create({ data: { actorId: actorId ?? null, moduleKey: MODULE_KEY, entityType: '${entityType}', entityId: row?.id ?? null, action: '${entity.name}.create', before: null, after: row } })`)
+  lines.push(activityCall(config, entity, { companyExpr: companyScoped ? 'safeCompanyId' : 'companyId', verbExpr: "'create'", rowVar: 'row' }))
   lines.push('    return row')
   lines.push('  } catch (error) {')
   lines.push(`    if (isUniqueViolation(error)) throw new ${errorClass}('Ya existe un registro con esos datos.', 409)`)
@@ -150,7 +162,7 @@ function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFiel
   return lines.join('\n')
 }
 
-function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields, rel) {
+function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorClass, allFields, rel, config) {
   const companyWhere = companyScoped ? ' AND company_id = ${safeCompanyId}' : ''
   const enabledWhere = softDelete ? ' AND enabled = true' : ''
   const notFoundMsg = escSingle(entity.label) + ' no encontrado.'
@@ -184,6 +196,7 @@ function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorCl
   lines.push('    })')
   lines.push(`    if (!updated) throw new ${errorClass}('${notFoundMsg}', 404)`)
   lines.push(`    await prisma.auditLog.create({ data: { actorId: actorId ?? null, moduleKey: MODULE_KEY, entityType: '${entityType}', entityId: updated.id, action: '${entity.name}.update', before, after: updated } })`)
+  lines.push(activityCall(config, entity, { companyExpr: companyScoped ? 'safeCompanyId' : 'companyId', verbExpr: "'update'", rowVar: 'updated', beforeVar: 'before' }))
   lines.push('    return updated')
   lines.push('  } catch (error) {')
   lines.push(`    if (isUniqueViolation(error)) throw new ${errorClass}('Ya existe un registro con esos datos.', 409)`)
@@ -193,7 +206,7 @@ function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorCl
   return lines.join('\n')
 }
 
-function buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel) {
+function buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel, config) {
   const companyWhere = companyScoped ? ' AND company_id = ${safeCompanyId}' : ''
   const entityType = toPascalSimple(entity.name)
   const lines = []
@@ -218,6 +231,7 @@ function buildSetEnabledFn(pascal, table, companyScoped, errorClass, entity, rel
   lines.push('  })')
   lines.push(`  if (!updated) throw new ${errorClass}('Registro no encontrado.', 404)`)
   lines.push(`  await prisma.auditLog.create({ data: { actorId: actorId ?? null, moduleKey: MODULE_KEY, entityType: '${entityType}', entityId: updated.id, action: '${entity.name}.' + (enabled ? 'enable' : 'disable'), before, after: updated } })`)
+  lines.push(activityCall(config, entity, { companyExpr: companyScoped ? 'safeCompanyId' : 'companyId', verbExpr: "(enabled ? 'enable' : 'disable')", rowVar: 'updated', beforeVar: 'before', indent: '  ' }))
   lines.push('  return updated')
   lines.push('}')
   return lines.join('\n')

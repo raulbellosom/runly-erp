@@ -126,7 +126,23 @@ Formulario para crear (sin `recordId`) o editar un registro, con las secciones y
 
 ### EntityDetail
 
-Ficha de solo lectura de un registro (secciones, adjuntos). Props: `entity`, `recordId`, `onEdit`, `onBack`, `heroActions`.
+Ficha de solo lectura de un registro (secciones, adjuntos). Props: `entity`, `recordId`, `onEdit`, `onBack`, `heroActions`, `mainExtra`, `asideExtra` (contenido propio de la pantalla que se agrega al final de la columna principal o lateral en `layout: 'two-column'`, en vez de una fila de ancho completo debajo del detalle).
+
+### AuditTrail
+
+Historial de cambios de un registro: quién cambió qué y cuándo, con los campos modificados en línea, filtros por tipo y el botón *Ver historial completo* (panel lateral con filtro por persona y paginación). En la ficha generada aparece solo; en un detalle por blueprint agrega la sección `{ type: 'audit', label: 'Historial de cambios', audit: { entityType: '<módulo>.<entidad>' } }`.
+
+```jsx
+<AuditTrail apiBaseUrl={apiBaseUrl} token={token} companyId={companyId}
+  entityType="visitas.visita" entityId={visita.id}
+  changeLabels={{ estado: { label: 'Estado', type: 'select', options: ESTADOS } }} />
+```
+
+`changeLabels` es opcional: sin él, los nombres de campo se muestran legibles ("fecha_visita" → "Fecha visita").
+
+### PersonAvatar
+
+Foto de una persona con globo de iniciales cuando no hay foto: `<PersonAvatar name="Ana López" src={persona.avatarUrl} size="sm" />` (tamaños `xs`, `sm`, `md`, `lg`).
 
 ### useEntityList
 

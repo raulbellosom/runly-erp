@@ -157,6 +157,18 @@ Content-Type: application/json
 
 Responde `200` con el registro. Si otras entidades del módulo apuntan a este registro, se aplica la regla de cada relación (ver *Relaciones*): con **Bloquear** responde `409` (`No se puede desactivar: 3 Pedidos lo usan.`), con **Vaciar** o **En cascada** se desactiva y ajusta los registros que lo usan.
 
+## Historial de cambios
+
+Cada alta, edición, desactivación y reactivación queda registrada automáticamente: la API guarda quién lo hizo, cuándo y, en las ediciones, qué campos cambiaron (valor anterior y nuevo). No tienes que escribir nada para que funcione.
+
+```http
+GET /activity/entity/visitas.visita/0192f0c4-7b1e-7c2a-9d3e-5f6a7b8c9d0e?limit=25
+```
+
+El tipo de entidad es `<módulo>.<entidad>` (aquí `visitas.visita`). Responde `{ data, nextCursor }`: cada entrada trae `summary`, `createdAt`, `category` (`created`, `updated`, `status`...), `actor` (con `avatarUrl`) y, en ediciones, `payload.changes` (`[{ field, oldValue, newValue }]`). Para la página siguiente pasa `before=<nextCursor>`; filtra con `category=updated` o `actorId=<id>`. Requiere el permiso `activity.read`.
+
+La ficha de detalle generada ya incluye la sección *Historial de cambios*. En una pantalla propia usa el componente `AuditTrail` (ver *Componentes*).
+
 ## Valores por tipo de campo
 
 Lo que envías al crear o editar y lo que la API devuelve no siempre tiene la misma forma:

@@ -76,6 +76,70 @@ export function firstRow(rows) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
 }
 
+const AUDIT_SKIP_FIELDS = new Set(['id', 'company_id', 'created_at', 'updated_at', 'enabled'])
+const AUDIT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function auditValue(value) {
+  if (value === null || value === undefined) return null
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) value = value.map(String).join(', ')
+  if (typeof value === 'object') return undefined
+  const text = String(value)
+  return text.length > 140 ? text.slice(0, 140) + '…' : value
+}
+
+// Field-level diff of two rows for the audit trail; capped to fit the
+// activity payload limit (4 KB).
+export function auditChanges(before, after) {
+  if (!before || !after) return []
+  const out = []
+  let bytes = 2
+  for (const field of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (AUDIT_SKIP_FIELDS.has(field) || field.startsWith('_')) continue
+    const oldValue = auditValue(before[field])
+    const newValue = auditValue(after[field])
+    if (oldValue === undefined || newValue === undefined) continue
+    if (String(oldValue ?? '') === String(newValue ?? '')) continue
+    const entry = { field, oldValue, newValue }
+    const size = JSON.stringify(entry).length + 1
+    if (out.length >= 25 || bytes + size > 3200) break
+    out.push(entry)
+    bytes += size
+  }
+  return out
+}
+
+const AUDIT_VERBS = { create: 'creó', update: 'actualizó', enable: 'reactivó', disable: 'desactivó' }
+
+// Publishes the record's audit-trail entry (Activity) next to its AuditLog
+// row. Best effort: a failure here never fails the write.
+export async function recordActivity(prisma, { companyId, actorId, type, verb, entityType, entityId, entityLabel, title, before = null, after = null }) {
+  try {
+    if (!companyId || !AUDIT_UUID.test(String(companyId)) || !entityId) return
+    const actor = actorId && AUDIT_UUID.test(String(actorId))
+      ? await prisma.userProfile.findUnique({ where: { id: actorId }, select: { displayName: true, firstName: true, lastName: true } })
+      : null
+    const actorName = actor?.displayName || [actor?.firstName, actor?.lastName].filter(Boolean).join(' ').trim() || 'Sistema'
+    const label = title ? ' «' + String(title).slice(0, 120) + '»' : ''
+    const changes = verb === 'update' ? auditChanges(before, after) : []
+    await prisma.activity.create({
+      data: {
+        companyId,
+        actorId: actor ? actorId : null,
+        type,
+        entityType,
+        entityId,
+        summary: actorName + ' ' + (AUDIT_VERBS[verb] ?? verb) + ' ' + entityLabel + label,
+        severity: verb === 'create' ? 'success' : verb === 'disable' ? 'warning' : 'info',
+        payload: changes.length ? { changes } : undefined,
+        source: 'audit_bridge',
+      },
+    })
+  } catch {
+    // best effort
+  }
+}
+
 export async function withDbErrorMapping(fn, ErrorClass = ${errorClass}) {
   try {
     return await fn()

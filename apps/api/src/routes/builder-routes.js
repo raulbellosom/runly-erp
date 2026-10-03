@@ -9,6 +9,7 @@
 import { Hono } from 'hono'
 import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, MODULE_ICON_NAMES, RECORDS_VIEW_DATE_FIELD_TYPES, RECORDS_VIEW_KINDS } from '@runly/module-engine'
 import { createModuleBuilderService, ModuleBuilderError } from '../services/module-builder-service.js'
+import { buildStarterPackage, StarterPackageError } from '@runly/module-compiler'
 import { publishActivityFromContext, getActivityContext } from '../services/activity-publisher.js'
 
 function handleBuilderError(c, error, fallbackMessage) {
@@ -124,6 +125,25 @@ export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = nu
       return c.json({ data })
     } catch (error) {
       return handleBuilderError(c, error, 'No se pudo generar la vista previa.')
+    }
+  })
+
+  // Paquete base: an installable sample module + guide, AGENTS.md, docs and
+  // golden screens, for authors who start in code or with an AI.
+  app.get('/module-builder/starter-package', requirePermission('core.modules.upload'), async (c) => {
+    try {
+      const { buffer, filename } = await buildStarterPackage({ key: c.req.query('key'), name: c.req.query('name') })
+      return new Response(buffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Length': String(buffer.length),
+        },
+      })
+    } catch (error) {
+      if (error instanceof StarterPackageError) return c.json({ error: error.message }, error.status)
+      return handleBuilderError(c, error, 'No se pudo generar el paquete base.')
     }
   })
 

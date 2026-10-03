@@ -49,6 +49,10 @@ export function createBuilderDomain({ request, requestBlob, withAuthHeaders }) {
     exportPackage: (id, token) =>
       requestBlob(`${projectPath(id)}/export`, { headers: withAuthHeaders(token) }),
 
+    // Paquete base (sample module + docs) to start a module in code or with an AI.
+    starterPackage: ({ key, name }, token) =>
+      requestBlob(`/module-builder/starter-package?key=${encodeURIComponent(key)}&name=${encodeURIComponent(name ?? '')}`, { headers: withAuthHeaders(token) }),
+
     getPublishImpact: (id, token) =>
       request(`${projectPath(id)}/publish-impact`, { headers: withAuthHeaders(token) }),
 

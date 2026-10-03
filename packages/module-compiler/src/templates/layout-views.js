@@ -208,6 +208,21 @@ export function generateLayoutFormView(config, entity) {
   return schema ? emitView(`${moduleSlug(config.key)}.${entity.name}.form`, 'FORM', schema) : null
 }
 
+// Built-in "Historial de cambios" section (spec 2026-10-03-audit-trail-design
+// §2.6): reads the record's Activity entries, published by the generated
+// service under the qualified entity type `<slug>.<entity>`.
+export function auditSection(config, entity, { column, tab } = {}) {
+  return {
+    id: 'audit',
+    type: 'audit',
+    label: 'Historial de cambios',
+    icon: 'History',
+    ...(column ? { column } : {}),
+    ...(tab ? { tab } : {}),
+    audit: { entityType: `${moduleSlug(config.key)}.${entity.name}` },
+  }
+}
+
 export function buildLayoutDetailSchema(config, entity) {
   const layout = resolveEntityLayout(entity, 'detail')
   if (!layout) return null
@@ -219,6 +234,7 @@ export function buildLayoutDetailSchema(config, entity) {
     ...(detail.hero.statusField ? { statusField: detail.hero.statusField } : {}),
     ...(detail.hero.imageField ? { imageField: detail.hero.imageField, signedUrlPath: entityFilePaths(config, entity).signedUrlPath } : {}),
   } : null
+  const sections = layoutSections(config, entity, layout, detailFieldSpec, { attachmentsColumn: detail.twoColumn ? 'aside' : undefined, related: true })
   return {
     entity: entity.name,
     component: 'RunlyDetail',
@@ -226,7 +242,7 @@ export function buildLayoutDetailSchema(config, entity) {
     ...(hero ? { hero } : {}),
     ...(detail.kpis?.length ? { kpis: detail.kpis.map((kpi) => ({ field: kpi.field, label: kpi.label })) } : {}),
     ...(detail.twoColumn ? { layout: 'two-column' } : {}),
-    ...withTabs(layout, layoutSections(config, entity, layout, detailFieldSpec, { attachmentsColumn: detail.twoColumn ? 'aside' : undefined, related: true })),
+    ...withTabs(layout, [...sections, auditSection(config, entity, { column: detail.twoColumn ? 'aside' : undefined, tab: sections[0]?.tab })]),
     actions: [
       { label: 'Editar', permission: permKey(slug, entity.name, 'update') },
       { label: 'Desactivar', permission: permKey(slug, entity.name, 'delete') },
