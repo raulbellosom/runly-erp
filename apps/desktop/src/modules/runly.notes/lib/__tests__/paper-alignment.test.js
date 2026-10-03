@@ -2,12 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { computeLineUnitPx, computePaperPhase } from '../paperAlignment.js'
 
-test('computeLineUnitPx: desktop uses 0.9375rem * 1.72', () => {
-  assert.equal(computeLineUnitPx(16, false), 0.9375 * 1.72 * 16)
+test('computeLineUnitPx: desktop line unit is 1.625rem (26px, whole pixels)', () => {
+  assert.equal(computeLineUnitPx(16, false), 26)
 })
 
-test('computeLineUnitPx: mobile follows its 0.875rem body typography', () => {
-  assert.equal(computeLineUnitPx(16, true), 0.875 * 1.72 * 16)
+test('computeLineUnitPx: mobile line unit is 1.5rem (24px)', () => {
+  assert.equal(computeLineUnitPx(16, true), 24)
 })
 
 test('computePaperPhase: exact multiple of the line unit needs no shift', () => {

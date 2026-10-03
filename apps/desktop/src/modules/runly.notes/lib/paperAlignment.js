@@ -7,10 +7,11 @@
 // real text — this computes the correction from an actually-measured
 // distance instead.
 
-// Match responsive body typography. Viewport distances must first be
-// divided by sheet zoom to keep the rules aligned at every zoom level.
+// Mirrors --note-line in styles.css (1.625rem desktop, 1.5rem mobile): the
+// body line-height and the ruled tile share it. Viewport distances must
+// first be divided by sheet zoom to keep the rules aligned at every zoom.
 export function computeLineUnitPx(rootFontSizePx, isMobile = false) {
-  return (isMobile ? 0.875 : 0.9375) * 1.72 * rootFontSizePx
+  return (isMobile ? 1.5 : 1.625) * rootFontSizePx
 }
 
 // How far (px) to shift the pattern's background-position so a line

@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { patchNoteInCache, toNoteRowPatch } from './lib/noteCache.js'
 import {
   Plus, ArrowLeft,
   Settings2, Share2, RotateCcw, Trash2, PenLine,
@@ -68,6 +70,7 @@ export default function NotesScreen() {
   const isTrashView = activeView === 'trash'
 
   const [selectedNote, setSelectedNote] = useState(null)
+  const queryClient = useQueryClient()
   useMiraiRecordContext({ recordType: 'note', recordId: selectedNote?.id, label: selectedNote?.title })
   const [viewingNoteId, setViewingNoteId] = useState(null)
   const viewOnly = viewingNoteId === selectedNote?.id
@@ -178,25 +181,19 @@ export default function NotesScreen() {
 
   const handleUpdateNote = useCallback((patch) => {
     if (!selectedNote) return
-    // Optimistic local update so the UI reacts instantly (title bar, bg color, etc.)
-    const camelToSnake = {
-      title: 'title', content: 'content', icon: 'icon',
-      backgroundColor: 'background_color', folderId: 'folder_id',
-      isPinned: 'is_pinned', isArchived: 'is_archived', coverUrl: 'cover_url',
-      paperStyle: 'paper_style',
-      paperMargin: 'paper_margin', paperTexture: 'paper_texture', paperShadow: 'paper_shadow',
-      showPublicCollaborators: 'show_public_collaborators',
-    }
-    const localPatch = {}
-    for (const [k, v] of Object.entries(patch)) {
-      localPatch[camelToSnake[k] ?? k] = v
-    }
+    // Optimistic update so the UI reacts instantly: the open note (title bar,
+    // bg color, etc.) and every cached list showing it.
+    const localPatch = toNoteRowPatch(patch)
     setSelectedNote(prev => prev ? { ...prev, ...localPatch } : prev)
+    patchNoteInCache(queryClient, selectedNote.id, patch)
     updateNote.mutate(
       { noteId: selectedNote.id, data: patch },
-      { onSuccess: (res) => { if (res?.note) setSelectedNote(res.note) } },
+      {
+        onSuccess: (res) => { if (res?.note) setSelectedNote(res.note) },
+        onError: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+      },
     )
-  }, [selectedNote, updateNote])
+  }, [selectedNote, updateNote, queryClient])
 
   function clearIfSelected(target) {
     if (selectedNote?.id === target.id) {

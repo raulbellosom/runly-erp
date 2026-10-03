@@ -26,6 +26,7 @@ import { NoteCoverBanner } from './NoteCoverBanner.jsx'
 import { NoteIconPickerContent } from './NoteIconPicker.jsx'
 import { PresenceStack } from './PresenceStack.jsx'
 import { NoteIcon } from '../noteIcons.jsx'
+import { patchNoteInCache } from '../lib/noteCache.js'
 import { DrawingBlock } from '../lib/extensions/DrawingBlock.jsx'
 import { AnnotatableImage } from '../lib/extensions/AnnotatableImage.jsx'
 
@@ -252,6 +253,9 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
   const savingRef = useRef(false)
   const rerunRef = useRef(false)
   const saveTimerRef = useRef(null)
+  // Last title pushed to the query caches (optimistic, per keystroke).
+  const lastTitleRef = useRef(note?.title ?? '')
+  useEffect(() => { lastTitleRef.current = note?.title ?? '' }, [note?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const flushSave = useCallback(async () => {
     if (readOnly || !note?.id || !token) return
@@ -289,8 +293,12 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       if (snap) {
         try {
           await runly.notes.update(note.id, snap, token)
-          queryClient.invalidateQueries({ queryKey: ['notes'] })
-          queryClient.invalidateQueries({ queryKey: ['notes', note.id] })
+          // While newer edits are still pending, a refetch would bring back
+          // this older title over the optimistic one; the next save refreshes.
+          if (!pendingRef.current) {
+            queryClient.invalidateQueries({ queryKey: ['notes'] })
+            queryClient.invalidateQueries({ queryKey: ['notes', note.id] })
+          }
         } catch (err) {
           console.warn('[NoteEditor] content autosave failed:', err?.message)
           // Keep the snapshot so the next edit (or the unmount flush) retries.
@@ -354,15 +362,22 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       // First paragraph text becomes the note title (Apple Notes pattern).
       // Always send it — an empty string clears a stale "Nueva nota".
       const firstChild = editor.state.doc.firstChild
+      const title = firstChild?.textContent?.trim() ?? ''
       pendingRef.current = {
         content: editor.getHTML(),
         contentText: editor.getText(),
-        title: firstChild?.textContent?.trim() ?? '',
+        title,
+      }
+      // The list and the header show the title as it is typed, not after
+      // the debounced save + refetch.
+      if (title !== lastTitleRef.current) {
+        lastTitleRef.current = title
+        patchNoteInCache(queryClient, note.id, { title })
       }
       clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(flushSave, AUTOSAVE_DELAY)
     },
-    [note?.id, token, viewing, ydoc, flushSave],
+    [note?.id, token, viewing, ydoc, flushSave, queryClient],
   )
 
   useEffect(() => {
@@ -392,12 +407,15 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
   const updateNoteMeta = useCallback(
     async (patch) => {
       if (readOnly || !note?.id || !token) return
+      patchNoteInCache(queryClient, note.id, patch)
       try {
         await runly.notes.update(note.id, patch, token)
         queryClient.invalidateQueries({ queryKey: ['notes'] })
         queryClient.invalidateQueries({ queryKey: ['notes', note.id] })
       } catch (err) {
         console.warn('[NoteEditor] meta update failed:', err?.message)
+        // Roll the optimistic patch back to the server state.
+        queryClient.invalidateQueries({ queryKey: ['notes'] })
       }
     },
     [note?.id, token, readOnly, queryClient],
@@ -557,7 +575,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
       onSelectionUpdate={handleSelectionUpdate}
       editorProps={{
         attributes: {
-          class: 'focus:outline-none note-sheet-inset pt-1 pb-6 min-h-full',
+          class: 'focus:outline-none note-sheet-inset pb-6 min-h-full',
         },
       }}
       slotBefore={
@@ -568,22 +586,23 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
             toolbarHost,
           )}
           {(
-            // Overlaps the title's own line (the editor's first paragraph —
-            // see handleUpdate) via a negative margin-bottom, computed from
-            // the title's font-size/line-height and .tiptap's own top
-            // padding — see the matching CSS comment in styles.css for the
-            // math. `relative z-10` makes this row paint above the title
-            // text in the overlap zone instead of the reverse (later DOM
-            // order would otherwise win).
+            // Zero-height anchor + an overlay row placed exactly on the
+            // title's first line box (the editor's first paragraph — see
+            // handleUpdate): same top (--note-title-top) and same height
+            // (--note-title-lh) as that line, with items-center, so icon,
+            // title text and presence are vertically centered on each other
+            // by construction. The row ignores the pointer so clicks reach
+            // the title text; only its controls take them.
             //
             // readOnly (public view): no icon picker to open and no presence
             // (public viewers never broadcast awareness — see
             // SupabaseYjsProvider's readOnly mode) — just the plain icon, so
             // the note's internal title line matches the editable editor
             // instead of showing bare text with no icon next to it.
+            <div className="relative h-0">
             <div
-              className="relative z-10 note-sheet-inset pt-4 flex items-center justify-between gap-2 -mb-10"
-              onClick={viewing ? undefined : handleTitleRowClick}
+              className="pointer-events-none absolute inset-x-0 z-10 note-sheet-inset flex items-center justify-between gap-2 *:pointer-events-auto"
+              style={{ top: 'var(--note-title-top, 1rem)', height: 'var(--note-title-lh, 2.5rem)' }}
             >
               {viewing ? (
                 <div className="w-10 h-10 flex items-center justify-center">
@@ -612,6 +631,7 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
               )}
               {!viewing && <PresenceStack users={presenceUsers} />}
             </div>
+            </div>
           )}
         </>
       }
@@ -625,21 +645,6 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, t
     if (shouldFocusDocumentEnd(e.target, e.currentTarget)) {
       editorInstanceRef.current?.commands.focus('end')
     }
-  }
-
-  // Makes the whole icon/title row behave like a text input: clicking any
-  // blank part of it (not the icon button or a presence avatar) focuses the
-  // title, caret at its end — matching where a click on real title text
-  // would land — instead of only the exact pixels the "Sin título" glyphs
-  // occupy. Guarded to the row's own background (target !== currentTarget
-  // means the click hit a real child control, e.g. the icon button) so it
-  // never steals focus from those.
-  function handleTitleRowClick(e) {
-    if (e.target !== e.currentTarget) return
-    const editor = editorInstanceRef.current
-    if (!editor) return
-    const titleSize = editor.state.doc.firstChild?.nodeSize ?? 2
-    editor.commands.focus(titleSize - 1)
   }
 
   return (
