@@ -105,7 +105,7 @@ export function createInventoryAdminService({ prisma, activityBridge, notifier =
 
     await bridge.logAndPublish({
       auditEntry: {
-        actorId: actorId ?? 'system',
+        actorId: actorId ?? null,
         moduleKey: 'runly.inventory',
         entityType: 'InvItem',
         entityId: itemId,

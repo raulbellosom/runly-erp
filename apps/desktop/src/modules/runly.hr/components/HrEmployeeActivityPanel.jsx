@@ -1,19 +1,17 @@
-// Registry key: runly.hr:HistorySection
-// Props (RunlyDetail "component" section contract): { data, token }
-import { ActivityTimeline } from "@runly/ui";
-import { runly } from "../../../lib/runly";
+// Registry key: runly.hr:HistorySection — the employee's audit trail.
+// Props (RunlyDetail "component" section contract): { data, apiBaseUrl, token, companyId }
+import { AuditTrail } from "@runly/ui";
 import { HR_EMPLOYEE_ACTIVITY_FIELD_LABELS } from "../lib/activity-field-labels.js";
 
-export default function HrEmployeeActivityPanel({ data, token }) {
+export default function HrEmployeeActivityPanel({ data, apiBaseUrl, token, companyId }) {
   return (
-    <ActivityTimeline
-      sdk={runly}
+    <AuditTrail
+      apiBaseUrl={apiBaseUrl}
       token={token}
+      companyId={companyId}
       entityType="HrEmployee"
       entityId={data?.id}
-      limit={50}
-      heightClass="max-h-[480px]"
-      emptyMessage="Sin actividad registrada para este colaborador."
+      emptyMessage="Sin cambios registrados para este colaborador."
       changeLabels={HR_EMPLOYEE_ACTIVITY_FIELD_LABELS}
     />
   );

@@ -149,10 +149,27 @@ const TRANSLATORS = {
   }),
   "inventory.item.deleted": ({ actor, entityId, after }) => ({
     type: "inventory.item.deleted",
-    summary: `${actorName(actor)} dio de baja el activo ${safeStr(after?.name)}`.trim(),
+    summary: `${actorName(actor)} eliminó el activo ${safeStr(after?.name)}`.trim(),
     severity: "warning",
     link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
   }),
+  ...Object.fromEntries(
+    [
+      ["confirm_registration", "confirmó el alta de", "success"],
+      ["propose_deregistration", "propuso la baja de", "warning"],
+      ["approve_deregistration", "aprobó la baja de", "critical"],
+      ["reject_deregistration", "rechazó la baja de", "info"],
+      ["revert_deregistration", "revirtió la baja de", "info"],
+    ].map(([action, verb, severity]) => [
+      `inventory.item.${action}`,
+      ({ actor, entityId, after }) => ({
+        type: `inventory.item.${action}`,
+        summary: `${actorName(actor)} ${verb} ${safeStr(after?.name) || "el activo"}`.trim(),
+        severity,
+        link: entityId ? `/app/m/runly.inventory/inventory/${entityId}` : undefined,
+      }),
+    ]),
+  ),
   "fleet.vehicle.create": ({ actor, entityId, after }) => ({
     type: "fleet.vehicle.create",
     summary: `${actorName(actor)} registró el vehículo ${safeStr(after?.plate)}`.trim(),
@@ -193,7 +210,50 @@ export function getTranslator(action) {
   return TRANSLATORS[action] ?? null;
 }
 
-const NEVER_DIFF_FIELDS = new Set(["id", "companyId", "createdAt", "updatedAt", "enabled"]);
+const NEVER_DIFF_FIELDS = new Set([
+  "id", "companyId", "createdAt", "updatedAt", "enabled",
+  "company_id", "created_at", "updated_at", "metadata", "search_vector",
+]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CHANGE_VALUE_MAX = 140;
+const CHANGES_MAX = 25;
+// Activity.payload is capped at 4096 bytes (@runly/validators); stay well below.
+const CHANGES_MAX_BYTES = 3200;
+
+const isUuidish = (v) => v === null || v === undefined || v === "" || (typeof v === "string" && UUID_RE.test(v));
+
+function compactValue(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) value = value.map((v) => (v && typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ");
+  if (typeof value === "object") return undefined; // nested objects never diff
+  if (typeof value === "string" && value.length > CHANGE_VALUE_MAX) return `${value.slice(0, CHANGE_VALUE_MAX)}…`;
+  return value;
+}
+
+// Makes a computed diff safe to store and readable: drops relation-id noise
+// (a *Id/*_id field whose values are uuids — the record's name fields carry
+// the readable change), nested objects and framework columns; truncates long
+// strings; caps count and serialized size so the activity publish never
+// fails on the payload limit (spec 2026-10-03-audit-trail-design §2.4).
+export function compactChanges(changes) {
+  const out = [];
+  let bytes = 2;
+  for (const change of Array.isArray(changes) ? changes : []) {
+    if (!change?.field || NEVER_DIFF_FIELDS.has(change.field)) continue;
+    if (/(Id|_id)$/.test(change.field) && isUuidish(change.oldValue) && isUuidish(change.newValue)) continue;
+    const oldValue = compactValue(change.oldValue);
+    const newValue = compactValue(change.newValue);
+    if (oldValue === undefined || newValue === undefined) continue;
+    if (String(oldValue ?? "") === String(newValue ?? "")) continue;
+    const entry = { field: change.field, oldValue, newValue };
+    const size = JSON.stringify(entry).length + 1;
+    if (out.length >= CHANGES_MAX || bytes + size > CHANGES_MAX_BYTES) break;
+    out.push(entry);
+    bytes += size;
+  }
+  return out;
+}
 
 // Compares two flat, JSON-serializable snapshots and returns only the fields
 // whose value actually changed (string-compared, so type/format differences
@@ -261,7 +321,7 @@ export function createActivityBridge({ activityService, prisma }) {
       // Ningún translator registrado y sin hint: no publicamos para evitar spam.
       return null;
     }
-    const changes = computeFieldChanges(auditEntry.before, auditEntry.after);
+    const changes = compactChanges(computeFieldChanges(auditEntry.before, auditEntry.after));
     const payload = {
       ...(hint?.payload ?? base?.payload ?? null),
       ...(changes.length > 0 ? { changes } : {}),

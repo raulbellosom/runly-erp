@@ -127,3 +127,9 @@ describe("activity-service", () => {
     assert.equal(receivedWhere.entityId, ENTITY_ID);
   });
 });
+
+it("readableSummary rewrites raw-type summaries only", async () => {
+  const { readableSummary } = await import("../activity-service.js");
+  assert.equal(readableSummary("Raul realizó inventory.item.created", "inventory.item.created", "created"), "Raul creó el registro");
+  assert.equal(readableSummary("Raul asignó el activo X", "inventory.item.assigned", "assignment"), "Raul asignó el activo X");
+});

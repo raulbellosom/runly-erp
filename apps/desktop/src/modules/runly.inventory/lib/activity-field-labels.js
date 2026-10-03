@@ -14,7 +14,7 @@ const ITEM_TYPE_OPTIONS = ITEM_TYPES.map((t) => ({ value: t.value, label: t.labe
 // generic extraction would need as much code as this map does directly.
 export const INVENTORY_ACTIVITY_FIELD_LABELS = {
   name: { label: 'Nombre', type: 'text' },
-  assetTag: { label: 'Etiqueta de activo', type: 'text' },
+  assetTag: { label: 'Número de activo', type: 'text' },
   itemType: { label: 'Tipo (anterior)', type: 'select', options: ITEM_TYPE_OPTIONS },
   categoryName: { label: 'Tipo', type: 'text' },
   brandName: { label: 'Marca', type: 'text' },

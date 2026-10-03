@@ -1,17 +1,16 @@
-import { ActivityTimeline } from '@runly/ui'
-import { runly } from '../../../lib/runly'
+import { AuditTrail } from '@runly/ui'
 import { INVENTORY_ACTIVITY_FIELD_LABELS } from '../lib/activity-field-labels.js'
 
-export default function InventoryDetailHistorySection({ data, token }) {
+// Registry key: runly.inventory:HistorySection — the item's audit trail.
+export default function InventoryDetailHistorySection({ data, apiBaseUrl, token, companyId }) {
   return (
-    <ActivityTimeline
-      sdk={runly}
+    <AuditTrail
+      apiBaseUrl={apiBaseUrl}
       token={token}
+      companyId={companyId}
       entityType="InvItem"
       entityId={data?.id}
-      limit={50}
-      heightClass="max-h-[480px]"
-      emptyMessage="Sin actividad registrada para este activo."
+      emptyMessage="Sin cambios registrados para este activo."
       changeLabels={INVENTORY_ACTIVITY_FIELD_LABELS}
     />
   )

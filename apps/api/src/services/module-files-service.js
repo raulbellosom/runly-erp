@@ -1,5 +1,6 @@
 import { IMAGE_VARIANTS, publicUrlWithVariant, signedUrlWithVariant } from "../lib/image-variants.js";
 import { tenantActiveContext } from "../lib/active-context.js";
+import { publishActivityFromContext, getActivityContext } from "./activity-publisher.js";
 
 // `moduleContext.files` for RME3 modules (see
 // docs/superpowers/specs/2026-09-27-rme3-builder-layout-media-design.md §5).
@@ -40,11 +41,25 @@ export function createModuleFilesCapability({ prisma, filesService, supabaseAdmi
       return asset;
     }
 
+    // Audit-trail entry on the owning record (entityType is the qualified
+    // `<slug>.<entity>` the generated service also publishes under).
+    async function fileActivity(c, { entityType, sourceEntityId, verb, kind, name }) {
+      if (!sourceEntityId) return;
+      const { actorName } = getActivityContext(c);
+      await publishActivityFromContext(prisma, c, {
+        type: `${entityType}.file.${kind}`,
+        severity: "info",
+        entityType,
+        entityId: String(sourceEntityId),
+        summary: `${actorName} ${verb}${name ? `: ${String(name).slice(0, 200)}` : ""}`,
+      });
+    }
+
     return {
       // `field` tags uploads that belong to a file field, so the record's
       // attachments list (list()) does not show them a second time.
       async upload(c, { file, entityType, sourceEntityId = null, field = null }) {
-        return filesService.upload({
+        const asset = await filesService.upload({
           authUserId: c.get("authUserId"),
           activeContext: tenantActiveContext(c),
           file,
@@ -55,6 +70,9 @@ export function createModuleFilesCapability({ prisma, filesService, supabaseAdmi
             ...(field ? { metadata: { field } } : {}),
           },
         });
+        // File-field uploads show up as the field's change on save instead.
+        if (!field) await fileActivity(c, { entityType, sourceEntityId, verb: "adjuntó un archivo", kind: "add", name: asset?.originalName ?? file?.name });
+        return asset;
       },
 
       // Attachments only: files uploaded through a file field are excluded.
@@ -87,6 +105,7 @@ export function createModuleFilesCapability({ prisma, filesService, supabaseAdmi
         const asset = await findOwned(c, fileId, entityType);
         if (sourceOf(asset) !== String(sourceEntityId)) throw new ModuleFilesError("Archivo no encontrado.", 404);
         await prisma.fileAsset.update({ where: { id: asset.id }, data: { enabled: false } });
+        await fileActivity(c, { entityType, sourceEntityId, verb: "eliminó un archivo", kind: "remove", name: asset.originalName });
         return { ok: true };
       },
 

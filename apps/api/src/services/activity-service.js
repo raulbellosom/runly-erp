@@ -1,4 +1,4 @@
-import { activityPublishSchema, ACTIVITY_CONSTANTS } from "@runly/validators";
+import { activityPublishSchema, ACTIVITY_CONSTANTS, activityCategory, activityCategoryWhere } from "@runly/validators";
 
 export class ActivityServiceError extends Error {
   constructor(message, status = 500, code = "activity_error") {
@@ -44,6 +44,25 @@ function buildWhere({ companyId, filters }) {
     }
   }
   return where;
+}
+
+// Older bridge entries without a translator were stored as
+// "<actor> realizó <raw.type>"; render them with a readable verb instead.
+const CATEGORY_VERBS = {
+  created: "creó el registro",
+  updated: "actualizó el registro",
+  status: "cambió el estado",
+  assignment: "cambió la asignación",
+  comment: "comentó",
+  file: "modificó los archivos",
+  other: "registró un cambio",
+};
+
+export function readableSummary(summary, type, category) {
+  const text = String(summary ?? "");
+  const marker = ` realizó ${type}`;
+  if (!type || !text.endsWith(marker)) return text;
+  return `${text.slice(0, -marker.length)} ${CATEGORY_VERBS[category] ?? CATEGORY_VERBS.other}`;
 }
 
 export function createActivityService({ prisma }) {
@@ -196,19 +215,31 @@ export function createActivityService({ prisma }) {
     return { data: items };
   }
 
+  // Audit trail of one record (spec 2026-10-03-audit-trail-design §5):
+  // newest first, cursor-paginated by createdAt (`before`), optionally
+  // filtered by category and actor. Each entry carries its derived category.
   async function listForEntity({
     authUserId,
     companyId: activeCompanyId,
     entityType,
     entityId,
     limit = 50,
+    before = null,
+    category = null,
+    actorId = null,
   }) {
     const { companyId } = await resolveCompanyContext(authUserId, activeCompanyId);
     const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const where = { companyId, entityType, entityId };
+    const beforeDate = before ? new Date(before) : null;
+    if (beforeDate && !Number.isNaN(beforeDate.getTime())) where.createdAt = { lt: beforeDate };
+    const categoryWhere = category ? activityCategoryWhere(category) : null;
+    if (categoryWhere) Object.assign(where, categoryWhere);
+    if (actorId && /^[0-9a-f-]{36}$/i.test(String(actorId))) where.actorId = actorId;
     const items = await prisma.activity.findMany({
-      where: { companyId, entityType, entityId },
+      where,
       orderBy: { createdAt: "desc" },
-      take: safeLimit,
+      take: safeLimit + 1,
       include: {
         actor: {
           select: {
@@ -221,7 +252,12 @@ export function createActivityService({ prisma }) {
         },
       },
     });
-    return { data: items };
+    const page = items.slice(0, safeLimit).map((item) => {
+      const category = activityCategory(item.type);
+      return { ...item, category, summary: readableSummary(item.summary, item.type, category) };
+    });
+    const nextCursor = items.length > safeLimit ? page[page.length - 1].createdAt.toISOString() : null;
+    return { data: page, nextCursor };
   }
 
   return {

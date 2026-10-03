@@ -1,5 +1,6 @@
 import { createUserAccessService } from './user-access-service.js';
 import { parseMentionIds } from '../lib/mention-utils.js';
+import { createActivityService } from './activity-service.js';
 
 export class CommentsServiceError extends Error {
   constructor(message, status = 500) {
@@ -9,8 +10,33 @@ export class CommentsServiceError extends Error {
   }
 }
 
-export function createCommentsService({ prisma }) {
+// Activity type prefix per commentable entity, so comments land in the
+// record's audit trail (spec 2026-10-03-audit-trail-design §2.5).
+const ACTIVITY_PREFIX = { InvItem: 'inventory.item', GrowthLead: 'growth.lead', Task: 'projects.task' };
+
+export function createCommentsService({ prisma, activityService = null }) {
   const access = createUserAccessService({ prisma });
+  const activity = activityService ?? createActivityService({ prisma });
+  async function commentActivity({ entityType, entityId, companyId, actorId, author, kind, body = null }) {
+    const prefix = ACTIVITY_PREFIX[entityType];
+    if (!prefix) return;
+    try {
+      const name = [author?.firstName, author?.lastName].filter(Boolean).join(' ').trim() || 'Alguien';
+      const text = String(body ?? '').replace(/\s+/g, ' ').trim();
+      const snippet = text ? `: «${text.length > 120 ? `${text.slice(0, 120)}…` : text}»` : '';
+      await activity.publish({
+        companyId,
+        actorId,
+        type: `${prefix}.comment.${kind}`,
+        entityType,
+        entityId,
+        summary: kind === 'add' ? `${name} comentó${snippet}` : `${name} eliminó un comentario`,
+        severity: 'info',
+      });
+    } catch {
+      // best effort: the comment itself already succeeded
+    }
+  }
   function entityPermission(entityType) {
     return { Task: 'projects.project.read', GrowthLead: 'growth.leads.read', InvItem: 'inventory.item.read' }[entityType];
   }
@@ -83,6 +109,7 @@ export function createCommentsService({ prisma }) {
       },
     });
 
+    await commentActivity({ entityType, entityId, companyId, actorId: authorId, author: comment.author, kind: 'add', body: comment.body });
     return comment;
   }
 
@@ -128,6 +155,8 @@ export function createCommentsService({ prisma }) {
     if (existing.authorId !== requesterId) throw new CommentsServiceError('No tienes permiso para eliminar este comentario.', 403);
 
     await prisma.entityComment.delete({ where: { id: commentId } });
+    const author = await prisma.userProfile.findUnique({ where: { id: requesterId }, select: { firstName: true, lastName: true } }).catch(() => null);
+    await commentActivity({ entityType: existing.entityType, entityId: existing.entityId, companyId, actorId: requesterId, author, kind: 'remove' });
   }
 
   async function toggleReaction(commentId, userAuthId, emoji, companyId, entityId) {

@@ -7,6 +7,7 @@
 // actorContext() from ../calendar/calendar-event-effects.js when called
 // outside an HTTP request.
 import { publishActivityFromContext, getActivityContext } from "../../services/activity-publisher.js";
+import { computeFieldChanges, compactChanges } from "../../services/activity-bridge.js";
 
 export function createContactsEffects({ prisma }) {
   async function afterCreate(c, contact) {
@@ -20,14 +21,18 @@ export function createContactsEffects({ prisma }) {
     });
   }
 
-  async function afterUpdate(c, contact) {
+  // `before`: the contact row prior to the write; with it the entry carries
+  // the field-level diff shown by the audit trail.
+  async function afterUpdate(c, contact, before = null) {
     const { actorName } = getActivityContext(c);
+    const changes = before ? compactChanges(computeFieldChanges(before, contact)) : [];
     await publishActivityFromContext(prisma, c, {
       type: "contacts.contact.update",
       severity: "info",
       entityType: "Contact",
       entityId: contact.id,
       summary: `${actorName} actualizó el contacto "${contact.name ?? ""}"`.trim(),
+      ...(changes.length ? { payload: { changes } } : {}),
     });
   }
 

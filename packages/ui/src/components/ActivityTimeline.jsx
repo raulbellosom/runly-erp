@@ -8,6 +8,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { PersonAvatar } from "./PersonAvatar.jsx";
 
 const SEVERITY_ICONS = {
   info: Info,
@@ -45,18 +46,6 @@ function actorLabel(actor) {
     actor.displayName ||
     [actor.firstName, actor.lastName].filter(Boolean).join(" ").trim() ||
     "Sistema"
-  );
-}
-
-function actorInitials(actor) {
-  const label = actorLabel(actor);
-  return (
-    label
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? "")
-      .join("") || "S"
   );
 }
 
@@ -140,9 +129,11 @@ function ActivityItem({ activity, onNavigate, onSelect, changeLabels }) {
               {activity.summary}
             </span>
             <span className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(var(--muted-foreground))]">
-              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[hsl(var(--muted))] text-[10px] font-semibold">
-                {actorInitials(activity.actor)}
-              </span>
+              <PersonAvatar
+                name={actorLabel(activity.actor)}
+                src={activity.actor?.avatarUrl ?? null}
+                size="xs"
+              />
               <span className="truncate">{actorLabel(activity.actor)}</span>
               <span>·</span>
               <span>{formatRelative(activity.createdAt)}</span>

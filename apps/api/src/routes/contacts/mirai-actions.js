@@ -165,8 +165,9 @@ export function createContactsMiraiActions({ contactsService, effects }) {
       return { input: { contactId: contact.id, data }, preview: { title: "Editar contacto", fields }, targetId: contact.id };
     },
     async execute(input, actx) {
+      const before = await contactsService.getById({ companyId: actx.companyId, id: input.contactId }).catch(() => null);
       const contact = await contactsService.update({ companyId: actx.companyId, id: input.contactId, payload: input.data });
-      await effects.afterUpdate(actorContext({ companyId: actx.companyId, profile: actx.actorProfile }), contact);
+      await effects.afterUpdate(actorContext({ companyId: actx.companyId, profile: actx.actorProfile }), contact, before);
       return { id: contact.id, summary: `Contacto actualizado: ${contact.name}`, link: `/app/m/runly.contacts/contacts/${contact.id}` };
     },
   };

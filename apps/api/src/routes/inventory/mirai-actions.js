@@ -149,7 +149,7 @@ export function createInventoryMiraiActions({ prisma, inventoryService }) {
       return { input: { itemId: item.id, data }, targetId: item.id, preview: { title: 'Editar equipo', fields } };
     },
     async execute(input, actx) {
-      const item = await inventoryService.updateItem(input.itemId, input.data, actx.companyId);
+      const item = await inventoryService.updateItem(input.itemId, input.data, actx.companyId, { actorAuthId: actx.actorAuthUserId ?? null });
       return { id: item.id, summary: `Equipo actualizado: ${item.name}`, link: LINK(item.id) };
     },
   };

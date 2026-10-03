@@ -6,6 +6,7 @@ import { FilesServiceError } from "../services/files-service.js";
 import { FileAccessError } from "../services/files/access.js";
 import { getActivityContext, publishActivityFromContext } from "../services/activity-publisher.js";
 import { tenantActiveContext } from "../lib/active-context.js";
+import { IMAGE_VARIANTS, publicUrlWithVariant, signedUrlWithVariant } from "../lib/image-variants.js";
 
 export function createFilesRouter({ prisma, supabaseAdmin, filesService, authMiddleware, requirePermission }) {
   const app = new Hono();
@@ -31,6 +32,25 @@ export function createFilesRouter({ prisma, supabaseAdmin, filesService, authMid
     }));
   app.post("/files/:id/links/:linkId/revoke", authMiddleware, requirePermission("files.assets.read"),
     linkHandler("No se pudo revocar el enlace.", async (c, args) => c.json({ data: await linksService.revoke({ ...args, linkId: c.req.param("linkId") }) })));
+// Records whose attachments go through these generic routes (no
+// module-specific association endpoint): their audit trail gets an entry
+// when a file is attached or removed (spec 2026-10-03-audit-trail-design).
+const RECORD_FILE_ACTIVITY = { HrEmployee: "hr.employee", Contact: "contacts.contact" };
+
+async function publishRecordFileActivity(c, { entityType, recordId, kind, fileName }) {
+  const prefix = RECORD_FILE_ACTIVITY[entityType];
+  if (!prefix || !recordId) return;
+  const { actorName } = getActivityContext(c);
+  const verb = kind === "add" ? "adjuntó un archivo" : "eliminó un archivo";
+  await publishActivityFromContext(prisma, c, {
+    type: `${prefix}.file.${kind}`,
+    severity: "info",
+    entityType,
+    entityId: String(recordId),
+    summary: `${actorName} ${verb}${fileName ? `: ${String(fileName).slice(0, 200)}` : ""}`,
+  });
+}
+
 app.post(
   "/files/upload",
   authMiddleware,
@@ -82,6 +102,7 @@ app.post(
       }
 
       const { actorName } = getActivityContext(c);
+      await publishRecordFileActivity(c, { entityType: body.entityType, recordId: body.entityId, kind: "add", fileName: asset.originalName });
 
       if (
         body.moduleKey === "runly.identity" &&
@@ -324,6 +345,10 @@ app.post(
         ? body.fileIds.slice(0, 50)
         : [];
       if (fileIds.length === 0) return c.json({ data: {} });
+      // Optional resized copy for grids/cards ("card", "preview"...); applied
+      // to images only — other files keep their original signed URL.
+      const variant = typeof body?.variant === "string" && body.variant in IMAGE_VARIANTS && body.variant !== "full" ? body.variant : null;
+      const isImage = (asset) => String(asset.mimeType ?? "").startsWith("image/");
 
       const assets = await filesService.getCompanyAssets({
         authUserId: c.get("authUserId"),
@@ -342,20 +367,25 @@ app.post(
         [...byBucket.entries()].map(async ([bucket, bucketAssets]) => {
           if (bucket === WEBSITE_BUCKET_NAME) {
             for (const a of bucketAssets) {
-              const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(a.objectKey)
-              urlMap[a.id] = data?.publicUrl ?? null
+              urlMap[a.id] = publicUrlWithVariant(supabaseAdmin, bucket, a.objectKey, variant && isImage(a) ? variant : "full")
             }
             return
           }
+          const resized = variant ? bucketAssets.filter(isImage) : [];
+          const original = bucketAssets.filter((a) => !resized.includes(a));
+          await Promise.all(resized.map(async (a) => {
+            urlMap[a.id] = await signedUrlWithVariant(supabaseAdmin, bucket, a.objectKey, variant, 3600);
+          }));
+          if (original.length === 0) return;
           const { data: signedList } = await supabaseAdmin.storage
             .from(bucket)
             .createSignedUrls(
-              bucketAssets.map((a) => a.objectKey),
+              original.map((a) => a.objectKey),
               3600,
             );
           if (Array.isArray(signedList)) {
-            for (let i = 0; i < bucketAssets.length; i++) {
-              urlMap[bucketAssets[i].id] = signedList[i]?.signedUrl ?? null;
+            for (let i = 0; i < original.length; i++) {
+              urlMap[original[i].id] = signedList[i]?.signedUrl ?? null;
             }
           }
         }),
@@ -415,7 +445,9 @@ app.delete(
     try {
       const authUserId = c.get("authUserId");
       const id = c.req.param("id");
+      const owner = await prisma.fileAsset.findUnique({ where: { id }, select: { entityType: true, metadata: true, originalName: true } }).catch(() => null);
       await filesService.delete({ authUserId, activeContext: tenantActiveContext(c), id });
+      await publishRecordFileActivity(c, { entityType: owner?.entityType, recordId: owner?.metadata?.sourceEntityId, kind: "remove", fileName: owner?.originalName });
       const { actorName } = getActivityContext(c);
       await publishActivityFromContext(prisma, c, {
         type: "files.assets.delete",

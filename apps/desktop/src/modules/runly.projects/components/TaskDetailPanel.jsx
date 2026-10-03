@@ -200,7 +200,12 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onOpenTask
   const [depsExpanded, setDepsExpanded] = useState(false);
   const { data: allTasksData } = useAllTasksForPicker(projectId, depsExpanded);
   const members = useMemo(() => membersData?.data ?? membersData ?? [], [membersData]);
-  const activityEvents = useMemo(() => activityData?.data ?? activityData ?? [], [activityData]);
+  // Comment events also live in Activity (audit trail); this feed already
+  // shows the comments themselves, so skip them here.
+  const activityEvents = useMemo(
+    () => (activityData?.data ?? activityData ?? []).filter((event) => !String(event?.type ?? '').includes('.comment.')),
+    [activityData],
+  );
   const deps = useMemo(() => depsData ?? { blockedBy: [], blocking: [] }, [depsData]);
   const fieldValues = useMemo(() => fieldValuesData ?? [], [fieldValuesData]);
   const allTasks = useMemo(

@@ -13,6 +13,7 @@ import { createInventoryAdminRouter } from './admin-routes.js';
 import { createInventoryModelService } from '../../services/inventory-model-service.js';
 import { createCoreTargetConnections } from '../../services/connections/core-target-connections.js';
 import { attachUserAvatarUrls } from '../../lib/attach-user-avatars.js';
+import { publishActivityFromContext, getActivityContext } from '../../services/activity-publisher.js';
 
 export function createInventoryRouter({
   prisma,
@@ -30,11 +31,28 @@ export function createInventoryRouter({
   const itemConnections = createCoreTargetConnections({ prisma, targetType: "inventory_item" });
   router.route('/', createInventoryIntakeRouter({ prisma, requirePermission }));
   router.route('/', createInventoryModelsRouter({ prisma, requirePermission, inventoryService, InventoryServiceError }));
-  router.route('/', createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc }));
+  router.route('/', createInventoryAdminRouter({ prisma, requirePermission, InventoryServiceError, inventoryNotifSvc, supabaseAdmin }));
   router.route('/', createInventoryImportRouter({ prisma, requirePermission, InventoryServiceError, inventoryService, filesService }));
   const modelDefaults = createInventoryModelService({ prisma });
 
   const isInvErr = (err) => err instanceof InventoryServiceError;
+
+  // Audit-trail entries for files on an item (comments publish from comments-service) (spec
+  // 2026-10-03-audit-trail-design §2.5). Best effort: never fails the write.
+  const itemActivity = (c, itemId, type, verb, detail = null) => {
+    const { actorName } = getActivityContext(c);
+    const text = detail ? `${actorName} ${verb}: ${detail}` : `${actorName} ${verb}`;
+    return publishActivityFromContext(prisma, c, {
+      type: `inventory.item.${type}`,
+      severity: "info",
+      entityType: "InvItem",
+      entityId: itemId,
+      summary: text.length > 480 ? `${text.slice(0, 480)}…` : text,
+      link: `/app/m/runly.inventory/inventory/${itemId}`,
+    });
+  };
+  const fileName = async (fileAssetId) =>
+    (await prisma.fileAsset.findUnique({ where: { id: fileAssetId }, select: { originalName: true } }).catch(() => null))?.originalName ?? null;
   const isCommentErr = (err) => err instanceof CommentsServiceError || err?.status === 404;
 
   // ── Items ────────────────────────────────────────────────────────────────
@@ -99,7 +117,7 @@ export function createInventoryRouter({
       const { id } = c.req.param();
       const { data: body, afterWrite } = await itemConnections.prepare(c, await c.req.json(), id);
       const data = await modelDefaults.applyModelDefaults(body, companyId);
-      const item = await inventoryService.updateItem(id, data, companyId, { afterWrite });
+      const item = await inventoryService.updateItem(id, data, companyId, { afterWrite, actorAuthId: c.get("authUserId") });
       return c.json({ data: item });
     } catch (err) {
       const connectionError = itemConnections.errorResponse(c, err);
@@ -118,7 +136,7 @@ export function createInventoryRouter({
       const { id } = c.req.param();
       const { data: body, afterWrite } = await itemConnections.prepare(c, await c.req.json(), id);
       const data = await modelDefaults.applyModelDefaults(body, companyId);
-      const item = await inventoryService.updateItem(id, data, companyId, { afterWrite });
+      const item = await inventoryService.updateItem(id, data, companyId, { afterWrite, actorAuthId: c.get("authUserId") });
       return c.json({ data: item });
     } catch (err) {
       const connectionError = itemConnections.errorResponse(c, err);
@@ -132,7 +150,7 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { id } = c.req.param();
-      await inventoryService.deleteItem(id, companyId);
+      await inventoryService.deleteItem(id, companyId, c.get("authUserId"));
       return c.json({ success: true });
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
@@ -206,6 +224,7 @@ export function createInventoryRouter({
         await filesService.getById({ authUserId: c.get('authUserId'), activeContext: tenantActiveContext(c), id: fileAssetId });
       }
       const record = await inventoryService.addItemFile(id, fileAssetId, companyId, body.label ?? null);
+      await itemActivity(c, id, 'file.add', 'adjuntó un archivo', await fileName(fileAssetId));
       return c.json({ data: record }, 201);
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);
@@ -217,7 +236,10 @@ export function createInventoryRouter({
     try {
       const companyId = c.get("companyId");
       const { id, docId } = c.req.param();
+      const doc = await prisma.invItemFile.findFirst({ where: { id: docId, itemId: id }, select: { fileAssetId: true } }).catch(() => null);
+      const removedName = doc?.fileAssetId ? await fileName(doc.fileAssetId) : null;
       await inventoryService.removeItemFile(id, docId, companyId);
+      await itemActivity(c, id, 'file.remove', 'eliminó un archivo', removedName);
       return c.json({ success: true });
     } catch (err) {
       if (isInvErr(err)) return c.json({ error: err.message }, err.status);

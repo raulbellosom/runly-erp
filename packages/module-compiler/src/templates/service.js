@@ -124,12 +124,12 @@ function buildGetByIdFn(pascal, table, entity, companyScoped, softDelete, errorC
 // Audit-trail Activity row next to each AuditLog write (spec
 // 2026-10-03-audit-trail-design §2.6). `rowVar`/`beforeVar` are the generated
 // local names; `verbExpr` is a JS expression yielding the verb.
-function activityCall(config, entity, { companyExpr, verbExpr, rowVar, beforeVar = 'null', indent = '    ' }) {
+function activityCall(config, entity, { companyExpr, verbExpr, rowVar, beforeVar = 'null', afterExpr = null, indent = '    ' }) {
   const slug = moduleSlug(config.key)
   const titleField = entity.fields.find((f) => ['text', 'email', 'phone'].includes(f.type))
   const title = titleField ? `${rowVar}?.${titleField.name} ?? null` : 'null'
   const label = escSingle(entity.label ?? entity.name)
-  return `${indent}await recordActivity(prisma, { companyId: ${companyExpr}, actorId, type: '${slug}.${entity.name}.' + ${verbExpr}, verb: ${verbExpr}, entityType: '${slug}.${entity.name}', entityId: ${rowVar}?.id ?? null, entityLabel: '${label}', title: ${title}, before: ${beforeVar}, after: ${rowVar} })`
+  return `${indent}await recordActivity(prisma, { companyId: ${companyExpr}, actorId, type: '${slug}.${entity.name}.' + ${verbExpr}, verb: ${verbExpr}, entityType: '${slug}.${entity.name}', entityId: ${rowVar}?.id ?? null, entityLabel: '${label}', title: ${title}, before: ${beforeVar}, after: ${afterExpr ?? rowVar} })`
 }
 
 function buildCreateFn(pascal, table, entity, companyScoped, errorClass, allFields, rel, config) {
@@ -196,7 +196,10 @@ function buildUpdateFn(pascal, table, entity, companyScoped, softDelete, errorCl
   lines.push('    })')
   lines.push(`    if (!updated) throw new ${errorClass}('${notFoundMsg}', 404)`)
   lines.push(`    await prisma.auditLog.create({ data: { actorId: actorId ?? null, moduleKey: MODULE_KEY, entityType: '${entityType}', entityId: updated.id, action: '${entity.name}.update', before, after: updated } })`)
-  lines.push(activityCall(config, entity, { companyExpr: companyScoped ? 'safeCompanyId' : 'companyId', verbExpr: "'update'", rowVar: 'updated', beforeVar: 'before' }))
+  // With relations, re-read the row so the diff compares relation labels
+  // (<field>__label) instead of raw ids.
+  const afterExpr = rel.sql.select ? `await get${pascal}ById({ companyId: ${companyArg}, id: updated.id }).catch(() => updated)` : null
+  lines.push(activityCall(config, entity, { companyExpr: companyScoped ? 'safeCompanyId' : 'companyId', verbExpr: "'update'", rowVar: 'updated', beforeVar: 'before', afterExpr }))
   lines.push('    return updated')
   lines.push('  } catch (error) {')
   lines.push(`    if (isUniqueViolation(error)) throw new ${errorClass}('Ya existe un registro con esos datos.', 409)`)

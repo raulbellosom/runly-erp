@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ActivityTimeline,
+  AuditTrail,
   AttachmentsPanel,
   Button,
   ConfirmDialog,
@@ -25,6 +25,7 @@ import { ContactHeroCard } from "../components/detail/ContactHeroCard";
 import { ContactPeopleTab, ContactSummaryTab } from "../components/detail/ContactSummaryTab";
 import { ContactActivityTab } from "../components/detail/ContactActivityTab";
 import { CONTACT_ATTACHMENTS_CONFIG } from "../lib/attachments";
+import { CONTACT_ACTIVITY_FIELD_LABELS } from "../lib/activity-field-labels.js";
 import { ConnectionSections } from "../../../shell/connections/ConnectionSections.jsx";
 
 const LIST_PATH = "/app/m/runly.contacts/contacts";
@@ -214,13 +215,15 @@ export default function ContactDetailScreen() {
           </TabsContent>
         )}
         <TabsContent value="historial" className="mt-5">
-          <ActivityTimeline
-            sdk={runly}
+          <AuditTrail
+            apiBaseUrl={getApiUrl()}
             token={token}
+            companyId={activeCompanyId}
             entityType="Contact"
             entityId={contact.id}
-            limit={50}
+            limit={15}
             emptyMessage="Sin cambios registrados para este contacto."
+            changeLabels={CONTACT_ACTIVITY_FIELD_LABELS}
           />
         </TabsContent>
       </Tabs>

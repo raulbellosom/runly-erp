@@ -96,6 +96,8 @@ export function auditChanges(before, after) {
   let bytes = 2
   for (const field of new Set([...Object.keys(before), ...Object.keys(after)])) {
     if (AUDIT_SKIP_FIELDS.has(field) || field.startsWith('_')) continue
+    // A relation diffs through its readable label column, not its id.
+    if ((field + '__label') in before || (field + '__label') in after) continue
     const oldValue = auditValue(before[field])
     const newValue = auditValue(after[field])
     if (oldValue === undefined || newValue === undefined) continue

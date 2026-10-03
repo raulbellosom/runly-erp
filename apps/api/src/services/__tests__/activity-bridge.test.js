@@ -5,6 +5,7 @@ import {
   getTranslator,
   registerTranslator,
   computeFieldChanges,
+  compactChanges,
 } from "../activity-bridge.js";
 
 const COMPANY_ID = "01900000-0000-7000-8000-000000000001";
@@ -331,5 +332,28 @@ describe("activity-bridge", () => {
     });
     const a = activityService._published[0];
     assert.equal(a.payload, undefined);
+  });
+});
+
+describe("compactChanges", () => {
+  it("drops relation-id noise, objects and framework columns; truncates long text", () => {
+    const out = compactChanges([
+      { field: "departmentId", oldValue: COMPANY_ID, newValue: USER_ID },
+      { field: "department", oldValue: "Ventas", newValue: "Soporte" },
+      { field: "metadata", oldValue: null, newValue: "x" },
+      { field: "address", oldValue: { a: 1 }, newValue: { a: 2 } },
+      { field: "notes", oldValue: null, newValue: "a".repeat(500) },
+      { field: "tags", oldValue: ["a"], newValue: ["a", "b"] },
+    ]);
+    assert.deepEqual(out.map((c) => c.field), ["department", "notes", "tags"]);
+    assert.ok(out[1].newValue.length <= 141);
+    assert.equal(out[2].newValue, "a, b");
+  });
+
+  it("keeps the serialized diff under the payload cap", () => {
+    const many = Array.from({ length: 200 }, (_, i) => ({ field: `f${i}`, oldValue: "x".repeat(130), newValue: "y".repeat(130) }));
+    const out = compactChanges(many);
+    assert.ok(JSON.stringify(out).length < 4096);
+    assert.ok(out.length <= 25);
   });
 });

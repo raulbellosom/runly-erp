@@ -431,8 +431,9 @@ export function createContactsRouter({ prisma, requirePermission, supabaseAdmin 
         const authUserId = c.get("authUserId");
         const id = c.req.param("id");
         const { data: payload, afterWrite } = await contactConnections.prepare(c, await c.req.json(), id);
+        const before = await contactsService.getById({ authUserId, companyId: c.get("companyId"), id }).catch(() => null);
         const contact = await contactsService.update({ authUserId, companyId: c.get("companyId"), id, payload, afterWrite });
-        await effects.afterUpdate(c, contact);
+        await effects.afterUpdate(c, contact, before);
         return c.json({ data: contact });
       } catch (err) {
         const connectionError = contactConnections.errorResponse(c, err);

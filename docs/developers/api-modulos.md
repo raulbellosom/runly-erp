@@ -159,7 +159,7 @@ Responde `200` con el registro. Si otras entidades del módulo apuntan a este re
 
 ## Historial de cambios
 
-Cada alta, edición, desactivación y reactivación queda registrada automáticamente: la API guarda quién lo hizo, cuándo y, en las ediciones, qué campos cambiaron (valor anterior y nuevo). No tienes que escribir nada para que funcione.
+Cada alta, edición, desactivación y reactivación queda registrada automáticamente, igual que los archivos que se adjuntan o quitan del registro: la API guarda quién lo hizo, cuándo y, en las ediciones, qué campos cambiaron (valor anterior y nuevo; en relaciones se muestra el nombre del registro relacionado, no su id). No tienes que escribir nada para que funcione.
 
 ```http
 GET /activity/entity/visitas.visita/0192f0c4-7b1e-7c2a-9d3e-5f6a7b8c9d0e?limit=25

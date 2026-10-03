@@ -70,6 +70,9 @@ export function createActivityRouter({ prisma, requirePermission, supabaseAdmin 
           entityType,
           entityId,
           limit,
+          before: c.req.query("before") || null,
+          category: c.req.query("category") || null,
+          actorId: c.req.query("actorId") || null,
         }));
         return c.json(result);
       } catch (err) {
