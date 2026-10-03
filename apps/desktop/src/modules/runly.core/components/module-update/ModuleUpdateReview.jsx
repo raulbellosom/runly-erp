@@ -9,6 +9,7 @@ import { AlertTriangle, CheckCircle2, Code2, Database, Layers, MonitorPlay, Rock
 import { toast } from "sonner";
 import { runly } from "../../../../lib/runly";
 import { CustomViewPreview } from "./CustomViewPreview";
+import { DesignReviewList } from "./DesignReviewList";
 
 function ReportList({ icon: Icon, title, items, tone }) {
   if (!items?.length) return null;
@@ -167,6 +168,7 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
         )
       )}
       <ReportList icon={AlertTriangle} title="Revisa antes de aplicar" items={report.warnings} tone="bg-amber-500/10 text-amber-800 dark:text-amber-300" />
+      <DesignReviewList findings={report.designReview} />
 
       {report.preview && (
         <section className="space-y-2">
