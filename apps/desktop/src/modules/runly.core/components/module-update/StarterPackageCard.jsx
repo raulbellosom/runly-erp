@@ -57,9 +57,12 @@ export function StarterPackageCard({ token }) {
         className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border p-3 text-left text-sm transition-colors hover:bg-muted/60"
       >
         <PackagePlus className="h-5 w-5 shrink-0 text-primary" />
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="block font-medium text-foreground">¿Vas a crear un módulo nuevo?</span>
           <span className="block text-xs text-muted-foreground">Descarga un paquete base con un módulo de ejemplo, la guía y las instrucciones para tu IA.</span>
+        </span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" aria-hidden>
+          <Download className="h-4 w-4" />
         </span>
       </button>
     );
