@@ -62,6 +62,17 @@ const __routesDir = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLES_DIR_SERVE = path.resolve(__routesDir, "..", "..", "bundles");
 const SEMVER_PATCH_RE = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/;
 
+// `version: '1.2.3'` from a module.manifest.js without importing it (Node's
+// import cache would keep serving the version first loaded).
+export async function readManifestVersion(manifestPath) {
+  try {
+    const source = await fs.readFile(manifestPath, "utf8");
+    return /\bversion\s*:\s*["'`]([^"'`\s]+)["'`]/.exec(source)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -893,7 +904,17 @@ export function createModulesRouter({
             },
           },
         });
-        return c.json({ data: modules.map(serializeModule) });
+        // The version of each custom package on disk right now: the desktop's
+        // bundled copy of modules/custom is frozen at build/dev-server start,
+        // so it cannot tell whether an uploaded package still needs syncing.
+        const modulesDir = await resolveModulesDir();
+        const data = await Promise.all(modules.map(async (row) => {
+          const serialized = serializeModule(row);
+          if (!modulesDir || !row.key.startsWith("custom.")) return serialized;
+          const diskVersion = await readManifestVersion(path.join(modulesDir, row.key, "module.manifest.js"));
+          return diskVersion ? { ...serialized, diskVersion } : serialized;
+        }));
+        return c.json({ data });
       } catch (err) {
         return handleLifecycleError(
           c,

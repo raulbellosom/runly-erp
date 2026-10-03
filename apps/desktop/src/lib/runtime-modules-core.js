@@ -98,8 +98,13 @@ export function mergeRuntimeModules(rawApiModules, options = {}) {
       typeof apiRow?.enabled === "boolean" ? apiRow.enabled : core;
 
     const manifestFallback = apiRow?.manifest ?? {};
+    // The API reads custom packages from disk on every list; the bundled
+    // manifest is frozen at build/dev-server start and goes stale after an
+    // uploaded update, so it only decides when the API sent no disk version.
+    const diskVersion =
+      typeof apiRow?.diskVersion === "string" ? apiRow.diskVersion.trim() : null;
     const localVersion =
-      typeof manifest?.version === "string" ? manifest.version.trim() : null;
+      diskVersion ?? (typeof manifest?.version === "string" ? manifest.version.trim() : null);
     const dbVersion =
       typeof apiRow?.version === "string"
         ? apiRow.version.trim()
@@ -111,6 +116,7 @@ export function mergeRuntimeModules(rawApiModules, options = {}) {
     const updateVersionMismatch =
       Boolean(localVersion) && Boolean(dbVersion) && localVersion !== dbVersion;
     const updateMigrationMismatch =
+      !diskVersion &&
       Boolean(localSignature) &&
       Boolean(persistedSignature) &&
       localSignature !== persistedSignature;
