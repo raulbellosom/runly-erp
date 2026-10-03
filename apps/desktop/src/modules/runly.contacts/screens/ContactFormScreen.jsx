@@ -363,7 +363,7 @@ export default function ContactFormScreen() {
         <Button type="button" variant="outline" onClick={cancel} disabled={saveMutation.isPending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={saveMutation.isPending || (isEdit && !formState.isDirty && !avatarPending && !connectionForm.payload())}>
+        <Button type="submit" disabled={saveMutation.isPending || (isEdit && !formState.isDirty && !avatarPending && !connectionForm.dirty)}>
           {saveMutation.isPending ? "Guardando..." : "Guardar contacto"}
         </Button>
       </footer>

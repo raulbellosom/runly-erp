@@ -4,6 +4,16 @@ import { useAuth } from '../../auth/AuthProvider'
 import { useActiveCompany } from '../../company/ActiveCompanyProvider'
 import { runly } from '../../lib/runly'
 
+const blank = (value) => value === null || value === undefined || value === ''
+// Dates come back as ISO timestamps but are edited as YYYY-MM-DD.
+function sameValue(a, b) {
+  if (blank(a) && blank(b)) return true
+  if (blank(a) || blank(b)) return false
+  const left = String(a)
+  const right = String(b)
+  return left === right || (/^\d{4}-\d{2}-\d{2}$/.test(left) && right.startsWith(`${left}T`)) || (/^\d{4}-\d{2}-\d{2}$/.test(right) && left.startsWith(`${right}T`))
+}
+
 // Connection sections of a core form (spec 2026-10-03-rme3-module-platform-v2
 // §8.2, D3). The core form keeps this state and sends payload() with its own
 // save request, so the core record and its sections commit together.
@@ -76,5 +86,11 @@ export function useConnectionForm({ targetType, targetId = null }) {
     return query.refetch()
   }, [query])
 
-  return { sections, isLoading: query.isLoading, valueOf, setFieldValue, errors, conflict, payload, applyErrorResponse, reset }
+  // A field edited back to its saved value is not a change.
+  const dirty = useMemo(() => sections.some((section) => {
+    const local = values[section.connectionId]
+    return section.editable && local && Object.entries(local).some(([field, value]) => !sameValue(value, section.record?.values?.[field]))
+  }), [sections, values])
+
+  return { sections, isLoading: query.isLoading, valueOf, setFieldValue, errors, conflict, dirty, payload, applyErrorResponse, reset }
 }

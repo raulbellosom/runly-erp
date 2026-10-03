@@ -40,6 +40,7 @@ export function ConnectedRunlyForm({ targetType, targetId = null, blueprint, com
       throw new Error(body?.error ?? 'No se pudo guardar la información.')
     }
     void queryClient.invalidateQueries({ queryKey: ['connections'] })
+    void connectionForm.reset()
     return body
   }
 
@@ -50,6 +51,7 @@ export function ConnectedRunlyForm({ targetType, targetId = null, blueprint, com
         blueprint={formBlueprint}
         componentRegistry={registry}
         submitRequest={submitRequest ?? (hasConnections ? submitWithConnections : null)}
+        extraDirty={connectionForm.dirty}
         apiBaseUrl={apiBaseUrl}
         token={token}
         companyId={companyId}

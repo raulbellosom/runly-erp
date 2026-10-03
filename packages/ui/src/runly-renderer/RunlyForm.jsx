@@ -110,6 +110,9 @@ export function RunlyForm({
   submitRequest = null,
   // Optional per-field pins, see FieldPinButton.jsx for the contract.
   fieldPins = null,
+  // Changes kept outside this form's state (e.g. connected-module sections)
+  // that also need the save bar.
+  extraDirty = false,
 }) {
   const schema = blueprint?.schema ?? {};
   const apiPath =
@@ -297,11 +300,11 @@ export function RunlyForm({
   // change hides the save bar again). Derived cost totals are ignored.
   const hasPendingAttachments = Object.values(pendingAttachments).some((count) => count > 0);
   const isDirty = useMemo(() => {
-    if (hasPendingAttachments) return true;
+    if (hasPendingAttachments || extraDirty) return true;
     if (!touched) return false;
     if (baselinePartsRef.current !== null && JSON.stringify(reportParts) !== baselinePartsRef.current) return true;
     return formValuesChanged(baselineRef.current, formValues, DERIVED_FIELDS);
-  }, [touched, formValues, reportParts, hasPendingAttachments]);
+  }, [touched, formValues, reportParts, hasPendingAttachments, extraDirty]);
 
   const registerAttachmentsController = useCallback((sectionId, controller) => {
     if (!sectionId) return;
