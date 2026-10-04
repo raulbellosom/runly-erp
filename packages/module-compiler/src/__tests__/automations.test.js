@@ -6,6 +6,8 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import * as acorn from 'acorn'
 import { compileModule, validateModuleDefinition } from '../index.js'
+import { archiveModule } from '../archive.js'
+import { inspectModuleZip } from '../inspection/index.js'
 
 const BASE = {
   schemaVersion: 1,
@@ -80,6 +82,35 @@ test('validation rejects unsafe or impossible automations', () => {
   const readOnly = structuredClone(BASE)
   readOnly.automations = [{ ...BASE.automations[0], action: { service: 'runly.contacts:contacts.search', args: {} } }]
   assert.ok(codes(readOnly).includes('AUTOMATION_SERVICE_READONLY'))
+})
+
+test('automation dependencies are derived, preserve explicit entries and inspect with the same compiler', async () => {
+  const input = structuredClone(BASE)
+  input.dependencies = [{ key: 'runly.core' }, { key: 'runly.calendar' }, { key: 'runly.files' }]
+  const compiled = compileModule(input)
+  assert.deepEqual(compiled.definition.dependencies, [
+    ...input.dependencies, { key: 'runly.notifications' }, { key: 'runly.contacts' },
+  ])
+  assert.deepEqual(compileModule(compiled.definition).definition, compiled.definition)
+  const report = inspectModuleZip(await archiveModule(compiled))
+  assert.equal(report.valid, true, JSON.stringify(report.diagnostics))
+  assert.equal(report.generatedMatch, true)
+  assert.deepEqual(report.definition.automations, compiled.definition.automations)
+  assert.ok(report.files.some((file) => file.path === 'api/events.js'))
+})
+
+test('invalid automation shapes and UUID literals yield diagnostics and block compilation', () => {
+  for (const change of [
+    (a) => { a.label = 123 },
+    (a) => { a.action.args = null },
+    (a) => { a.action.args.sourceEntityId = { from: 'value', value: 'not-a-uuid' } },
+    (a) => { a.action.service = '__proto__' },
+  ]) {
+    const input = structuredClone(BASE)
+    change(input.automations[0])
+    assert.equal(validateModuleDefinition(input).valid, false)
+    assert.throws(() => compileModule(input))
+  }
 })
 
 test('generated runtime maps args, conditions and idempotency', async () => {

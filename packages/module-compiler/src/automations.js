@@ -37,7 +37,7 @@ export function automationConsumes(definition) {
   const consumes = {}
   for (const automation of definition.automations ?? []) {
     const [owner, name] = String(automation?.action?.service ?? '').split(':')
-    if (!owner || !name) continue
+    if (!Object.hasOwn(SERVICE_CONTRACTS, automation?.action?.service ?? '')) throw new Error('AUTOMATION_SERVICE_UNKNOWN')
     consumes[owner] ??= []
     if (!consumes[owner].includes(name)) consumes[owner].push(name)
   }
@@ -66,8 +66,8 @@ function validateCondition(when, { base, fieldNames, trigger, errors }) {
 }
 
 function validateArgs(automation, { base, fieldNames, trigger, contract, errors }) {
-  const args = automation.action?.args ?? {}
-  if (typeof args !== 'object' || Array.isArray(args)) { errors.push(diagnostic(`${base}.action.args`, 'AUTOMATION_ARGS_INVALID', 'Args must be an object.')); return }
+  const args = automation.action?.args === undefined ? {} : automation.action.args
+  if (!args || typeof args !== 'object' || Array.isArray(args)) { errors.push(diagnostic(`${base}.action.args`, 'AUTOMATION_ARGS_INVALID', 'Args must be an object.')); return }
   for (const [name, source] of Object.entries(args)) {
     const path = `${base}.action.args.${name}`
     if (!contract.args[name] || name === 'idempotencyKey') { errors.push(diagnostic(path, 'AUTOMATION_ARG_UNKNOWN', `The service does not accept "${name}".`)); continue }
@@ -108,7 +108,7 @@ export function validateDefinitionAutomations(definition, errors) {
     if (!KEY.test(automation.key ?? '')) errors.push(diagnostic(`${base}.key`, 'AUTOMATION_KEY_INVALID', 'Key must be lowercase snake_case (2-41 chars).'))
     if (keys.has(automation.key)) errors.push(diagnostic(`${base}.key`, 'AUTOMATION_KEY_DUPLICATE', `Duplicate automation key "${automation.key}".`))
     keys.add(automation.key)
-    if (!automation.label?.trim() || automation.label.length > 120 || UNSAFE_TEXT.test(automation.label)) errors.push(diagnostic(`${base}.label`, 'AUTOMATION_LABEL_INVALID', 'Label is required (one line, max 120).'))
+    if (typeof automation.label !== 'string' || !automation.label.trim() || automation.label.length > 120 || UNSAFE_TEXT.test(automation.label)) errors.push(diagnostic(`${base}.label`, 'AUTOMATION_LABEL_INVALID', 'Label is required (one line, max 120).'))
     if (automation.enabled !== undefined && typeof automation.enabled !== 'boolean') errors.push(diagnostic(`${base}.enabled`, 'AUTOMATIONS_INVALID', 'enabled must be boolean.'))
 
     const trigger = automation.trigger ?? {}
@@ -126,7 +126,7 @@ export function validateDefinitionAutomations(definition, errors) {
     }
     validateCondition(trigger.when, { base, fieldNames, trigger, errors })
 
-    const contract = SERVICE_CONTRACTS[automation.action?.service]
+    const contract = Object.hasOwn(SERVICE_CONTRACTS, automation.action?.service ?? '') ? SERVICE_CONTRACTS[automation.action.service] : null
     if (!contract) { errors.push(diagnostic(`${base}.action.service`, 'AUTOMATION_SERVICE_UNKNOWN', `Unknown service "${automation.action?.service}".`)); return }
     if (!contract.mutates) errors.push(diagnostic(`${base}.action.service`, 'AUTOMATION_SERVICE_READONLY', 'Automations can only call services that create or change records.'))
     if (trigger.type === 'event' && !contract.system) {

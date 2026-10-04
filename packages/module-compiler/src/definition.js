@@ -6,7 +6,7 @@ import { validateRelations } from './relations.js'
 import { validateExtensions } from './extensions.js'
 import { validatePublicLinks } from './public-links.js'
 import { validateDefinitionConnections } from './connections.js'
-import { normalizeAutomations, validateDefinitionAutomations } from './automations.js'
+import { automationConsumes, normalizeAutomations, validateDefinitionAutomations } from './automations.js'
 import { externalRelationDependencies, externalTarget } from './external-relations.js'
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/
@@ -162,10 +162,10 @@ export function validateModuleDefinition(definition) {
 
 // Relations to system entities make the owning module a dependency, so it
 // cannot be uninstalled while this module uses it.
-function withExternalDependencies(dependencies, entities) {
+function withExternalDependencies(dependencies, entities, automations) {
   const next = [...dependencies]
-  for (const key of externalRelationDependencies(entities)) {
-    if (!next.some((dependency) => dependency.key === key)) next.push({ key })
+  for (const key of [...externalRelationDependencies(entities), ...Object.keys(automationConsumes({ automations }))]) {
+    if (!next.some((dependency) => (typeof dependency === 'string' ? dependency : dependency.key) === key)) next.push({ key })
   }
   return next
 }
@@ -181,7 +181,7 @@ export function normalizeModuleDefinition(input) {
     color: input.color,
     pwa: { shortName: input.pwa?.shortName, startPath: input.pwa?.startPath },
     preset: input.preset || 'crud',
-    dependencies: withExternalDependencies(input.dependencies ?? [{ key: 'runly.core' }], input.entities),
+    dependencies: withExternalDependencies(input.dependencies ?? [{ key: 'runly.core' }], input.entities, input.automations),
     entities: (input.entities ?? []).map((entity) => ({
       id: entity.id ?? entity.key ?? entity.name,
       key: entity.key ?? entity.name,

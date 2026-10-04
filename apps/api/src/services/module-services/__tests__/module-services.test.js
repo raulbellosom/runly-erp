@@ -48,6 +48,20 @@ test('arguments are validated against the shared contract (422)', async () => {
   )
 })
 
+test('sourceEntityId rejects non-UUID input before reaching calendar, files or notifications handlers', async () => {
+  const inputs = {
+    'runly.calendar:events.create': { title: 'Visita', startAt: '2026-10-05T10:00:00Z' },
+    'runly.calendar:events.list': { from: '2026-10-05T10:00:00Z', to: '2026-10-06T10:00:00Z' },
+    'runly.files:files.save': { name: 'demo.txt', mimeType: 'text/plain', contentBase64: 'YQ==' },
+    'runly.notifications:notifications.send': { title: 'Aviso', userIds: [ID] },
+  }
+  const api = createModuleServices({ prisma: prismaWithGrants(Object.keys(inputs)) }).forRequest(ctx({ isAdmin: true }), 'custom.crm')
+  for (const [key, args] of Object.entries(inputs)) {
+    await assert.rejects(api.call(key, { ...args, sourceEntityId: 'custom.crm:record' }),
+      (error) => error.status === 422 && Boolean(error.fields.sourceEntityId), key)
+  }
+})
+
 test('scope own: a module cannot touch calendar events it did not create', async () => {
   const prisma = prismaWithGrants(['runly.calendar:events.cancel'])
   const seen = []
