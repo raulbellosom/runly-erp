@@ -124,15 +124,15 @@ export function CommandPalette({ activeModule }) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-110 flex items-start justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div
-            className="absolute inset-0 command-scrim"
+        // The wrapper must not animate opacity: a fading ancestor becomes a
+        // backdrop root and the blur only appears once the fade finishes.
+        <div className="fixed inset-0 z-110 flex items-start justify-center">
+          <motion.div
+            className="absolute inset-0 overlay-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             onClick={() => {
               closeCommand();
               setQuery("");
@@ -140,7 +140,7 @@ export function CommandPalette({ activeModule }) {
           />
 
           <motion.div
-            className="relative glass-command rounded-2xl w-full max-w-xl mx-4 mt-[15dvh] flex flex-col overflow-hidden"
+            className="relative glass-overlay rounded-2xl w-full max-w-xl mx-4 mt-[15dvh] flex flex-col overflow-hidden"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -202,7 +202,7 @@ export function CommandPalette({ activeModule }) {
                               ? "opacity-40 cursor-not-allowed"
                               : `cursor-pointer ${
                                   isSelected
-                                    ? "command-item-active"
+                                    ? "overlay-item-active"
                                     : "hover:bg-[hsl(var(--foreground)/0.05)]"
                                 }`
                           }`}
@@ -266,7 +266,7 @@ export function CommandPalette({ activeModule }) {
               </span>
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

@@ -76,20 +76,19 @@ export function AppLauncher() {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-100 flex items-start justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        // No opacity animation on the wrapper (see .glass-overlay in styles.css).
+        <div className="fixed inset-0 z-100 flex items-start justify-center">
+          <motion.div
+            className="absolute inset-0 overlay-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             onClick={() => { closeLauncher(); setQuery(''); }}
           />
 
           <motion.div
-            className="relative glass-strong rounded-2xl w-full max-w-2xl mx-4 mt-[10dvh] max-h-[80dvh] flex flex-col overflow-hidden"
+            className="relative glass-overlay rounded-2xl w-full max-w-2xl mx-4 mt-[10dvh] max-h-[80dvh] flex flex-col overflow-hidden"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -188,7 +187,7 @@ export function AppLauncher() {
               onClose={closeMenu}
             />
           )}
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

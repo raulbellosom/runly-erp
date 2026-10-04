@@ -134,11 +134,11 @@ html {
   .dark .glass-viewer {
     background: rgb(15, 23, 42) !important;
   }
-  .glass-command {
+  .glass-overlay {
     backdrop-filter: none !important;
     background: #fff !important;
   }
-  .dark .glass-command {
+  .dark .glass-overlay {
     background: rgb(15, 23, 42) !important;
   }
 }
@@ -279,10 +279,13 @@ html {
     background: rgba(255, 255, 255, 0.15);
   }
 
-  /* Command palette: .glass-strong's 0.8 white over the dimmed backdrop
-     reads as a flat gray sheet in light mode. Lighter, more translucent
-     white + saturate gives it the same glass feel it has in dark mode. */
-  .glass-command {
+  /* Modal overlays (command palette, app launcher, Dialog): .glass-strong's
+     0.8 white over the dimmed backdrop reads as a flat gray sheet in light
+     mode. Lighter, more translucent white + saturate gives it the same glass
+     feel it has in dark mode. Pair it with .overlay-scrim. Never put either
+     inside an ancestor that animates opacity: that makes the ancestor a
+     backdrop root and the blur only pops in once the fade ends. */
+  .glass-overlay {
     backdrop-filter: blur(24px) saturate(140%);
     -webkit-backdrop-filter: blur(24px) saturate(140%);
     background: rgba(241, 245, 249, 0.42);
@@ -290,26 +293,26 @@ html {
     box-shadow: var(--glass-shadow);
     isolation: isolate;
   }
-  .dark .glass-command {
+  .dark .glass-overlay {
     background: var(--glass-bg-strong);
     border-color: var(--glass-border);
   }
-  /* Scrim behind the palette. A black/40 scrim turns the light page into a
+  /* Scrim behind modal overlays. A black/40 scrim turns the light page into a
      flat gray sheet, so the panel had nothing colorful left to blur. */
-  .command-scrim {
+  .overlay-scrim {
     background: rgba(15, 23, 42, 0.18);
     backdrop-filter: blur(6px) saturate(140%);
     -webkit-backdrop-filter: blur(6px) saturate(140%);
   }
-  .dark .command-scrim {
+  .dark .overlay-scrim {
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
-  .command-item-active {
+  .overlay-item-active {
     background: var(--brand-soft);
   }
-  .dark .command-item-active {
+  .dark .overlay-item-active {
     background: hsl(var(--muted));
   }
 

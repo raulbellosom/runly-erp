@@ -27,7 +27,7 @@ const DialogOverlay = forwardRef(function DialogOverlay(
     <DialogPrimitive.Overlay
       ref={ref}
       className={cn(
-        "fixed inset-0 z-50 bg-black/40 backdrop-blur-sm",
+        "fixed inset-0 z-50 overlay-scrim",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className,
@@ -88,7 +88,7 @@ const DialogContent = forwardRef(function DialogContent(
           ? style
           : bottomSheetDragStyle({ dragY, dragging, expanded, baseHeight, style, keyboard })}
         className={cn(
-          "fixed z-50 glass-strong shadow-xl focus:outline-none",
+          "fixed z-50 glass-overlay shadow-xl focus:outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           // ── Mobile: full-width bottom sheet ──────────────────────────────
