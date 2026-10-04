@@ -8,7 +8,8 @@ import { PageHeader } from '../components/PageHeader.jsx'
 import { Skeleton } from '../components/Skeleton.jsx'
 import { StatCard } from '../components/StatCard.jsx'
 
-const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))']
+const PRIMARY_COLOR = 'var(--brand-primary-computed, var(--brand-primary))'
+const CHART_COLORS = [PRIMARY_COLOR, 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))']
 
 function formatValue(value, format = 'number', currency = 'MXN') {
   const numeric = Number(value ?? 0)
@@ -26,9 +27,9 @@ function ChartWidget({ widget, data }) {
   if (!rows.length) return <WidgetFrame title={widget.title ?? widget.label}><EmptyState variant="compact" icon={BarChart3} title="No hay datos para mostrar" /></WidgetFrame>
   const axes = <><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip /></>
   let chart
-  if (widget.chart === 'line') chart = <LineChart data={rows}>{axes}<Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={false} /></LineChart>
+  if (widget.chart === 'line') chart = <LineChart data={rows}>{axes}<Line type="monotone" dataKey="value" stroke={PRIMARY_COLOR} strokeWidth={2.5} dot={false} /></LineChart>
   else if (widget.chart === 'pie' || widget.chart === 'donut') chart = <PieChart><Tooltip /><Pie data={rows} dataKey="value" nameKey="label" innerRadius={widget.chart === 'donut' ? 58 : 0} outerRadius={88} paddingAngle={2}>{rows.map((row, index) => <Cell key={row.label} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}</Pie></PieChart>
-  else chart = <BarChart data={rows}>{axes}<Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} /></BarChart>
+  else chart = <BarChart data={rows}>{axes}<Bar dataKey="value" fill={PRIMARY_COLOR} radius={[6, 6, 0, 0]} /></BarChart>
   return <WidgetFrame title={widget.title ?? widget.label}><div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%" minWidth={0}>{chart}</ResponsiveContainer></div></WidgetFrame>
 }
 
