@@ -140,7 +140,7 @@ export function CommandPalette({ activeModule }) {
           />
 
           <motion.div
-            className="relative glass-strong rounded-2xl w-full max-w-xl mx-4 mt-[15dvh] flex flex-col overflow-hidden"
+            className="relative glass-command rounded-2xl w-full max-w-xl mx-4 mt-[15dvh] flex flex-col overflow-hidden"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -202,8 +202,8 @@ export function CommandPalette({ activeModule }) {
                               ? "opacity-40 cursor-not-allowed"
                               : `cursor-pointer ${
                                   isSelected
-                                    ? "bg-[hsl(var(--primary)/0.12)] ring-1 ring-inset ring-[hsl(var(--primary)/0.25)]"
-                                    : "hover:bg-[hsl(var(--primary)/0.08)]"
+                                    ? "bg-[hsl(var(--foreground)/0.08)] ring-1 ring-inset ring-[hsl(var(--foreground)/0.10)]"
+                                    : "hover:bg-[hsl(var(--foreground)/0.05)]"
                                 }`
                           }`}
                         >

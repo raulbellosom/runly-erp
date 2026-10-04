@@ -134,6 +134,13 @@ html {
   .dark .glass-viewer {
     background: rgb(15, 23, 42) !important;
   }
+  .glass-command {
+    backdrop-filter: none !important;
+    background: #fff !important;
+  }
+  .dark .glass-command {
+    background: rgb(15, 23, 42) !important;
+  }
 }
 
 .dark {
@@ -270,6 +277,22 @@ html {
   }
   .dark .glass-viewer {
     background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* Command palette: .glass-strong's 0.8 white over the dimmed backdrop
+     reads as a flat gray sheet in light mode. Lighter, more translucent
+     white + saturate gives it the same glass feel it has in dark mode. */
+  .glass-command {
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+  .dark .glass-command {
+    background: var(--glass-bg-strong);
+    border-color: var(--glass-border);
   }
 
   .glass-shell {
