@@ -6,8 +6,9 @@ import { TrashError, TrashInUseError, isForeignKeyViolation } from './trash-erro
 
 const PAGE_SIZE = 25
 
-function prismaProvider({ id, moduleKey, moduleName, label, pluralLabel, restorePermission, delegate, toLabel, searchWhere, select }) {
-  const where = (companyId, extra = {}) => ({ companyId, enabled: false, ...extra })
+// scope: where-fragment that ties a row to the company (default: its own companyId column).
+export function prismaProvider({ id, moduleKey, moduleName, label, pluralLabel, restorePermission, purgePermission = null, delegate, toLabel, searchWhere, select, scope = (companyId) => ({ companyId }) }) {
+  const where = (companyId, extra = {}) => ({ ...scope(companyId), enabled: false, ...extra })
   const find = async (prisma, companyId, recordId) => {
     const row = await prisma[delegate].findFirst({ where: where(companyId, { id: recordId }), select })
     if (!row) throw new TrashError('El registro no está desactivado o no existe.', 404)
@@ -15,7 +16,7 @@ function prismaProvider({ id, moduleKey, moduleName, label, pluralLabel, restore
   }
   return {
     id, moduleKey, moduleName, label, pluralLabel,
-    permissions: { restore: restorePermission },
+    permissions: { restore: restorePermission, purge: purgePermission },
     count: ({ prisma, companyId }) => prisma[delegate].count({ where: where(companyId) }),
     async list({ prisma, companyId }, { search = '', page = 1 } = {}) {
       const term = String(search ?? '').trim()
@@ -44,7 +45,7 @@ function prismaProvider({ id, moduleKey, moduleName, label, pluralLabel, restore
   }
 }
 
-const contains = (term) => ({ contains: term, mode: 'insensitive' })
+export const contains = (term) => ({ contains: term, mode: 'insensitive' })
 
 export const CORE_TRASH_PROVIDERS = Object.freeze([
   prismaProvider({

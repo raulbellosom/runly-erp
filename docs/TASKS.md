@@ -1723,7 +1723,7 @@ Spec: `docs/superpowers/specs/2026-10-03-records-trash-design.md` · Plan: `docs
 - [x] UI: shell-added "Desactivados" sidebar entry for modules with providers, `TrashScreen` (entity selector, server search, Reactivar, Eliminar with two confirmations), breadcrumb label. Verified: 2026-10-03 (Playwright 7/7, `vite build`, eslint)
 - [x] Docs: help page `runly.core/views/desactivados.md`, `docs/developers/solucion-problemas.md` (regenerated)
 - [x] Owner: "Sincronizar módulos" once so the new permissions exist for role assignment. Done by the owner 2026-10-04 (POST /modules/sync 200).
-- [ ] Next providers: calendar events, fleet vehicles/drivers, canvas boards, purchases, documents, files (same contract).
+- [x] More providers: calendar events (company through the calendar), fleet vehicles + drivers, document templates + generated documents, files (through files-service: restricted access respected, storage object removed on purge, Office files keep their history and cannot be purged); optional per-provider purge permission (`files.assets.delete`); sidebar entry also in fullscreen modules (Calendario). Not applicable: Canvas (boards are deleted, archiving retired) and Compras (status workflow, no deactivation). Verified: 2026-10-04 (backend E2E 13/13, Playwright: entry in Flota/Calendario/Documentos/Archivos)
 
 ## RME3 Module Platform v2 (2026-10-03)
 

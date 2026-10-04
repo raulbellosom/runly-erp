@@ -4,6 +4,7 @@
 // being installed/enabled for the company.
 import { CORE_TRASH_PROVIDERS } from './core-trash-providers.js'
 import { createRme3TrashProvider } from './rme3-trash-provider.js'
+import { MORE_TRASH_PROVIDERS, createFilesTrashProvider } from './more-trash-providers.js'
 import { TrashError } from './trash-errors.js'
 
 export const PURGE_PERMISSION = 'core.records.purge'
@@ -12,7 +13,8 @@ export function can(user, permission) {
   return Boolean(user?.isAdmin || user?.permissionSet?.has?.(permission))
 }
 
-export function createTrashRegistry({ prisma }) {
+export function createTrashRegistry({ prisma, filesService = null }) {
+  const builtIn = [...CORE_TRASH_PROVIDERS, ...MORE_TRASH_PROVIDERS, createFilesTrashProvider({ filesService })].filter(Boolean)
   async function allProviders(companyId) {
     const modules = await prisma.runlyModule.findMany({
       where: { status: 'INSTALLED', enabled: true },
@@ -21,7 +23,7 @@ export function createTrashRegistry({ prisma }) {
     const disabled = new Set((await prisma.companyModule.findMany({ where: { companyId, enabled: false }, select: { moduleId: true } })).map((row) => row.moduleId))
     const active = modules.filter((mod) => !disabled.has(mod.id))
     const activeKeys = new Set(active.map((mod) => mod.key))
-    const providers = CORE_TRASH_PROVIDERS.filter((provider) => activeKeys.has(provider.moduleKey))
+    const providers = builtIn.filter((provider) => activeKeys.has(provider.moduleKey))
     const custom = active.filter((mod) => /^(custom|community)\./.test(mod.key))
     if (custom.length) {
       const models = await prisma.runlyModel.findMany({ where: { moduleKey: { in: custom.map((mod) => mod.key) } }, select: { moduleKey: true, schema: true, label: true, pluralLabel: true } })

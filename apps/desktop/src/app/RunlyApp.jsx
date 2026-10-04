@@ -343,7 +343,7 @@ export function RunlyApp() {
             style={{ top: "calc(var(--topbar-height, 3.5rem) + env(safe-area-inset-top, 0px))" }}
           >
             <ModuleSidebar
-              module={activeModule}
+              module={sidebarModule}
               currentPath={location.pathname}
               onNavigate={(path) => {
                 navigate(path);
