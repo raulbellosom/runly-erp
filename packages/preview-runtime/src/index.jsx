@@ -1,7 +1,6 @@
 import { forwardRef, useEffect, useMemo } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RunlyCrudView, RunlyDashboard, RunlyKanban, ErrorState, extractBlueprintFields } from '@runly/ui/preview';
-import { RuntimeAdaptersProvider } from '@runly/ui/runtime-adapters';
+import { RunlyCrudView, RunlyDashboard, RunlyKanban, ErrorState, extractBlueprintFields, RuntimeAdaptersProvider } from '@runly/ui/preview';
 import { diagnoseBlueprints } from './contracts.js';
 export { PREVIEW_RUNTIME_CONTRACT, diagnoseBlueprints } from './contracts.js';
 export { createRuntimeSession } from './session.js';
