@@ -148,3 +148,14 @@ archivos, JSON y relaciones externas no se aceptan, y todos los campos
 obligatorios del formulario deben estar en `formFields`. Implementación:
 `packages/module-compiler/src/public-links.js`. Plataforma y reglas:
 `docs/ai-context/rme3-public-links.md`.
+
+## Automatizaciones (`automations`)
+
+Spec: `docs/superpowers/specs/2026-10-04-builder-automations-design.md`; guía: `docs/developers/automatizaciones.md`.
+
+- `definition.automations` (máx. 20): `{ key, label, enabled, trigger, action }`. `trigger` es `{ type: 'record', entity, on: 'create'|'update'|'save', when? }` o `{ type: 'event', event, when? }`; `when` = `{ field, op: 'equals'|'changed'|'filled', value? }`. `action` = `{ service, args: { <arg>: { from: 'value'|'field'|'template'|'recordId'|'actor', ... } } }`.
+- `automations.js` valida contra `SERVICE_CONTRACTS` / `DOMAIN_EVENT_PAYLOADS`: servicio existente y que escribe, args declarados y obligatorios cubiertos, `system: true` para triggers de evento, `actor` solo en triggers de registro, `changed` solo al actualizar.
+- El manifiesto **deriva** `consumes` y `events.subscribes`; en la definición siguen prohibidos a mano (`BUILDER_INTEGRATION_UNSUPPORTED`).
+- `compileModule` genera `api/automations.js` (runtime inline: `matches`, `render`, `buildArgs`, `runRecordAutomations`, `createEventHandlers`), `api/events.js` si hay triggers de evento, y llamadas en las rutas create/update (respuesta `automations: [{ key, ok, error? }]`; un fallo no deshace el guardado). `sourceEntityId` e `idempotencyKey` se agregan solos.
+- Publicar (`publishProject`, `canGrant` = `core.modules.manage`) autoriza los servicios derivados o los devuelve en `pendingGrants`.
+- Las rutas generadas leen la empresa con `c.get('companyId')` (respaldo: `memberships[0]`).

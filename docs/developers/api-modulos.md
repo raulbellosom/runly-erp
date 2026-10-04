@@ -222,6 +222,8 @@ Las respuestas de error son JSON con `error`:
 
 Muestra `error` al usuario (por ejemplo con `toast.error`) y no dependas del texto exacto: usa el código HTTP para decidir.
 
+Si la entidad tiene [automatizaciones](/documentacion/desarrolladores/automatizaciones), crear y editar responden además `automations: [{ key, ok, error? }]` (solo cuando alguna corrió). Una automatización fallida no cambia el código HTTP: el registro ya se guardó.
+
 ## Archivos
 
 Solo en entidades con campos de archivo o sección de documentos.

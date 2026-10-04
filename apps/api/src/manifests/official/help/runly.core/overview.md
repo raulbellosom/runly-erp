@@ -8,7 +8,7 @@ Desde aqui se administra:
 
 - **Modulos**: ver el catalogo completo de modulos disponibles para tu instancia, instalarlos, habilitarlos o deshabilitarlos temporalmente, y desinstalarlos cuando ya no los necesitas (con la opcion de conservar o purgar sus datos).
 - **Configuracion**: ajustes generales de la instancia que aplican a todas las companias que operan sobre ella (nombre de la empresa por defecto, zona horaria, preferencias de la plataforma).
-- **Constructor de modulos**: crear tus propios modulos sin programar (entidades, campos, pantallas con pestanas y secciones, condiciones, relaciones, archivos y vistas) y publicarlos en la instancia.
+- **Constructor de modulos**: crear tus propios modulos sin programar (entidades, campos, pantallas con pestanas y secciones, condiciones, relaciones, archivos, vistas, conexiones y automatizaciones con otros modulos) y publicarlos en la instancia.
 - **Bitacora de auditoria**: un registro de quien hizo que y cuando, en cualquier parte del sistema — util para investigar un cambio inesperado o confirmar que una accion se realizo correctamente.
 - **Pantalla de inicio**: el punto de partida al entrar a Runly, con accesos directos a los modulos instalados y a la ayuda contextual.
 

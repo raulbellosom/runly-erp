@@ -391,6 +391,28 @@ Cell components used in TABLE blueprints (badge renderers, custom cells) do not 
 
 ---
 
+## Module services (`moduleContext.services`)
+
+Spec: `docs/superpowers/specs/2026-10-04-module-services-v2-design.md`. A module creates/reads/updates records of system modules (calendar, files, notifications, contacts, inventory, projects, ledger, fleet, pfm) **only** through this gateway — never `prisma` on their tables. Contract: `SERVICE_CONTRACTS` in `@runly/module-engine/contracts` (32 services; args schema, permission, `mutates`, `scope: 'own'`, `system`). Developer doc: `docs/developers/servicios-y-eventos.md`.
+
+```js
+// module.manifest.js — admin grants each one at install (Módulos > detalle)
+consumes: { 'runly.calendar': ['events.create'], 'runly.notifications': ['notifications.send'] },
+
+// api/*.js
+const services = moduleContext.services.forRequest(c)
+const event = await services.module('runly.calendar').events.create({ title: 'Visita', startAt, sourceEntityId: record.id })
+```
+
+- Checks in order: unknown 404 → company 400 → `system_not_supported` 403 → `service_not_granted` 403 → `permission_denied` 403 → `invalid_args` 422 (`error.fields`); ledger/fleet/pfm business rules → 400 `rejected`.
+- Undeclared args are dropped; `null` clears optional fields on updates; `sourceEntityId` is a UUID (your record id).
+- Every mutating service accepts `idempotencyKey` (returns the earlier result instead of writing again).
+- `api/events.js` handlers receive `services` (= `forSystem`, no user): only contracts with `system: true`. Always pass an `idempotencyKey` there (delivery is at-least-once). It is never on `moduleContext`.
+- Builder modules use the same services through `definition.automations` (see `rme3-module-compiler.md`).
+- Developer Hub: `createServiceSimulator` (same contract) simulates them in memory.
+
+---
+
 ## Module AI (`moduleContext.ai`)
 
 The Route Loader injects `moduleContext.ai` into every module API factory
