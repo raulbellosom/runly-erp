@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.js",
     "./icons": "./src/lib/icon-library/index.js",
-    "./theme.css": "./src/tailwind-theme.css"
+    "./theme.css": "./src/tailwind-theme.css",
+    "./primitives": "./src/primitives.js"
   },
   "dependencies": {
     "@atlas/core": "workspace:@runly/core@*",

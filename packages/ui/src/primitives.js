@@ -1,0 +1,10 @@
+// Portable primitives: no ERP shell, auth, runtime or browser transport.
+export { Button, buttonVariants } from './components/Button.jsx'
+export { Input } from './components/Input.jsx'
+export { Textarea } from './components/Textarea.jsx'
+export { Label } from './components/Label.jsx'
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './components/Card.jsx'
+export { Badge } from './components/Badge.jsx'
+export { PageHeader } from './components/PageHeader.jsx'
+export { EmptyState } from './components/EmptyState.jsx'
+export { Select, SelectValue, SelectTrigger, SelectContent, SelectItem } from './components/Select.jsx'
