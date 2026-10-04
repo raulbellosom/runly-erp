@@ -1,7 +1,7 @@
 ---
 viewKey: /inventory/summary
 title: Dashboard
-summary: Estado general del inventario: altas y bajas, movimientos por mes, lo que mas tienes, garantias y propuestas de baja.
+summary: "Estado general del inventario: altas y bajas, movimientos por mes, lo que mas tienes, garantias y propuestas de baja."
 ---
 El dashboard es la pantalla inicial del inventario.
 
