@@ -77,6 +77,8 @@ export const runlyCoreMap = createModuleManifest({
     { key: "core.modules.upload", name: "Upload Custom Module ZIP" },
     { key: "core.modules.purge", name: "Purge Custom Module from Server" },
     { key: "core.modules.builder", name: "Use Module Builder" },
+    { key: "core.modules.manage", name: "Manage Module Data (backups, archived fields, connection index)" },
+    { key: "core.records.purge", name: "Permanently Delete Deactivated Records" },
     { key: "core.instance.read", name: "Read Core Instance" },
     { key: "core.instance.create", name: "Create Core Instance Config" },
     { key: "core.instance.update", name: "Update Core Instance Config" },

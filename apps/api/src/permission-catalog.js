@@ -178,6 +178,18 @@ export const PERMISSION_CATALOG = {
     groupKey: "core",
     order: 77,
   },
+  "core.modules.manage": {
+    displayNameEs: "Administrar datos de los módulos",
+    descriptionEs: "Permite ver y restaurar los respaldos previos a una actualización, eliminar campos archivados y reconstruir el índice de Conexiones.",
+    groupKey: "core",
+    order: 78,
+  },
+  "core.records.purge": {
+    displayNameEs: "Eliminar definitivamente registros desactivados",
+    descriptionEs: "Permite borrar para siempre registros desactivados desde la sección Desactivados de cada módulo. Reactivarlos solo requiere el permiso de desactivar de esa entidad.",
+    groupKey: "core",
+    order: 79,
+  },
   "core.instance.read": {
     displayNameEs: "Ver configuracion de instancia",
     descriptionEs: "Permite consultar la configuracion de la instancia.",

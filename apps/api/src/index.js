@@ -105,6 +105,7 @@ import { createMiraiService } from "./routes/chat/mirai-service.js";
 import { createRelationTargetsService } from "./services/relation-targets-service.js";
 import { createRelationTargetsRouter } from "./routes/relation-targets-routes.js";
 import { createConnectionsRouter } from "./routes/connections-routes.js";
+import { createTrashRouter } from "./routes/trash-routes.js";
 import { createDistServeService } from "./services/dist-serve-service.js";
 import { createNotificationDeliveryWorker } from "./services/notification-delivery-worker.js";
 import { createNotificationService } from "./services/notification-service.js";
@@ -561,22 +562,39 @@ function requirePermission(permissionKey) {
   };
 }
 
+// Sets the active company and the user's company-scoped permissions on the
+// context. Returns an error response, or null when the request may continue.
+async function establishTenant(c) {
+  const context = await getOrLoadUserContext(c);
+  if (!context?.profile) {
+    return c.json(
+      { error: "No autorizado. Perfil de usuario no encontrado." },
+      401,
+    );
+  }
+  const resolved = await resolveTenantContext(c, context);
+  if (!resolved.ok) return resolved.response;
+  const { tenant } = resolved;
+  c.set("companyId", tenant.companyId);
+  c.set("tenantContext", tenant);
+  c.set("userContext", { ...context, memberships: activeMembershipFirst(context.memberships, tenant.companyId), isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
+  c.set("userId", context.profile.id);
+  return null;
+}
+
+// Active company + user only: for routes whose permission depends on the
+// resource (e.g. /trash providers), checked by the handler itself.
+async function requireActiveCompany(c, next) {
+  const failed = await establishTenant(c);
+  if (failed) return failed;
+  await next();
+}
+
 function requireAnyPermission(permissionKeys = []) {
   return async (c, next) => {
-    const context = await getOrLoadUserContext(c);
-    if (!context?.profile) {
-      return c.json(
-        { error: "No autorizado. Perfil de usuario no encontrado." },
-        401,
-      );
-    }
-    const resolved = await resolveTenantContext(c, context);
-    if (!resolved.ok) return resolved.response;
-    const { tenant } = resolved;
-    c.set("companyId", tenant.companyId);
-    c.set("tenantContext", tenant);
-    c.set("userContext", { ...context, memberships: activeMembershipFirst(context.memberships, tenant.companyId), isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
-    c.set("userId", context.profile.id);
+    const failed = await establishTenant(c);
+    if (failed) return failed;
+    const tenant = c.get("tenantContext");
     if (tenant.isAdmin) {
       await next();
       return;
@@ -2372,6 +2390,7 @@ mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }))
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));
 mountWithAuth(app, createRelationTargetsRouter({ relationTargets, requirePermission, requireAnyPermission }));
 mountWithAuth(app, createConnectionsRouter({ prisma, requirePermission, requireAnyPermission }));
+mountWithAuth(app, createTrashRouter({ prisma, requireActiveCompany }));
 mountWithAuth(app, createIdentityRouter({
   prisma,
   supabaseAdmin,
