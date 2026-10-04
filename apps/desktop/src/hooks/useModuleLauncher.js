@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useOfflineStore, OFFLINE_MODULES } from "@runly/offline";
 import { getModuleLaunchPath, getSortedDisplay } from "../lib/runtimeModules";
 import { isModuleOfflineBlocked, resolveMenuAnchor } from "../lib/moduleLauncher";
+import { recordRecentModule } from "../lib/recentModules";
 import { useAppViewPrefs } from "./useAppViewPrefs";
 
 // Shared launcher behavior for HomeScreen and AppLauncher:
@@ -42,6 +43,7 @@ export function useModuleLauncher(modules) {
   const launch = useCallback(
     (module, opts = {}) => {
       if (isModuleOfflineBlocked(isOnline, module, OFFLINE_MODULES)) return;
+      recordRecentModule(module.key);
       navigate(getModuleLaunchPath(module));
       opts.onDone?.();
     },

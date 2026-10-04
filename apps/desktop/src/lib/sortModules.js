@@ -22,7 +22,7 @@ export function getSortedDisplay(modules, { sortMode, favorites, favoritesFirst 
   if (favoritesFirst && favorites.length > 0) {
     const favModules = sorted.filter((m) => favorites.includes(m.key));
     if (favModules.length > 0) {
-      sections.push({ label: 'Favoritos', modules: favModules });
+      sections.push({ label: 'Favoritos', kind: 'favorites', modules: favModules });
       favModules.forEach((m) => shownKeys.add(m.key));
     }
   }

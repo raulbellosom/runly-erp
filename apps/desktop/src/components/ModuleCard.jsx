@@ -123,7 +123,7 @@ export function ModuleIcon({ module, size = "md" }) {
 }
 
 // ---- FavoriteStarButton: always-visible star toggle used on cards/rows ----
-function FavoriteStarButton({ moduleKey, isFavorite, onToggleFavorite, className }) {
+export function FavoriteStarButton({ moduleKey, isFavorite, onToggleFavorite, className }) {
   return (
     <button
       type="button"
@@ -153,7 +153,7 @@ function FavoriteStarButton({ moduleKey, isFavorite, onToggleFavorite, className
 // Wires long-press -> onLongPress({x,y}, key) on coarse pointers only, and
 // returns a `guardClick` that swallows the post-long-press click so it does
 // not also navigate.
-function useCardLongPress(moduleKey, onLongPress) {
+export function useCardLongPress(moduleKey, onLongPress) {
   const suppressClick = useRef(false);
   const handlers = useLongPress({
     disabled: !onLongPress || !isCoarsePointer(),
@@ -185,7 +185,7 @@ function useCardLongPress(moduleKey, onLongPress) {
 // The favorite toggle is its own <button>; nesting it inside the card's
 // <button>/<a> is invalid HTML, so it is rendered as an absolutely-positioned
 // sibling within a `relative` wrapper.
-function CardShell({
+export function CardShell({
   href,
   cardClassName,
   wrapperClassName,
