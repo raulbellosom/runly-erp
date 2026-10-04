@@ -4,6 +4,7 @@ import { kanbanFileName } from './kanban.js'
 import { recordsViewFileName } from './records-view.js'
 import { isRecordsViewKind } from '../records-views.js'
 import { generatePublicResources, publicLinkViewFile } from '../public-links.js'
+import { manifestConnections } from '../connections.js'
 
 export function generateManifest(config) {
   const slug = moduleSlug(config.key)
@@ -128,7 +129,8 @@ ${permissions}
   ],
   navigation: [
 ${navigation}
-  ],${config.publicLinks?.length ? `
+  ],${config.connections?.length ? `
+  connections: ${JSON.stringify(manifestConnections(config), null, 2).replace(/\n/g, '\n  ')},` : ''}${config.publicLinks?.length ? `
   publicResources: ${JSON.stringify(generatePublicResources(config), null, 2).replace(/\n/g, '\n  ')},` : ''}
 })
 `

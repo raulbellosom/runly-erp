@@ -27,7 +27,9 @@ Cada uno de estos módulos tiene en su menú la pantalla **Conexiones**. Otros t
 
 ## Declararla en el manifiesto
 
-Por ahora el Constructor no tiene un asistente para conexiones: se declaran en `module.manifest.js` (modo desarrollador o paquete base) y se suben con **Subir actualización**.
+**Desde el Constructor:** pestaña **Conexiones** > *Conectar a un módulo del sistema*. Elige el módulo del sistema, el tipo, la entidad de tu módulo y el campo de relación que guarda el registro del sistema (si no existe, *Crear campo de relación* lo agrega). Después marca, por campo, dónde se ve: Formulario, Detalle, Columna y Búsqueda para *Campos extra*; Detalle y Búsqueda para *Registros relacionados*, que además piden qué pasa al eliminar el registro del sistema. Al publicar, el Constructor genera la declaración de abajo y la dependencia del módulo dueño.
+
+**A mano** (modo desarrollador o paquete base): declárala en `module.manifest.js` y súbela con **Subir actualización**.
 
 1. Tu entidad necesita un campo de tipo **Relación** que guarde el `id` del registro del sistema (`targetField`).
 2. Agrega `connections` al manifiesto y declara el módulo dueño en `dependencies`.

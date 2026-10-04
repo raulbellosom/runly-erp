@@ -11,6 +11,7 @@ const TAB_BY_ROOT = {
   navigation: "navigation",
   permissions: "permissions",
   publicLinks: "public",
+  connections: "connections",
   extensions: "views",
 };
 
@@ -21,6 +22,7 @@ export const TAB_LABELS = {
   navigation: "Navegación",
   permissions: "Permisos",
   public: "Enlaces",
+  connections: "Conexiones",
 };
 
 // Quoted value in the compiler message, e.g. Duplicate field key "nombre".
@@ -119,6 +121,13 @@ const TEXTS = {
   PUBLIC_LINK_FIELD_NOT_ALLOWED: (m) => `El campo${q(quoted(m))} no se puede usar en una página pública.`,
   PUBLIC_LINK_LINK_FIELD_INVALID: () => "El campo para ligar el formulario debe ser una relación hacia la entidad compartida.",
   PUBLIC_LINK_REQUIRED_FIELD_MISSING: (m) => `El formulario público debe incluir el campo obligatorio${q(quoted(m))}.`,
+  CONNECTION_INVALID: () => "La conexión está incompleta: revisa clave, nombre, tipo, entidad, campo de relación y campos ofrecidos.",
+  CONNECTION_TARGET_UNSUPPORTED: (m) => `El módulo del sistema${q(quoted(m))} aún no acepta conexiones.`,
+  CONNECTION_ENTITY_NOT_FOUND: (m) => `La conexión usa la entidad${q(quoted(m))}, que ya no existe.`,
+  CONNECTION_TARGET_FIELD_INVALID: (m) => `El campo${q(quoted(m))} debe ser una relación hacia el módulo del sistema elegido.`,
+  CONNECTION_SET_NULL_REQUIRED: () => "Con «Dejar sin vínculo» el campo de relación no puede ser obligatorio.",
+  CONNECTION_FIELD_NOT_FOUND: (m) => `La conexión ofrece el campo${q(quoted(m))}, que ya no existe.`,
+  CONNECTION_FIELD_TYPE_UNSUPPORTED: (m) => `Los campos de tipo${q(quoted(m))} no se pueden mostrar en un módulo del sistema.`,
 };
 
 // "entities[0].fields[2].key" -> "Entidad «Visita» › campo «Nombre»".
@@ -143,6 +152,11 @@ function describeLocation(path, definition) {
   if (linkMatch) {
     const link = definition?.publicLinks?.[Number(linkMatch[1])];
     return `Página pública «${link?.title || link?.key || Number(linkMatch[1]) + 1}»`;
+  }
+  const connectionMatch = /^connections\[(\d+)\]/.exec(path);
+  if (connectionMatch) {
+    const connection = definition?.connections?.[Number(connectionMatch[1])];
+    return `Conexión «${connection?.label || connection?.key || Number(connectionMatch[1]) + 1}»`;
   }
   if (/^navigation/.test(path)) return "Menú";
   if (/^permissions/.test(path)) return "Permisos";

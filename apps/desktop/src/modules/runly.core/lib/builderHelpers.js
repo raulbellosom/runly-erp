@@ -111,6 +111,7 @@ export function removeEntity(definition, entityKey) {
     ...definition,
     entities: definition.entities.filter((e) => e.key !== entityKey),
     views: (definition.views ?? []).filter((v) => (v.entity ?? v.schema?.entity) !== entityKey),
+    ...(definition.connections ? { connections: definition.connections.filter((c) => c.entity !== entityKey) } : {}),
     navigation: Array.isArray(definition.navigation)
       ? definition.navigation.filter((item) => item.page !== `${slug}.${entityKey}.page`)
       : definition.navigation,
