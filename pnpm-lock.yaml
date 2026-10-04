@@ -128,6 +128,9 @@ importers:
       '@runly/module-engine':
         specifier: workspace:*
         version: link:../../packages/module-engine
+      '@runly/preview-runtime':
+        specifier: workspace:*
+        version: link:../../packages/preview-runtime
       '@runly/validators':
         specifier: workspace:*
         version: link:../../packages/validators
@@ -269,6 +272,9 @@ importers:
       '@runly/offline':
         specifier: workspace:*
         version: link:../../packages/offline
+      '@runly/preview-runtime':
+        specifier: workspace:*
+        version: link:../../packages/preview-runtime
       '@runly/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -544,6 +550,21 @@ importers:
       zustand:
         specifier: ^5.0.0
         version: 5.0.14(@types/react@19.2.14)(immer@11.1.8)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
+
+  packages/preview-runtime:
+    dependencies:
+      '@runly/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@tanstack/react-query':
+        specifier: ^5.104.0
+        version: 5.104.1(react@19.3.0)
+      react:
+        specifier: '>=19 <20'
+        version: 19.3.0
+      react-dom:
+        specifier: '>=19 <20'
+        version: 19.3.0(react@19.3.0)
 
   packages/sdk: {}
 

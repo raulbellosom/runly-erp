@@ -6,10 +6,10 @@ import { createContext, useContext, useMemo } from "react";
 // Provided by the desktop host around every CUSTOM component.
 const ModuleRuntimeContext = createContext(null);
 
-export function ModuleRuntimeProvider({ moduleKey, token, companyId, apiBaseUrl, navigate, blueprints, children }) {
+export function ModuleRuntimeProvider({ moduleKey, token, companyId, apiBaseUrl, navigate, blueprints, transport, sessionId, children }) {
   const value = useMemo(
-    () => ({ moduleKey, token, companyId, apiBaseUrl, navigate, blueprints: blueprints ?? [] }),
-    [moduleKey, token, companyId, apiBaseUrl, navigate, blueprints],
+    () => ({ moduleKey, token, companyId, apiBaseUrl, navigate, transport, sessionId, blueprints: blueprints ?? [] }),
+    [moduleKey, token, companyId, apiBaseUrl, navigate, blueprints, transport, sessionId],
   );
   return <ModuleRuntimeContext.Provider value={value}>{children}</ModuleRuntimeContext.Provider>;
 }

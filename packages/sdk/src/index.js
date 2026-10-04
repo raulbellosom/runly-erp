@@ -11,7 +11,7 @@ import { createTrashDomain } from "./domains/trash.js";
 import { createModuleCatalogDomain } from "./domains/module-catalog.js";
 export { createCompanyFetch } from "./company-fetch.js";
 
-export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
+export function createRunlyClient({ baseUrl, getActiveCompanyId, fetch: fetchImpl = (...args) => globalThis.fetch(...args) } = {}) {
   let _offlineTransport = null;
 
   function withAuthHeaders(token, headers = {}) {
@@ -40,7 +40,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
 
   async function requestBlob(path, options = {}) {
     const { headers, ...rest } = options;
-    const response = await fetch(`${baseUrl}${path}`, {
+    const response = await fetchImpl(`${baseUrl}${path}`, {
       headers: headers ?? {},
       ...rest,
     });
@@ -76,7 +76,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
       const queued = await _offlineTransport.queue(path, options);
       if (queued) return queued;
     }
-    const response = await fetch(`${baseUrl}${path}`, {
+    const response = await fetchImpl(`${baseUrl}${path}`, {
       ...fetchOptions,
       headers: isFormData
         ? (options.headers ?? {})

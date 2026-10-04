@@ -1,3 +1,4 @@
+import { useRuntimeFetch, useRuntimeAdapters } from '../lib/module-runtime/RuntimeAdapters.jsx';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Eye, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../components/Alert.jsx";
@@ -87,6 +88,8 @@ export function RunlyTable({
   // Filter values to start with, e.g. from a deep link (?categoryId=...).
   initialFilters = null,
 }) {
+  const runtimeFetch = useRuntimeFetch();
+  const adapters = useRuntimeAdapters();
   const schema = blueprint?.schema ?? {};
   const apiPath =
     typeof schema.apiPath === "string" ? schema.apiPath.trim() : "";
@@ -138,12 +141,12 @@ export function RunlyTable({
   const preferenceScopeRef = useRef("");
   const preferenceScope = `${apiBaseUrl ?? ""}::${companyId ?? ""}::${token ?? ""}::${tableKey ?? ""}`;
   useEffect(() => {
-    if (!tableKey || !token || !apiBaseUrl) return;
+    if (!tableKey || (!token && !adapters) || !apiBaseUrl) return;
     if (preferenceScopeRef.current === preferenceScope) return;
     preferenceScopeRef.current = preferenceScope;
     let cancelled = false;
     const prefUrl = `${apiBaseUrl.replace(/\/+$/, "")}/profile/me/table-preferences/${encodeURIComponent(tableKey)}`;
-    fetch(prefUrl, { headers: buildApiHeaders(token, companyId) })
+    runtimeFetch(prefUrl, { headers: buildApiHeaders(token, companyId) })
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (cancelled) return;
@@ -175,7 +178,7 @@ export function RunlyTable({
   const pendingSaveRef = useRef(false);
 
   const schedulePreferenceSave = useCallback(() => {
-    if (!tableKey || !token || !apiBaseUrl) return;
+    if (!tableKey || (!token && !adapters) || !apiBaseUrl) return;
     if (preferenceScopeRef.current !== preferenceScope) return;
     pendingSaveRef.current = true;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -184,13 +187,13 @@ export function RunlyTable({
       pendingSaveRef.current = false;
       const config = toConfigRef.current();
       const prefUrl = `${apiBaseUrl.replace(/\/+$/, "")}/profile/me/table-preferences/${encodeURIComponent(tableKey)}`;
-      fetch(prefUrl, {
+      runtimeFetch(prefUrl, {
         method: "PUT",
         headers: buildApiHeaders(token, companyId, { "Content-Type": "application/json" }),
         body: JSON.stringify(config),
       }).catch(() => {});
     }, 800);
-  }, [apiBaseUrl, tableKey, token, preferenceScope, companyId]);
+  }, [runtimeFetch, apiBaseUrl, tableKey, token, preferenceScope, companyId]);
 
   const handleReorderColumns = useCallback(
     (activeKey, overKey) => {
@@ -210,9 +213,9 @@ export function RunlyTable({
 
   const handleResetToDefaults = useCallback(async () => {
     resetToDefaults();
-    if (tableKey && token && apiBaseUrl) {
+    if (tableKey && (token || adapters) && apiBaseUrl) {
       const prefUrl = `${apiBaseUrl.replace(/\/+$/, "")}/profile/me/table-preferences/${encodeURIComponent(tableKey)}`;
-      fetch(prefUrl, {
+      runtimeFetch(prefUrl, {
         method: "DELETE",
         headers: buildApiHeaders(token, companyId),
       }).catch(() => {});
@@ -278,7 +281,7 @@ export function RunlyTable({
           params.set("sortDir", sortDir);
         }
         const endpoint = `${joinUrl(apiBaseUrl, apiPath)}?${params.toString()}`;
-        const response = await fetch(endpoint, {
+        const response = await runtimeFetch(endpoint, {
           method: "GET",
           headers: buildApiHeaders(token, companyId),
           signal: controller.signal,
@@ -314,6 +317,7 @@ export function RunlyTable({
     run();
     return () => controller.abort();
   }, [
+    runtimeFetch,
     apiBaseUrl,
     apiPath,
     filterValues,

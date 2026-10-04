@@ -200,3 +200,5 @@ function safeRoute(route, prefix) {
   return typeof route === 'string' && (route === prefix || route.startsWith(`${prefix}/`)) &&
     !/[\\?#\x00-\x20%]/.test(route) && !route.split('/').some((part) => part === '.' || part === '..')
 }
+export { parseDeclaration } from './declarations.js'
+export { DEFAULT_INSPECTION_LIMITS } from './limits.js'

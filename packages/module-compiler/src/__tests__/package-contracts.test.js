@@ -30,10 +30,8 @@ test('old root/server and Atlas declarations retain identical functions', () => 
 })
 
 test('runtime capability inventory matches actual ERP externals and integrations', async () => {
-  const bundler = await readFile(new URL('../../../../apps/api/src/services/module-bundler-service.js', import.meta.url), 'utf8')
-  const externals = bundler.match(/const BUNDLE_EXTERNALS = \[([\s\S]*?)\]/)?.[1]
-  assert.ok(externals)
-  assert.deepEqual([...externals.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort(), [...RME3_CAPABILITIES.runtime.sharedExternals].sort())
+  const { BUNDLE_EXTERNALS } = await import('../../../../packages/preview-runtime/src/externals.js')
+  assert.deepEqual([...BUNDLE_EXTERNALS].sort(), [...RME3_CAPABILITIES.runtime.sharedExternals].sort())
   const catalog = (await Promise.all(['service-catalog.js', 'action-backed-services.js'].map((file) => readFile(new URL(`../../../../apps/api/src/services/module-services/${file}`, import.meta.url), 'utf8')))).join('\n')
   assert.deepEqual([...catalog.matchAll(/^    '(runly\.[^']+:[^']+)':/gm)].map((m) => m[1]).sort(), [...SERVICE_KEYS].sort())
   const events = await import('../../../../apps/api/src/services/domain-events/events.js')

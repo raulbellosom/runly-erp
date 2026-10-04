@@ -16,17 +16,8 @@ const sessionVersion = String(Date.now())
 // Module utilities CSS (spec 2026-10-03-rme3-module-platform-v2 §12.1): one
 // <link> per id, replaced when the href changes so a republished module gets
 // fresh CSS. Returns the element so a caller can remove it (previews).
-export function ensureModuleStylesheet(id, href) {
-  const existing = document.head.querySelector(`link[data-module-css="${CSS.escape(id)}"]`)
-  if (existing?.getAttribute('href') === href) return existing
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.href = href
-  link.dataset.moduleCss = id
-  if (existing) existing.replaceWith(link)
-  else document.head.appendChild(link)
-  return link
-}
+import { ensureModuleStylesheet } from '@runly/preview-runtime/styles';
+export { ensureModuleStylesheet };
 
 export function loadBundle(key, bundleVersion) {
   const version = String(bundleVersion ?? sessionVersion)

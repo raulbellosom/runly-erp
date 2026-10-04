@@ -48,6 +48,7 @@
     "web-push": "^3.6.7",
     "yauzl": "^3.4.0",
     "yjs": "^13.6.31",
-    "zod": "latest"
+    "zod": "latest",
+    "@runly/preview-runtime": "workspace:*"
   }
 }

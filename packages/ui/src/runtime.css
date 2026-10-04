@@ -1,0 +1,1452 @@
+:root {
+  --brand-primary-computed: var(--brand-primary);
+}
+
+:root,
+html {
+  font-family:
+    "Plus Jakarta Sans",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+  /* Runly palette (2026-09-13 brand guide). Structural tokens map to
+     Midnight/Navy; --runly-blue/--runly-cyan carry the warm accent used for
+     buttons, active states and the loader's moving stroke — see
+     docs/superpowers/specs/2026-09-13-runly-brand-assets-design.md. Variable
+     names kept as-is (atlas-* legacy naming) to avoid touching every
+     consumer; only the hex values changed. */
+  --runly-navy: #0c172d; /* Midnight */
+  --runly-navy-2: #132646; /* Navy */
+  --runly-navy-dark: #070d18; /* Runly dark-neutral background */
+  --runly-blue: #f6381a; /* Red — brand-primary hover/pressed */
+  --runly-cyan: #fd6016; /* Flame — brand-primary accent */
+  --runly-gray-light: #e6eaf0;
+  --runly-gray-text: #5f6b7a;
+
+  --brand-primary: var(--runly-cyan);
+  --brand-primary-hover: var(--runly-blue);
+  --brand-primary-foreground: var(--runly-navy-dark);
+  --brand-soft: rgba(253, 96, 22, 0.14);
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --muted: 210 16% 93%;
+  --muted-foreground: 215 18% 36%;
+  --border: 214 13% 89%;
+  /* Field borders: darker than --border so inputs stay legible on white cards. */
+  --input: 214 14% 78%;
+  --ring: 195 98% 56%;
+
+  /* Realistic notebook paper effects (runly.notes "Estilo de hoja" +
+     "Efectos de papel") — deliberately distinct from --border, warm/paper
+     toned rather than neutral UI gray. */
+  --note-paper-line: 213 55% 78%;
+  --note-paper-margin: 350 70% 78%;
+  --surface-1: 0 0% 100%;
+  --surface-2: 210 18% 97%;
+  --surface-3: 210 16% 95%;
+
+  --glass-blur: 20px;
+  --glass-bg: rgba(255, 255, 255, 0.68);
+  --glass-bg-strong: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-subtle: rgba(0, 0, 0, 0.04);
+  --glass-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-tint: rgba(33, 199, 255, 0.08);
+  --glass-glow: rgba(33, 199, 255, 0.25);
+  /* Brand-colored counterpart to --glass-tint/--glass-glow (cyan): use this
+     for translucent surfaces that should carry the Runly orange accent
+     instead — e.g. the setup wizard's active-step indicator. */
+  --glass-tint-brand: rgba(253, 96, 22, 0.1);
+  --glass-glow-brand: rgba(253, 96, 22, 0.32);
+  /* Counterpart to --glass-bg-strong for full-page "shell" cards (setup
+     wizard, login) that hold ordinary .glass-subtle fields and group panels.
+     In light mode this is a visibly distinct light gray, not just a
+     higher-opacity white — .glass-shell also bumps its nested --glass-bg to
+     near-opaque white (see .glass-shell below), and two different opacities
+     of the SAME white are indistinguishable against this screen's pale
+     backdrop. A real gray-vs-white color step is what actually separates
+     card from field. Dark mode doesn't have this problem (the shell is
+     lighter than what's nested inside it against a dark backdrop), so its
+     value just reuses --glass-bg-strong unchanged. */
+  --glass-bg-shell: rgba(228, 232, 238, 0.96);
+  --surface-card-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --topbar-height: 3.5rem;
+  /* Exposed as custom properties so JS (MessageActionSheet positioning) can
+     read the device safe-area insets without a probe element. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Mobile glass: still translucent + blurred (modern iOS/Android honour
+   backdrop-filter), just a touch more opaque than desktop so text stays
+   readable on phones that fall back to no blur. ── */
+@media (max-width: 767px) {
+  :root {
+    --glass-blur: 16px;
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-bg-strong: rgba(255, 255, 255, 0.84);
+    --glass-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.1),
+      0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .dark {
+    --glass-bg: rgba(15, 23, 42, 0.82);
+    --glass-bg-strong: rgba(15, 23, 42, 0.9);
+    --glass-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+}
+
+/* Users who ask the OS for less transparency get the opaque treatment back. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-blur: 0px;
+    --glass-bg: rgba(255, 255, 255, 0.98);
+    --glass-bg-strong: #fff;
+  }
+  .dark {
+    --glass-bg: rgba(15, 23, 42, 0.98);
+    --glass-bg-strong: rgb(15, 23, 42);
+  }
+  .glass-viewer {
+    backdrop-filter: none !important;
+    background: #fff !important;
+  }
+  .dark .glass-viewer {
+    background: rgb(15, 23, 42) !important;
+  }
+  .glass-overlay {
+    backdrop-filter: none !important;
+    background: #fff !important;
+  }
+  .dark .glass-overlay {
+    background: rgb(15, 23, 42) !important;
+  }
+}
+
+.dark {
+  --brand-primary-computed: var(--brand-primary-on-dark, var(--brand-primary));
+  --background: 222 47% 5%;
+  --foreground: 210 40% 95%;
+  --card: 222 47% 8%;
+  --card-foreground: 210 40% 95%;
+  --muted: 222 47% 12%;
+  --muted-foreground: 215 16% 55%;
+  --border: 222 47% 15%;
+  --input: 222 28% 24%;
+  --ring: 195 98% 56%;
+
+  --note-paper-line: 213 35% 38%;
+  --note-paper-margin: 350 45% 45%;
+
+  --surface-1: 222 47% 8%;
+  --surface-2: 222 47% 6%;
+  --surface-3: 222 47% 10%;
+  --brand-soft: rgba(253, 96, 22, 0.2);
+
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-strong: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border-subtle: rgba(255, 255, 255, 0.055);
+  --glass-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --glass-tint: rgba(33, 199, 255, 0.14);
+  --glass-glow: rgba(33, 199, 255, 0.36);
+  --glass-tint-brand: rgba(253, 96, 22, 0.16);
+  --glass-glow-brand: rgba(253, 96, 22, 0.42);
+  --glass-bg-shell: var(--glass-bg-strong);
+  --surface-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+@layer utilities {
+  /* ── Safe-area / topbar helpers ──────────────────────────── */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* h-topbar: topbar height = h-14 + iOS notch */
+  .h-topbar {
+    height: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
+  }
+  /* pt-topbar: body top padding to clear topbar */
+  .pt-topbar {
+    padding-top: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
+  }
+  /* top-topbar: position sidebar/overlays right below the topbar (incl. notch) */
+  .top-topbar {
+    top: calc(var(--topbar-height) + env(safe-area-inset-top, 0px));
+  }
+  /* h-below-topbar: fill remaining height after topbar + notch */
+  .h-below-topbar {
+    height: calc(100dvh - var(--topbar-height) - env(safe-area-inset-top, 0px));
+  }
+  /* h-chat-viewport: like h-below-topbar but also subtracts bottom safe area.
+     Use for full-screen chat layouts where main has safe-bottom padding. */
+  .h-chat-viewport {
+    height: calc(100dvh - var(--topbar-height) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+  /* inset-safe: modal/dialog inset that respects iOS safe-area in PWA mode */
+  .inset-safe {
+    top: calc(0.75rem + env(safe-area-inset-top, 0px));
+    right: calc(0.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    left: calc(0.75rem + env(safe-area-inset-left, 0px));
+  }
+  @media (min-width: 640px) {
+    .inset-safe {
+      top: calc(1.25rem + env(safe-area-inset-top, 0px));
+      right: calc(1.25rem + env(safe-area-inset-right, 0px));
+      bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+      left: calc(1.25rem + env(safe-area-inset-left, 0px));
+    }
+  }
+  /* touch-target: minimum 44x44px tap area */
+  .touch-target {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  /* Only the standard `backdrop-filter` is declared here — Lightning CSS (the
+     production minifier bundled with @tailwindcss/vite) adds `-webkit-` from the
+     package.json browserslist. Declaring both by hand triggers a minifier
+     dedupe bug: with a `var()` value it collapses the pair to whichever line
+     comes last, silently dropping the standard property in the prod build and
+     killing the blur in engines that don't honor `-webkit-backdrop-filter`
+     (Firefox, some webviews). Keep this a single declaration. */
+  /* isolation forces each blurred surface into its own stacking context so
+     unrelated repaints elsewhere don't force Chromium/WebView2 to
+     recomposite this element's backdrop blur. Deliberately NOT pairing this
+     with `transform: translateZ(0)` — that GPU-layer-promotion trick is the
+     usual fix for backdrop-filter flicker, but on this app it was
+     implicated in a DIFFERENT artifact (a diagonal seam/glare crossing
+     glass-shell cards, reported after adding it) — forcing a fresh 3D layer
+     onto an already-blurred, semi-transparent surface can itself introduce
+     compositing seams on some Chromium/ANGLE GPU driver combos. If seams
+     resurface, isolation alone is the safer piece to keep. See the
+     "glassic flicker" bug report. */
+  .glass {
+    backdrop-filter: blur(var(--glass-blur));
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+
+  .glass-strong {
+    backdrop-filter: blur(var(--glass-blur));
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+
+  /* Full-screen media viewer (AdvancedFileViewer). .glass-strong's light
+     value is near-opaque white, which washes the blurred page out to a flat
+     white sheet; the viewer needs real see-through glass in both themes. */
+  .glass-viewer {
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    background: rgba(241, 245, 249, 0.42);
+    isolation: isolate;
+  }
+  .dark .glass-viewer {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* Modal overlays (command palette, app launcher, Dialog): .glass-strong's
+     0.8 white over the dimmed backdrop reads as a flat gray sheet in light
+     mode. Lighter, more translucent white + saturate gives it the same glass
+     feel it has in dark mode. Pair it with .overlay-scrim. Never put either
+     inside an ancestor that animates opacity: that makes the ancestor a
+     backdrop root and the blur only pops in once the fade ends. */
+  .glass-overlay {
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    background: rgba(241, 245, 249, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+  .dark .glass-overlay {
+    background: var(--glass-bg-strong);
+    border-color: var(--glass-border);
+  }
+  /* Scrim behind modal overlays. A black/40 scrim turns the light page into a
+     flat gray sheet, so the panel had nothing colorful left to blur. */
+  .overlay-scrim {
+    background: rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px) saturate(140%);
+    -webkit-backdrop-filter: blur(6px) saturate(140%);
+  }
+  .dark .overlay-scrim {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .overlay-item-active {
+    background: var(--brand-soft);
+  }
+  .dark .overlay-item-active {
+    background: hsl(var(--muted));
+  }
+
+  .glass-shell {
+    backdrop-filter: blur(var(--glass-blur));
+    background: var(--glass-bg-shell);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+    /* Nested .glass/.glass-subtle surfaces (form fields, grouped panels)
+       need to read as a visibly distinct layer from this shell. Plain alpha
+       stacking can't do that here: in light mode both this shell and its
+       .glass-subtle children are translucent WHITE, and mixing white over
+       white stays white regardless of the opacity gap between them — there's
+       no color info underneath for the transparency to reveal. Dark mode
+       doesn't have this problem (the dark backdrop shows through each layer
+       at a different rate, which is genuinely visible), so only light mode
+       needs the stronger, more opaque values below. Scoped as CSS variables
+       to this subtree, not the global tokens every other .glass consumer
+       relies on. */
+    --glass-bg: rgba(255, 255, 255, 0.97);
+    --glass-border-subtle: rgba(16, 37, 87, 0.12);
+  }
+  .dark .glass-shell {
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-border-subtle: rgba(255, 255, 255, 0.055);
+  }
+
+  /* Solid structural container surface — cards, tables, form/detail
+     section cards, stat tiles. These sit on the app's plain page background,
+     where translucent glass read as washed-out/muddy rather than as a layer,
+     so containers are opaque (--card) while floating surfaces (dialogs,
+     sheets, popovers, dropdowns, toasts) and controls (inputs, selects,
+     tabs, buttons) keep the glass treatment. No backdrop-filter: blur here
+     also produced the seam/two-tone artifacts from the "glassic flicker" bug
+     report. `.glass-shell-flat` is kept as an alias for existing call sites.
+     Do NOT use this for login/setup-wizard's main card (.glass-shell there
+     sits over an animated gradient backdrop where the blur is the point). */
+  .surface-card,
+  .glass-shell-flat {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--surface-card-shadow);
+  }
+
+  .glass-tinted {
+    backdrop-filter: blur(var(--glass-blur));
+    background: var(--glass-tint);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+
+  .glass-tinted-brand {
+    backdrop-filter: blur(var(--glass-blur));
+    background: var(--glass-tint-brand);
+    border: 1px solid var(--glass-glow-brand);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+
+  /* No backdrop-filter here, unlike the other .glass* variants — every
+     .glass-subtle consumer (Input, Select, Textarea, form-field-base,
+     SearchInput, Tabs — i.e. every form field) is itself nested inside an
+     ancestor .glass/.glass-shell/.glass-strong Card, which already blurs
+     the real page content behind it. Blurring AGAIN here means blurring an
+     already-blurred layer: a form with a dozen fields becomes a dozen
+     *nested* backdrop-filter layers stacked inside one outer blur layer,
+     which is exactly the pattern Chromium/WebView2's tiled blur compositor
+     handles worst — this is what kept producing the flicker/seam artifacts
+     even after the .glass fixes above (isolation stabilizes a layer's own
+     compositing, it doesn't fix the cost of nesting N more blurred layers
+     inside it). The translucent background/border alone
+     still reads as "glass" against the already-blurred Card behind it. */
+  .glass-subtle {
+    background: var(--glass-bg);
+    border-width: 1px;
+    border-style: solid;
+  }
+
+  /* Default border color at zero specificity: this block is emitted after
+     Tailwind's generated utilities, so a plain `.glass-subtle` color used to
+     override every field's own border-input / border-destructive class and
+     left inputs with a near-invisible rgba(0,0,0,0.04) outline in light mode.
+     Any explicit border color utility now wins; bare .glass-subtle surfaces
+     keep the subtle glass edge. */
+  :where(.glass-subtle) {
+    border-color: var(--glass-border-subtle);
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* ── Auth atmosphere keyframes (setup wizard + login backdrop) ──────────── */
+@keyframes authDriftA {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6%, -8%, 0) scale(1.14); }
+}
+@keyframes authDriftB {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); }
+  50% { transform: translate3d(-9%, 7%, 0) scale(1); }
+}
+@keyframes authDriftC {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(4%, 10%, 0) scale(1.2); }
+}
+@keyframes authGridDrift {
+  from { background-position: 0 0, 34px 28px, 126px 112px; }
+  to { background-position: 220px 110px, 254px 138px, 346px 222px; }
+}
+@keyframes authStreak {
+  0% { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  18% { opacity: 1; }
+  100% { transform: translateX(320%) skewX(-18deg); opacity: 0; }
+}
+
+/* iOS Safari: `100dvh` on a position:fixed root can resolve to the SHORT
+   viewport and fail to grow when the browser toolbar auto-hides, leaving a
+   band of page background below the content (most visible under the chat
+   composer). `-webkit-fill-available` tracks the real visible height there.
+   Detector: -webkit-touch-callout is Safari/iOS-only; ignored elsewhere so the
+   `h-dvh` utility keeps applying. */
+@supports (-webkit-touch-callout: none) {
+  @media (pointer: coarse) {
+    .app-shell-root {
+      height: -webkit-fill-available;
+    }
+  }
+  /* In an iOS Safari TAB (not an installed PWA) -webkit-fill-available already
+     stops above the home indicator, so a `.safe-bottom` element (the chat
+     composer) would tack on env(safe-area-inset-bottom) of dead space below the
+     input. In a standalone PWA the fill height IS the full screen, so keep the
+     inset there. */
+  @media (pointer: coarse) and (display-mode: browser) {
+    .app-shell-root .safe-bottom {
+      padding-bottom: 0 !important;
+    }
+  }
+}
+
+/* ── Badge variant overrides (light mode: solid; dark mode: glass) ──────────
+   These are defined here — not in the ui package — to guarantee Tailwind
+   always emits the rules regardless of package-boundary scanning. */
+
+/* Light mode: solid saturated pill, white text — always readable at 12px */
+.badge-success {
+  background: #10b981;
+  border-color: transparent;
+  color: #fff;
+}
+.badge-warning {
+  background: #f59e0b;
+  border-color: transparent;
+  color: #fff;
+}
+.badge-destructive {
+  background: #ef4444;
+  border-color: transparent;
+  color: #fff;
+}
+
+/* Dark mode: glass tinted pill — neon look */
+.dark .badge-success {
+  background: rgba(52, 211, 153, 0.18);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+}
+.dark .badge-warning {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fcd34d;
+}
+.dark .badge-destructive {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
+/* ── Prevent iOS Safari auto-zoom on input focus ─────────── */
+/* iOS zooms in when font-size < 16px. Fix globally at mobile widths. */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ── AppLoader animations ─────────────────────────────────── */
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loader-dot-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.18;
+    transform: scale(0.75) translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1) translateY(-4px);
+  }
+}
+
+@keyframes loader-halo-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.08);
+  }
+}
+
+.loader-ring {
+  animation: loader-spin 1.1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+
+.loader-halo {
+  animation: loader-halo-pulse 2s ease-in-out infinite;
+}
+
+.loader-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  animation: loader-dot-bounce 1.2s ease-in-out var(--dot-delay, 0s) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-halo {
+    animation: none;
+  }
+}
+
+/* ── Combobox (@runly/ui Combobox.jsx) ─────────────────────
+   Row entrance stagger (delay set inline per row), pop-in for check marks,
+   chips and clear buttons, fade for empty/error states. */
+@keyframes runly-cbx-item-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes runly-cbx-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes runly-cbx-fade {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.runly-cbx-item-in {
+  animation: runly-cbx-item-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.runly-cbx-pop {
+  animation: runly-cbx-pop 160ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.runly-cbx-fade {
+  animation: runly-cbx-fade 200ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .runly-cbx-item-in,
+  .runly-cbx-pop,
+  .runly-cbx-fade {
+    animation: none;
+  }
+}
+
+/* ── TipTap Notes editor ─────────────────────────────────── */
+/* Tailwind preflight resets h1-h6, strong, em, etc. to inherit.
+   These rules restore visual meaning inside the editor content area. */
+.tiptap {
+  font-size: var(--note-body-font-size, 0.9375rem);
+  /* One line unit shared with the ruled/grid pattern (see .note-sheet). */
+  line-height: var(--note-line, 1.625rem);
+  color: hsl(var(--foreground));
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  caret-color: #f59e0b;
+}
+
+/* First paragraph = Apple-Notes-style title. Its first line box is exactly
+   --note-title-lh tall and starts --note-title-top below the sheet content;
+   the icon row in NoteEditor.jsx is absolutely positioned at that same top
+   with that same height and centers its content, so icon and title text are
+   vertically centered on each other by construction. */
+.tiptap > p:first-child {
+  font-size: 1.625rem !important;
+  font-weight: 700 !important;
+  line-height: var(--note-title-lh, 2.5rem) !important;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: var(--note-title-top, 1rem);
+  letter-spacing: -0.02em;
+  color: hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--border));
+  /* Opaque box that hides the ruled/grid pattern behind it, so the
+     border-bottom below is the ONLY line visible in the title area — a
+     pattern line peeking through nearby otherwise reads as a confusing,
+     slightly-offset second line right under the title (or a "cut" line if
+     the opaque box doesn't reach every edge). To make sure there are truly
+     no gaps for the pattern to show through:
+     - margin-left/right cancel .tiptap's responsive side padding, extending
+       this box's background full-bleed to .note-sheet's edges (matching
+       padding-left/right below re-adds the same inset so the TEXT position
+       is unchanged — only the painted background area gets wider).
+     - the old separate margin-bottom is folded into padding-bottom instead,
+       since background-color paints the padding-box but never the margin
+       box — any spacing left as a margin would be an uncovered gap. */
+  margin-left: calc(-1 * var(--note-sheet-padding, 2rem));
+  margin-right: calc(-1 * var(--note-sheet-padding, 2rem));
+  padding-left: var(--note-sheet-padding, 2rem);
+  padding-right: var(--note-sheet-padding, 2rem);
+  padding-bottom: 1.125rem;
+  background-color: var(--note-sheet-bg, hsl(var(--card)));
+  /* Room for the icon button on the first line only (the icon row overlays
+     it). text-indent, not padding: a wrapped title's continuation lines
+     return to the normal inset, like body text. */
+  text-indent: var(--note-title-indent, 3rem);
+}
+
+/* When a ruled/grid paper style is active, the title's own separator line
+   uses the same warm paper-line color as the rest of the page, so the
+   title visually reads as sitting on one of the notebook's rules instead
+   of a mismatched neutral UI divider. Left as the neutral --border color
+   on "En blanco" (no paper style), where there's no ruled pattern to match. */
+[data-paper-style="lined"] .tiptap > p:first-child,
+[data-paper-style="grid"] .tiptap > p:first-child,
+[data-paper-style="dots"] .tiptap > p:first-child {
+  border-bottom-color: hsl(var(--note-paper-line));
+}
+
+/* Headings */
+.tiptap h1 {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  line-height: 1.3;
+  margin: 1.25rem 0 0.5rem;
+  color: hsl(var(--foreground));
+  letter-spacing: -0.015em;
+}
+.tiptap h2 {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  line-height: 1.35;
+  margin: 1rem 0 0.375rem;
+  color: hsl(var(--foreground));
+}
+.tiptap h3 {
+  font-size: 1.0625rem !important;
+  font-weight: 600 !important;
+  line-height: 1.4;
+  margin: 0.875rem 0 0.25rem;
+  color: hsl(var(--foreground));
+}
+
+/* Paper-style backgrounds (per-note "Estilo de hoja" setting). Painted on
+   .note-sheet (NoteSheet.jsx), NOT .tiptap: .tiptap's own min-height:100%
+   never resolves because TipTap's internal EditorContent wrapper (which we
+   don't style) has no defined height, so a percentage height on .tiptap
+   computes as auto per the CSS spec — the pattern used to stop at the
+   content's intrinsic height instead of covering the whole page. .note-sheet
+   sits one level up and its min-height:100% DOES resolve (its parent is the
+   flex-sized, definite-height scrollable container), so it reliably fills
+   the whole visible page and grows further with content.
+   Line spacing uses calc(<rem> * 1.72) — the exact same numbers .tiptap
+   uses for its own line-height: 1.72 on every screen — instead of
+   `em`, because .note-sheet doesn't share .tiptap's explicit font-size, so
+   `em` here would resolve against the wrong element and desync from the
+   real body-text line-height. Cover banner/toolbar sit in the same tree but
+   already paint their own opaque/blurred background, so this doesn't leak
+   through them. */
+.note-sheet {
+  --note-body-font-size: 0.9375rem;
+  /* Body line unit: whole pixels (26px / 24px at a 16px root) so the 1px
+     rules land on the pixel grid instead of being anti-aliased away. */
+  --note-line: 1.625rem;
+  --note-title-lh: 2.5rem;
+  --note-title-top: 1rem;
+  --note-title-indent: 3rem;
+  /* Lifts each rule from the bottom of its line box to just under the text
+     baseline, so the writing sits on the line like on real ruled paper. */
+  --note-rule-lift: 0.375rem;
+  --note-sheet-padding: 2rem;
+  position: relative;
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+}
+.note-sheet-inset {
+  padding-inline: var(--note-sheet-padding, 2rem);
+}
+@media (max-width: 639px) {
+  .note-sheet {
+    --note-body-font-size: 0.875rem;
+    --note-line: 1.5rem;
+    --note-title-lh: 2.25rem;
+    --note-title-indent: 2.75rem;
+    --note-rule-lift: 0.3125rem;
+    --note-sheet-padding: 1rem;
+  }
+  .tiptap > p:first-child { font-size: 1.375rem !important; }
+  .tiptap h1 { font-size: 1.3125rem !important; }
+  .tiptap h2 { font-size: 1.125rem !important; }
+  .tiptap h3 { font-size: 1rem !important; }
+}
+/* The pattern is ONE line-unit tile repeated by background-size, not a
+   repeating-linear-gradient: Chrome rasterizes long repeating gradients per
+   tile and drops thin 1px stops at fractional offsets, which is what made
+   bands of lines vanish. background-position shifts the tiles so a rule
+   lands under real body text (see the measurement effect in NoteEditor.jsx
+   that sets --note-paper-phase). */
+[data-paper-style="lined"] .note-sheet {
+  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), hsl(var(--note-paper-line)) calc(100% - 1px));
+  background-size: 100% var(--note-line);
+  background-position: 0 calc(-1 * var(--note-paper-phase, 0px) - var(--note-rule-lift, 0px));
+}
+[data-paper-style="grid"] .note-sheet {
+  background-image:
+    linear-gradient(to bottom, transparent calc(100% - 1px), hsl(var(--note-paper-line)) calc(100% - 1px)),
+    linear-gradient(to right, transparent calc(100% - 1px), hsl(var(--note-paper-line)) calc(100% - 1px));
+  background-size: 100% var(--note-line), var(--note-line) 100%;
+  background-position: 0 calc(-1 * var(--note-paper-phase, 0px) - var(--note-rule-lift, 0px)), 0 0;
+}
+/* Dot grid: one dot per line unit, centered on where the ruled lines
+   would cross (tile shifted half a unit), so text sits on the dot rows. */
+[data-paper-style="dots"] .note-sheet {
+  background-image: radial-gradient(circle, hsl(var(--note-paper-line)) 1.25px, transparent 1.75px);
+  background-size: var(--note-line) var(--note-line);
+  background-position:
+    calc(var(--note-line) / -2)
+    calc(var(--note-line) / 2 - var(--note-paper-phase, 0px) - var(--note-rule-lift, 0px));
+}
+/* On ruled/grid paper every text block advances by whole line units, so the
+   text keeps sitting on the rules all the way down (a paragraph margin would
+   drift it a few px per line). */
+[data-paper-style="lined"] .tiptap p,
+[data-paper-style="grid"] .tiptap p,
+[data-paper-style="dots"] .tiptap p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+[data-paper-style="lined"] .tiptap h1,
+[data-paper-style="grid"] .tiptap h1,
+[data-paper-style="dots"] .tiptap h1 {
+  line-height: calc(var(--note-line) * 2);
+  margin: 0;
+}
+[data-paper-style="lined"] .tiptap :is(h2, h3),
+[data-paper-style="grid"] .tiptap :is(h2, h3),
+[data-paper-style="dots"] .tiptap :is(h2, h3) {
+  line-height: var(--note-line);
+  margin: 0;
+}
+/* Red margin line (school-notebook style) — independent of paper_style,
+   works even on a blank ("En blanco") page. Positioned before the responsive
+   left padding shared by the icon row, title, and
+   body text, so all writing starts to the right of the line, never on top
+   of or before it. `top` starts at --note-content-top (the measured
+   distance to where body content actually begins, same measurement effect
+   as the paper-pattern phase above) instead of 0, so the line doesn't
+   bleed up into the sticky toolbar's translucent (90%-opacity) background —
+   at 0 it would start behind the toolbar and be faintly visible through it. */
+[data-paper-margin="true"] .note-sheet::before {
+  content: '';
+  position: absolute;
+  top: var(--note-content-top, 0px);
+  bottom: 0;
+  left: calc(var(--note-sheet-padding) * 0.625);
+  width: 1px;
+  background: hsl(var(--note-paper-margin) / 0.6);
+  pointer-events: none;
+}
+
+/* Subtle paper grain — inline SVG feTurbulence noise, no external asset.
+   Kept at very low opacity so it never fights with text contrast. */
+[data-paper-texture="true"] .note-sheet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  opacity: 0.035;
+  pointer-events: none;
+}
+
+/* Sheet depth — a page sitting on the desk, not a flat panel. */
+[data-paper-shadow="true"] .note-sheet {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Paragraph */
+.tiptap p { margin: 0.3rem 0; }
+
+/* Marks */
+.tiptap strong { font-weight: 700 !important; }
+.tiptap em     { font-style: italic !important; }
+.tiptap s, .tiptap del { text-decoration: line-through; }
+.tiptap u { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Inline code */
+.tiptap :not(pre) > code {
+  background: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Code block */
+.tiptap pre {
+  background: hsl(222 47% 11%);
+  color: hsl(210 40% 90%);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1.6;
+}
+.tiptap pre code {
+  background: none !important;
+  padding: 0 !important;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Blockquote */
+.tiptap blockquote {
+  border-left: 3px solid #f59e0b;
+  padding-left: 1rem;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+  margin: 0.75rem 0;
+}
+
+/* Lists */
+.tiptap ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.tiptap ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.tiptap li {
+  margin: 0.2rem 0;
+  line-height: 1.65;
+  display: list-item;
+}
+.tiptap li > p { margin: 0; }
+.tiptap ul ul:not([data-type="taskList"]) { list-style-type: circle; }
+.tiptap ul ul ul:not([data-type="taskList"]) { list-style-type: square; }
+
+/* Task list */
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.5rem 0;
+}
+.tiptap ul[data-type="taskList"] > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  list-style: none;
+}
+.tiptap ul[data-type="taskList"] > li > label {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  cursor: pointer;
+}
+.tiptap ul[data-type="taskList"] > li > label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #f59e0b;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.tiptap ul[data-type="taskList"] > li[data-checked="true"] > div {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.tiptap ul[data-type="taskList"] > li > div { flex: 1; }
+
+/* Horizontal rule */
+.tiptap hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1rem 0;
+}
+
+/* Links */
+.tiptap a {
+  color: #3b82f6;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: 2px;
+}
+.tiptap a:hover { opacity: 0.75; }
+
+/* Tables */
+.tiptap table {
+  border-collapse: collapse;
+  margin: 0;
+  /* min-width: 100% ensures the table fills its container; width: auto lets it grow
+     wider when column widths exceed the container, triggering overflow-x on .tableWrapper */
+  min-width: 100%;
+  width: auto;
+  font-size: 0.875rem;
+  table-layout: fixed;
+}
+.tiptap th,
+.tiptap td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.4rem 0.75rem;
+  vertical-align: top;
+  text-align: left;
+  position: relative;
+  min-width: 80px;
+  /* Prevent single letters stacking vertically in narrow cells */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.tiptap th {
+  background: hsl(var(--muted));
+  font-weight: 600 !important;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(var(--muted-foreground));
+}
+.tiptap .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(245, 158, 11, 0.12);
+  pointer-events: none;
+}
+.tiptap .column-resize-handle {
+  background: #f59e0b;
+  bottom: -2px;
+  /* pointer-events: auto allows touch events to target the handle directly */
+  pointer-events: auto;
+  position: absolute;
+  right: -3px;
+  top: 0;
+  width: 6px;
+  z-index: 10;
+  cursor: col-resize;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.tiptap td:hover .column-resize-handle,
+.tiptap th:hover .column-resize-handle,
+.tiptap .resize-cursor .column-resize-handle {
+  opacity: 1;
+}
+/* :hover never fires on touch, so the handle would otherwise stay invisible
+   forever on phones even though the touch->mouse bridge (NoteEditor.jsx)
+   already forwards touch events to it. Always show it, and widen the strip
+   for a more forgiving touch target. */
+@media (pointer: coarse) {
+  .tiptap .column-resize-handle {
+    opacity: 1;
+    width: 12px;
+    right: -6px;
+  }
+}
+.tiptap .tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0.75rem 0;
+  /* Breathing room so the image resize handle's -m-5 extended hit-area
+     (ImageAnnotationOverlay.jsx) isn't clipped by this wrapper's overflow
+     when the image sits in the table's last column/row. */
+  padding: 0 0.5rem 0.5rem 0;
+}
+.tiptap .resize-cursor { cursor: col-resize; }
+
+/* Placeholder — TipTap adds data-placeholder + is-empty on empty blocks */
+.tiptap p.is-empty::before,
+.tiptap h1.is-empty::before,
+.tiptap h2.is-empty::before,
+.tiptap h3.is-empty::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+/* Title-size placeholder for empty first paragraph */
+.tiptap > p:first-child.is-empty::before {
+  font-size: 1.625rem !important;
+  font-weight: 700 !important;
+  opacity: 0.45;
+}
+/* Body "start writing" hint — normal text size, muted, only shown on the
+   first empty paragraph of an otherwise-empty note (see bodyPlaceholderText) */
+.tiptap p:not(:first-child).is-empty::before {
+  font-size: 0.9375rem;
+  font-weight: 400;
+  opacity: 1;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Body images: never overflow the content column, keep aspect ratio.
+   NOT !important — the crop wrapper overrides max-width on the <img>. */
+.tiptap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Highlighted text — force dark text in dark mode so light pastels remain readable.
+   Without this, white --foreground text on #fef08a (yellow) etc. is invisible.
+   !important is required to override both CSS inheritance from .tiptap and
+   any inline color style that TextStyle/Color extension may have injected. */
+.dark .tiptap mark,
+.dark .tiptap mark span {
+  color: #1a1a1a !important;
+}
+
+/* Collaboration carets — thin line + small avatar chip (see buildCollabCaret).
+   The @tiptap/extension-collaboration-caret v3 default builder is replaced, so
+   these target our own classes, not the extension's collaboration-carets__*. */
+.tiptap .runly-yjs-caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid var(--caret-color, #f59e0b);
+  pointer-events: none;
+  word-break: normal;
+  box-sizing: border-box;
+}
+.tiptap .runly-yjs-caret__chip {
+  position: absolute;
+  top: -1.5em;
+  left: -2px;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px hsl(var(--background));
+  user-select: none;
+  pointer-events: auto;
+}
+.tiptap .runly-yjs-caret__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Remote selection wash (buildCollabSelection sets the per-user tint inline) */
+.tiptap .ProseMirror-yjs-selection {
+  border-radius: 2px;
+}
+
+/* ── MDXEditor theme overrides ────────────────────────────── */
+/* Adapt MDXEditor's CSS variables to the app's design tokens  */
+.mdxeditor {
+  --accentBase: hsl(var(--primary));
+  --accentBgSubtle: hsl(var(--primary) / 0.08);
+  --accentBgHover: hsl(var(--primary) / 0.12);
+  --accentText: hsl(var(--primary));
+  --baseBase: hsl(var(--foreground));
+  --baseBg: hsl(var(--card));
+  --basePageBg: hsl(var(--card));
+  --baseBgSubtle: hsl(var(--muted));
+  --baseBgHover: hsl(var(--muted));
+  --baseBgActive: hsl(var(--border));
+  --baseBorder: hsl(var(--border));
+  --baseSolid: hsl(var(--primary));
+  --baseSolidHover: hsl(var(--primary));
+  --baseText: hsl(var(--foreground));
+  --baseTextContrast: hsl(var(--foreground));
+  font-family: inherit;
+}
+
+/* Toolbar: match the app border/muted style */
+.mdxeditor-toolbar {
+  background: hsl(var(--muted) / 0.3);
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.25rem 0.5rem;
+  gap: 0.125rem;
+  flex-wrap: wrap;
+  min-height: 2.5rem;
+}
+
+/* Content area — padding must live on the contenteditable itself so the
+   placeholder (absolutely positioned relative to it) aligns with the cursor.
+   Scoped to .mdx-editor-root so MarkdownViewer's .mdx-prose is unaffected. */
+.mdx-editor-root .mdxeditor-root-contenteditable {
+  min-height: 9rem;
+}
+.mdx-editor-root .mdx-prose {
+  padding: 0.75rem 0.875rem;
+}
+
+/* Link dialog + toolbar dropdowns must appear above any modal overlay (z-50) */
+[data-radix-popper-content-wrapper],
+.mdxeditor-popup-container,
+[data-radix-select-viewport],
+[data-radix-dropdown-menu-content] {
+  z-index: 9999 !important;
+}
+/* ...except menus that belong to a layer stacked above 9999 (the full-screen
+   file viewer opens at z-index 10000), which the rule above would bury
+   behind that layer. */
+[data-radix-popper-content-wrapper]:has(> [data-above-viewer]) {
+  z-index: 10050 !important;
+}
+
+/* ── Shared prose styles (used by MDXEditor content + MarkdownViewer) ─ */
+/* Applied via .mdx-prose class on contentEditableClassName and viewer div */
+.mdx-prose {
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  line-height: 1.625;
+}
+
+.mdx-prose p {
+  margin: 0.25rem 0;
+  line-height: 1.625;
+}
+
+/* Headings — use !important to override Tailwind preflight's
+   h1,h2,h3{font-size:inherit;font-weight:inherit} reset */
+.mdx-prose h1 {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  margin: 0.75rem 0 0.25rem;
+  line-height: 1.3;
+}
+.mdx-prose h2 {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  margin: 0.5rem 0 0.25rem;
+  line-height: 1.35;
+}
+.mdx-prose h3 {
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  margin: 0.5rem 0 0.125rem;
+  line-height: 1.4;
+}
+
+.mdx-prose strong {
+  font-weight: 600;
+}
+.mdx-prose em {
+  font-style: italic;
+}
+.mdx-prose del,
+.mdx-prose s {
+  text-decoration: line-through;
+}
+
+/* Lists — Tailwind preflight resets list-style; restore here with plain CSS */
+.mdx-prose ul:not(.contains-task-list) {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin: 0.375rem 0;
+}
+.mdx-prose ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.5rem;
+  margin: 0.375rem 0;
+}
+.mdx-prose li:not(.task-list-item) {
+  display: list-item;
+  line-height: 1.625;
+  margin: 0.125rem 0;
+}
+.mdx-prose li > p {
+  margin: 0;
+}
+
+/* Task lists — react-markdown (remark-gfm) uses .contains-task-list + .task-list-item */
+.mdx-prose .contains-task-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.375rem 0;
+}
+.mdx-prose .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  margin: 0.125rem 0;
+  list-style: none;
+}
+.mdx-prose .task-list-item input[type="checkbox"] {
+  flex-shrink: 0;
+  margin: 0;
+  margin-top: 0.25rem;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 1.5px solid hsl(var(--border));
+  border-radius: 3px;
+  cursor: default;
+  background-color: transparent;
+  transition:
+    background-color 0.1s,
+    border-color 0.1s;
+}
+.mdx-prose .task-list-item input[type="checkbox"]:checked {
+  background-color: var(--md-accent-color, hsl(var(--primary)));
+  border-color: var(--md-accent-color, hsl(var(--primary)));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 5.5L4 7.5L8 3' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 80%;
+}
+
+/* Nested lists */
+.mdx-prose ul:not(.contains-task-list) ul:not(.contains-task-list) {
+  list-style-type: circle;
+}
+.mdx-prose
+  ul:not(.contains-task-list)
+  ul:not(.contains-task-list)
+  ul:not(.contains-task-list) {
+  list-style-type: square;
+}
+
+.mdx-prose a {
+  color: hsl(var(--primary));
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: hsl(var(--primary) / 0.45);
+  border-radius: 2px;
+  padding: 0 1px;
+  transition:
+    background 0.12s,
+    text-decoration-color 0.12s;
+}
+.mdx-prose a:hover {
+  text-decoration-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.08);
+}
+
+.mdx-prose code {
+  background: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.mdx-prose pre {
+  background: hsl(var(--muted));
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.mdx-prose pre code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.mdx-prose blockquote {
+  border-left: 2px solid hsl(var(--border));
+  padding-left: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+.mdx-prose hr {
+  border-top: 1px solid hsl(var(--border));
+  margin: 0.75rem 0;
+}
+
+.mdx-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.875rem;
+}
+.mdx-prose th,
+.mdx-prose td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.375rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.mdx-prose th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+}
+.mdx-prose tr:nth-child(even) td {
+  background: hsl(var(--muted) / 0.3);
+}
+
+/* ── General ──────────────────────────────────────────────── */
+
+/* Must live in @layer base: unlayered rules always win over @layer utilities
+   in CSS cascade layers regardless of specificity. Without this layer, this
+   default border-color silently overrode .glass/.glass-strong/etc.'s own
+   border-color everywhere — every "glass" surface (dropdowns, popovers,
+   dialogs) rendered with the opaque --border color instead of the
+   translucent --glass-border, which is why borders looked flat and
+   high-contrast instead of soft glass edges. */
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+}
+
+/* Suppress transitions for one paint during a light/dark theme swap — see
+   useThemeStore.toggle(). Without this, every element with transition-colors
+   (used broadly for hover states) animates the swap at its own duration,
+   which reads as a staggered lag instead of an instant switch. */
+.theme-transitioning-off,
+.theme-transitioning-off * {
+  transition: none !important;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family:
+    "Plus Jakarta Sans",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+button,
+[role="button"],
+a[href],
+label[for],
+select {
+  cursor: pointer;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+/* ── Mobile / Responsive globals ─────────────────────────────────── */
+html,
+body {
+  overflow: hidden;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Block drag grip in the sheet gutter (NoteBlockDragHandle placement="gutter"):
+   hidden until the block is hovered, like a classic block handle. Touch
+   screens have no hover, so it stays faintly visible there. */
+.note-block > .note-block-grip {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.note-block:hover > .note-block-grip,
+.note-block > .note-block-grip:focus-visible,
+.note-block > .note-block-grip:active {
+  opacity: 1;
+}
+@media (hover: none) {
+  .note-block > .note-block-grip { opacity: 0.6; }
+}
+
+/* Visually hidden form inputs (Tailwind `sr-only` = position:absolute) inside
+   the app's inner scroll containers have no positioned ancestor, so they are
+   laid out against the viewport at their deep static position: the document
+   itself grows taller than the screen and focusing the input (clicking its
+   label) scrolls the WHOLE app shell away — the "page breaks" bug after
+   ticking a checkbox. `fixed` never adds document overflow nor triggers a
+   focus scroll; the input stays visually hidden and accessible. */
+input.sr-only,
+select.sr-only,
+textarea.sr-only {
+  position: fixed;
+  top: 0;
+  left: 0;
+}

@@ -1,3 +1,4 @@
+import { useRuntimeFetch } from '../lib/module-runtime/RuntimeAdapters.jsx';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { resolveRecordLabel } from "./record-label.js";
 import { withDetailFieldTypes, withSelectColumnOptions } from "./table-select-columns.js";
@@ -101,6 +102,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
   // "Compartir" public-links action added by BlueprintCrudScreen).
   extraDetailActions = [],
 }, ref) {
+  const runtimeFetch = useRuntimeFetch();
   const tableApiPath = getApiPath(tableBlueprint);
   const resolvedInitialMode = MODES.has(initialMode) ? initialMode : "list";
   const accentColor = resolveAccentColor(module, tableBlueprint);
@@ -170,7 +172,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
       setRecordError("");
       try {
         const endpoint = `${joinUrl(apiBaseUrl, tableApiPath)}/${encodeURIComponent(String(nextRecordId))}`;
-        const response = await fetch(endpoint, {
+        const response = await runtimeFetch(endpoint, {
           method: "GET",
           headers: buildApiHeaders(token, companyId),
         });
@@ -196,7 +198,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
         setLoadingRecord(false);
       }
     },
-    [apiBaseUrl, tableApiPath, token, companyId],
+    [runtimeFetch, apiBaseUrl, tableApiPath, token, companyId],
   );
 
   useEffect(() => {
@@ -285,12 +287,12 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
     try {
       const endpoint = `${joinUrl(apiBaseUrl, tableApiPath)}/${encodeURIComponent(String(id))}`;
       const response = pendingIsSoftDelete
-        ? await fetch(`${endpoint}/enabled`, {
+        ? await runtimeFetch(`${endpoint}/enabled`, {
             method: "PATCH",
             headers: { ...buildApiHeaders(token, companyId), "Content-Type": "application/json" },
             body: JSON.stringify({ enabled: false }),
           })
-        : await fetch(endpoint, {
+        : await runtimeFetch(endpoint, {
             method: "DELETE",
             headers: buildApiHeaders(token, companyId),
           });
@@ -346,7 +348,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
       setHeaderActionLoadingKey(actionKey);
       setRecordError("");
       try {
-        const response = await fetch(joinUrl(apiBaseUrl, endpointPath), {
+        const response = await runtimeFetch(joinUrl(apiBaseUrl, endpointPath), {
           method,
           headers: buildApiHeaders(token, companyId),
         });
@@ -386,7 +388,7 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
         setHeaderActionLoadingKey("");
       }
     },
-    [apiBaseUrl, fetchRecord, recordData, token, companyId],
+    [runtimeFetch, apiBaseUrl, fetchRecord, recordData, token, companyId],
   );
 
   const renderRecordLoadingOrError = () => {

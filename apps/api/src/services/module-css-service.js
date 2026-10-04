@@ -61,23 +61,8 @@ async function collectSources(dir) {
 
 // Nests the body of the `@layer utilities { ... }` block under the module
 // scope; @property rules stay top-level (they cannot be nested).
-export function scopeUtilities(css, scope) {
-  const start = css.indexOf('@layer utilities {')
-  if (start === -1) return css
-  const open = css.indexOf('{', start)
-  let depth = 0
-  let end = -1
-  for (let i = open; i < css.length; i++) {
-    if (css[i] === '{') depth++
-    else if (css[i] === '}') {
-      depth--
-      if (depth === 0) { end = i; break }
-    }
-  }
-  if (end === -1) return css
-  const inner = css.slice(open + 1, end)
-  return `${css.slice(0, open + 1)}\n:where([data-runly-module="${scope}"]) {${inner}}\n${css.slice(end)}`
-}
+import { scopeUtilities } from '@runly/preview-runtime/css';
+export { scopeUtilities };
 
 // scope: the module key whose screens these utilities belong to. Required for
 // anything loaded into the app (only tests omit it).

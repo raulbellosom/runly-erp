@@ -11,26 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // with BUNDLE_EXTERNALS in apps/api/src/services/module-bundler-service.js).
 // The importmap plugins below map these specifiers to URLs the browser can resolve
 // both in dev (Vite /@id/ virtual modules) and in production (shim entry files).
-const MODULE_EXTERNALS_IMPORTMAP = {
-  "react":                  "ext-react",
-  "react-dom":              "ext-react-dom",
-  "react/jsx-runtime":      "ext-react-jsx-runtime",
-  "react/jsx-dev-runtime":  "ext-react-jsx-dev-runtime",
-  "@tanstack/react-query":  "ext-tanstack-react-query",
-  "zustand":                "ext-zustand",
-  "@runly/ui":              "ext-atlas-ui",
-  "@runly/sdk":             "ext-atlas-sdk",
-  "@runly/validators":      "ext-atlas-validators",
-  "@atlas/ui":              "ext-atlas-ui",
-  "@atlas/sdk":             "ext-atlas-sdk",
-  "@atlas/validators":      "ext-atlas-validators",
-  "react-router-dom":       "ext-react-router-dom",
-  "sonner":                 "ext-sonner",
-  "lucide-react":           "ext-lucide-react",
-  "recharts":               "ext-recharts",
-  "qrcode":                 "ext-qrcode",
-  "@zxing/browser":         "ext-zxing-browser",
-};
+import { MODULE_EXTERNALS_IMPORTMAP } from '@runly/preview-runtime/externals';
 
 // Dev-mode: route bare specifiers through the same explicit shim entry points
 // used by production. Pointing dynamic bundles directly at Vite's /@id/ URLs
@@ -175,6 +156,8 @@ export default defineConfig({
       "@runly/module-engine": resolve(__dirname, "../../packages/module-engine/src/index.js"),
       "@runly/sdk": resolve(__dirname, "../../packages/sdk/src/index.js"),
       // Before "@runly/ui": aliases match by prefix, first entry wins.
+      "@runly/ui/runtime-adapters": resolve(__dirname, "../../packages/ui/src/lib/module-runtime/RuntimeAdapters.jsx"),
+      "@runly/ui/renderer-adapters": resolve(__dirname, "../../packages/ui/src/runly-renderer/renderer-adapters.js"),
       "@runly/ui/icons": resolve(__dirname, "../../packages/ui/src/lib/icon-library/index.js"),
       "@runly/ui": resolve(__dirname, "../../packages/ui/src/index.js"),
       "@runly/validators": resolve(

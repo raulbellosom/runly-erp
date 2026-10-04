@@ -9,8 +9,8 @@ import { buildListUrl, entityApiPath, entityQueryKey } from "./entity-helpers.js
 // Builder generates for the entity (docs/developers/api-modulos.md), with the
 // session and company headers, and show Spanish error toasts.
 
-async function request(url, { token, companyId, method = "GET", body } = {}) {
-  const res = await fetch(url, {
+async function request(url, { token, companyId, transport, method = "GET", body } = {}) {
+  const res = await (transport?.fetch ?? globalThis.fetch)(url, {
     method,
     headers: buildApiHeaders(token, companyId, body ? { "Content-Type": "application/json" } : undefined),
     body: body ? JSON.stringify(body) : undefined,
@@ -39,45 +39,45 @@ function requireApiPath(apiPath, entity) {
 
 // { data: [...], pagination: { page, pageSize, total, totalPages } }
 export function useEntityList(entity, { page = 1, pageSize = 20, search = "", filters = {}, enabled = true } = {}) {
-  const { moduleKey, token, companyId, apiBaseUrl, apiPath } = useEntityContext(entity);
+  const { moduleKey, token, companyId, apiBaseUrl, apiPath, transport, sessionId } = useEntityContext(entity);
   return useQuery({
-    queryKey: entityQueryKey(moduleKey, entity, "list", { page, pageSize, search, filters, companyId }),
-    queryFn: () => request(buildListUrl(apiBaseUrl, apiPath, { page, pageSize, search, filters }), { token, companyId }),
-    enabled: Boolean(token && apiPath) && enabled,
+    queryKey: entityQueryKey(sessionId ?? moduleKey, entity, "list", { page, pageSize, search, filters, companyId }),
+    queryFn: () => request(buildListUrl(apiBaseUrl, apiPath, { page, pageSize, search, filters }), { token, companyId, transport }),
+    enabled: Boolean((token || transport) && apiPath) && enabled,
     placeholderData: (previous) => previous,
   });
 }
 
 // The record object itself (the API's `data`), or undefined while loading.
 export function useEntityRecord(entity, id, { enabled = true } = {}) {
-  const { moduleKey, token, companyId, apiBaseUrl, apiPath } = useEntityContext(entity);
+  const { moduleKey, token, companyId, apiBaseUrl, apiPath, transport, sessionId } = useEntityContext(entity);
   return useQuery({
-    queryKey: entityQueryKey(moduleKey, entity, "record", id, companyId),
-    queryFn: async () => (await request(`${apiBaseUrl}${apiPath}/${id}`, { token, companyId }))?.data ?? null,
-    enabled: Boolean(token && id && apiPath) && enabled,
+    queryKey: entityQueryKey(sessionId ?? moduleKey, entity, "record", id, companyId),
+    queryFn: async () => (await request(`${apiBaseUrl}${apiPath}/${id}`, { token, companyId, transport }))?.data ?? null,
+    enabled: Boolean((token || transport) && id && apiPath) && enabled,
   });
 }
 
 // create(values) / update(id, values) / disable(id), each a mutation with
 // toasts and cache invalidation of the entity's lists and records.
 export function useEntityMutations(entity, { successMessages = {} } = {}) {
-  const { moduleKey, token, companyId, apiBaseUrl, apiPath } = useEntityContext(entity);
+  const { moduleKey, token, companyId, apiBaseUrl, apiPath, transport, sessionId } = useEntityContext(entity);
   const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: entityQueryKey(moduleKey, entity) });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: entityQueryKey(sessionId ?? moduleKey, entity) });
   const onError = (error) => toast.error(error.message);
 
   const create = useMutation({
-    mutationFn: (values) => request(`${apiBaseUrl}${requireApiPath(apiPath, entity)}`, { token, companyId, method: "POST", body: values }),
+    mutationFn: (values) => request(`${apiBaseUrl}${requireApiPath(apiPath, entity)}`, { token, companyId, transport, method: "POST", body: values }),
     onSuccess: () => { invalidate(); toast.success(successMessages.create ?? "Registro creado."); },
     onError,
   });
   const update = useMutation({
-    mutationFn: ({ id, values }) => request(`${apiBaseUrl}${requireApiPath(apiPath, entity)}/${id}`, { token, companyId, method: "PATCH", body: values }),
+    mutationFn: ({ id, values }) => request(`${apiBaseUrl}${requireApiPath(apiPath, entity)}/${id}`, { token, companyId, transport, method: "PATCH", body: values }),
     onSuccess: () => { invalidate(); toast.success(successMessages.update ?? "Cambios guardados."); },
     onError,
   });
   const disable = useMutation({
-    mutationFn: (id) => request(`${apiBaseUrl}${requireApiPath(apiPath, entity)}/${id}/enabled`, { token, companyId, method: "PATCH", body: { enabled: false } }),
+    mutationFn: (id) => request(`${apiBaseUrl}${requireApiPath(apiPath, entity)}/${id}/enabled`, { token, companyId, transport, method: "PATCH", body: { enabled: false } }),
     onSuccess: () => { invalidate(); toast.success(successMessages.disable ?? "Registro desactivado."); },
     onError,
   });

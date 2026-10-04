@@ -9,32 +9,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUNDLES_DIR = path.resolve(__dirname, '..', '..', 'bundles')
 const STORAGE_BUCKET = 'module-bundles'
 
-export const BUNDLE_EXTERNALS = [
-  'react',
-  'react-dom',
-  'react/jsx-runtime',
-  'react/jsx-dev-runtime',
-  '@tanstack/react-query',
-  'zustand',
-  '@runly/ui',
-  '@runly/sdk',
-  '@runly/validators',
-  // Legacy bundles must use the same shared modules as new Runly bundles.
-  '@atlas/ui',
-  '@atlas/sdk',
-  '@atlas/validators',
-  'react-router-dom',
-  'sonner',
-  'lucide-react',
-  'recharts',
-  'qrcode',
-  '@zxing/browser',
-]
-
-// Preserve HTTPS ESM imports in the generated bundle so the browser can load
-// packages from providers such as esm.sh at runtime. HTTP is intentionally not
-// supported: production is HTTPS and browsers would block mixed content.
-export const BUNDLE_EXTERNAL_URL_PATTERNS = ['https://*']
+import { BUNDLE_EXTERNALS, BUNDLE_EXTERNAL_URL_PATTERNS } from '@runly/preview-runtime/externals';
+export { BUNDLE_EXTERNALS, BUNDLE_EXTERNAL_URL_PATTERNS };
 
 const ESBUILD_EXTERNALS = [...BUNDLE_EXTERNALS, ...BUNDLE_EXTERNAL_URL_PATTERNS]
 

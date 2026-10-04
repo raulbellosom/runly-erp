@@ -1,3 +1,4 @@
+import { useRuntimeFetch } from '../lib/module-runtime/RuntimeAdapters.jsx';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as LucideIcons from "lucide-react";
 import { renderFormFieldControl } from "./runly-form-field-control.jsx";
@@ -114,6 +115,7 @@ export function RunlyForm({
   // that also need the save bar.
   extraDirty = false,
 }) {
+  const runtimeFetch = useRuntimeFetch();
   const schema = blueprint?.schema ?? {};
   const apiPath =
     typeof schema.apiPath === "string" ? schema.apiPath.trim() : "";
@@ -454,7 +456,7 @@ export function RunlyForm({
       const endpoint = isEditMode
         ? `${joinUrl(apiBaseUrl, apiPath)}/${encodeURIComponent(String(recordId))}`
         : joinUrl(apiBaseUrl, apiPath);
-      const response = await fetch(endpoint, {
+      const response = await runtimeFetch(endpoint, {
         method: isEditMode ? "PATCH" : "POST",
         headers: buildApiHeaders(token, companyId, { "Content-Type": "application/json" }),
         body: JSON.stringify(payload),

@@ -7,7 +7,10 @@
     ".": "./src/index.js",
     "./icons": "./src/lib/icon-library/index.js",
     "./theme.css": "./src/tailwind-theme.css",
-    "./primitives": "./src/primitives.js"
+    "./primitives": "./src/primitives.js",
+    "./runtime-adapters": "./src/lib/module-runtime/RuntimeAdapters.jsx",
+    "./renderer-adapters": "./src/runly-renderer/renderer-adapters.js",
+    "./runtime.css": "./src/runtime.css"
   },
   "dependencies": {
     "@atlas/core": "workspace:@runly/core@*",
