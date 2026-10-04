@@ -169,3 +169,16 @@ effects (activity, attendee invitations, realtime). They now call
   Ledger/pfm publish no events: their per-account/per-wallet ACLs would leak
   to subscribers.
 - **Deferred to phase 3:** Builder no-code automations.
+
+## 7. Service simulator for the Developer Hub
+
+`createServiceSimulator({ moduleKey, companyId, user, grants, fixtures })` in
+`@runly/module-engine/contracts` (browser-safe, `service-simulator.js`). Same
+API as the gateway (`forRequest().call/module`, `forSystem()`), same checks
+(unknown service, system flag, grant, permission, `validateServiceArgs`,
+idempotencyKey, `own` scope) over in-memory collections
+(`'runly.calendar:events'`, ...). Business rules of action-backed services are
+not simulated: they are listed in `diagnostics` (spec of the Hub: unknown cases
+produce a diagnostic, not a fictitious success). `calls` records every call for
+the Playground report. The Hub picks it up when it refreshes its shared
+package tarballs (`pnpm run prepare:shared`).

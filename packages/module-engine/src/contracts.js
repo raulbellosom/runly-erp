@@ -4,6 +4,7 @@ export const RME3_CONTRACT_VERSION = 1
 export const RME3_ENGINE_VERSION = '0.1.0'
 // Shared metadata only. Handlers remain inside the ERP API.
 export { SERVICE_CONTRACTS, SERVICE_KEYS, IDEMPOTENCY_ARG, validateServiceArgs } from './service-contracts.js'
+export { createServiceSimulator, SimulatedServiceError } from './service-simulator.js'
 export const DOMAIN_EVENTS = Object.freeze({
   'inventory.item.created': 'Se creó un artículo de inventario',
   'inventory.item.updated': 'Se actualizó un artículo de inventario',
