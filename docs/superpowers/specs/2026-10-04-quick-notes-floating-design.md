@@ -25,8 +25,7 @@ and minimizes to a bubble.
 - The pad lists the user's regular document notes (canvas notes excluded) and
   creates new ones as regular notes. On first open it continues the most recent note
   (or creates one). It uses the full NoteEditor (toolbar, slash menu).
-- Editing reuses `NoteEditor` with a new `compact` prop (no toolbar, cover, icon row
-  or paper sheet). It runs the same Y.js engine and autosave, so edits sync live with
+- The full editor runs the same Y.js engine and autosave, so edits sync live with
   the Notes module and with collaborators. Writing plain HTML over PATCH would be
   ignored once a Y.Doc exists, so it is not used.
 
