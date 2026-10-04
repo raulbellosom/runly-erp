@@ -10,5 +10,6 @@ En esta pantalla ves el catalogo completo de modulos disponibles para tu instanc
 - Si un modulo depende de otro (por ejemplo, POS depende de Catalogo), Runly te avisa y no te deja instalarlo hasta resolver la dependencia.
 - Al desinstalar puedes elegir conservar los datos o purgarlos por completo, con una confirmacion explicita antes de borrar cualquier cosa.
 - Deshabilitar un modulo no borra sus datos: solo lo oculta de la navegacion y le impide seguir funcionando hasta que lo vuelvas a habilitar.
-- **Subir modulo** recibe un ZIP y primero lo revisa: valida el paquete, muestra que cambiara en la estructura de datos (bloquea los cambios que perderian datos), avisa si no subiste la version y muestra una vista previa de las pantallas React del modulo. Solo se aplica cuando confirmas.
+- **Subir modulo** recibe un ZIP y primero lo revisa: valida el paquete, muestra que cambiara en la estructura de datos (te pide un valor cuando un cambio lo necesita y guarda un respaldo antes de aplicar), avisa si no subiste la version y muestra una vista previa de las pantallas React del modulo. Solo se aplica cuando confirmas.
+- La pestana **Disponibles** muestra los modulos oficiales de Runly. **Instalar** o **Actualizar** te muestra que datos de otros modulos podra usar el modulo y que avisos recibira; autorizas solo lo que quieras. Runly verifica que el paquete sea autentico antes de instalarlo.
 - **Sincronizar** vuelve a leer el manifiesto de un modulo (util despues de una actualizacion) sin perder los datos que ya tenia guardados.

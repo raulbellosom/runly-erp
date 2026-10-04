@@ -55,6 +55,7 @@ import {
 } from "../components/ModuleCatalogCard";
 import { ModuleDetailSheet } from "../components/ModuleDetailSheet";
 import { ModuleCatalogDialogs } from "../components/ModuleCatalogDialogs";
+import { CatalogAvailablePanel } from "../components/CatalogAvailablePanel";
 
 function getFirstFiniteNumber(...values) {
   for (const value of values) {
@@ -519,10 +520,14 @@ export default function ModuleCatalog() {
                   </span>
                 </TabsTrigger>
               ))}
+              <TabsTrigger value="catalog" className="text-xs gap-1.5">Disponibles</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
+        {activeTab === "catalog" ? (
+          <CatalogAvailablePanel token={token} canManage={hasPermission("core.modules.manage")} />
+        ) : (<>
         {/* Toolbar: search + filters + view toggle */}
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput
@@ -835,6 +840,7 @@ export default function ModuleCatalog() {
             })}
           </div>
         )}
+        </>)}
       </div>
 
       {/* Module detail sheet */}

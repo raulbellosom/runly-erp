@@ -17,6 +17,7 @@ Esta documentación está pensada para personas desarrolladoras **y para asisten
 - [**Relaciones**](/documentacion/desarrolladores/relaciones): relaciones entre entidades del módulo y con módulos del sistema (Flotilla, Inventario, Contactos…), integridad y búsqueda.
 - [**Conexiones con módulos del sistema**](/documentacion/desarrolladores/conexiones): agregar campos o registros de tu módulo a las fichas de Inventario, Contactos, RR. HH. y Proyectos, con guardado atómico, búsqueda e integridad al borrar.
 - [**Servicios y eventos entre módulos**](/documentacion/desarrolladores/servicios-y-eventos): usar datos de Inventario, Contactos y Proyectos con autorización del administrador y reaccionar a lo que pasa en ellos.
+- [**Catálogo oficial de módulos**](/documentacion/desarrolladores/catalogo): instalar y actualizar módulos firmados desde Módulos > Disponibles, formato del índice y cómo se publica una versión.
 - [**Enlaces y páginas públicas**](/documentacion/desarrolladores/enlaces-publicos): compartir una ficha o un formulario con personas sin cuenta; lo que genera el Constructor, `publicResources`, `api/public.js` y reglas de seguridad.
 - [**Campos**](/documentacion/desarrolladores/campos): tipos de campo, su columna en la base de datos y su valor en la API.
 - [**Librerías disponibles**](/documentacion/desarrolladores/librerias): qué puedes importar en tus componentes, con la versión exacta instalada en Runly, componentes de `@runly/ui` por uso y ejemplos.
