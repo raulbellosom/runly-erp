@@ -274,16 +274,26 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
     setDeleteConfirmOpen(true);
   };
 
+  // Soft-delete entities (rows carry `enabled`, e.g. Builder modules) only
+  // expose PATCH /:id/enabled; there is no DELETE route for them.
+  const pendingIsSoftDelete = Boolean(pendingDeleteRow) && Object.prototype.hasOwnProperty.call(pendingDeleteRow, "enabled");
+
   const confirmDelete = async () => {
     const id = resolveIdFromRow(pendingDeleteRow);
     if (!id || !tableApiPath) return;
     setDeleting(true);
     try {
       const endpoint = `${joinUrl(apiBaseUrl, tableApiPath)}/${encodeURIComponent(String(id))}`;
-      const response = await fetch(endpoint, {
-        method: "DELETE",
-        headers: buildApiHeaders(token, companyId),
-      });
+      const response = pendingIsSoftDelete
+        ? await fetch(`${endpoint}/enabled`, {
+            method: "PATCH",
+            headers: { ...buildApiHeaders(token, companyId), "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: false }),
+          })
+        : await fetch(endpoint, {
+            method: "DELETE",
+            headers: buildApiHeaders(token, companyId),
+          });
       if (!response.ok) {
         const text = await response.text();
         let message = "No se pudo eliminar el registro.";
@@ -707,10 +717,12 @@ export const RunlyCrudView = forwardRef(function RunlyCrudView({
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
-        title="Eliminar registro"
-        description="Esta acción no se puede deshacer. ¿Deseas continuar?"
+        title={pendingIsSoftDelete ? "Desactivar registro" : "Eliminar registro"}
+        description={pendingIsSoftDelete
+          ? "Dejará de mostrarse en la lista; sus datos se conservan. ¿Deseas continuar?"
+          : "Esta acción no se puede deshacer. ¿Deseas continuar?"}
         detail={deleteLabel || undefined}
-        confirmLabel="Eliminar"
+        confirmLabel={pendingIsSoftDelete ? "Desactivar" : "Eliminar"}
         cancelLabel="Cancelar"
         loading={deleting}
         onConfirm={confirmDelete}
