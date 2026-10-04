@@ -36,13 +36,14 @@ export function createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cac
         stagingService: stagingSvc,
         bundlerSvc,
         routeLoader,
-        preflightPackage: async ({ staged, moduleRow }) => {
+        preflightPackage: async ({ staged, moduleRow, decisions }) => {
           const dependencyResult = await loadManifestDependencies(prisma, staged.manifest.dependencies ?? [])
           const schemaMigration = moduleRow?.status === 'INSTALLED'
             ? await schemaMigrationSvc.planModuleSchemaMigration({
                 moduleKey: staged.manifest.key,
                 desiredModels: staged.models,
                 moduleRow,
+                decisions,
               })
             : { required: false, canAutoApply: true, safety: 'SAFE', operations: [], drift: [], warnings: [] }
           return {

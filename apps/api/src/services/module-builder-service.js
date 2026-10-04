@@ -16,6 +16,7 @@ import {
   goldenScreenFiles,
   normalizeModuleDefinition,
   validateModuleDefinition,
+  assignFieldIds,
 } from '@runly/module-compiler'
 import { validateManifest, RESERVED_NAMESPACES } from '@runly/module-engine'
 import { resolveModulesDir } from './module-upload-service.js'
@@ -284,12 +285,17 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     }
   }
 
-  async function publishProject({ companyId, actorId, projectId }) {
+  async function publishProject({ companyId, actorId, projectId, decisions = {} }) {
     const project = await requireProject({ companyId, projectId })
     if (project.detachedAt) {
       throw new ModuleBuilderError('Este proyecto está en modo desarrollador: instala su código desde Módulos > Subir módulo.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
     }
-    const compiled = compileDefinition(project.definition)
+    // Stable field ids before the first publish that needs them (renames keep data).
+    const withIds = assignFieldIds(project.definition)
+    if (withIds.changed) {
+      await prisma.moduleBuilderProject.update({ where: { id: project.id }, data: { definition: withIds.definition } })
+    }
+    const compiled = compileDefinition(withIds.definition)
     const modulesDir = await resolveModulesDir()
     if (!modulesDir) throw new ModuleBuilderError('No hay un directorio de módulos configurado en esta instancia.', { code: 'MODULES_DIR_NOT_CONFIGURED', statusCode: 503 })
     if (!wiring.packageSvc) throw new ModuleBuilderError('El servicio de paquetes de módulos no está disponible.', { code: 'MODULE_PACKAGE_PUBLISH_UNAVAILABLE', statusCode: 503 })
@@ -297,7 +303,7 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     const buffer = await archiveModule(compiled)
     let publishResult
     try {
-      publishResult = await wiring.packageSvc.publishZip({ key: project.moduleKey, fileBuffer: buffer, modulesDir, actorId })
+      publishResult = await wiring.packageSvc.publishZip({ key: project.moduleKey, fileBuffer: buffer, modulesDir, actorId, decisions })
     } catch (error) {
       throw new ModuleBuilderError(error.message ?? 'No se pudo publicar el módulo.', {
         code: error.code ?? 'MODULE_PACKAGE_PUBLISH_FAILED',

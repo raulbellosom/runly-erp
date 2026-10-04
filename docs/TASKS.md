@@ -1753,5 +1753,11 @@ Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · P
 - [ ] Owner: Builder > new module with a relation to Artículo > Conexiones tab > publish/install > Inventario > Conexiones shows it.
 - Note: no hard company deletion path exists in the API today; `onCompanyRemoved` is ready for when one is added.
 
-### Phase 4 — Safe schema evolution · Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
-- [ ] See plan tasks 4.1–6.5
+### Phase 4 — Safe schema evolution
+- [x] 4.1 Stable field ids: `defineModel` field `id` (UUID, unique), `normalizeModelSchema` keeps `fieldId`; Builder `assignFieldIds` on publish; legacy schemas match by name once. Verified: 2026-10-03 (field-ids 2/2)
+- [x] 4.2 Diff operations: rename, archive (keeps data), restore, NOT NULL with backfill, conversions with failing-row preflight, defaults, unique-index duplicate check; decisions plumbed through upload/check/publish and Builder publish; report `structure` + `decisionsPending`. Verified: 2026-10-03 (module-engine 138/138, module-compiler 69/69, API services 713/713)
+- [ ] 4.3 Pre-update backups + data migrations in the apply transaction
+- [ ] 4.4 Decisions UI, archived fields (restore/purge), docs
+
+### Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
+- [ ] See plan tasks 5.1–6.5

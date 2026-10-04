@@ -42,7 +42,13 @@ export { createChecksum }               from './checksum.js'
 export { normalizeModelSchema,
          hashNormalizedSchema,
          diffModelSchemas,
-         compileMigrationPlan }         from './schema-diff.js'
+         compileMigrationPlan,
+         preflightQueries,
+         classifyOperation,
+         operationBlocker,
+         AUTO_SAFETY,
+         DECIDABLE_SAFETY }             from './schema-diff.js'
+export { columnConversion }             from './schema-conversions.js'
 
 // Additional constants re-exported for module authors
 export { MODULE_KINDS, BLUEPRINT_KINDS,

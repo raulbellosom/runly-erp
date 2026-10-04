@@ -635,6 +635,13 @@ Run: `node --test packages/ui/src/__tests__/component-docs.test.js` → PASS.
 
 ---
 
+### Phase 4 — detailed steps (expanded 2026-10-03 against the current code)
+- Archive registry: no new table. `module-metadata-service.js` already keeps removed fields as `RunlyField` rows with `validation.reason = 'removed_from_manifest'`; `planModuleSchemaMigration` passes their names as `archivedColumns`, and a field added back restores the column (`RESTORE_COLUMN`; `upsertField` resets `validation`).
+- Engine (`schema-diff.js` + `schema-conversions.js`): operations carry a stable `id` (`TYPE:table:name`). Matching by `fieldId` then name. New ops: `RENAME_COLUMN`, `ARCHIVE_COLUMN` (drop NOT NULL, keep data), `RESTORE_COLUMN`, `SET_NOT_NULL`, `DROP_NOT_NULL`, `ALTER_COLUMN_DEFAULT`; `ALTER_COLUMN_TYPE` via the cast matrix; `DROP_INDEX` is SAFE; unique `ADD_INDEX` on populated tables is `NEEDS_CHECK`. `preflightQueries` → API counts → `classifyOperation`; `operationBlocker(op, decision)`; `compileMigrationPlan(plan, decisions)` orders statements and throws on blocked ops.
+- API: `planModuleSchemaMigration({ ..., decisions })` returns `blockers[]`; decisions travel as a JSON form field `decisions` on `/modules/:key/upload` and `/upload/check`, and as `{ decisions }` in `POST /module-builder/projects/:id/publish`. Report: `structure[]` rows + `decisionsPending`.
+- Builder: `assignFieldIds` (module-compiler `field-ids.js`, UUID v7) runs in `publishProject` and persists ids; model template emits `id` only when present (old packages classify unchanged).
+- Remaining: 4.3 backups (`runly_backup` schema, `ModuleSchemaBackup`, restore endpoint, expiry job) + data migrations (`ModuleDataMigration`, `migrations/NNN-*.js`) inside the apply transaction; 4.4 decisions UI in upload/publish dialogs, archived fields list with restore/purge, docs.
+
 ## Phase 5 — Builder onboarding
 
 ### Task 5.1: Templates

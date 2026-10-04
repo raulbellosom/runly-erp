@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import {
+  classifyOperation,
   compileMigrationPlan,
   diffModelSchemas,
   hashNormalizedSchema,
   normalizeModelSchema,
+  operationBlocker,
+  preflightQueries,
 } from '@runly/module-engine'
 
 const IDENTIFIER_RE = /^[a-z][a-z0-9_]*$/
@@ -99,9 +102,25 @@ export function createModuleSchemaMigrationService({ prisma }) {
     }
   }
 
-  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null }) {
+  // Counts that decide whether type changes, NOT NULL and unique indexes can
+  // run as is (schema-diff.js preflightQueries/classifyOperation).
+  async function classifyWithPreflight(operations, db = prisma) {
+    const counts = new Map()
+    for (const query of preflightQueries(operations)) {
+      const rows = await db.$queryRawUnsafe(query.sql)
+      counts.set(query.id, { ...(counts.get(query.id) ?? {}), [query.kind]: Number(rows?.[0]?.count ?? 0) })
+    }
+    return operations.map((operation) => classifyOperation(operation, counts.get(operation.id)))
+  }
+
+  // decisions: { [operation.id]: { backfill?, onConversionFailure? } } chosen
+  // by the admin in the update report (spec §12.3).
+  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null, decisions = {} }) {
     const persistedRows = moduleRow?.status === 'INSTALLED'
-      ? await prisma.runlyModel.findMany({ where: { moduleKey }, select: { name: true, tableName: true, schema: true } })
+      ? await prisma.runlyModel.findMany({
+          where: { moduleKey },
+          select: { name: true, tableName: true, schema: true, fields: { select: { name: true, validation: true } } },
+        })
       : []
     const previousByTable = new Map(persistedRows.map((row) => [row.tableName, row]))
     const desired = desiredModels.map((model) => ({ model, schema: normalizeModelSchema(model) }))
@@ -119,14 +138,20 @@ export function createModuleSchemaMigrationService({ prisma }) {
       const previousRow = previousByTable.get(entry.schema.table)
       const previous = previousRow?.schema ? normalizeModelSchema(previousRow.schema) : null
       const actual = await inspectTableSchema(entry.schema.table)
+      // Fields removed by an earlier update keep their column (ARCHIVE_COLUMN)
+      // and their RunlyField row marked removed_from_manifest.
+      const archivedColumns = (previousRow?.fields ?? [])
+        .filter((field) => field.validation?.reason === 'removed_from_manifest')
+        .map((field) => field.name)
       const diff = diffModelSchemas({
         previous,
         desired: entry.schema,
         actual,
         rowCount: actual.rowCount,
         modelDefinition: entry.model,
+        archivedColumns,
       })
-      operations.push(...diff.operations)
+      operations.push(...await classifyWithPreflight(diff.operations))
       drift.push(...diff.drift)
       warnings.push(...diff.warnings)
       models.push({
@@ -142,20 +167,23 @@ export function createModuleSchemaMigrationService({ prisma }) {
       operations.push({ type: 'DROP_TABLE', table: removed.tableName, model: removed.name, safety: 'DESTRUCTIVE' })
     }
     const required = operations.length > 0
-    const canAutoApply = drift.length === 0 && operations.every((operation) => ['SAFE', 'CONDITIONAL'].includes(operation.safety))
-    const core = { moduleKey, models, operations, drift, warnings }
+    const blockers = operations
+      .map((operation) => ({ id: operation.id, reason: operationBlocker(operation, decisions[operation.id]) }))
+      .filter((entry) => entry.reason)
+    const canAutoApply = drift.length === 0 && blockers.length === 0
+    const core = { moduleKey, models, operations, drift, warnings, decisions }
     const planHash = createHash('sha256').update(JSON.stringify(core)).digest('hex')
     return {
       ...core,
       required,
       canAutoApply,
-      safety: drift.length ? 'DRIFT' : operations.some((operation) => operation.safety === 'DESTRUCTIVE')
-        ? 'DESTRUCTIVE'
-        : operations.some((operation) => operation.safety === 'UNSUPPORTED') ? 'UNSUPPORTED'
-          : operations.some((operation) => operation.safety === 'CONDITIONAL') ? 'CONDITIONAL' : 'SAFE',
+      blockers,
+      safety: drift.length ? 'DRIFT'
+        : ['DESTRUCTIVE', 'UNSUPPORTED', 'NEEDS_CHECK', 'NEEDS_CONVERSION', 'NEEDS_BACKFILL', 'CONDITIONAL']
+          .find((level) => operations.some((operation) => operation.safety === level)) ?? 'SAFE',
       planHash,
       filename: `schema__${planHash.slice(0, 24)}.sql`,
-      sql: canAutoApply ? compileMigrationPlan({ operations }) : [],
+      sql: canAutoApply ? compileMigrationPlan({ operations }, decisions) : [],
       baselineCreated: !required && warnings.some((warning) => warning.type === 'BASELINE_COLUMN'),
     }
   }

@@ -49,3 +49,22 @@ test("design review findings are passed through and never block", () => {
   assert.equal(report.blocked, false);
   assert.deepEqual(buildUpdateReport({ staged, moduleRow: null, preflight: {}, noChanges: false, preview: null }).designReview, []);
 });
+
+test("operations waiting for a decision are listed in structure, not as blockers", () => {
+  const report = buildUpdateReport({
+    staged,
+    moduleRow: { status: "INSTALLED", version: "1.1.0" },
+    preflight: { schemaMigration: { canAutoApply: false, drift: [], operations: [
+      { id: "SET_NOT_NULL:x_cliente:rfc", type: "SET_NOT_NULL", table: "x_cliente", column: "rfc", sqlType: "VARCHAR(255)", safety: "NEEDS_BACKFILL", failingRows: 3 },
+      { id: "RENAME_COLUMN:x_cliente:nombre", type: "RENAME_COLUMN", table: "x_cliente", from: "razon", column: "nombre", safety: "SAFE" },
+    ], blockers: [{ id: "SET_NOT_NULL:x_cliente:rfc", reason: "backfill_required" }] } },
+    noChanges: false,
+  });
+  assert.equal(report.blocked, false);
+  assert.equal(report.decisionsPending, true);
+  assert.match(report.changes[0], /renombrará la columna razon a nombre/);
+  assert.deepEqual(report.structure.map((row) => [row.id, row.needs, row.failingRows, row.blocker]), [
+    ["SET_NOT_NULL:x_cliente:rfc", "backfill", 3, "backfill_required"],
+    ["RENAME_COLUMN:x_cliente:nombre", null, null, null],
+  ]);
+});

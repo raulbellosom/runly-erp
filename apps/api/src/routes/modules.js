@@ -77,6 +77,18 @@ function isPlainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+// Schema migration decisions sent with an upload as a JSON form field:
+// { [operationId]: { backfill?, onConversionFailure? } } (schema-diff.js).
+function parseDecisions(raw) {
+  if (typeof raw !== "string" || !raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -684,7 +696,7 @@ export function createModulesRouter({
         stagingService: stagingSvc,
         bundlerSvc,
         routeLoader,
-        preflightPackage: async ({ staged, moduleRow }) => {
+        preflightPackage: async ({ staged, moduleRow, decisions }) => {
           const dependencyResult = await loadManifestDependencies(
             prisma,
             staged.manifest.dependencies ?? [],
@@ -713,6 +725,7 @@ export function createModulesRouter({
                 moduleKey: staged.manifest.key,
                 desiredModels: staged.models,
                 moduleRow,
+                decisions,
               })
             : {
                 required: false,
@@ -2545,6 +2558,7 @@ export function createModulesRouter({
           key,
           fileBuffer: Buffer.from(await file.arrayBuffer()),
           modulesDir,
+          decisions: parseDecisions(body.decisions),
           inspect: (staged) => builderSync.evaluateUpload({ moduleKey: key, dir: staged.packageDir, manifest: staged.manifest }),
         });
         return c.json({ data: { moduleKey: key, ...report } });
@@ -2624,6 +2638,7 @@ export function createModulesRouter({
           fileBuffer: buffer,
           modulesDir,
           actorId,
+          decisions: parseDecisions(body.decisions),
         });
         // Builder projects keep React-screen-only changes and switch to
         // developer mode for anything else, so a Builder publish never

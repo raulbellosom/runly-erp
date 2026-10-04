@@ -140,7 +140,7 @@ export function createModulePackageService({
     })
   }
 
-  async function publishZip({ key, fileBuffer, modulesDir, actorId = null }) {
+  async function publishZip({ key, fileBuffer, modulesDir, actorId = null, decisions = {} }) {
     await stagingService.cleanupStaleStaging(modulesDir)
     const release = await acquireModuleLock(modulesDir, key)
     let staged = null
@@ -191,7 +191,7 @@ export function createModulePackageService({
         requiresSchemaMigration: schemaChangesDetected,
       }
       stage = 'PREFLIGHT'
-      const preflight = await preflightPackage({ key, staged, moduleRow, publicationPlan })
+      const preflight = await preflightPackage({ key, staged, moduleRow, publicationPlan, decisions })
       if (preflight.schemaMigration) {
         publicationPlan.schemaChangesDetected = preflight.schemaMigration.required === true
         publicationPlan.requiresSchemaMigration = preflight.schemaMigration.required === true
@@ -448,7 +448,7 @@ export function createModulePackageService({
   // database schema or the published bundle.
   // `inspect(staged)` lets the caller add its own findings (the Builder
   // project impact) while the staged copy still exists.
-  async function checkZip({ key, fileBuffer, modulesDir, inspect = null }) {
+  async function checkZip({ key, fileBuffer, modulesDir, inspect = null, decisions = {} }) {
     await stagingService.cleanupStaleStaging(modulesDir)
     const previewsDir = path.join(modulesDir, PREVIEWS_DIRNAME, key)
     await removeExpiredPreviews(previewsDir)
@@ -465,7 +465,7 @@ export function createModulePackageService({
       }).catch(() => null)
       const currentDir = path.join(modulesDir, key)
       const currentHash = await exists(currentDir) ? await computeSourceHash(currentDir) : null
-      const preflight = await preflightPackage({ key, staged, moduleRow, publicationPlan: {} })
+      const preflight = await preflightPackage({ key, staged, moduleRow, publicationPlan: {}, decisions })
       let preview = null
       if (staged.inspection.hasComponents && bundlerSvc?.buildBundleFromDirectory) {
         const previewId = randomUUID()

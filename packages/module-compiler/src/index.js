@@ -23,5 +23,6 @@ export function classifyModulePackage({ key, files, manifest }) {
 export { EXTERNAL_RELATION_TARGETS, connectionTarget, connectionsManagePermission, externalTarget, isExternalRelation, targetTypeFromRecordContext } from './external-relations.js'
 export { reviewComponentSources } from './design-review.js'
 export { BUILDER_CONNECTION_TARGETS, CONNECTION_FIELD_EXCLUDED_TYPES } from './connections.js'
+export { assignFieldIds, uuidv7 } from './field-ids.js'
 export { EXAMPLES_DIR, goldenScreenFiles } from './templates/golden-screens.js'
 export { buildStarterPackage, createStarterDefinition, StarterPackageError, STARTER_KEY_RE } from './starter-package.js'

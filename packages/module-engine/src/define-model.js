@@ -48,7 +48,13 @@ export function validateModel(model) {
       if (!field.type || !FIELD_TYPE_SET.has(field.type)) {
         errors.push(`fields[${i}].type "${field.type}" is not a supported type. Use FIELD_TYPES constants. Supported: ${[...FIELD_TYPE_SET].join(', ')}`)
       }
+      // Optional stable id (UUID): keeps the column when the field is renamed.
+      if (field.id !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(field.id))) {
+        errors.push(`fields[${i}].id must be a UUID`)
+      }
     })
+    const ids = model.fields.map((field) => field.id).filter(Boolean).map((id) => String(id).toLowerCase())
+    if (new Set(ids).size !== ids.length) errors.push('fields[].id must be unique')
   }
 
   if (model.indexes !== undefined && !Array.isArray(model.indexes)) {

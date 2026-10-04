@@ -1,5 +1,7 @@
 import { moduleSlug } from './helpers.js'
 
+const FIELD_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export function generateModel(config, entity) {
   const slug = moduleSlug(config.key)
   const table = `${slug}_${entity.name}`
@@ -30,7 +32,10 @@ ${fieldLines}
 }
 
 function fieldToDefineModelField(field) {
-  const parts = [`    name: '${field.name}'`, `    type: '${field.type}'`, `    label: '${field.label || field.name}'`]
+  const parts = [
+    ...(FIELD_ID_RE.test(field.fieldId ?? '') ? [`    id: '${field.fieldId}'`] : []),
+    `    name: '${field.name}'`, `    type: '${field.type}'`, `    label: '${field.label || field.name}'`,
+  ]
   if (field.required) parts.push('    required: true')
   if (field.maxLength) parts.push(`    maxLength: ${field.maxLength}`)
   if (field.default !== undefined) {
