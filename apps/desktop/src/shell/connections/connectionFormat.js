@@ -11,10 +11,15 @@ export function displayValue(field, value) {
   switch (field.type) {
     case 'boolean':
       return value ? 'Sí' : 'No'
-    case 'date':
-      return String(value).slice(0, 10)
-    case 'datetime':
-      return String(value).replace('T', ' ').slice(0, 16)
+    case 'date': {
+      // Calendar date: read the YYYY-MM-DD part, never shift by time zone.
+      const [y, m, d] = String(value).slice(0, 10).split('-')
+      return y && m && d ? `${d}/${m}/${y}` : String(value)
+    }
+    case 'datetime': {
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
+    }
     case 'select':
       return String(optionLabel(field, value))
     case 'multiselect':

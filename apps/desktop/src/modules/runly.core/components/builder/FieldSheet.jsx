@@ -278,6 +278,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
             </div>
           ) : (
             <TextField
+              id="builder-field-key"
               label="Clave"
               icon={KeyRound}
               value={draft.key ?? ""}

@@ -33,6 +33,8 @@ function DecisionInput({ row, decision, onChange, disabled }) {
   if (row.needs === "backfill") {
     return (
       <TextField
+        id={`decision-${row.id}`}
+        icon={null}
         label="Valor para los registros existentes"
         value={decision?.backfill ?? ""}
         placeholder={row.suggestedValue != null ? String(row.suggestedValue) : ""}
@@ -47,6 +49,7 @@ function DecisionInput({ row, decision, onChange, disabled }) {
     }
     return (
       <SelectField
+        id={`decision-${row.id}`}
         label={`${row.failingRows} registro(s) que no se convierten`}
         options={CONVERSION_OPTIONS}
         value={decision?.onConversionFailure ?? "abort"}

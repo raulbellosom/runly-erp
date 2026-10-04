@@ -282,7 +282,7 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
       packageHash: compiled.packageHash,
       installed: existingModule?.status === 'INSTALLED',
       schemaNote: existingModule
-        ? 'El análisis definitivo de esquema (aditivo vs. destructivo) se confirma al publicar; los cambios destructivos bloquean la publicación.'
+        ? 'Los cambios de estructura se revisan al publicar: si alguno necesita un dato (por ejemplo, un campo obligatorio nuevo en una tabla con registros), te lo pediremos. Antes de aplicar se guarda un respaldo.'
         : 'Se creará un módulo nuevo; no hay esquema previo que comparar.',
     }
   }

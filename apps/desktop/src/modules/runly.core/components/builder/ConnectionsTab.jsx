@@ -35,7 +35,7 @@ const SURFACES = [
   { key: "column", label: "Columna", kinds: ["fields"] },
   { key: "search", label: "Búsqueda", kinds: ["fields", "related"] },
 ];
-const EXCLUDED_TYPES = new Set(["file", "json"]);
+const EXCLUDED_TYPES = new Set(["file", "json", "relation"]);
 const MAX_CONNECTIONS = 10;
 
 const keyOf = (item) => item.key ?? item.name;

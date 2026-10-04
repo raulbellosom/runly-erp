@@ -7,7 +7,8 @@ import { validateConnections } from '@runly/module-engine'
 // Targets whose owning module has a "Conexiones" screen; the API accepts other
 // relation targets but nobody could activate them yet.
 export const BUILDER_CONNECTION_TARGETS = Object.freeze(['inventory_item', 'contact', 'hr_employee', 'project'])
-export const CONNECTION_FIELD_EXCLUDED_TYPES = Object.freeze(['file', 'json'])
+// Relations would show a raw id inside the system screen.
+export const CONNECTION_FIELD_EXCLUDED_TYPES = Object.freeze(['file', 'json', 'relation'])
 
 const SURFACES = ['form', 'detail', 'column', 'search']
 const fieldKey = (field) => field.key ?? field.name

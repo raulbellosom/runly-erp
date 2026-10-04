@@ -132,14 +132,16 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      {/* Header and footer stay fixed; only the middle scrolls (structure decisions can be long). */}
+      <DialogContent className="flex max-h-[90dvh] flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Publicar {definition?.name || moduleKey}</DialogTitle>
           <DialogDescription>
             {impact?.action === "UPDATE" ? "Se actualizará el módulo ya instalado." : "Se instalará un módulo nuevo en esta instancia."}
           </DialogDescription>
         </DialogHeader>
 
+        <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto px-6">
         {loading && <Skeleton className="h-32 w-full rounded-xl" />}
 
         {impact && !result && (
@@ -169,7 +171,7 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
               value={version}
               onChange={setVersion}
             />
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">{impact.schemaNote}</p>
+            {!blocked && <p className="text-xs text-[hsl(var(--muted-foreground))]">{impact.schemaNote}</p>}
           </div>
         )}
 
@@ -208,7 +210,9 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
           </Alert>
         )}
 
-        <DialogFooter>
+        </div>
+
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>{result ? "Cerrar" : "Cancelar"}</Button>
           {!result && (
             <Button onClick={handlePublish} disabled={publishing || loading || (blocked && (!needsOnlyDecisions(blocked) || missingDecisions(blocked.structure, decisions).length > 0))}>
