@@ -28,7 +28,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "./ContextMenu.jsx";
-import { getOfficeFormat } from "@runly/core";
+import { getOfficeFormat } from "@runly/core/browser";
 import { getFileKind, getKindLabel, formatBytes } from "../lib/file-kind";
 import { useHlsPlayback } from "../lib/useHlsPlayback";
 import { FileVisual } from "./FileVisual";

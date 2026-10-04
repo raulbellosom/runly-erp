@@ -24,7 +24,7 @@ export function createRuntimeSession({ id, transport, preferences, resources } =
     return response;
   };
   return {
-    id, adapters: { transport: { fetch }, preferences, resources },
+    id, adapters: { sessionId: id, transport: { fetch }, preferences, resources },
     registry: { register(key, component) { requireLive(); registry.set(key, component); }, resolve(key) { requireLive(); return registry.get(key) ?? null; } },
     dispose() { disposed = true; registry.clear(); transport.dispose?.(); preferences.dispose?.(); resources.dispose?.(); },
   };

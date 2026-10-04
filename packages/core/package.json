@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "main": "src/index.js",
-  "exports": { ".": "./src/index.js", "./native-runtime": "./src/native-runtime.js" },
+  "exports": {
+    ".": "./src/index.js",
+    "./native-runtime": "./src/native-runtime.js",
+    "./browser": "./src/browser.js"
+  },
   "scripts": {
     "test": "node --test src/__tests__/"
   }

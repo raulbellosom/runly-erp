@@ -147,6 +147,7 @@ export default defineConfig({
       "@atlas/sdk": resolve(__dirname, "../../packages/sdk/src/index.js"),
       "@atlas/ui": resolve(__dirname, "../../packages/ui/src/index.js"),
       "@atlas/validators": resolve(__dirname, "../../packages/validators/src/index.js"),
+      "@runly/core/browser": resolve(__dirname, "../../packages/core/src/browser.js"),
       "@runly/core/native-runtime": resolve(__dirname, "../../packages/core/src/native-runtime.js"),
       "@runly/core": resolve(__dirname, "../../packages/core/src/index.js"),
       // Before "@runly/module-engine": browser-safe subpaths used by
@@ -156,6 +157,7 @@ export default defineConfig({
       "@runly/module-engine": resolve(__dirname, "../../packages/module-engine/src/index.js"),
       "@runly/sdk": resolve(__dirname, "../../packages/sdk/src/index.js"),
       // Before "@runly/ui": aliases match by prefix, first entry wins.
+      "@runly/ui/preview": resolve(__dirname, "../../packages/ui/src/preview.js"),
       "@runly/ui/runtime-adapters": resolve(__dirname, "../../packages/ui/src/lib/module-runtime/RuntimeAdapters.jsx"),
       "@runly/ui/renderer-adapters": resolve(__dirname, "../../packages/ui/src/runly-renderer/renderer-adapters.js"),
       "@runly/ui/icons": resolve(__dirname, "../../packages/ui/src/lib/icon-library/index.js"),

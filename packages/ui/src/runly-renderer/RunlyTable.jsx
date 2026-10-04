@@ -139,7 +139,7 @@ export function RunlyTable({
 
   // ── Preference load ────────────────────────────────────────────────────────
   const preferenceScopeRef = useRef("");
-  const preferenceScope = `${apiBaseUrl ?? ""}::${companyId ?? ""}::${token ?? ""}::${tableKey ?? ""}`;
+  const preferenceScope = `${adapters?.sessionId ?? ""}::${apiBaseUrl ?? ""}::${companyId ?? ""}::${token ?? ""}::${tableKey ?? ""}`;
   useEffect(() => {
     if (!tableKey || (!token && !adapters) || !apiBaseUrl) return;
     if (preferenceScopeRef.current === preferenceScope) return;
@@ -245,7 +245,7 @@ export function RunlyTable({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [reloadTick, setReloadTick] = useState(0);
-  const storageKey = `runly.renderer.${apiPath.replace(/\//g, ".")}`;
+  const storageKey = adapters?.sessionId ? null : `runly.renderer.${apiPath.replace(/\//g, ".")}`;
   const [view, setView] = useState(() =>
     getStoredViewMode(storageKey, schema.defaultViewMode ?? "table"),
   );

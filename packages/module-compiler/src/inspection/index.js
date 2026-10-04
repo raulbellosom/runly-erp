@@ -201,4 +201,3 @@ function safeRoute(route, prefix) {
     !/[\\?#\x00-\x20%]/.test(route) && !route.split('/').some((part) => part === '.' || part === '..')
 }
 export { parseDeclaration } from './declarations.js'
-export { DEFAULT_INSPECTION_LIMITS } from './limits.js'

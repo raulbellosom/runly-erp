@@ -1,4 +1,4 @@
-import { fileKindOf, fileKindLabel, fileKindAccent } from "@runly/core";
+import { fileKindOf, fileKindLabel, fileKindAccent } from "@runly/core/browser";
 
 // Facade over @runly/core so existing imports in this module keep working.
 // getFileKind now takes the whole file (name + mime) so the extension

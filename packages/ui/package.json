@@ -10,7 +10,8 @@
     "./primitives": "./src/primitives.js",
     "./runtime-adapters": "./src/lib/module-runtime/RuntimeAdapters.jsx",
     "./renderer-adapters": "./src/runly-renderer/renderer-adapters.js",
-    "./runtime.css": "./src/runtime.css"
+    "./runtime.css": "./src/runtime.css",
+    "./preview": "./src/preview.js"
   },
   "dependencies": {
     "@atlas/core": "workspace:@runly/core@*",
