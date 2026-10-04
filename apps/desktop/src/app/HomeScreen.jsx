@@ -33,8 +33,12 @@ export function HomeScreen() {
   const {
     availableModules,
     isLoading: modulesLoading,
-    isError: modulesError,
+    isError: modulesFailed,
+    error: modulesErrorDetail,
   } = useRuntimeModules();
+  // Only a request that never reached the API (no HTTP status) means "offline";
+  // 401/409/5xx answers come from a server that is up.
+  const modulesError = modulesFailed && !modulesErrorDetail?.status;
   const {
     sections,
     viewMode,

@@ -17,6 +17,11 @@ export function useRuntimeModules() {
     queryFn: () => runly.runtime.modules(token),
     enabled: Boolean(token),
     staleTime: 60000,
+    // A failed refetch (API restart, expired token before refresh, company
+    // switch) must heal on its own instead of leaving the home screen stuck.
+    retry: 2,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => (query.state.status === "error" ? 15000 : false),
   });
 
   const runtimeModules = useMemo(
