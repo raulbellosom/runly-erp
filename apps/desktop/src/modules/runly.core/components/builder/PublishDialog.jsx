@@ -210,6 +210,15 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
           </Alert>
         )}
 
+        {result?.pendingGrants?.length > 0 && (
+          <Alert variant="warning">
+            <AlertTitle>Automatizaciones pendientes de autorizar</AlertTitle>
+            <AlertDescription>
+              Un administrador debe autorizar {result.pendingGrants.length === 1 ? "1 servicio" : `${result.pendingGrants.length} servicios`} en Módulos &gt; detalle del módulo para que las automatizaciones funcionen.
+            </AlertDescription>
+          </Alert>
+        )}
+
         </div>
 
         <DialogFooter className="shrink-0">

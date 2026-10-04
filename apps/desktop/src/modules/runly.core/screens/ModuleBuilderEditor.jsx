@@ -35,6 +35,7 @@ import { NavigationTab } from "../components/builder/NavigationTab";
 import { PermissionsTab } from "../components/builder/PermissionsTab";
 import { PublicLinksTab } from "../components/builder/PublicLinksTab";
 import { ConnectionsTab } from "../components/builder/ConnectionsTab";
+import { AutomationsTab } from "../components/builder/AutomationsTab";
 import { ExternalAiPromptDialog } from "../components/builder/ExternalAiPromptDialog";
 import { DiagnosticsPanel } from "../components/builder/DiagnosticsPanel";
 import { describeDiagnostic } from "../lib/builderDiagnostics";
@@ -351,6 +352,7 @@ export default function ModuleBuilderEditor() {
             <TabsTrigger value="permissions">Permisos</TabsTrigger>
             <TabsTrigger value="public">Enlaces</TabsTrigger>
             <TabsTrigger value="connections">Conexiones</TabsTrigger>
+            <TabsTrigger value="automations">Automatizaciones</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general">
@@ -392,6 +394,9 @@ export default function ModuleBuilderEditor() {
           </TabsContent>
           <TabsContent value="connections">
             <ConnectionsTab definition={definition} onChange={patchDefinition} readOnly={Boolean(project.detachedAt)} />
+          </TabsContent>
+          <TabsContent value="automations">
+            <AutomationsTab definition={definition} onChange={patchDefinition} readOnly={Boolean(project.detachedAt)} />
           </TabsContent>
         </Tabs>
       </div>

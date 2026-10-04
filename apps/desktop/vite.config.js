@@ -168,6 +168,10 @@ export default defineConfig({
       "@atlas/validators": resolve(__dirname, "../../packages/validators/src/index.js"),
       "@runly/core/native-runtime": resolve(__dirname, "../../packages/core/src/native-runtime.js"),
       "@runly/core": resolve(__dirname, "../../packages/core/src/index.js"),
+      // Before "@runly/module-engine": browser-safe subpaths used by
+      // @runly/module-compiler/browser (Builder automations).
+      "@runly/module-engine/browser": resolve(__dirname, "../../packages/module-engine/src/browser.js"),
+      "@runly/module-engine/contracts": resolve(__dirname, "../../packages/module-engine/src/contracts.js"),
       "@runly/module-engine": resolve(__dirname, "../../packages/module-engine/src/index.js"),
       "@runly/sdk": resolve(__dirname, "../../packages/sdk/src/index.js"),
       // Before "@runly/ui": aliases match by prefix, first entry wins.

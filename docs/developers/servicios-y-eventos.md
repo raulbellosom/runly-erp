@@ -3,7 +3,7 @@ title: Servicios y eventos entre módulos
 summary: Cómo tu módulo lee, crea y actualiza registros de Calendario, Archivos, Notificaciones, Inventario, Contactos, Proyectos, Libro de cuentas, Flota y Finanzas personales con autorización del administrador (consumes) y cómo reacciona a lo que pasa en ellos (events).
 order: 4.3
 ---
-Tu módulo no lee ni escribe tablas de otros módulos directamente. Para eso hay dos mecanismos controlados por Runly:
+Tu módulo no lee ni escribe tablas de otros módulos directamente. Si tu módulo se hace con el Constructor, usa las [automatizaciones](/documentacion/desarrolladores/automatizaciones): llaman a estos mismos servicios sin programar. Para eso hay dos mecanismos controlados por Runly:
 
 - **Servicios**: llamas funciones de otro módulo (agendar un evento, guardar un archivo, notificar, actualizar un contacto o una tarea).
 - **Eventos**: Runly te avisa cuando algo pasa en otro módulo (se creó un contacto, cambió un artículo).
