@@ -64,6 +64,7 @@ const usersProvider = {
         enabled: true,
         user: {
           enabled: true,
+          isBot: false,
           OR: [
             { displayName: contains(q) },
             { email: contains(q) },

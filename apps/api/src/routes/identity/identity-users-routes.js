@@ -42,7 +42,7 @@ export function createIdentityUsersRouter({ prisma, supabaseAdmin, requirePermis
   async function filterUserIdsInCompany(ids, companyId) {
     if (!ids.length || !companyId) return [];
     const rows = await prisma.userProfile.findMany({
-      where: { id: { in: ids }, memberships: { some: { companyId } } },
+      where: { id: { in: ids }, isBot: false, memberships: { some: { companyId } } },
       select: { id: true },
     });
     return rows.map((r) => r.id);
