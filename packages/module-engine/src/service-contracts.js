@@ -16,7 +16,8 @@ const req = (spec) => ({ ...spec, required: true })
 const ID = req({ type: 'uuid' })
 const LIMIT = { type: 'integer', min: 1, max: 50 }
 const SEARCH = s(120)
-const SOURCE = s(200)
+// Id of the calling module's own record (RME3 ids are UUID v7).
+const SOURCE = { type: 'uuid' }
 const CONTACT_TYPES = ['customer', 'supplier', 'person', 'company']
 const TASK_PRIORITIES = ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'URGENT']
 

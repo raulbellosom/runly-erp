@@ -171,6 +171,7 @@ export function createMovementsService({ prisma, wallets }) {
   }
 
   return {
+    getOwnedMovement,
     createMovement,
     adjustWalletBalance,
     updateMovement,

@@ -65,7 +65,7 @@ try {
 
 ### Origen y alcance
 
-Lo que tu módulo crea queda marcado con su origen: `sourceEntityId` es el id de **tu** registro (por ejemplo, la orden de servicio que agendó la visita).
+Lo que tu módulo crea queda marcado con su origen: `sourceEntityId` es el id (UUID) de **tu** registro (por ejemplo, la orden de servicio que agendó la visita).
 
 | Destino | Dónde queda el origen |
 |---|---|
