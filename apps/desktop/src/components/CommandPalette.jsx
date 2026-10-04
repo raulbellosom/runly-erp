@@ -132,7 +132,7 @@ export function CommandPalette({ activeModule }) {
           transition={{ duration: 0.15 }}
         >
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 command-scrim"
             onClick={() => {
               closeCommand();
               setQuery("");
@@ -202,7 +202,7 @@ export function CommandPalette({ activeModule }) {
                               ? "opacity-40 cursor-not-allowed"
                               : `cursor-pointer ${
                                   isSelected
-                                    ? "bg-[hsl(var(--foreground)/0.08)] ring-1 ring-inset ring-[hsl(var(--foreground)/0.10)]"
+                                    ? "command-item-active"
                                     : "hover:bg-[hsl(var(--foreground)/0.05)]"
                                 }`
                           }`}

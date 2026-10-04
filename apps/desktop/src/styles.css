@@ -283,16 +283,36 @@ html {
      reads as a flat gray sheet in light mode. Lighter, more translucent
      white + saturate gives it the same glass feel it has in dark mode. */
   .glass-command {
-    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    background: rgba(241, 245, 249, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: var(--glass-shadow);
     isolation: isolate;
   }
   .dark .glass-command {
     background: var(--glass-bg-strong);
     border-color: var(--glass-border);
+  }
+  /* Scrim behind the palette. A black/40 scrim turns the light page into a
+     flat gray sheet, so the panel had nothing colorful left to blur. */
+  .command-scrim {
+    background: rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .dark .command-scrim {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .command-item-active {
+    background: var(--brand-soft);
+    box-shadow: inset 0 0 0 1px rgba(253, 96, 22, 0.35);
+  }
+  .dark .command-item-active {
+    background: rgba(253, 96, 22, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(253, 96, 22, 0.3);
   }
 
   .glass-shell {
