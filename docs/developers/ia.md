@@ -16,6 +16,26 @@ Los módulos de Runly están pensados para que un asistente de IA pueda trabajar
 | [`/llms-full.txt`](https://runly.mx/llms-full.txt) | Toda la documentación para desarrolladores en un solo archivo de texto. | Adjúntalo o pega la URL cuando el asistente no tenga acceso al ZIP. |
 | Cada página en Markdown | Agrega `.md` a la URL de cualquier página (`/documentacion/desarrolladores/pantallas-react.md`). | Para darle solo el tema que necesita. |
 
+## Crear un módulo nuevo con IA
+
+No necesitas el Constructor para empezar:
+
+1. En **Módulos > Subir módulo**, abre **¿Vas a crear un módulo nuevo?**, escribe el nombre y da **Descargar paquete base** (ver *Flujo con ZIP*). Trae un módulo instalable de ejemplo, `AGENTS.md`, la guía, esta documentación y pantallas de referencia en `docs/ejemplos/` (Listado, Detalle, Formulario, Tablero) hechas con el kit de `@runly/ui`.
+2. Descomprímelo, ábrelo con tu asistente y describe el módulo completo:
+
+```
+Este es el paquete base de un módulo de Runly (lee AGENTS.md, GUIA_DESARROLLO_RUNLY.md y docs/).
+Conviértelo en "Préstamos de equipo":
+- Entidad Préstamo: artículo (relación a inventory_item), persona (relación a hr_employee),
+  fecha de salida, fecha de regreso, estado (Prestado, Devuelto, Vencido), notas.
+- Un tablero con StatCard de préstamos activos y vencidos, basado en docs/ejemplos/.
+- Una conexión related a inventory_item para ver los préstamos en la ficha del artículo
+  (docs/conexiones.md), con onTargetDelete 'restrict'.
+- Cambia Registro por Préstamo en modelos, vistas, API, permisos y navegación.
+```
+
+3. Sube el ZIP con **Subir módulo**: la revisión muestra errores de compilación, cambios de tablas y la **Revisión de diseño** (con *Copiar para la IA* para pegarle las observaciones). Corrige y vuelve a subir hasta que salga limpia, luego instálalo.
+
 ## Una buena petición
 
 ```

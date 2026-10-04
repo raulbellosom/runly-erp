@@ -38,6 +38,7 @@ Se definen con `targetExternal`. El módulo dueño pasa a ser una **dependencia*
 - La búsqueda y la validación usan las reglas del módulo dueño: empresa activa y visibilidad por usuario (miembros de proyectos y tareas, calendarios compartidos, cuentas con acceso, alcance de archivos).
 - La API de tu módulo devuelve `<campo>__label` ("Título · detalle", por ejemplo "ABC-123 · Nissan NP300") y `<campo>__url` (la ficha original). Si el usuario no puede verlo o está inactivo: "No disponible (inactivo o sin acceso)".
 - Las reglas `onDisable` no aplican: los registros del sistema los administra su propio módulo.
+- Una relación solo se ve en las pantallas de **tu** módulo. Para que tus datos aparezcan y se editen dentro de la ficha del módulo del sistema (por ejemplo, campos extra en el artículo de Inventario), declara además una [conexión](/documentacion/desarrolladores/conexiones).
 
 ### Usarlas desde tus pantallas React
 

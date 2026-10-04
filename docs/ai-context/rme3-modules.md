@@ -449,6 +449,30 @@ export default defineRunlyModule({
 })
 ```
 
+#### Connections to core entities (optional `connections`)
+
+To show/save module data **inside a core screen** (inventory item, contact, HR employee, project),
+declare `connections` in the manifest. Full contract: `docs/developers/conexiones.md`; validation:
+`packages/module-engine/src/manifest-connections.js`; runtime: `apps/api/src/services/connections/`.
+
+```js
+connections: [{
+  key: 'calibracion_item',     // stable, /^[a-z][a-z0-9_]{1,40}$/, max 10 per module
+  target: 'inventory_item',    // inventory_item | contact | hr_employee | project (have a Conexiones screen)
+  kind: 'fields',              // 'fields' (1:1 extra fields) | 'related' (1:N records)
+  entity: 'calibracion',       // model key in this module
+  targetField: 'articulo',     // a `relation` field of that model holding the core record id
+  label: 'Calibración',
+  fields: [{ field: 'certificado', form: true, detail: true, column: true, search: true }],
+  // onTargetDelete: 'cascade' | 'setNull' (default) | 'restrict'  — related only; fields always cascade
+}],
+dependencies: [{ key: 'runly.core' }, { key: 'runly.inventory' }],
+```
+
+- Install/publish creates FK + (fields) unique index + index trigger at runtime; never write that SQL or touch Prisma.
+- Each company admin activates it in `<core module> > Conexiones` (`<slug>.connections.manage`); it starts `pending`.
+- Core forms save connection sections in the same transaction, validated with this module's `validators/` and its entity permissions.
+
 ### 4.9 Complete `models/contact.model.js` example
 
 ```js

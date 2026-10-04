@@ -1748,7 +1748,7 @@ Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · P
 - [x] Owner E2E (inventory, 2026-10-03): install of `custom.calibraciones`, Conexiones activate, connected-field search OK. Fixed from it: record titles fell back to the UUID (`resolveRecordLabel`), detail sections stale for 5 min (connection queries always refetch), Conexiones screen made collapsible.
 - [x] 3.10 Rollout: contacts (atomic save, search, hard/bulk delete → 409 via `isRestrictViolation`, verified against a real Prisma P2003), HR (atomic save, search, detail), projects (atomic save in the project modal). Shared `core-target-connections.js`, `withAfterWrite`, `ConnectedRunlyForm`, generic `ModuleConnectionsScreen`. Verified: 2026-10-03 (API services 782/783 — pre-existing sendBugReport; lint; `pnpm build:web`). Owner: "Sincronizar módulos" once so the new Conexiones menus/permissions appear.
 - [ ] 3.11 Record-context button for screens without a slot.
-- [ ] 3.12 Builder: "Conectar a un módulo del sistema" + `docs/developers/conexiones.md`.
+- [ ] 3.12 Builder: "Conectar a un módulo del sistema" (UI pending). Docs part done 2026-10-03: `docs/developers/conexiones.md` (manifest-declared connections), links from index/relaciones/ia/solucion-problemas, `ai-context/rme3-modules.md`, Conexiones help in inventory/contacts/hr/projects.
 - Note: no hard company deletion path exists in the API today; `onCompanyRemoved` is ready for when one is added.
 
 ### Phase 4 — Safe schema evolution · Phase 5 — Builder onboarding · Phase 6 — Catalog and services API

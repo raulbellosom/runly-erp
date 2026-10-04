@@ -37,6 +37,20 @@ order: 8
 | *Cannot read properties of null (reading 'useState')* | `import React from 'react'` o `React.useState`. | Imports nombrados de `react`. |
 | 409 *No se puede desactivar: N … lo usan* | Una relación con integridad *restringir* protege el registro. | Desactiva o reasigna primero los registros que lo usan. |
 
+## Conexiones
+
+| Mensaje o síntoma | Causa | Qué hacer |
+|---|---|---|
+| *connections[0].targetField is required* / *must be a relation field* | Falta `targetField` o no es un campo `relation` de `entity`. | Agrega el campo relation al modelo y ponlo en `targetField`. |
+| *unknown target "…"* | `target` no es un tipo del catálogo. | Usa `inventory_item`, `contact`, `hr_employee` o `project`. |
+| *onTargetDelete "setNull" needs an optional targetField* | `setNull` con el campo requerido. | Haz el campo opcional o usa `cascade`/`restrict`. |
+| La sección no aparece en la ficha | La conexión sigue **pendiente**, el campo no está ofrecido para esa superficie, o el usuario no puede leer tu entidad. | Actívala en *Conexiones* del módulo del sistema; revisa `fields` y los permisos `<slug>.<entidad>.read`. |
+| No aparece el menú *Conexiones* | Runly se actualizó y los permisos nuevos no se han sincronizado. | **Sincronizar módulos** una vez. |
+| *La conexión … tiene N registro(s) que apuntan a … inexistentes* | Al actualizar, registros tuyos apuntan a ids que ya no existen. | Corrígelos o vacía ese campo y vuelve a subir. |
+| 422 *Revisa los datos de las secciones conectadas* | Un valor no pasa los validadores de tu módulo. | El mensaje de cada campo aparece en la sección. |
+| 409 *Otra persona modificó …* | Edición concurrente de la misma sección. | *Recargar* y repetir el cambio. |
+| 409 *No se puede eliminar: tiene registros relacionados* | Conexión `related` con `onTargetDelete: 'restrict'`. | Elimina o reasigna primero esos registros. |
+
 ## Si nada de esto aplica
 
 Usa **Reportar bug** desde la pantalla con el problema e incluye: la versión del módulo, qué hiciste y el mensaje exacto (o una captura de la consola del navegador).
