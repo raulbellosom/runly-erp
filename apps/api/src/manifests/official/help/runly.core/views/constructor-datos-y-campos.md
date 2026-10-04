@@ -11,7 +11,7 @@ Una entidad es un tipo de registro: Cliente, Pedido, Visita. Con **Anadir entida
 
 ### Campos
 
-Con **Crear campo** abres un panel donde eliges etiqueta y tipo. La clave interna se genera a partir de la etiqueta y **no se puede cambiar despues** de crear el campo.
+Con **Crear campo** abres un panel donde eliges etiqueta y tipo. La clave interna se genera a partir de la etiqueta. Puedes cambiarla despues desde **Editar campo**: el Constructor actualiza el diseño, las vistas y las demas referencias, y si el campo ya esta publicado, al publicar se renombra la columna conservando sus datos (disponible despues de la primera publicacion del campo).
 
 | Tipo | Para que sirve |
 |---|---|

@@ -23,6 +23,7 @@ import {
   hasDuplicateOptionValues,
 } from "../../lib/builderHelpers";
 import { FIELD_TYPE_ICONS } from "../../lib/builderFieldIcons";
+import { validateFieldKey } from "../../lib/fieldRename";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../../auth/AuthProvider";
 import { runly } from "../../../../lib/runly";
@@ -167,7 +168,7 @@ function RelationOptionsEditor({ field, definition, onPatch, readOnly }) {
   );
 }
 
-export function FieldSheet({ open, onOpenChange, field, entity, definition, existedInPublished, readOnly, onSubmit }) {
+export function FieldSheet({ open, onOpenChange, field, entity, definition, existedInPublished, canRenameWithData = false, readOnly, onSubmit }) {
   const isNew = !field;
   const { session } = useAuth();
   const token = session?.access_token;
@@ -207,6 +208,9 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
     else patch({ targetEntity: key, targetExternal: undefined, labelField: undefined });
   }
   const keyPreview = isNew ? slugify(draft.label) : field.key;
+  // Unpublished fields rename freely; published ones once their fieldId is published.
+  const keyEditable = !isNew && (!existedInPublished || canRenameWithData);
+  const keyError = !isNew && keyEditable ? validateFieldKey(draft.key, entity, field.key) : "";
 
   function patch(p) {
     setDraft((current) => ({ ...current, ...p }));
@@ -260,14 +264,28 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
               onValueChange={handleTypeChange}
             />
           </div>
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">Clave</span>
-            <p className="flex items-center gap-2 rounded-lg bg-[hsl(var(--muted))] px-3 py-2 font-mono text-xs break-all">
-              <KeyRound className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-              {keyPreview || "se genera a partir de la etiqueta"}
-            </p>
-            {isNew && <p className="text-xs text-[hsl(var(--muted-foreground))]">No se puede cambiar después de crear el campo.</p>}
-          </div>
+          {isNew || readOnly || !keyEditable ? (
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">Clave</span>
+              <p className="flex items-center gap-2 rounded-lg bg-[hsl(var(--muted))] px-3 py-2 font-mono text-xs break-all">
+                <KeyRound className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+                {keyPreview || "se genera a partir de la etiqueta"}
+              </p>
+              {isNew && <p className="text-xs text-[hsl(var(--muted-foreground))]">Podrás cambiarla después; el Constructor actualiza todas sus referencias.</p>}
+              {!isNew && !readOnly && !keyEditable && (
+                <p className="text-xs text-[hsl(var(--muted-foreground))]">Publica una vez el módulo para poder renombrar esta clave conservando sus datos.</p>
+              )}
+            </div>
+          ) : (
+            <TextField
+              label="Clave"
+              icon={KeyRound}
+              value={draft.key ?? ""}
+              error={keyError}
+              hint={existedInPublished ? "Al publicar se renombra la columna y se conservan los datos." : "Se actualizan el diseño, las vistas y las demás referencias."}
+              onChange={(e) => patch({ key: e.target.value.trim() })}
+            />
+          )}
           <SwitchField
             label="Requerido"
             description="El registro no se puede guardar sin este valor."
@@ -305,7 +323,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>{readOnly ? "Cerrar" : "Cancelar"}</Button>
             {!readOnly && (
-              <Button disabled={!draft.label?.trim()} onClick={handleSubmit}>
+              <Button disabled={!draft.label?.trim() || Boolean(keyError)} onClick={handleSubmit}>
                 {isNew ? "Crear" : "Guardar"}
               </Button>
             )}

@@ -74,7 +74,7 @@ Para saber qué cambiaste, Runly regenera el paquete a partir de `.module-defini
 
 ## Cambiar la estructura de un módulo instalado
 
-Cada campo puede llevar un `id` fijo (UUID). El Constructor lo pone solo (`fieldId`); en un paquete hecho a mano agrégalo tú y **no lo cambies nunca**:
+Cada campo puede llevar un `id` fijo (UUID). El Constructor lo pone solo (`fieldId`) y permite cambiar la clave desde **Editar campo**; en un paquete hecho a mano agrégalo tú y **no lo cambies nunca**:
 
 ```js
 fields: [

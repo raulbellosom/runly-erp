@@ -27,3 +27,12 @@ test('assignFieldIds fills missing ids once and the model carries them', () => {
   const model = defineModel({ key: 'vehiculo', tableName: 'flota_vehiculo', fields: [{ id: fieldId, name: 'placa', type: 'text' }] })
   assert.equal(normalizeModelSchema(model).columns.find((column) => column.name === 'placa').fieldId, fieldId)
 })
+
+test('assignFieldIds reuses ids of earlier definitions by entity and field key', () => {
+  const published = assignFieldIds(structuredClone(BASE)).definition
+  const staleDraft = structuredClone(BASE)
+  staleDraft.entities[0].fields.push({ key: 'color', type: 'text', label: 'Color' })
+  const { definition } = assignFieldIds(staleDraft, [published])
+  assert.equal(definition.entities[0].fields[0].fieldId, published.entities[0].fields[0].fieldId)
+  assert.match(definition.entities[0].fields[1].fieldId, /^[0-9a-f-]{36}$/)
+})

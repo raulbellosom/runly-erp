@@ -490,6 +490,9 @@ export default function ModuleBuilderEditor() {
           return next;
         })}
         onPublished={() => {
+          // Publishing assigns stable field ids on the server: reload the draft
+          // so renames keep their data and autosave does not drop the ids.
+          reloadDefinitionFromServer();
           queryClient.invalidateQueries({ queryKey: ["module-builder-project", id] });
           queryClient.invalidateQueries({ queryKey: ["modules"] });
           // The sidebar/menu and module screens read these, not ["modules"];

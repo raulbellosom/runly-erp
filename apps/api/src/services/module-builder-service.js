@@ -199,10 +199,12 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     if (definition && !Object.prototype.hasOwnProperty.call(definition, 'extensions') && project.definition?.extensions) {
       nextDefinition.extensions = project.definition.extensions
     }
+    // Keep stable field ids an editor with a stale draft did not send.
+    const withIds = assignFieldIds(nextDefinition, [project.definition, project.publishedDefinition])
     const updated = await prisma.moduleBuilderProject.update({
       where: { id: project.id },
       data: {
-        definition: nextDefinition,
+        definition: withIds.definition,
         name: name ?? project.name,
         description: description !== undefined ? description : project.description,
         status: 'DRAFT',
@@ -291,7 +293,7 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
       throw new ModuleBuilderError('Este proyecto está en modo desarrollador: instala su código desde Módulos > Subir módulo.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
     }
     // Stable field ids before the first publish that needs them (renames keep data).
-    const withIds = assignFieldIds(project.definition)
+    const withIds = assignFieldIds(project.definition, [project.publishedDefinition])
     if (withIds.changed) {
       await prisma.moduleBuilderProject.update({ where: { id: project.id }, data: { definition: withIds.definition } })
     }

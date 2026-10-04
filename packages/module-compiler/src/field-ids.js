@@ -15,15 +15,27 @@ export function uuidv7(now = Date.now()) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-// Returns { definition, changed }: fields without fieldId get one.
-export function assignFieldIds(definition) {
+// Returns { definition, changed }: fields without fieldId get one — the id of
+// the same entity/field key in `previous` definitions (stored draft,
+// published) when there is one, so an editor that saves a draft without ids
+// never re-keys a published column.
+export function assignFieldIds(definition, previous = []) {
+  const known = new Map()
+  for (const source of previous) {
+    for (const entity of source?.entities ?? []) {
+      for (const field of entity.fields ?? []) {
+        const key = `${entity.key}.${field.key ?? field.name}`
+        if (field.fieldId && !known.has(key)) known.set(key, field.fieldId)
+      }
+    }
+  }
   let changed = false
   const entities = (definition?.entities ?? []).map((entity) => ({
     ...entity,
     fields: (entity.fields ?? []).map((field) => {
       if (field.fieldId) return field
       changed = true
-      return { ...field, fieldId: uuidv7() }
+      return { ...field, fieldId: known.get(`${entity.key}.${field.key ?? field.name}`) ?? uuidv7() }
     }),
   }))
   return { definition: changed ? { ...definition, entities } : definition, changed }

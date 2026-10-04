@@ -26,6 +26,7 @@ import { EntityFieldList } from "./EntityFieldList";
 import { FieldSheet } from "./FieldSheet";
 import { LayoutDesignerSheet } from "./LayoutDesignerSheet";
 import { ArchivedFieldsPanel } from "./ArchivedFieldsPanel";
+import { canRenameKeepingData, renameField } from "../../lib/fieldRename";
 
 // addField() only knows key/label/type; the extra attributes the sheet
 // collects (required, options, targetEntity) are applied to the field it
@@ -50,7 +51,11 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
   }
 
   function handleSubmitField(draft) {
-    if (sheet.field) onChange((d) => updateField(d, entity.key, sheet.field.key, draft));
+    if (sheet.field && draft.key && draft.key !== sheet.field.key) {
+      // Rename first (updates every reference), then apply the other edits.
+      const { key, ...rest } = draft;
+      onChange((d) => updateField(renameField(d, entity.key, sheet.field.key, key), entity.key, key, rest));
+    } else if (sheet.field) onChange((d) => updateField(d, entity.key, sheet.field.key, draft));
     else onChange((d) => addFieldFromDraft(d, entity.key, draft));
   }
 
@@ -169,7 +174,8 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
         field={sheet.field}
         entity={entity}
         definition={definition}
-        existedInPublished={Boolean(sheet.field) && fieldExistedInPublished(publishedDefinition, entity.key, sheet.field.key)}
+        existedInPublished={Boolean(sheet.field) && (fieldExistedInPublished(publishedDefinition, entity.key, sheet.field.key) || canRenameKeepingData(sheet.field, publishedDefinition, entity.key))}
+        canRenameWithData={canRenameKeepingData(sheet.field, publishedDefinition, entity.key)}
         readOnly={readOnly}
         onSubmit={handleSubmitField}
       />
