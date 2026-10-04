@@ -11,6 +11,25 @@ function isWithinPath(parentPath, childPath) {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
 }
 
+// Builder-generated module routes (and hand-written ones copied from them)
+// read the company as `userContext.memberships[0]`. For a user in several
+// companies that was an arbitrary one, not the active company the request
+// asks for: records were written to and read from the wrong company. Put the
+// membership of the requested company (X-Runly-Company-Id, only when the user
+// belongs to it) first, so every installed module uses the active company.
+export async function activeMembershipFirst(c, next) {
+  const requested = c.req.header('X-Runly-Company-Id') || c.req.header('X-Atlas-Company-Id') || null
+  const context = c.get('userContext')
+  const memberships = context?.memberships
+  if (requested && Array.isArray(memberships)) {
+    const index = memberships.findIndex((membership) => membership?.companyId === requested)
+    if (index > 0) {
+      c.set('userContext', { ...context, memberships: [memberships[index], ...memberships.filter((_, i) => i !== index)] })
+    }
+  }
+  await next()
+}
+
 async function pathExists(targetPath) {
   try {
     await fs.access(targetPath)
@@ -345,6 +364,7 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
   function wrapWithAuth(moduleRouter) {
     const securedRouter = new Hono()
     securedRouter.use('*', authMiddleware)
+    securedRouter.use('*', activeMembershipFirst)
     securedRouter.route('/', moduleRouter)
     return securedRouter
   }
