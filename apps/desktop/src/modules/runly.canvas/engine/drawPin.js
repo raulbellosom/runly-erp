@@ -10,7 +10,11 @@ import { PIN_HEAD, pinOf } from './pins.js'
 import { worldToScreen } from './viewport.js'
 
 const HEAD_RATIO = 0.36
-const ICON_RATIO = 0.42
+const ICON_RATIO = 0.62
+// Icon stroke in the icon's own 24-unit grid: drawIconNode already scales it
+// with the glyph, so it must not depend on zoom (dividing by zoom made icons
+// bold blobs when zoomed out).
+const ICON_STROKE = 2.25
 const DOT_RATIO = 0.12
 const SCREEN_LABEL_ZOOM = 0.25
 const PLAN_LABEL_ZOOM = 0.5
@@ -42,9 +46,9 @@ function teardropPath(ctx, head, r, tip) {
   ctx.closePath()
 }
 
-function drawGlyph(ctx, object, head, r, zoom) {
+function drawGlyph(ctx, object, head, r) {
   const iconNode = getIconNode(object.hotspot?.icon)
-  if (iconNode) { drawIconNode(ctx, iconNode, head.x, head.y, r * 2 * ICON_RATIO, '#ffffff', 2.25 / Math.max(zoom, 0.5)); return }
+  if (iconNode) { drawIconNode(ctx, iconNode, head.x, head.y, r * 2 * ICON_RATIO, '#ffffff', ICON_STROKE); return }
   ctx.beginPath(); ctx.arc(head.x, head.y, r * 2 * DOT_RATIO, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill()
 }
 
@@ -58,10 +62,11 @@ export function drawPin(ctx, object, viewport, color, theme, pinLabels) {
   teardropPath(ctx, head, r, tip)
   ctx.fillStyle = color
   ctx.fill()
-  ctx.lineWidth = 2 / Math.max(zoom, 0.5)
+  // Screen pins keep a constant 2px border; plan pins thin it out when zoomed in.
+  ctx.lineWidth = plan ? 2 / Math.max(zoom, 0.5) : 2 / zoom
   ctx.strokeStyle = '#ffffff'
   ctx.stroke()
-  drawGlyph(ctx, object, head, r, zoom)
+  drawGlyph(ctx, object, head, r)
   ctx.restore()
 
   const title = object.hotspot?.title
