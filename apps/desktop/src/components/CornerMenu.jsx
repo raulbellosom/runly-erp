@@ -205,8 +205,8 @@ export function CornerMenu() {
           )}
           style={{
             zIndex: Z_CORNER,
-            paddingRight: "max(6px, env(safe-area-inset-right))",
-            paddingBottom: "max(6px, env(safe-area-inset-bottom))",
+            paddingRight: "env(safe-area-inset-right, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
           }}
         >
           <span
