@@ -202,8 +202,8 @@ export function CommandPalette({ activeModule }) {
                               ? "opacity-40 cursor-not-allowed"
                               : `cursor-pointer ${
                                   isSelected
-                                    ? "bg-[hsl(var(--muted))]"
-                                    : "hover:bg-[hsl(var(--muted))]"
+                                    ? "bg-[hsl(var(--primary)/0.12)] ring-1 ring-inset ring-[hsl(var(--primary)/0.25)]"
+                                    : "hover:bg-[hsl(var(--primary)/0.08)]"
                                 }`
                           }`}
                         >
