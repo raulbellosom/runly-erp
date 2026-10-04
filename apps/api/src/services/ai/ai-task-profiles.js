@@ -38,6 +38,13 @@ export const TASK_PROFILES = {
     envOverrideVar: "CHAT_MIRAI_WEB_MODEL",
     groqDefaultModel: "groq/compound-mini",
   },
+  // "Crear con IA" in the Module Builder: description -> module definition JSON.
+  builder_draft: {
+    weight: "heavy",
+    localCapable: true,
+    envOverrideVar: "BUILDER_DRAFT_MODEL",
+    groqDefaultModel: "openai/gpt-oss-120b",
+  },
   help_assistant: {
     weight: "light",
     localCapable: true,

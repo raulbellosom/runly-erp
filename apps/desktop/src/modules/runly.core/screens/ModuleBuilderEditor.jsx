@@ -24,7 +24,7 @@ import {
   AlertTitle,
   AlertDescription,
 } from "@runly/ui";
-import { ArrowLeft, Code2, Download, Eye, ShieldCheck, Rocket, MoreHorizontal, Upload } from "lucide-react";
+import { ArrowLeft, Code2, Download, Eye, ShieldCheck, Rocket, MoreHorizontal, Sparkles, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
@@ -35,6 +35,7 @@ import { NavigationTab } from "../components/builder/NavigationTab";
 import { PermissionsTab } from "../components/builder/PermissionsTab";
 import { PublicLinksTab } from "../components/builder/PublicLinksTab";
 import { ConnectionsTab } from "../components/builder/ConnectionsTab";
+import { ExternalAiPromptDialog } from "../components/builder/ExternalAiPromptDialog";
 import { DiagnosticsPanel } from "../components/builder/DiagnosticsPanel";
 import { describeDiagnostic } from "../lib/builderDiagnostics";
 import { PreviewSheet } from "../components/builder/PreviewSheet";
@@ -63,6 +64,7 @@ export default function ModuleBuilderEditor() {
   const [saveStatus, setSaveStatus] = useState("saved"); // saved | saving | error
   const [diagnostics, setDiagnostics] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [capabilities, setCapabilities] = useState(null);
 
@@ -436,10 +438,23 @@ export default function ModuleBuilderEditor() {
                 <Download />
                 Descargar ZIP
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => flushPendingSave().then(() => setAiPromptOpen(true))}>
+                <Sparkles />
+                Preparar para IA externa
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      <ExternalAiPromptDialog
+        open={aiPromptOpen}
+        onOpenChange={setAiPromptOpen}
+        projectId={id}
+        token={token}
+        onDownload={() => exportMutation.mutate()}
+        downloading={exportMutation.isPending}
+      />
 
       <DeveloperModeDialog
         open={developerOpen}

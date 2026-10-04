@@ -1773,5 +1773,10 @@ Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · P
 
 - E2E run 2026-10-03 found and fixed: Builder module routes used the user's first company instead of the active one (`d1505a5a`); companies created after a module install got no connections (`248c4aa4`); a rename + backfill hit the old connection trigger (`fb43615c`); publish dialog overflowed the screen, `$` icon on the backfill input, unformatted connected dates, relation fields offered in connections (this commit).
 
-### Phase 5 — Builder onboarding · Phase 6 — Catalog and services API
-- [ ] See plan tasks 5.1–6.5
+### Phase 5 — Builder onboarding
+- [x] 5.1 Templates: domain templates (Visitas a clientes, Préstamo de herramientas with an inventory connection, Mantenimiento de equipos, Solicitudes internas) next to inventory-lite / simple / blank; `BUILDER_TEMPLATE_CATALOG` in capabilities; new "Crear módulo" dialog (Desde plantilla / Con IA / En blanco; drafts without entities were already allowed). Decision: templates stay as API factories (`module-builder-domain-templates.js`) instead of compiler JSON files. Verified: 2026-10-03 (all 7 templates validate + compile, 7/7)
+- [x] 5.2 "Crear con IA": `builder-ai-draft-service.js` (task `builder_draft`, Groq/Ollama via ai-router, JSON contract, compiler validation, one repair round, 503 `ai_unavailable`), `POST /module-builder/ai-draft`, capabilities `aiDraft`; dialog previews entities/fields before creating. Verified: 2026-10-03 (unit 4/4; real Groq draft valid in 3-4 s; created project validates)
+- [x] 5.3 "Preparar para IA externa": `module-builder-ai-prompt.js`, `GET /module-builder/projects/:id/ai-prompt`, editor menu dialog with Copiar texto + Descargar ZIP; docs `ia.md` + Builder help. Verified: 2026-10-03 (unit 1/1, backend E2E 6/6, Playwright 3/3)
+
+### Phase 6 — Catalog and services API
+- [ ] See plan tasks 6.1–6.5

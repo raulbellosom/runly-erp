@@ -18,7 +18,11 @@ Los módulos de Runly están pensados para que un asistente de IA pueda trabajar
 
 ## Crear un módulo nuevo con IA
 
-No necesitas el Constructor para empezar:
+**Dentro de Runly (MirAI):** Constructor de módulos > **Crear módulo** > **Con IA**. Describe lo que necesitas registrar en lenguaje normal; MirAI arma las entidades, los campos (usando Contactos, Colaboradores, Inventario o Proyectos cuando corresponde) y un Kanban si hay un estado. Revisa el borrador, ajusta nombre y clave, y créalo: se abre en el editor visual. Requiere la IA configurada en la instancia.
+
+**Con tu propio asistente sobre un módulo existente:** en el editor del Constructor, menú **…** > **Preparar para IA externa**. Runly te da un texto listo con la descripción actual del módulo, qué leer dentro del ZIP, las reglas que no se pueden romper y qué devolver; descarga el ZIP, pega el texto en tu asistente, describe el cambio donde dice `<<Describe aquí...>>` y sube el ZIP que te devuelva en **Módulos > Subir actualización**.
+
+**Sin el Constructor:**
 
 1. En **Módulos > Subir módulo**, abre **¿Vas a crear un módulo nuevo?**, escribe el nombre y da **Descargar paquete base** (ver *Flujo con ZIP*). Trae un módulo instalable de ejemplo, `AGENTS.md`, la guía, esta documentación y pantallas de referencia en `docs/ejemplos/` (Listado, Detalle, Formulario, Tablero) hechas con el kit de `@runly/ui`.
 2. Descomprímelo, ábrelo con tu asistente y describe el módulo completo:

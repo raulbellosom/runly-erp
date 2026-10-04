@@ -56,6 +56,14 @@ export function createBuilderDomain({ request, requestBlob, withAuthHeaders }) {
     getPublishImpact: (id, token) =>
       request(`${projectPath(id)}/publish-impact`, { headers: withAuthHeaders(token) }),
 
+    // "Crear con IA": { definition, errors, attempts } to review before creating.
+    aiDraft: (description, token) =>
+      request('/module-builder/ai-draft', { method: 'POST', headers: withAuthHeaders(token), body: JSON.stringify({ description }) }),
+
+    // "Preparar para IA externa": { prompt } for the project's ZIP.
+    aiPrompt: (id, token) =>
+      request(`${projectPath(id)}/ai-prompt`, { headers: withAuthHeaders(token) }),
+
     // decisions: schema migration choices ({ [operationId]: { backfill?, onConversionFailure? } }).
     publishProject: (id, token, { decisions } = {}) =>
       request(`${projectPath(id)}/publish`, {

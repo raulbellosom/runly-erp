@@ -11,6 +11,8 @@ import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, MODULE_ICON_
 import { createModuleBuilderService, ModuleBuilderError } from '../services/module-builder-service.js'
 import { buildStarterPackage, StarterPackageError } from '@runly/module-compiler'
 import { publishActivityFromContext, getActivityContext } from '../services/activity-publisher.js'
+import { BuilderAiDraftError, createBuilderAiDraftService } from '../services/builder-ai-draft-service.js'
+import { buildExternalAiPrompt } from '../services/module-builder-ai-prompt.js'
 
 function handleBuilderError(c, error, fallbackMessage) {
   if (error instanceof ModuleBuilderError) {
@@ -23,6 +25,7 @@ function handleBuilderError(c, error, fallbackMessage) {
 export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = null, routeLoader = null, cacheDel = () => {} }) {
   const app = new Hono()
   const svc = createModuleBuilderService({ prisma, bundlerSvc, routeLoader, cacheDel })
+  const aiDraft = createBuilderAiDraftService()
 
   function actor(c) {
     return c.get('userContext')?.profile?.id ?? null
@@ -38,6 +41,7 @@ export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = nu
         kanbanGroupFieldTypes: KANBAN_GROUP_FIELD_TYPES,
         kanbanMaxColumns: KANBAN_MAX_COLUMNS,
         templates: svc.templates,
+        aiDraft: aiDraft.isConfigured(),
       },
     })
   })
@@ -67,6 +71,28 @@ export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = nu
       return c.json({ data: project }, 201)
     } catch (error) {
       return handleBuilderError(c, error, 'No se pudo crear el proyecto del Builder.')
+    }
+  })
+
+  // "Crear con IA": description -> draft definition to review (nothing is created).
+  app.post('/module-builder/ai-draft', requirePermission('core.modules.builder'), async (c) => {
+    try {
+      const body = await c.req.json().catch(() => ({}))
+      return c.json({ data: await aiDraft.draft({ description: body?.description }) })
+    } catch (error) {
+      if (error instanceof BuilderAiDraftError) return c.json({ error: error.code, message: error.message }, error.status)
+      console.error('[builder-routes] ai-draft', error?.message)
+      return c.json({ error: 'ai_draft_failed', message: 'La IA no respondió. Intenta de nuevo en un momento.' }, 502)
+    }
+  })
+
+  // "Preparar para IA externa": ready-to-paste prompt for the project's ZIP.
+  app.get('/module-builder/projects/:id/ai-prompt', requirePermission('core.modules.builder'), async (c) => {
+    try {
+      const project = await svc.getProject({ companyId: c.get('companyId'), projectId: c.req.param('id') })
+      return c.json({ data: { prompt: buildExternalAiPrompt(project.definition) } })
+    } catch (error) {
+      return handleBuilderError(c, error, 'No se pudo preparar el texto para la IA.')
     }
   })
 

@@ -11,15 +11,6 @@ import {
   EmptyState,
   ErrorState,
   Skeleton,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  TextField,
-  TextareaField,
-  SelectField,
   ConfirmDialog,
   SearchInput,
   FilterBar,
@@ -33,15 +24,11 @@ import { runly } from "../../../lib/runly";
 import { mergeRuntimeModules } from "../../../lib/runtimeModules";
 import { BuilderProjectCard } from "../components/builder/BuilderProjectCard";
 import { PROJECT_FILTERS, matchesFilters, matchesSearch, projectSummary } from "../lib/builderProjectSummary";
+import { NewModuleDialog } from "../components/builder/NewModuleDialog";
 
 // 12 fills whole rows in both the 2- and 3-column grid.
 const PAGE_SIZE = 12;
 
-const TEMPLATE_OPTIONS = [
-  { value: "blank", label: "Módulo vacío" },
-  { value: "simple-crud", label: "CRUD simple (una entidad)" },
-  { value: "inventory-lite", label: "Inventario ligero (con Kanban y dashboard)" },
-];
 
 export default function ModuleBuilder() {
   const navigate = useNavigate();
@@ -52,7 +39,6 @@ export default function ModuleBuilder() {
   const canUse = isAdmin || (userProfile?.permissions ?? []).includes("core.modules.builder");
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", moduleKey: "", description: "", template: "blank" });
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const projectsQuery = useQuery({
@@ -91,28 +77,12 @@ export default function ModuleBuilder() {
   const paged = usePagedList(visibleRows, PAGE_SIZE);
   const hasQuery = Boolean(search.trim()) || Object.values(filters).some(Boolean);
 
-  const suggestedKey = useMemo(() => {
-    const slug = form.name
-      .normalize("NFD").replace(/[̀-ͯ]/g, "")
-      .toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24);
-    return slug ? `custom.${slug}` : "";
-  }, [form.name]);
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      runly.builder.createProject(
-        {
-          name: form.name,
-          moduleKey: form.moduleKey || undefined,
-          description: form.description,
-          template: form.template,
-        },
-        token,
-      ),
+    mutationFn: (payload) => runly.builder.createProject(payload, token),
     onSuccess: (result) => {
       toast.success("Proyecto creado.");
       setCreateOpen(false);
-      setForm({ name: "", moduleKey: "", description: "", template: "blank" });
       queryClient.invalidateQueries({ queryKey: ["module-builder-projects"] });
       navigate(`/app/m/runly.core/module-builder/${result.data.id}`);
     },
@@ -214,50 +184,13 @@ export default function ModuleBuilder() {
         <ListPager {...paged} />
       </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear módulo</DialogTitle>
-            <DialogDescription>Elige un punto de partida. Podrás editarlo todo después.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <TextField
-              label="Nombre"
-              required
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Control de vehículos"
-            />
-            <TextField
-              label="Module key"
-              value={form.moduleKey}
-              onChange={(e) => setForm((f) => ({ ...f, moduleKey: e.target.value }))}
-              placeholder={suggestedKey || "custom.mi-modulo"}
-              hint="Se sugiere automáticamente a partir del nombre. No podrá cambiarse después de guardar."
-            />
-            <TextareaField
-              label="Descripción"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            />
-            <SelectField
-              label="Plantilla"
-              options={TEMPLATE_OPTIONS}
-              value={form.template}
-              onValueChange={(value) => setForm((f) => ({ ...f, template: value }))}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button
-              disabled={!form.name.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate()}
-            >
-              {createMutation.isPending ? "Creando..." : "Crear"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewModuleDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        token={token}
+        creating={createMutation.isPending}
+        onCreate={(payload) => createMutation.mutate(payload)}
+      />
 
       <ConfirmDialog
         open={Boolean(confirmDelete)}

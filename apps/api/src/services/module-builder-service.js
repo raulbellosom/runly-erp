@@ -22,7 +22,7 @@ import { validateManifest, RESERVED_NAMESPACES } from '@runly/module-engine'
 import { resolveModulesDir } from './module-upload-service.js'
 import { createModulePackageWiring } from './module-package-wiring-service.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
-import { buildDefinitionFromTemplate, BUILDER_TEMPLATE_KEYS } from './module-builder-templates.js'
+import { buildDefinitionFromTemplate, BUILDER_TEMPLATE_CATALOG, BUILDER_TEMPLATE_KEYS } from './module-builder-templates.js'
 import { buildPreview } from './module-builder-preview-service.js'
 import { createBuilderPackageSync } from './module-builder-package-sync.js'
 
@@ -444,6 +444,6 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     reattachProject,
     installedPackage,
     deleteDraft,
-    templates: BUILDER_TEMPLATE_KEYS,
+    templates: BUILDER_TEMPLATE_CATALOG,
   }
 }

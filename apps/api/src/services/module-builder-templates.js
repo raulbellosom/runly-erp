@@ -7,7 +7,19 @@
 // other draft. Keeping these as data factories, not code generators, means
 // the scaffolder's createCrudDefinition()/createCrudCustomDefinition() stay
 // the only place that turns a definition into files.
-export const BUILDER_TEMPLATE_KEYS = ['blank', 'simple-crud', 'inventory-lite']
+import { maintenanceTemplate, requestsTemplate, toolLoansTemplate, visitsTemplate } from './module-builder-domain-templates.js'
+
+// What "Crear módulo" shows for each template (order = display order).
+export const BUILDER_TEMPLATE_CATALOG = Object.freeze([
+  { key: 'visitas', label: 'Visitas a clientes', description: 'Agenda visitas a contactos con responsable, resultado, tablero por estado y resumen.', icon: 'MapPin' },
+  { key: 'prestamo-herramientas', label: 'Préstamo de herramientas', description: 'Presta artículos de inventario a colaboradores y ve los préstamos dentro de cada artículo.', icon: 'Wrench' },
+  { key: 'mantenimiento', label: 'Mantenimiento de equipos', description: 'Órdenes preventivas y correctivas ligadas a equipos de inventario, con costos.', icon: 'Settings' },
+  { key: 'solicitudes', label: 'Solicitudes internas', description: 'Solicitudes de colaboradores con prioridad y flujo de aprobación.', icon: 'ClipboardList' },
+  { key: 'inventory-lite', label: 'Inventario ligero', description: 'Artículos con categoría, estado, cantidad, tablero Kanban y dashboard.', icon: 'Package' },
+  { key: 'simple-crud', label: 'Lista simple', description: 'Una entidad con título, notas y activo.', icon: 'ListChecks' },
+  { key: 'blank', label: 'En blanco', description: 'Sin entidades; empiezas desde cero.', icon: 'Boxes' },
+])
+export const BUILDER_TEMPLATE_KEYS = BUILDER_TEMPLATE_CATALOG.map((template) => template.key)
 
 function baseMeta({ moduleKey, name, description, icon, color, startPath }) {
   return {
@@ -107,6 +119,10 @@ const TEMPLATE_FACTORIES = {
   blank: blankTemplate,
   'simple-crud': simpleCrudTemplate,
   'inventory-lite': inventoryLiteTemplate,
+  visitas: (meta) => visitsTemplate(meta, baseMeta),
+  'prestamo-herramientas': (meta) => toolLoansTemplate(meta, baseMeta),
+  mantenimiento: (meta) => maintenanceTemplate(meta, baseMeta),
+  solicitudes: (meta) => requestsTemplate(meta, baseMeta),
 }
 
 export function buildDefinitionFromTemplate(templateKey, meta) {

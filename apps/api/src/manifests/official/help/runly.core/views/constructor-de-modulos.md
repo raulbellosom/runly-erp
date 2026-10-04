@@ -7,7 +7,7 @@ El Constructor de modulos te permite crear un modulo completo de Runly sin escri
 
 ### Como se trabaja
 
-1. **Crear modulo**: desde esta pantalla, boton **Crear modulo**. Eliges nombre, clave (por ejemplo `custom.visitas`), icono y color. La clave no se puede cambiar despues.
+1. **Crear modulo**: desde esta pantalla, boton **Crear modulo**. Eliges como empezar: **Desde plantilla** (Visitas a clientes, Prestamo de herramientas, Mantenimiento de equipos, Solicitudes internas, Inventario ligero o Lista simple), **Con IA** (describes lo que necesitas y MirAI arma el borrador para que lo revises) o **En blanco**. Despues pones nombre y clave (por ejemplo `custom.visitas`); la clave no se puede cambiar despues.
 2. **Editar el borrador**: el editor tiene cinco pestanas:
    - **General**: nombre, descripcion, version, icono, color y nombre corto para la app.
    - **Datos**: las **entidades** (las "tablas" del modulo, como Cliente o Pedido) y sus **campos**. Cada entidad tiene ademas un boton **Diseno** para organizar su formulario y su detalle.
