@@ -1,4 +1,4 @@
-import { ArrowUpRight, WifiOff } from "lucide-react";
+import { ArrowUpRight, WifiOff, X } from "lucide-react";
 import { cn } from "@runly/ui";
 import {
   CardShell,
@@ -54,7 +54,9 @@ function tileStyle(color) {
   };
 }
 
-// ---- Compact tile: dense row-shaped card for the full app grid ----
+// ---- Compact tile: dense card for the full app grid ----
+// Phones: small stacked card (icon above name) so the grid fits two columns.
+// sm and up: row-shaped tile (icon left, name + summary right).
 export function HomeAppTile({
   module,
   onClick,
@@ -74,7 +76,8 @@ export function HomeAppTile({
       cardClassName={tileClassName(
         isOfflineBlocked,
         cn(
-          "h-17 items-center gap-3 rounded-xl pl-3 pr-11",
+          "flex-col items-start gap-2 rounded-xl p-3",
+          "sm:h-17 sm:flex-row sm:items-center sm:gap-3 sm:py-0 sm:pl-3 sm:pr-11",
           highlighted && "ring-2 ring-(--brand-primary) border-transparent",
         ),
       )}
@@ -89,7 +92,7 @@ export function HomeAppTile({
           isFavorite={isFavorite}
           isOfflineBlocked={isOfflineBlocked}
           onToggleFavorite={onToggleFavorite}
-          className="right-2 top-1/2 -translate-y-1/2"
+          className="right-1 top-1 sm:right-2 sm:top-1/2 sm:-translate-y-1/2"
         />
       }
     >
@@ -102,11 +105,11 @@ export function HomeAppTile({
         }}
       />
       <ModuleIcon module={module} size="sm" />
-      <span className="min-w-0 flex-1">
+      <span className="w-full min-w-0 sm:w-auto sm:flex-1">
         <span className="block truncate text-sm font-semibold leading-tight text-[hsl(var(--foreground))]">
           {module.name}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-[hsl(var(--muted-foreground))]">
+        <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-[hsl(var(--muted-foreground))] sm:line-clamp-1">
           {module.summary || module.description}
         </span>
       </span>
@@ -187,23 +190,38 @@ export function HomeFeaturedTile({
 }
 
 // ---- Recent chip: pill shown in the header "Continuar" row ----
-export function HomeRecentChip({ module, onClick, isOfflineBlocked }) {
+// The remove "x" is a sibling button (no nested buttons); always visible on
+// touch screens, revealed on hover/focus with a mouse.
+export function HomeRecentChip({ module, onClick, onRemove, isOfflineBlocked }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={isOfflineBlocked}
-      title={module.name}
-      className={cn(
-        "flex min-h-10 max-w-56 items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1 pl-1 pr-3.5 text-left text-sm font-medium text-[hsl(var(--foreground))]",
-        "transition-colors duration-200 hover:border-[hsl(var(--muted-foreground))]/40 hover:bg-[hsl(var(--muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
-        "disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer",
+    <span className="group/chip relative inline-flex max-w-56">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isOfflineBlocked}
+        title={module.name}
+        className={cn(
+          "flex min-h-10 min-w-0 items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1 pl-1 pr-8 text-left text-sm font-medium text-[hsl(var(--foreground))]",
+          "transition-colors duration-200 hover:border-[hsl(var(--muted-foreground))]/40 hover:bg-[hsl(var(--muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
+          "disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer",
+        )}
+      >
+        <span className="scale-[0.8]">
+          <ModuleIcon module={module} size="sm" />
+        </span>
+        <span className="truncate">{module.name}</span>
+      </button>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={`Quitar ${module.name} de recientes`}
+          title="Quitar de recientes"
+          onClick={() => onRemove(module.key)}
+          className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] opacity-0 transition-opacity hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] focus-visible:opacity-100 group-hover/chip:opacity-100 [@media(hover:none)]:opacity-100"
+        >
+          <X size={13} aria-hidden />
+        </button>
       )}
-    >
-      <span className="scale-[0.8]">
-        <ModuleIcon module={module} size="sm" />
-      </span>
-      <span className="truncate">{module.name}</span>
-    </button>
+    </span>
   );
 }

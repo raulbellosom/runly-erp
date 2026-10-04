@@ -28,6 +28,17 @@ export function recordRecentModule(key) {
   }
 }
 
+export function removeRecentModule(key) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(readRecentModuleKeys().filter((k) => k !== key)),
+    );
+  } catch {
+    // Storage unavailable: nothing to remove.
+  }
+}
+
 // Case/accent-insensitive match over name, summary and key.
 export function normalizeSearchText(value) {
   return String(value ?? "")

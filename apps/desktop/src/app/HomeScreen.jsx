@@ -7,7 +7,7 @@ import { useModuleLauncher } from "../hooks/useModuleLauncher";
 import { AppViewControls } from "../components/AppViewControls";
 import { AppContextMenu } from "../components/AppContextMenu";
 import { ModuleListRow } from "../components/ModuleCard";
-import { filterModulesByQuery, readRecentModuleKeys } from "../lib/recentModules";
+import { filterModulesByQuery, readRecentModuleKeys, removeRecentModule } from "../lib/recentModules";
 import { availableWidgets } from "../lib/homeWidgets";
 import { useHomeWidgetPrefs } from "../hooks/useHomeWidgetPrefs";
 import { HomeHeader } from "./home/HomeHeader";
@@ -16,7 +16,7 @@ import { HomeWidgetBoard, HomeWidgetCustomizer } from "./home/HomeWidgetBoard";
 import { HOME_WIDGETS } from "./home/widgets/registry";
 
 const RECENT_LIMIT = 6;
-const COMPACT_GRID = "grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
+const COMPACT_GRID = "grid grid-cols-2 gap-2.5 lg:grid-cols-3 2xl:grid-cols-4";
 const FEATURED_GRID = "grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5";
 
 function isTypingTarget(el) {
@@ -64,7 +64,7 @@ export function HomeScreen() {
   } = useModuleLauncher(availableModules);
 
   const [query, setQuery] = useState("");
-  const [recentKeys] = useState(readRecentModuleKeys);
+  const [recentKeys, setRecentKeys] = useState(readRecentModuleKeys);
   const searchRef = useRef(null);
 
   const firstName = userProfile?.firstName ?? userProfile?.displayName ?? "tú";
@@ -154,6 +154,10 @@ export function HomeScreen() {
         onQueryKeyDown={handleQueryKeyDown}
         recentModules={recentModules}
         onLaunch={launch}
+        onRemoveRecent={(key) => {
+          removeRecentModule(key);
+          setRecentKeys((keys) => keys.filter((k) => k !== key));
+        }}
         isOfflineBlocked={isOfflineBlocked}
         actions={
           <HomeWidgetCustomizer

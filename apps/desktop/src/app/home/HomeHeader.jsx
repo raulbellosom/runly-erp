@@ -35,6 +35,7 @@ export const HomeHeader = forwardRef(function HomeHeader(
     onQueryKeyDown,
     recentModules,
     onLaunch,
+    onRemoveRecent,
     isOfflineBlocked,
     actions,
   },
@@ -114,6 +115,7 @@ export const HomeHeader = forwardRef(function HomeHeader(
                 key={module.key}
                 module={module}
                 onClick={() => onLaunch(module)}
+                onRemove={onRemoveRecent}
                 isOfflineBlocked={isOfflineBlocked(module)}
               />
             ))}
