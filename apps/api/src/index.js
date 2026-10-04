@@ -527,6 +527,16 @@ function forbiddenMessage(permissionKey) {
   return `No tienes permisos para ${label}.`;
 }
 
+// Builder-generated module routes (and hand-written ones copied from them)
+// read the company as userContext.memberships[0]. With several companies that
+// was an arbitrary one, so module records were written to and read from the
+// wrong company: keep the request's active company first.
+function activeMembershipFirst(memberships, companyId) {
+  if (!Array.isArray(memberships) || !companyId) return memberships;
+  const index = memberships.findIndex((membership) => membership?.companyId === companyId);
+  return index > 0 ? [memberships[index], ...memberships.filter((_, i) => i !== index)] : memberships;
+}
+
 function requirePermission(permissionKey) {
   return async (c, next) => {
     const context = await getOrLoadUserContext(c);
@@ -541,7 +551,7 @@ function requirePermission(permissionKey) {
     const { tenant } = resolved;
     c.set("companyId", tenant.companyId);
     c.set("tenantContext", tenant);
-    c.set("userContext", { ...context, isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
+    c.set("userContext", { ...context, memberships: activeMembershipFirst(context.memberships, tenant.companyId), isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
     c.set("userId", context.profile.id);
     if (tenant.isAdmin || tenant.permissionSet.has(permissionKey)) {
       await next();
@@ -565,7 +575,7 @@ function requireAnyPermission(permissionKeys = []) {
     const { tenant } = resolved;
     c.set("companyId", tenant.companyId);
     c.set("tenantContext", tenant);
-    c.set("userContext", { ...context, isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
+    c.set("userContext", { ...context, memberships: activeMembershipFirst(context.memberships, tenant.companyId), isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
     c.set("userId", context.profile.id);
     if (tenant.isAdmin) {
       await next();
@@ -628,7 +638,7 @@ function requireModuleAccess(moduleKey) {
     const { tenant } = resolved;
     c.set("companyId", tenant.companyId);
     c.set("tenantContext", tenant);
-    c.set("userContext", { ...context, isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
+    c.set("userContext", { ...context, memberships: activeMembershipFirst(context.memberships, tenant.companyId), isAdmin: tenant.isAdmin, permissionSet: tenant.permissionSet });
     const moduleRow = await prisma.runlyModule.findUnique({
       where: { key: moduleKey },
       select: {
