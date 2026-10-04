@@ -25,6 +25,7 @@ import { MODULE_SIDEBAR_SLOTS } from './sidebar-slots.js'
 import { useModuleNavBadges } from './useModuleNavBadges.js'
 import { useServiceWorkerNotifications } from './useServiceWorkerNotifications.js'
 import { useHelpTip } from './useHelpTip.js'
+import { RecordConnectionsButton } from '../shell/connections/RecordConnectionsButton.jsx'
 
 const MiraiSidebarHost = lazy(() =>
   import("../modules/runly.chat/components/MiraiSidebarHost.jsx").then((m) => ({ default: m.MiraiSidebarHost })),
@@ -289,9 +290,12 @@ export function RunlyApp() {
             {/* MirAI docks next to <main> (below the top bar); <main> stays the
                 page scroll container. */}
             <div className="flex flex-1 min-h-0 min-w-0">
-              <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-clip scrollbar-gutter-stable">
-                <Outlet />
-              </main>
+              <div className="relative flex flex-1 min-w-0 min-h-0">
+                <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-clip scrollbar-gutter-stable">
+                  <Outlet />
+                </main>
+                <RecordConnectionsButton />
+              </div>
               <Suspense fallback={null}>
                 <MiraiSidebarHost />
               </Suspense>

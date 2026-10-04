@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { useActiveCompany } from '../../company/ActiveCompanyProvider'
 import { runly } from '../../lib/runly'
 import { displayValue } from './connectionFormat.js'
+import { useRegisterConnectionSlot } from './recordConnectionTarget.js'
 
 // Read-only connection sections on a core record's detail (spec
 // 2026-10-03-rme3-module-platform-v2 §8.2): `fields` as a two-column grid,
@@ -35,7 +36,10 @@ function FieldsGrid({ fields, values }) {
   )
 }
 
-export function ConnectionSections({ targetType, targetId }) {
+// `asSlot={false}` when rendered by the shell's RecordConnectionsButton, so it
+// does not count as the screen's own slot.
+export function ConnectionSections({ targetType, targetId, asSlot = true }) {
+  useRegisterConnectionSlot(asSlot)
   const { session } = useAuth()
   const { activeCompanyId } = useActiveCompany()
   const token = session?.access_token
