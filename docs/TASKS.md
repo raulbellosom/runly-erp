@@ -1726,6 +1726,14 @@ Spec: `docs/superpowers/specs/2026-10-03-records-trash-design.md` · Plan: `docs
 - [x] Owner: "Sincronizar módulos" once so the new permissions exist for role assignment. Done by the owner 2026-10-04 (POST /modules/sync 200).
 - [x] More providers: calendar events (company through the calendar), fleet vehicles + drivers, document templates + generated documents, files (through files-service: restricted access respected, storage object removed on purge, Office files keep their history and cannot be purged); optional per-provider purge permission (`files.assets.delete`); sidebar entry also in fullscreen modules (Calendario). Not applicable: Canvas (boards are deleted, archiving retired) and Compras (status workflow, no deactivation). Verified: 2026-10-04 (backend E2E 13/13, Playwright: entry in Flota/Calendario/Documentos/Archivos)
 
+## Desactivados v2 — dependents, unlink, automatic purge, Canvas (2026-10-04)
+
+Spec: `docs/superpowers/specs/2026-10-04-trash-retention-conflicts-design.md` · Plan: `docs/superpowers/plans/2026-10-04-trash-retention-conflicts.md`
+
+- [x] What uses a record (`trash-dependents.js`, database FKs: cascade / cleared / unlinkable / blocking incl. Connections locks), `GET /trash/:provider/items/:id/dependents`, purge with `unlink` in one transaction (`trash-purge.js`); purge dialog lists them with "Desvincular y eliminar". Verified: 2026-10-04 (unit, integration against PostgreSQL rolled back 2/2, Playwright)
+- [x] Automatic purge per company (`InstanceConfig trash.retentionDays.<companyId>`, default 90 by owner decision; 30/60/90/180/never), selector in Desactivados, worker every 12 h with unlink-if-possible and an audit summary; grace start `trash.retention.since` so nothing deactivated before rollout is purged without the full retention; Archivos excluded from automatic purge. Verified: 2026-10-04 (unit 3/3 incl. grace; backend E2E V7-V9)
+- [x] Canvas: "Eliminar Board" archives; Canvas > Desactivados restores or purges (full board deletion as owner). Verified: 2026-10-04 (backend E2E V1-V6, Playwright X1-X4, canvas route tests 87/87)
+
 ## RME3 Module Platform v2 (2026-10-03)
 
 Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · Plan: `docs/superpowers/plans/2026-10-03-rme3-module-platform-v2.md`

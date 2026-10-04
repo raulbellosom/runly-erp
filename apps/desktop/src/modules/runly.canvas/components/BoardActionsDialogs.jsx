@@ -71,7 +71,7 @@ export function BoardActionsDialogs({ board, mode, onClose, onDeleted }) {
           <DialogHeader>
             <DialogTitle>Eliminar «{board.name}»</DialogTitle>
             <DialogDescription>
-              Se eliminarán sus páginas, elementos, hotspots, versiones, comentarios, enlaces públicos y archivos. Esta acción no se puede deshacer.
+              El Board sale de tu lista y deja de abrirse. Podrás restaurarlo o eliminarlo definitivamente, con sus páginas, elementos y archivos, en Canvas › Desactivados.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5 py-1">

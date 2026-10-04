@@ -3,13 +3,15 @@
 // (two confirmations). Rendered by ModuleOutlet for /<module>/desactivados.
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, DataTable, EmptyState, PageHeader, SelectField, TextField } from '@runly/ui'
+import { Button, DataTable, EmptyState, PageHeader, SelectField, TextField } from '@runly/ui'
 import { Archive, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../auth/AuthProvider'
 import { useActiveCompany } from '../../company/ActiveCompanyProvider'
 import { runly } from '../../lib/runly'
 import { useTrashProviders } from './useTrashProviders'
+import { PurgeDialog } from './PurgeDialog'
+import { RetentionControl } from './RetentionControl'
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
@@ -59,12 +61,16 @@ export function TrashScreen({ moduleKey, moduleName }) {
     onError: (error) => toast.error('No se pudo reactivar', { description: error.message }),
   })
   const remove = useMutation({
-    mutationFn: async (row) => {
-      const result = await runly.trash.purge(providerId, row.id, token)
+    mutationFn: async ({ row, unlink }) => {
+      const result = await runly.trash.purge(providerId, row.id, token, { unlink })
       if (result?.error) throw new Error(result.error)
       return result.data
     },
-    onSuccess: (data) => { toast.success(`${data.label || 'El registro'} se eliminó definitivamente`); refresh() },
+    onSuccess: (data) => {
+      toast.success(`${data.label || 'El registro'} se eliminó definitivamente`, data.unlinked ? { description: `${data.unlinked} registro(s) quedaron sin ese dato.` } : undefined)
+      setPurge({ row: null, step: 0 })
+      refresh()
+    },
     onError: (error) => toast.error('No se pudo eliminar', { description: error.message }),
   })
 
@@ -102,6 +108,7 @@ export function TrashScreen({ moduleKey, moduleName }) {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <PageHeader eyebrow={moduleName} title="Desactivados" description={description} />
+      <RetentionControl />
       <div className={providers.length > 1 ? 'grid gap-3 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)]' : 'max-w-xl'}>
         {providers.length > 1 && (
           <SelectField
@@ -128,22 +135,13 @@ export function TrashScreen({ moduleKey, moduleName }) {
       {(itemsQuery.data?.total ?? 0) > (itemsQuery.data?.items?.length ?? 0) && (
         <p className="text-xs text-[hsl(var(--muted-foreground))]">Mostrando los {itemsQuery.data.items.length} más recientes de {itemsQuery.data.total}. Usa la búsqueda para encontrar otros.</p>
       )}
-      <ConfirmDialog
-        open={purge.step === 1}
+      <PurgeDialog
+        row={purge.row}
+        providerId={providerId}
+        token={token}
+        pending={remove.isPending}
         onOpenChange={(open) => !open && setPurge({ row: null, step: 0 })}
-        title="Eliminar definitivamente"
-        description={`"${purge.row?.label || 'Este registro'}" se borrará para siempre. Si otros registros dependen de él, no se eliminará.`}
-        confirmLabel="Continuar"
-        onConfirm={() => setPurge((current) => ({ ...current, step: 2 }))}
-      />
-      <ConfirmDialog
-        open={purge.step === 2}
-        onOpenChange={(open) => !open && setPurge({ row: null, step: 0 })}
-        title="¿Eliminar para siempre?"
-        description="Esta acción no se puede deshacer."
-        confirmLabel="Eliminar definitivamente"
-        loading={remove.isPending}
-        onConfirm={() => { remove.mutate(purge.row); setPurge({ row: null, step: 0 }) }}
+        onConfirm={({ unlink }) => remove.mutate({ row: purge.row, unlink })}
       />
     </div>
   )

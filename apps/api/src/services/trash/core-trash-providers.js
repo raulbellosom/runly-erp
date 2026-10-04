@@ -7,7 +7,7 @@ import { TrashError, TrashInUseError, isForeignKeyViolation } from './trash-erro
 const PAGE_SIZE = 25
 
 // scope: where-fragment that ties a row to the company (default: its own companyId column).
-export function prismaProvider({ id, moduleKey, moduleName, label, pluralLabel, restorePermission, purgePermission = null, delegate, toLabel, searchWhere, select, scope = (companyId) => ({ companyId }) }) {
+export function prismaProvider({ id, table, moduleKey, moduleName, label, pluralLabel, restorePermission, purgePermission = null, delegate, toLabel, searchWhere, select, scope = (companyId) => ({ companyId }) }) {
   const where = (companyId, extra = {}) => ({ ...scope(companyId), enabled: false, ...extra })
   const find = async (prisma, companyId, recordId) => {
     const row = await prisma[delegate].findFirst({ where: where(companyId, { id: recordId }), select })
@@ -15,9 +15,14 @@ export function prismaProvider({ id, moduleKey, moduleName, label, pluralLabel, 
     return row
   }
   return {
-    id, moduleKey, moduleName, label, pluralLabel,
+    id, table, transactional: true, moduleKey, moduleName, label, pluralLabel,
     permissions: { restore: restorePermission, purge: purgePermission },
     count: ({ prisma, companyId }) => prisma[delegate].count({ where: where(companyId) }),
+    // Ids deactivated (last changed) before `before`, for the automatic purge.
+    async expired({ prisma, companyId }, before, limit = 200) {
+      const rows = await prisma[delegate].findMany({ where: where(companyId, { updatedAt: { lt: before } }), select: { id: true }, orderBy: { updatedAt: 'asc' }, take: limit })
+      return rows.map((row) => row.id)
+    },
     async list({ prisma, companyId }, { search = '', page = 1 } = {}) {
       const term = String(search ?? '').trim()
       const filter = where(companyId, term ? searchWhere(term) : {})
@@ -49,21 +54,21 @@ export const contains = (term) => ({ contains: term, mode: 'insensitive' })
 
 export const CORE_TRASH_PROVIDERS = Object.freeze([
   prismaProvider({
-    id: 'runly.inventory:item', moduleKey: 'runly.inventory', moduleName: 'Inventario',
+    id: 'runly.inventory:item', table: 'inv_item', moduleKey: 'runly.inventory', moduleName: 'Inventario',
     label: 'Artículo', pluralLabel: 'Artículos', restorePermission: 'inventory.item.delete', delegate: 'invItem',
     select: { id: true, name: true, assetTag: true, updatedAt: true },
     toLabel: (row) => [row.name, row.assetTag].filter(Boolean).join(' · '),
     searchWhere: (term) => ({ OR: [{ name: contains(term) }, { assetTag: contains(term) }] }),
   }),
   prismaProvider({
-    id: 'runly.contacts:contact', moduleKey: 'runly.contacts', moduleName: 'Contactos',
+    id: 'runly.contacts:contact', table: 'contact', moduleKey: 'runly.contacts', moduleName: 'Contactos',
     label: 'Contacto', pluralLabel: 'Contactos', restorePermission: 'contacts.contacts.update', delegate: 'contact',
     select: { id: true, name: true, updatedAt: true },
     toLabel: (row) => row.name,
     searchWhere: (term) => ({ name: contains(term) }),
   }),
   prismaProvider({
-    id: 'runly.hr:employee', moduleKey: 'runly.hr', moduleName: 'Recursos humanos',
+    id: 'runly.hr:employee', table: 'hr_employee', moduleKey: 'runly.hr', moduleName: 'Recursos humanos',
     label: 'Colaborador', pluralLabel: 'Colaboradores', restorePermission: 'hr.employee.delete', delegate: 'hrEmployee',
     select: { id: true, firstName: true, lastName: true, employeeCode: true, updatedAt: true },
     toLabel: (row) => [`${row.firstName ?? ''} ${row.lastName ?? ''}`.trim(), row.employeeCode].filter(Boolean).join(' · '),

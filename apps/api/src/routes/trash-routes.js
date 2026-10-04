@@ -5,18 +5,21 @@ import { Hono } from "hono";
 import { tenantActiveContext } from "../lib/active-context.js";
 import { createTrashRegistry, can, PURGE_PERMISSION } from "../services/trash/trash-registry.js";
 import { TrashError } from "../services/trash/trash-errors.js";
+import { findDependents } from "../services/trash/trash-dependents.js";
+import { purgeWithDependents } from "../services/trash/trash-purge.js";
+import { RETENTION_OPTIONS, getRetentionDays, setRetentionDays } from "../services/trash/trash-retention.js";
 
 function fail(c, error, fallback) {
-  if (error instanceof TrashError) return c.json({ error: error.message, code: error.code }, error.status);
+  if (error instanceof TrashError) return c.json({ error: error.message, code: error.code, details: error.details ?? null }, error.status);
   // Module service errors (files-service access, not found...) keep their status.
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 500) return c.json({ error: error.message }, error.status);
   console.error("[trash]", error?.message ?? error);
   return c.json({ error: fallback }, 500);
 }
 
-export function createTrashRouter({ prisma, requireActiveCompany, filesService = null }) {
+export function createTrashRouter({ prisma, requireActiveCompany, filesService = null, supabaseAdmin = null }) {
   const app = new Hono();
-  const registry = createTrashRegistry({ prisma, filesService });
+  const registry = createTrashRegistry({ prisma, filesService, supabaseAdmin });
   const ctx = (c) => ({
     prisma, companyId: c.get("companyId"), user: c.get("userContext"), actorId: c.get("userId") ?? null,
     // For providers that delegate to a module service (Archivos).
@@ -34,6 +37,27 @@ export function createTrashRouter({ prisma, requireActiveCompany, filesService =
       },
     }).catch((error) => console.error("[trash] audit failed:", error?.message));
   }
+
+  // Automatic purge after N days for the active company (0 = never).
+  app.get("/trash/retention", requireActiveCompany, async (c) => {
+    try {
+      return c.json({ data: { days: await getRetentionDays(prisma, c.get("companyId")), options: RETENTION_OPTIONS, canEdit: can(c.get("userContext"), PURGE_PERMISSION) } });
+    } catch (error) {
+      return fail(c, error, "No se pudo leer la configuración.");
+    }
+  });
+
+  app.put("/trash/retention", requireActiveCompany, async (c) => {
+    try {
+      if (!can(c.get("userContext"), PURGE_PERMISSION)) return c.json({ error: "No tienes permiso para cambiar esta configuración." }, 403);
+      const body = await c.req.json().catch(() => ({}));
+      const days = await setRetentionDays(prisma, c.get("companyId"), Number(body?.days));
+      await prisma.auditLog.create({ data: { companyId: c.get("companyId"), actorId: c.get("userId") ?? null, moduleKey: "runly.core", entityType: "Desactivados", entityId: null, action: "core.records.retention_changed", before: null, after: { days }, metadata: null } }).catch(() => {});
+      return c.json({ data: { days } });
+    } catch (error) {
+      return fail(c, error, "No se pudo guardar la configuración.");
+    }
+  });
 
   app.get("/trash/providers", requireActiveCompany, async (c) => {
     try {
@@ -71,6 +95,17 @@ export function createTrashRouter({ prisma, requireActiveCompany, filesService =
     }
   });
 
+  // What references the record (cascade / cleared / unlinkable / blocking).
+  app.get("/trash/:providerId/items/:id/dependents", requireActiveCompany, async (c) => {
+    try {
+      const { companyId, user } = ctx(c);
+      const provider = await registry.providerFor({ companyId, user, providerId: c.req.param("providerId") });
+      return c.json({ data: provider.table ? await findDependents(prisma, { table: provider.table, id: c.req.param("id") }) : { cascade: [], setNull: [], unlinkable: [], blocking: [] } });
+    } catch (error) {
+      return fail(c, error, "No se pudo revisar qué usa el registro.");
+    }
+  });
+
   app.delete("/trash/:providerId/items/:id", requireActiveCompany, async (c) => {
     try {
       const { companyId, user } = ctx(c);
@@ -78,7 +113,7 @@ export function createTrashRouter({ prisma, requireActiveCompany, filesService =
       if (body?.confirmation !== "ELIMINAR") return c.json({ error: "Confirmación requerida." }, 422);
       const provider = await registry.providerFor({ companyId, user, providerId: c.req.param("providerId") });
       if (!canPurge(user, provider)) return c.json({ error: "No tienes permiso para eliminar registros definitivamente." }, 403);
-      const record = await provider.purge(ctx(c), c.req.param("id"));
+      const { record } = await purgeWithDependents(ctx(c), provider, c.req.param("id"), { unlink: body?.unlink === true });
       await audit(c, provider, "core.records.purged", record);
       return c.json({ data: record });
     } catch (error) {

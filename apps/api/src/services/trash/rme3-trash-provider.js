@@ -41,6 +41,8 @@ export function createRme3TrashProvider({ moduleKey, moduleName, manifest, model
 
   return {
     id: `${moduleKey}:${model.key}`,
+    table,
+    transactional: true,
     moduleKey,
     moduleName,
     label: model.label ?? model.key,
@@ -50,6 +52,14 @@ export function createRme3TrashProvider({ moduleKey, moduleName, manifest, model
     async count({ prisma, companyId }) {
       const [{ count }] = await prisma.$queryRawUnsafe(`SELECT COUNT(*)::int AS count FROM "${table}" WHERE company_id = $1::uuid AND enabled = false`, companyId)
       return count
+    },
+
+    async expired({ prisma, companyId }, before, limit = 200) {
+      const rows = await prisma.$queryRawUnsafe(
+        `SELECT id::text AS id FROM "${table}" WHERE company_id = $1::uuid AND enabled = false AND updated_at < $2 ORDER BY updated_at ASC LIMIT ${Number(limit) || 200}`,
+        companyId, before,
+      )
+      return rows.map((row) => row.id)
     },
 
     async list({ prisma, companyId }, { search = '', page = 1, pageSize = 25 } = {}) {

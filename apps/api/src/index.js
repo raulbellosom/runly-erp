@@ -2395,7 +2395,7 @@ mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }))
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));
 mountWithAuth(app, createRelationTargetsRouter({ relationTargets, requirePermission, requireAnyPermission }));
 mountWithAuth(app, createConnectionsRouter({ prisma, requirePermission, requireAnyPermission }));
-mountWithAuth(app, createTrashRouter({ prisma, requireActiveCompany, filesService }));
+mountWithAuth(app, createTrashRouter({ prisma, requireActiveCompany, filesService, supabaseAdmin }));
 mountWithAuth(app, createIdentityRouter({
   prisma,
   supabaseAdmin,

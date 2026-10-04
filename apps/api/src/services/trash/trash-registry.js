@@ -5,6 +5,7 @@
 import { CORE_TRASH_PROVIDERS } from './core-trash-providers.js'
 import { createRme3TrashProvider } from './rme3-trash-provider.js'
 import { MORE_TRASH_PROVIDERS, createFilesTrashProvider } from './more-trash-providers.js'
+import { createCanvasTrashProvider } from './canvas-trash-provider.js'
 import { TrashError } from './trash-errors.js'
 
 export const PURGE_PERMISSION = 'core.records.purge'
@@ -13,8 +14,8 @@ export function can(user, permission) {
   return Boolean(user?.isAdmin || user?.permissionSet?.has?.(permission))
 }
 
-export function createTrashRegistry({ prisma, filesService = null }) {
-  const builtIn = [...CORE_TRASH_PROVIDERS, ...MORE_TRASH_PROVIDERS, createFilesTrashProvider({ filesService })].filter(Boolean)
+export function createTrashRegistry({ prisma, filesService = null, supabaseAdmin = null }) {
+  const builtIn = [...CORE_TRASH_PROVIDERS, ...MORE_TRASH_PROVIDERS, createFilesTrashProvider({ filesService }), createCanvasTrashProvider({ prisma, supabaseAdmin })].filter(Boolean)
   async function allProviders(companyId) {
     const modules = await prisma.runlyModule.findMany({
       where: { status: 'INSTALLED', enabled: true },
@@ -47,5 +48,5 @@ export function createTrashRegistry({ prisma, filesService = null }) {
     return provider
   }
 
-  return { providersFor, providerFor }
+  return { providersFor, providerFor, allProviders }
 }

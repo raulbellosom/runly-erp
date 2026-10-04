@@ -10,6 +10,8 @@ import { createCalendarNotificationService } from '../../api/src/routes/calendar
 import { createSyncLogCleanupWorker } from '../../api/src/services/sync-cleanup-worker.js'
 import { createModuleBackupService } from '../../api/src/services/module-backup-service.js'
 import { createDomainEventDispatcher } from '../../api/src/services/domain-events/dispatcher.js'
+import { createTrashRegistry } from '../../api/src/services/trash/trash-registry.js'
+import { runAutoPurge } from '../../api/src/services/trash/trash-retention.js'
 import { resolveModulesDir } from '../../api/src/services/module-upload-service.js'
 import { resolveGoogleCalendarConfig } from '../../api/src/routes/calendar/google/google-config.js'
 import { createGoogleTokenCrypto } from '../../api/src/routes/calendar/google/google-token-crypto.js'
@@ -79,6 +81,8 @@ const SYNC_CLEANUP_INTERVAL_MS = syncCleanupWorker.SYNC_CLEANUP_INTERVAL_MS
 const moduleBackupService = createModuleBackupService({ prisma })
 const domainEventDispatcher = createDomainEventDispatcher({ prisma, resolveModulesDir })
 const DOMAIN_EVENTS_INTERVAL_MS = Number(process.env.RUNLY_DOMAIN_EVENTS_INTERVAL_MS ?? 15_000)
+const trashRegistry = createTrashRegistry({ prisma, supabaseAdmin: workerSupabaseAdmin })
+const TRASH_RETENTION_INTERVAL_MS = Number(process.env.RUNLY_TRASH_RETENTION_INTERVAL_MS ?? 12 * 60 * 60 * 1000)
 const projectsNotifService = createProjectsNotificationService({
   prisma,
   notificationService: createNotificationService({ prisma }),
@@ -173,7 +177,7 @@ async function reconnect() {
 // (slow SMTP, dead push endpoints) or when two worker processes overlap. A
 // per-tick in-flight flag keeps a single process from processing the same rows
 // twice; the delivery worker's atomic claim covers the multi-process case.
-const tickRunning = { calendar: false, delivery: false, tasksDueSoon: false, domainEvents: false }
+const tickRunning = { calendar: false, delivery: false, tasksDueSoon: false, domainEvents: false, trashRetention: false }
 
 async function runCalendarReminderTick() {
   if (tickRunning.calendar) return
@@ -214,6 +218,23 @@ async function runDeliveryTick() {
     if (isConnectionError(err)) await reconnect()
   } finally {
     tickRunning.delivery = false
+  }
+}
+
+// Purges records deactivated longer than each company's retention (Desactivados).
+async function runTrashRetentionTick() {
+  if (tickRunning.trashRetention) return
+  tickRunning.trashRetention = true
+  try {
+    const summary = await runAutoPurge({ prisma, registry: trashRegistry })
+    const purged = summary.reduce((sum, row) => sum + row.purged, 0)
+    const skipped = summary.reduce((sum, row) => sum + row.skipped, 0)
+    if (purged || skipped) console.log(`[worker] desactivados ${formatLogTimestamp()} purged=${purged} skipped=${skipped}`)
+  } catch (err) {
+    console.error('[worker] desactivados retention tick failed:', err?.message ?? err)
+    if (isConnectionError(err)) await reconnect()
+  } finally {
+    tickRunning.trashRetention = false
   }
 }
 
@@ -344,6 +365,10 @@ setInterval(() => {
 setInterval(() => {
   runDomainEventsTick()
 }, DOMAIN_EVENTS_INTERVAL_MS)
+setTimeout(runTrashRetentionTick, 60_000)
+setInterval(() => {
+  runTrashRetentionTick()
+}, TRASH_RETENTION_INTERVAL_MS)
 runTasksDueSoonTick()
 setInterval(() => {
   runTasksDueSoonTick()

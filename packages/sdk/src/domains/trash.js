@@ -11,6 +11,10 @@ export function createTrashDomain({ request, withAuthHeaders, toQueryString }) {
     providers: (moduleKey, token) => send('GET', `/trash/providers${toQueryString({ moduleKey })}`, undefined, token),
     items: (providerId, { search, page } = {}, token) => send('GET', `/trash/${id(providerId)}/items${toQueryString({ search, page })}`, undefined, token),
     restore: (providerId, recordId, token) => send('POST', `/trash/${id(providerId)}/items/${id(recordId)}/restore`, {}, token),
-    purge: (providerId, recordId, token) => send('DELETE', `/trash/${id(providerId)}/items/${id(recordId)}`, { confirmation: 'ELIMINAR' }, token),
+    // unlink: clear nullable references that point to the record (see dependents).
+    purge: (providerId, recordId, token, { unlink = false } = {}) => send('DELETE', `/trash/${id(providerId)}/items/${id(recordId)}`, { confirmation: 'ELIMINAR', unlink }, token),
+    dependents: (providerId, recordId, token) => send('GET', `/trash/${id(providerId)}/items/${id(recordId)}/dependents`, undefined, token),
+    retention: (token) => send('GET', '/trash/retention', undefined, token),
+    setRetention: (days, token) => send('PUT', '/trash/retention', { days }, token),
   }
 }

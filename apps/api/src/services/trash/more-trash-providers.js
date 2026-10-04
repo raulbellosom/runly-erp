@@ -9,7 +9,7 @@ const dateLabel = (value) => (value ? new Date(value).toLocaleDateString('es-MX'
 
 export const MORE_TRASH_PROVIDERS = Object.freeze([
   prismaProvider({
-    id: 'runly.calendar:event', moduleKey: 'runly.calendar', moduleName: 'Calendario',
+    id: 'runly.calendar:event', table: 'calendar_event', moduleKey: 'runly.calendar', moduleName: 'Calendario',
     label: 'Evento', pluralLabel: 'Eventos', restorePermission: 'calendar.events.delete', delegate: 'calendarEvent',
     scope: (companyId) => ({ calendar: { companyId } }),
     select: { id: true, title: true, startAt: true, updatedAt: true },
@@ -17,28 +17,28 @@ export const MORE_TRASH_PROVIDERS = Object.freeze([
     searchWhere: (term) => ({ title: contains(term) }),
   }),
   prismaProvider({
-    id: 'runly.fleet:vehicle', moduleKey: 'runly.fleet', moduleName: 'Flota',
+    id: 'runly.fleet:vehicle', table: 'fleet_vehicle', moduleKey: 'runly.fleet', moduleName: 'Flota',
     label: 'Vehículo', pluralLabel: 'Vehículos', restorePermission: 'fleet.vehicles.delete', delegate: 'fleetVehicle',
     select: { id: true, plate: true, brand: true, modelName: true, updatedAt: true },
     toLabel: (row) => [row.plate, [row.brand, row.modelName].filter(Boolean).join(' ')].filter(Boolean).join(' · '),
     searchWhere: (term) => ({ OR: [{ plate: contains(term) }, { brand: contains(term) }, { modelName: contains(term) }] }),
   }),
   prismaProvider({
-    id: 'runly.fleet:driver', moduleKey: 'runly.fleet', moduleName: 'Flota',
+    id: 'runly.fleet:driver', table: 'fleet_driver', moduleKey: 'runly.fleet', moduleName: 'Flota',
     label: 'Conductor', pluralLabel: 'Conductores', restorePermission: 'fleet.drivers.delete', delegate: 'fleetDriver',
     select: { id: true, firstName: true, lastName: true, updatedAt: true },
     toLabel: (row) => `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim(),
     searchWhere: (term) => ({ OR: [{ firstName: contains(term) }, { lastName: contains(term) }] }),
   }),
   prismaProvider({
-    id: 'runly.documents:template', moduleKey: 'runly.documents', moduleName: 'Documentos',
+    id: 'runly.documents:template', table: 'document_template', moduleKey: 'runly.documents', moduleName: 'Documentos',
     label: 'Plantilla', pluralLabel: 'Plantillas', restorePermission: 'documents.templates.delete', delegate: 'documentTemplate',
     select: { id: true, name: true, updatedAt: true },
     toLabel: (row) => row.name,
     searchWhere: (term) => ({ name: contains(term) }),
   }),
   prismaProvider({
-    id: 'runly.documents:generated', moduleKey: 'runly.documents', moduleName: 'Documentos',
+    id: 'runly.documents:generated', table: 'generated_document', moduleKey: 'runly.documents', moduleName: 'Documentos',
     label: 'Documento generado', pluralLabel: 'Documentos generados', restorePermission: 'documents.generated.delete', delegate: 'generatedDocument',
     select: { id: true, createdAt: true, updatedAt: true, template: { select: { name: true } } },
     toLabel: (row) => [row.template?.name ?? 'Documento', dateLabel(row.createdAt)].filter(Boolean).join(' · '),
@@ -53,7 +53,7 @@ export function createFilesTrashProvider({ filesService }) {
   if (!filesService) return null
   const call = (ctx, extra) => ({ authUserId: ctx.authUserId, activeContext: ctx.activeContext, ...extra })
   return {
-    id: 'runly.files:file', moduleKey: 'runly.files', moduleName: 'Archivos',
+    id: 'runly.files:file', table: 'file_asset', transactional: false, autoPurge: false, moduleKey: 'runly.files', moduleName: 'Archivos',
     label: 'Archivo', pluralLabel: 'Archivos',
     permissions: { restore: 'files.assets.update', purge: 'files.assets.delete' },
     async count(ctx) {
