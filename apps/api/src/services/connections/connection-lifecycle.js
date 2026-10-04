@@ -217,5 +217,44 @@ export function createConnectionLifecycle({ prisma }) {
     return { rebuilt }
   }
 
-  return { syncModuleConnections, onModuleUninstalled, onModulePurged, onModuleReset, onCompanyRemoved, rebuildIndex, resolveDeclared }
+  // A company created after a module was installed has no rows yet (sync only
+  // covers the companies that existed then): add them as pending. Only for
+  // connections already synced (their FK/trigger objects exist).
+  async function ensureCompanyConnections({ companyId, db = prisma }) {
+    const modules = (await db.runlyModule.findMany({ where: { status: 'INSTALLED' }, select: { id: true, key: true, manifest: true, version: true } }))
+      .filter((mod) => Array.isArray(mod.manifest?.connections) && mod.manifest.connections.length)
+    if (!modules.length) return { created: 0 }
+    const [existing, disabled] = await Promise.all([
+      db.moduleConnection.findMany({ where: { companyId }, select: { moduleKey: true, connectionKey: true } }),
+      db.companyModule.findMany({ where: { companyId, enabled: false }, select: { moduleId: true } }),
+    ])
+    const have = new Set(existing.map((row) => `${row.moduleKey}:${row.connectionKey}`))
+    const off = new Set(disabled.map((row) => row.moduleId))
+    let created = 0
+    for (const mod of modules) {
+      if (off.has(mod.id) || mod.manifest.connections.every((c) => have.has(`${mod.key}:${c.key}`))) continue
+      const models = (await db.runlyModel.findMany({ where: { moduleKey: mod.key }, select: { schema: true } })).map((m) => m.schema)
+      let resolved = []
+      try { resolved = resolveDeclared(mod.key, mod.manifest, models) } catch { continue }
+      for (const { connection, spec } of resolved) {
+        if (have.has(`${mod.key}:${connection.key}`)) continue
+        const synced = await db.moduleConnection.findFirst({ where: { moduleKey: mod.key, connectionKey: connection.key }, select: { id: true } })
+        if (!synced) continue
+        try {
+          await db.moduleConnection.create({
+            data: {
+              companyId, moduleKey: mod.key, connectionKey: connection.key, status: 'pending', fieldConfig: defaultFieldConfig(connection),
+              kind: connection.kind, targetType: connection.target, sourceEntity: connection.entity, sourceTable: spec.sourceTable, offeredVersion: mod.version ?? null,
+            },
+          })
+          created += 1
+        } catch (error) {
+          if (error?.code !== 'P2002') throw error
+        }
+      }
+    }
+    return { created }
+  }
+
+  return { syncModuleConnections, ensureCompanyConnections, onModuleUninstalled, onModulePurged, onModuleReset, onCompanyRemoved, rebuildIndex, resolveDeclared }
 }

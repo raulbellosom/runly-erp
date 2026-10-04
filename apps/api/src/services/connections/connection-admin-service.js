@@ -2,7 +2,7 @@
 // §8.2): every connection declared to a target type for the company (pending,
 // active, disabled), with what the module offers and the admin's choices.
 import { normalizeConnection } from '@runly/module-engine'
-import { reconcileFieldConfig } from './connection-lifecycle.js'
+import { createConnectionLifecycle, reconcileFieldConfig } from './connection-lifecycle.js'
 
 export class ConnectionAdminError extends Error {
   constructor(message, status) {
@@ -14,7 +14,9 @@ export class ConnectionAdminError extends Error {
 const SURFACES = ['form', 'detail', 'column', 'search']
 
 export function createConnectionAdminService({ prisma }) {
+  const lifecycle = createConnectionLifecycle({ prisma })
   async function listForAdmin({ companyId, targetType }) {
+    await lifecycle.ensureCompanyConnections({ companyId })
     const rows = await prisma.moduleConnection.findMany({
       where: { companyId, targetType },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
