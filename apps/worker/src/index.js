@@ -9,6 +9,8 @@ import { createNotificationDeliveryWorker } from '../../api/src/services/notific
 import { createCalendarNotificationService } from '../../api/src/routes/calendar/calendar-notification-service.js'
 import { createSyncLogCleanupWorker } from '../../api/src/services/sync-cleanup-worker.js'
 import { createModuleBackupService } from '../../api/src/services/module-backup-service.js'
+import { createDomainEventDispatcher } from '../../api/src/services/domain-events/dispatcher.js'
+import { resolveModulesDir } from '../../api/src/services/module-upload-service.js'
 import { resolveGoogleCalendarConfig } from '../../api/src/routes/calendar/google/google-config.js'
 import { createGoogleTokenCrypto } from '../../api/src/routes/calendar/google/google-token-crypto.js'
 import { createGoogleCalendarConnectionService } from '../../api/src/routes/calendar/google/google-connection-service.js'
@@ -75,6 +77,8 @@ const DELIVERY_INTERVAL_MS = Number(process.env.RUNLY_NOTIFICATION_DELIVERY_INTE
 const syncCleanupWorker = createSyncLogCleanupWorker({ prisma })
 const SYNC_CLEANUP_INTERVAL_MS = syncCleanupWorker.SYNC_CLEANUP_INTERVAL_MS
 const moduleBackupService = createModuleBackupService({ prisma })
+const domainEventDispatcher = createDomainEventDispatcher({ prisma, resolveModulesDir })
+const DOMAIN_EVENTS_INTERVAL_MS = Number(process.env.RUNLY_DOMAIN_EVENTS_INTERVAL_MS ?? 15_000)
 const projectsNotifService = createProjectsNotificationService({
   prisma,
   notificationService: createNotificationService({ prisma }),
@@ -169,7 +173,7 @@ async function reconnect() {
 // (slow SMTP, dead push endpoints) or when two worker processes overlap. A
 // per-tick in-flight flag keeps a single process from processing the same rows
 // twice; the delivery worker's atomic claim covers the multi-process case.
-const tickRunning = { calendar: false, delivery: false, tasksDueSoon: false }
+const tickRunning = { calendar: false, delivery: false, tasksDueSoon: false, domainEvents: false }
 
 async function runCalendarReminderTick() {
   if (tickRunning.calendar) return
@@ -210,6 +214,21 @@ async function runDeliveryTick() {
     if (isConnectionError(err)) await reconnect()
   } finally {
     tickRunning.delivery = false
+  }
+}
+
+// Delivers domain events (domain_event_outbox) to subscribed modules.
+async function runDomainEventsTick() {
+  if (tickRunning.domainEvents) return
+  tickRunning.domainEvents = true
+  try {
+    const result = await domainEventDispatcher.processDue()
+    if (result.delivered || result.failed) console.log(`[worker] domain events ${formatLogTimestamp()} delivered=${result.delivered} failed=${result.failed}`)
+  } catch (err) {
+    console.error('[worker] domain events tick failed:', err?.message ?? err)
+    if (isConnectionError(err)) await reconnect()
+  } finally {
+    tickRunning.domainEvents = false
   }
 }
 
@@ -322,6 +341,9 @@ runModuleBackupCleanupTick()
 setInterval(() => {
   runModuleBackupCleanupTick()
 }, SYNC_CLEANUP_INTERVAL_MS)
+setInterval(() => {
+  runDomainEventsTick()
+}, DOMAIN_EVENTS_INTERVAL_MS)
 runTasksDueSoonTick()
 setInterval(() => {
   runTasksDueSoonTick()

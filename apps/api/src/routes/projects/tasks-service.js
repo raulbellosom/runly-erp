@@ -1,5 +1,6 @@
 import { createUserAccessService } from '../../services/user-access-service.js'
 import { createProjectFilesService } from './project-files.js'
+import { publishDomainEvent } from '../../services/domain-events/events.js'
 export class TaskServiceError extends Error {
   constructor(message, status = 500) {
     super(message)
@@ -131,7 +132,7 @@ export function createTasksService({ prisma }) {
       orderBy: { position: 'desc' },
     })
     const position = (last?.position ?? -1) + 1
-    return prisma.$transaction(async (tx) => {
+    const task = await prisma.$transaction(async (tx) => {
       let taskNumber = null
       if (!parentTaskId) {
         const updated = await tx.project.update({
@@ -158,6 +159,9 @@ export function createTasksService({ prisma }) {
         },
       })
     })
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } })
+    await publishDomainEvent(prisma, { companyId: project?.companyId, event: 'projects.task.created', payload: { id: task.id, projectId, title: task.title } })
+    return task
   }
 
   async function updateTask(taskId, data) {

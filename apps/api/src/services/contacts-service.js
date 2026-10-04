@@ -6,6 +6,7 @@ import {
 } from "./contacts/contact-children-service.js";
 import { buildAvatarUrlMapByFileIds } from "../lib/avatar-url-map.js";
 import { getSignedUrlByFileId } from "../lib/signed-url-by-file-id.js";
+import { publishDomainEvent } from "./domain-events/events.js";
 
 class ContactsServiceError extends Error {
   constructor(message, status = 500) {
@@ -284,6 +285,7 @@ export function createContactsService({ prisma, supabaseAdmin = null, storageBuc
         if (afterWrite) await afterWrite(tx, contact);
         return contact.id;
       }).catch(rethrowChildrenError);
+      await publishDomainEvent(prisma, { companyId, event: "contacts.contact.created", payload: { id } });
       return prisma.contact.findUnique({ where: { id } });
     },
 

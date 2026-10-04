@@ -5,6 +5,7 @@ import { buildInventoryWhere } from './inventory-query.js';
 import { InventoryServiceError, assertCompany, createRefGuard } from './inventory-guards.js';
 import { createInventoryCatalogService } from './inventory-catalog-service.js';
 import { DEFAULT_LISTED_ADMIN_STATUSES } from './inventory-admin-service.js';
+import { publishDomainEvent } from './domain-events/events.js';
 
 // Operational statuses a user can set by hand; `assigned` only comes from
 // the assign/return flow, bajas from the administrative transitions.
@@ -444,6 +445,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       hint: { verb: 'created', label: created.name },
       companyId,
     }).catch(() => {});
+    await publishDomainEvent(prisma, { companyId, event: 'inventory.item.created', payload: { id: created.id, name: created.name, assetTag: created.assetTag ?? null } });
     return created;
   }
 
@@ -574,6 +576,7 @@ export function createInventoryService({ prisma, activityBridge }) {
         hint: { verb: 'updated', label: result?.name ?? id },
         companyId,
       }).catch(() => {});
+      await publishDomainEvent(prisma, { companyId, event: 'inventory.item.updated', payload: { id, name: result?.name ?? null } });
       return result;
     }
 
@@ -599,6 +602,7 @@ export function createInventoryService({ prisma, activityBridge }) {
       hint: { verb: 'updated', label: updated.name ?? id },
       companyId,
     }).catch(() => {});
+    await publishDomainEvent(prisma, { companyId, event: 'inventory.item.updated', payload: { id, name: updated.name ?? null } });
     return updated;
   }
 
