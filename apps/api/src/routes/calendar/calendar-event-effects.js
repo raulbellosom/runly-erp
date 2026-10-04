@@ -9,6 +9,13 @@ import {
   getActivityContext,
 } from "../../services/activity-publisher.js";
 import { publishNotificationFromContext } from "../../services/notification-publisher.js";
+import { publishDomainEvent } from "../../services/domain-events/events.js";
+
+// Domain event payload (subscribers in api/events.js). Published here so the
+// HTTP routes, MirAI and module services all emit it.
+function eventPayload(event, id = event?.id) {
+  return { id: id ?? null, title: event?.title ?? null, startAt: event?.startAt ?? null, sourceModule: event?.sourceModule ?? null, sourceEntityId: event?.sourceEntityId ?? null };
+}
 
 const TRACKED_FIELDS = ["title", "calendarId", "startDate", "endDate", "allDay", "location", "description", "status"];
 
@@ -75,6 +82,7 @@ export function createCalendarEventEffects({ prisma, broadcaster = null }) {
         },
       });
     }
+    await publishDomainEvent(prisma, { companyId: c.get("companyId"), event: "calendar.event.created", payload: eventPayload(event) });
     broadcast(c, event.id, "created");
   }
 
@@ -123,6 +131,7 @@ export function createCalendarEventEffects({ prisma, broadcaster = null }) {
         },
       });
     }
+    await publishDomainEvent(prisma, { companyId: c.get("companyId"), event: "calendar.event.updated", payload: eventPayload(event) });
     broadcast(c, event.id, "updated");
   }
 
@@ -167,6 +176,7 @@ export function createCalendarEventEffects({ prisma, broadcaster = null }) {
           : undefined,
       });
     }
+    await publishDomainEvent(prisma, { companyId: c.get("companyId"), event: "calendar.event.cancelled", payload: eventPayload(before, eventId) });
     broadcast(c, eventId, "deleted");
   }
 

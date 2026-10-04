@@ -20,3 +20,19 @@ Spec: `docs/superpowers/specs/2026-10-04-module-services-v2-design.md`
   module-compiler), `pnpm lint`, API boot via existing dev server `/health`.
 
 Verified: 2026-10-04 (node --test module-services + module-engine + module-compiler: 252/252 pass; eslint clean on touched files; service catalog imports with 18 handlers matching SERVICE_KEYS. Not verified: real API boot and calls against a running API — dev server on 4010 was down and is not started by agents.)
+
+## Round 2 — ledger, fleet, pfm + phase 2 (spec §6)
+
+- [x] **Task 5 — Contracts.** `number` arg type, 14 ledger/fleet/pfm
+  contracts (`action` names the MirAI action), `system` flags,
+  `IDEMPOTENCY_ARG`.
+- [x] **Task 6 — Handlers.** `action-backed-services.js` (prepare/execute
+  bridge + reads); calendar services now run `createCalendarEventEffects`.
+- [x] **Task 7 — Gateway.** `forSystem`, idempotency through audit metadata,
+  `describe()` exposes `system`; dispatcher passes `services` to handlers;
+  worker builds `createModuleServices`.
+- [x] **Task 8 — Events.** `calendar.event.created|updated|cancelled`,
+  `files.file.created`, `fleet.vehicle.created|updated`.
+- [x] **Task 9 — Docs + verify.**
+
+Verified: 2026-10-04 (node --test module-services + module-engine + module-compiler + domain-events + calendar + fleet + files: 446/446; full apps/api suite 2284 pass / 3 fail — the 3 failures (createTasksService, atlas.growth manifest, storefront contract) fail identically with these changes stashed, so pre-existing; eslint clean on touched files; catalog builds 32 services with every MirAI action found. Not verified: real API/worker run against the database.)

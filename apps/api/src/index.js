@@ -798,7 +798,7 @@ async function resolveCanvasEntityLink({ authUserId, companyId, moduleKey, entit
   return resolved.get(String(entityId)) ?? null;
 }
 
-const moduleServices = createModuleServices({ prisma, filesService });
+const moduleServices = createModuleServices({ prisma, filesService, broadcaster });
 const routeLoader = createRouteLoaderService({
   prisma,
   authMiddleware,

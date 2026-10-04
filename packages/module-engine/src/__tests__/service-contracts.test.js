@@ -37,3 +37,10 @@ test('base64 content is checked for format and decoded size', () => {
   const big = 'A'.repeat(Math.ceil((10 * 1024 * 1024 + 3) / 3) * 4)
   assert.match(validateServiceArgs('runly.files:files.save', { ...base, contentBase64: big }).errors.contentBase64, /MB/)
 })
+
+test('number args accept decimals and numeric strings within bounds', () => {
+  const base = { fecha: '2026-10-04', nombre: 'Pago' }
+  assert.deepEqual(validateServiceArgs('runly.ledger:transactions.create', { ...base, deposito: '120.5' }).value, { ...base, deposito: 120.5 })
+  assert.equal(validateServiceArgs('runly.ledger:transactions.create', { ...base, retiro: -1 }).ok, false)
+  assert.equal(validateServiceArgs('runly.pfm:movements.create', { direction: 'EXPENSE', amount: 0 }).ok, false)
+})

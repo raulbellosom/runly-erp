@@ -10,6 +10,7 @@ import { createCalendarNotificationService } from '../../api/src/routes/calendar
 import { createSyncLogCleanupWorker } from '../../api/src/services/sync-cleanup-worker.js'
 import { createModuleBackupService } from '../../api/src/services/module-backup-service.js'
 import { createDomainEventDispatcher } from '../../api/src/services/domain-events/dispatcher.js'
+import { createModuleServices } from '../../api/src/services/module-services/module-services.js'
 import { createTrashRegistry } from '../../api/src/services/trash/trash-registry.js'
 import { runAutoPurge } from '../../api/src/services/trash/trash-retention.js'
 import { resolveModulesDir } from '../../api/src/services/module-upload-service.js'
@@ -79,7 +80,7 @@ const DELIVERY_INTERVAL_MS = Number(process.env.RUNLY_NOTIFICATION_DELIVERY_INTE
 const syncCleanupWorker = createSyncLogCleanupWorker({ prisma })
 const SYNC_CLEANUP_INTERVAL_MS = syncCleanupWorker.SYNC_CLEANUP_INTERVAL_MS
 const moduleBackupService = createModuleBackupService({ prisma })
-const domainEventDispatcher = createDomainEventDispatcher({ prisma, resolveModulesDir })
+const domainEventDispatcher = createDomainEventDispatcher({ prisma, resolveModulesDir, moduleServices: createModuleServices({ prisma }) })
 const DOMAIN_EVENTS_INTERVAL_MS = Number(process.env.RUNLY_DOMAIN_EVENTS_INTERVAL_MS ?? 15_000)
 const trashRegistry = createTrashRegistry({ prisma, supabaseAdmin: workerSupabaseAdmin })
 const TRASH_RETENTION_INTERVAL_MS = Number(process.env.RUNLY_TRASH_RETENTION_INTERVAL_MS ?? 12 * 60 * 60 * 1000)

@@ -1,6 +1,7 @@
 ﻿import { createFileAccess } from "./files/access.js";
 import { createFileVisibility, describeFile, isFilesOrigin, FILES_ORIGIN_MODULES } from "./files/visibility.js";
 import JSZip from "jszip";
+import { publishDomainEvent } from "./domain-events/events.js";
 import { fileKindWhere } from "./files/query.js";
 import { toLocalIso, getOfficeFormat, OFFICE_FORMATS } from "@runly/core";
 import { signedUrlWithVariant, publicUrlWithVariant } from "../lib/image-variants.js";
@@ -439,6 +440,11 @@ export function createFilesService({ prisma, supabaseAdmin }) {
           },
         },
       });
+
+      // Files-explorer uploads only: module attachments belong to their record.
+      if (filesOrigin) {
+        await publishDomainEvent(prisma, { companyId: context.companyId, event: "files.file.created", payload: { id: asset.id, name: asset.originalName, mimeType: asset.mimeType } });
+      }
 
       return asset;
     },

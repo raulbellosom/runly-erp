@@ -34,7 +34,7 @@ test('runtime capability inventory matches actual ERP externals and integrations
   const externals = bundler.match(/const BUNDLE_EXTERNALS = \[([\s\S]*?)\]/)?.[1]
   assert.ok(externals)
   assert.deepEqual([...externals.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort(), [...RME3_CAPABILITIES.runtime.sharedExternals].sort())
-  const catalog = await readFile(new URL('../../../../apps/api/src/services/module-services/service-catalog.js', import.meta.url), 'utf8')
+  const catalog = (await Promise.all(['service-catalog.js', 'action-backed-services.js'].map((file) => readFile(new URL(`../../../../apps/api/src/services/module-services/${file}`, import.meta.url), 'utf8')))).join('\n')
   assert.deepEqual([...catalog.matchAll(/^    '(runly\.[^']+:[^']+)':/gm)].map((m) => m[1]).sort(), [...SERVICE_KEYS].sort())
   const events = await import('../../../../apps/api/src/services/domain-events/events.js')
   assert.equal(events.DOMAIN_EVENTS, DOMAIN_EVENTS)

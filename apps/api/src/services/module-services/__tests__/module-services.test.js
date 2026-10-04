@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { SERVICE_CONTRACTS } from '@runly/module-engine/contracts'
 import { consumedServiceKeys, createModuleServices } from '../module-services.js'
+import { createActionBackedServices } from '../action-backed-services.js'
 
 function ctx({ companyId = 'c1', isAdmin = false, permissions = [] } = {}) {
   const values = { companyId, userId: 'u1', userContext: { isAdmin, permissionSet: new Set(permissions), profile: { id: 'u1' } } }
@@ -67,6 +69,33 @@ test('tasks.update checks the task belongs to the active company', async () => {
 test('notifications.send needs no permission, only the grant', async () => {
   const api = createModuleServices({ prisma: prismaWithGrants([]) }).forRequest(ctx(), 'custom.crm')
   await assert.rejects(api.call('runly.notifications:notifications.send', { userIds: [ID], title: 'Hola' }), (error) => error.code === 'service_not_granted')
+})
+
+test('forSystem: only system services, grant required, no user permission', async () => {
+  const services = createModuleServices({ prisma: prismaWithGrants(['runly.contacts:contacts.create', 'runly.calendar:events.create']) })
+  const system = services.forSystem('custom.crm', 'c1')
+  await assert.rejects(system.call('runly.calendar:events.create', { title: 'X', startAt: '2026-10-05T10:00:00Z' }), (error) => error.code === 'system_not_supported')
+  // No user: reaches the handler (which validates the name) without a permission check.
+  await assert.rejects(system.call('runly.contacts:contacts.create', { name: 'A' }), /obligatorio/)
+  await assert.rejects(services.forSystem('custom.crm', 'c1').call('runly.inventory:items.update', { id: ID }), (error) => error.code === 'service_not_granted')
+})
+
+test('idempotencyKey returns the audited result instead of writing again', async () => {
+  const prisma = prismaWithGrants(['runly.contacts:contacts.create'])
+  const seen = []
+  prisma.auditLog.findFirst = async ({ where }) => { seen.push(where); return { after: { id: ID, name: 'Ana' } } }
+  const api = createModuleServices({ prisma }).forRequest(ctx({ permissions: ['contacts.contacts.create'] }), 'custom.crm')
+  assert.deepEqual(await api.call('runly.contacts:contacts.create', { name: 'Ana', idempotencyKey: 'evt-1' }), { id: ID, name: 'Ana' })
+  assert.deepEqual(seen[0].metadata, { path: ['idempotencyKey'], equals: 'evt-1' })
+  assert.equal(seen[0].companyId, 'c1')
+})
+
+test('action-backed contracts use the permission of the action they run', () => {
+  const { actions } = createActionBackedServices({ prisma: {}, ServiceError: Error })
+  for (const [key, contract] of Object.entries(SERVICE_CONTRACTS)) {
+    if (!contract.action) continue
+    assert.equal(actions.get(contract.action)?.permission, contract.permission, key)
+  }
 })
 
 test('module() exposes the services of one module as methods', () => {

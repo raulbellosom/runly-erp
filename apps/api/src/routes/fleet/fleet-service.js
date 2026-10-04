@@ -11,6 +11,7 @@ import {
 } from "./service-helpers.js";
 import { createActivityService } from "../../services/activity-service.js";
 import { createActivityBridge } from "../../services/activity-bridge.js";
+import { publishDomainEvent } from "../../services/domain-events/events.js";
 
 const MODULE_KEY = "runly.fleet";
 const UUID_REGEX =
@@ -539,6 +540,7 @@ export function createFleetService({ prisma, activityBridge }) {
         after: row,
         companyId: safeCompanyId,
       });
+      if (row?.id) await publishDomainEvent(prisma, { companyId: safeCompanyId, event: "fleet.vehicle.created", payload: { id: row.id, plate: row.plate ?? null, status: row.status ?? null } });
 
       return row;
     } catch (error) {
@@ -684,6 +686,7 @@ export function createFleetService({ prisma, activityBridge }) {
         after: toFleetVehicleSnapshot(after),
         companyId: safeCompanyId,
       });
+      await publishDomainEvent(prisma, { companyId: safeCompanyId, event: "fleet.vehicle.updated", payload: { id: updated.id, plate: after?.plate ?? updated.plate ?? null, status: after?.status ?? updated.status ?? null } });
 
       return updated;
     } catch (error) {

@@ -3,13 +3,14 @@
 // handles them in `api/events.js`:
 //
 //   export const handlers = {
-//     'inventory.item.updated': async ({ event, payload, companyId, prisma }) => { ... },
+//     'inventory.item.updated': async ({ event, payload, companyId, prisma, services }) => { ... },
 //   }
 //
 // Each row is retried with exponential backoff (1, 2, 4... up to 60 min) and
 // given up after MAX_ATTEMPTS (processed_at set, last_error kept). Events
 // nobody listens to are marked processed right away. Modules disabled for the
-// event's company are skipped.
+// event's company are skipped. `services` is moduleServices.forSystem() bound
+// to the subscriber and the event's company (null when the host gave none).
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -25,7 +26,7 @@ export function subscribersOf(modules, event, disabledModuleIds = new Set()) {
   return modules.filter((mod) => !disabledModuleIds.has(mod.id) && Array.isArray(mod.manifest?.events?.subscribes) && mod.manifest.events.subscribes.includes(event))
 }
 
-export function createDomainEventDispatcher({ prisma, resolveModulesDir, importHandlers = null, now = () => new Date() }) {
+export function createDomainEventDispatcher({ prisma, resolveModulesDir, importHandlers = null, now = () => new Date(), moduleServices = null }) {
   const handlerCache = new Map()
 
   async function defaultImport(moduleKey) {
@@ -48,7 +49,8 @@ export function createDomainEventDispatcher({ prisma, resolveModulesDir, importH
       const handlers = await loadHandlers(mod.key)
       const handler = typeof handlers === 'function' ? handlers : handlers?.[row.event]
       if (typeof handler !== 'function') throw new Error(`${mod.key} se suscribe a ${row.event} pero api/events.js no lo maneja`)
-      await handler({ event: row.event, payload: row.payload, companyId: row.companyId, eventId: row.id, prisma })
+      const services = moduleServices ? moduleServices.forSystem(mod.key, row.companyId) : null
+      await handler({ event: row.event, payload: row.payload, companyId: row.companyId, eventId: row.id, prisma, services })
     }
   }
 

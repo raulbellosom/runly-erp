@@ -16,6 +16,8 @@ import { createNotificationService } from '../notification-service.js'
 import { createTasksService } from '../../routes/projects/tasks-service.js'
 import { createCalendarService } from '../../routes/calendar/calendar-service.js'
 import { createCalendarEventService } from '../../routes/calendar/calendar-event-service.js'
+import { createCalendarEventEffects } from '../../routes/calendar/calendar-event-effects.js'
+import { createActionBackedServices } from './action-backed-services.js'
 
 export class ModuleServiceError extends Error {
   constructor(message, status = 400, code = 'module_service_error') {
@@ -35,13 +37,15 @@ const fileView = (asset) => asset && ({ id: asset.id, name: asset.originalName, 
 const withoutNull = (args, keys) => Object.fromEntries(Object.entries(args).filter(([key, value]) => !(keys.includes(key) && value === null)))
 const notFound = (label) => new ModuleServiceError(`${label} no existe o no lo creó este módulo.`, 404, 'not_found')
 
-export function createServiceCatalog({ prisma, filesService = null }) {
+export function createServiceCatalog({ prisma, filesService = null, broadcaster = null }) {
   const inventory = createInventoryService({ prisma, activityBridge: null })
   const contacts = createContactsService({ prisma })
   const tasks = createTasksService({ prisma })
   const calendars = createCalendarService({ prisma })
   const events = createCalendarEventService({ prisma })
   const notifications = createNotificationService({ prisma })
+  // Same activity/invitation/realtime effects the calendar routes and MirAI run.
+  const calendarEffects = createCalendarEventEffects({ prisma, broadcaster })
 
   async function companyTask(id, companyId) {
     const task = await prisma.task.findFirst({ where: { id, project: { companyId } }, select: { id: true, projectId: true } })
@@ -115,18 +119,24 @@ export function createServiceCatalog({ prisma, filesService = null }) {
       const rows = await events.listEvents({ userId: actorId, companyId, start: args.from, end: args.to, sourceModule: moduleKey, sourceEntityId: args.sourceEntityId ?? undefined })
       return rows.map(eventView)
     },
-    'runly.calendar:events.create': async ({ companyId, actorId, moduleKey }, args) => {
+    'runly.calendar:events.create': async ({ companyId, actorId, moduleKey, request }, args) => {
       const calendarId = args.calendarId ?? (await calendars.ensureDefaultCalendar(actorId, companyId)).id
       const event = await events.createEvent(actorId, { ...args, calendarId, sourceModule: moduleKey, sourceEntityId: args.sourceEntityId ?? null }, companyId)
+      await calendarEffects.afterCreate(request, event, actorId)
       return eventView(event)
     },
-    'runly.calendar:events.update': async ({ companyId, actorId, moduleKey }, { id, ...data }) => {
+    'runly.calendar:events.update': async ({ companyId, actorId, moduleKey, request }, { id, ...data }) => {
       await ownEvent(id, moduleKey)
-      return eventView(await events.updateEvent(actorId, id, withoutNull(data, ['title', 'startAt', 'allDay']), companyId))
+      const before = await events.getEvent(actorId, id, companyId).catch(() => null)
+      const event = await events.updateEvent(actorId, id, withoutNull(data, ['title', 'startAt', 'allDay']), companyId)
+      await calendarEffects.afterUpdate(request, before, event, actorId)
+      return eventView(event)
     },
-    'runly.calendar:events.cancel': async ({ companyId, actorId, moduleKey }, { id }) => {
+    'runly.calendar:events.cancel': async ({ companyId, actorId, moduleKey, request }, { id }) => {
       await ownEvent(id, moduleKey)
+      const before = await events.getEvent(actorId, id, companyId).catch(() => null)
       await events.deleteEvent(actorId, id, companyId)
+      await calendarEffects.afterDelete(request, id, before, actorId)
       return { id, cancelled: true }
     },
     'runly.files:files.save': async ({ actorAuthId, activeContext, moduleKey }, args) => {
@@ -168,6 +178,8 @@ export function createServiceCatalog({ prisma, filesService = null }) {
       return { sent: result?.created ?? 0 }
     },
   }
+
+  Object.assign(handlers, createActionBackedServices({ prisma, ServiceError: ModuleServiceError }).handlers)
 
   return Object.fromEntries(Object.entries(handlers).map(([key, handler]) => [key, { ...SERVICE_CONTRACTS[key], handler }]))
 }

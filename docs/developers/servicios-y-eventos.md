@@ -1,6 +1,6 @@
 ---
 title: Servicios y eventos entre módulos
-summary: Cómo tu módulo lee, crea y actualiza registros de Calendario, Archivos, Notificaciones, Inventario, Contactos y Proyectos con autorización del administrador (consumes) y cómo reacciona a lo que pasa en ellos (events).
+summary: Cómo tu módulo lee, crea y actualiza registros de Calendario, Archivos, Notificaciones, Inventario, Contactos, Proyectos, Libro de cuentas, Flota y Finanzas personales con autorización del administrador (consumes) y cómo reacciona a lo que pasa en ellos (events).
 order: 4.3
 ---
 Tu módulo no lee ni escribe tablas de otros módulos directamente. Para eso hay dos mecanismos controlados por Runly:
@@ -45,6 +45,15 @@ Runly revisa los argumentos de cada llamada contra el contrato publicado del ser
 - En los servicios de actualización solo cambian los campos que envías; `null` vacía un campo opcional.
 - Fechas con hora (`datetime`) en ISO 8601; fechas solas (`date`) como `AAAA-MM-DD`.
 - Si algo no es válido la llamada falla con **422** `invalid_args` y `error.fields` (`{ campo: mensaje }`).
+- Si el módulo dueño rechaza la operación por una regla de negocio (cuenta sin permiso de escritura, cartera ligada a un banco, matrícula ambigua…) la llamada falla con **400** `rejected` y el mensaje del módulo.
+
+### Llamadas repetidas (`idempotencyKey`)
+
+Todo servicio que escribe acepta además `idempotencyKey` (texto, máximo 200). Si tu módulo ya hizo con éxito esa misma llamada con la misma clave en esa empresa, Runly devuelve el resultado anterior y **no** vuelve a escribir. Úsala siempre en los handlers de eventos, que pueden recibir el mismo evento dos veces:
+
+```js
+await contacts.contacts.create({ name: 'Ana López', idempotencyKey: `alta-${payload.id}` })
+```
 
 ```js
 try {
@@ -89,6 +98,22 @@ Los servicios marcados como **propios** solo actúan sobre lo que tu módulo cre
 | `runly.files` `files.save({ name, mimeType, contentBase64, shareWithCompany, sourceEntityId })` | Guarda el archivo en **Archivos** del usuario (privado salvo `shareWithCompany: true`). Máximo 10 MB; imagen, PDF, texto u oficina | `files.assets.create` |
 | `runly.files` `files.signedUrl({ id })` | Enlace temporal de descarga de un archivo **propio** | `files.assets.read` |
 | `runly.notifications` `notifications.send({ userIds, title, body, link, priority, sourceEntityId })` | Notifica a usuarios de la empresa (los demás se ignoran); `priority`: `low, medium, high, critical` | Ninguno: basta ser miembro de la empresa |
+| `runly.ledger` `accounts.list()` | Cuentas que el usuario puede ver: `id, name, bank, currency, balance` | `ledger.accounts.read` |
+| `runly.ledger` `categories.list()` | Categorías: `id, name, kind, system` | `ledger.categories.read` |
+| `runly.ledger` `transactions.create({ accountId \| accountName, fecha, nombre, referencia, concepto, numero, deposito, retiro, categoryId })` | Registra un depósito o retiro (uno de los dos mayor a cero). El usuario debe poder escribir en esa cuenta | `ledger.transactions.create` |
+| `runly.ledger` `transactions.update({ transactionId, fecha, nombre, referencia, concepto, numero, deposito, retiro, categoryId })` | Edita un movimiento de una cuenta donde el usuario puede escribir | `ledger.transactions.update` |
+| `runly.fleet` `vehicles.search({ search, status, limit })` | `{ items: [{ id, plate, brand, model, year, status, driverName }], total }` | `fleet.vehicles.read` |
+| `runly.fleet` `drivers.search({ search, status, limit })` | `{ items: [{ id, name, phone, licenseNumber, status }], total }` | `fleet.drivers.read` |
+| `runly.fleet` `vehicles.create({ plate, brand, model, year, color, status, driver, notes })` | Crea el vehículo; `driver` es el nombre del chofer | `fleet.vehicles.create` |
+| `runly.fleet` `vehicles.update({ vehicleId \| plate, status, driver, color, notes })` | Edita el vehículo; `driver: null` lo deja sin chofer | `fleet.vehicles.update` |
+| `runly.fleet` `insurance.create({ vehicleId \| plate, insurer, policyNumber, coverageType, startDate, expiryDate, premium, currency, notes })` | Registra una póliza; `coverageType`: `basic, comprehensive, third_party, other` | `fleet.insurance.create` |
+| `runly.fleet` `insurance.update({ policyId, expiryDate, premium, coverageType, notes })` | Edita una póliza | `fleet.insurance.update` |
+| `runly.pfm` `wallets.list()` | Carteras del usuario: `id, name, kind, currency, balance, bankLinked` | `pfm.wallets.read` |
+| `runly.pfm` `categories.list({ kind })` | Categorías de gasto o ingreso: `id, name, kind` | `pfm.categories.read` |
+| `runly.pfm` `movements.create({ wallet, direction, amount, occurredOn, category, merchant, note })` | Registra un gasto o ingreso (`direction`: `EXPENSE, INCOME`); `wallet` y `category` aceptan nombre o id. No se puede en carteras ligadas a una cuenta bancaria | `pfm.movements.create` |
+| `runly.pfm` `movements.update({ movementId, direction, amount, occurredOn, category, merchant, note })` | Edita un movimiento de una cartera donde el usuario puede escribir | `pfm.movements.update` |
+
+Los servicios de Libro de cuentas, Flota y Finanzas personales que escriben devuelven `{ id, summary, link }` y aplican exactamente las mismas reglas que las pantallas de esos módulos (acceso por cuenta o cartera, actividad, bitácora). Borrar registros de otros módulos no está disponible.
 
 Para adjuntar archivos a **tus propios** registros usa los adjuntos del registro (`GET /<base>/:id/files`, ver [API del módulo](/documentacion/desarrolladores/api-modulos), y el componente `AttachmentsPanel`); `files.save` es para dejar un documento en el explorador de Archivos del usuario.
 
@@ -122,7 +147,7 @@ El contrato completo (argumentos, tipos, límites y campos de respuesta) se publ
 
 ## Eventos
 
-Suscríbete en el manifiesto y maneja los eventos en `api/events.js`:
+Suscríbete en el manifiesto y maneja los eventos en `api/events.js`. Además de `prisma` (para **tus** tablas), cada handler recibe `services`: los mismos servicios, en la empresa del evento y sin usuario.
 
 ```js
 // module.manifest.js
@@ -135,8 +160,16 @@ export const handlers = {
   'contacts.contact.created': async ({ payload, companyId, prisma }) => {
     await prisma.$executeRaw`INSERT INTO "mimodulo_bitacora" (company_id, texto) VALUES (${companyId}::uuid, ${'Nuevo contacto ' + payload.id})`
   },
+  'fleet.vehicle.updated': async ({ payload, eventId, services }) => {
+    if (payload.status !== 'maintenance') return
+    await services.module('runly.notifications').notifications.send({
+      userIds: [JEFE_DE_TALLER_ID], title: `Vehículo ${payload.plate} en mantenimiento`, idempotencyKey: `taller-${eventId}`,
+    })
+  },
 }
 ```
+
+Desde un evento solo funcionan los servicios que no necesitan a una persona: notificaciones, contactos (leer, buscar, crear, actualizar), inventario (leer, buscar, actualizar), `tasks.update` de Proyectos y `vehicles.search` de Flota. Los demás (calendario, archivos, libro de cuentas, finanzas personales, crear tareas) responden **403** `system_not_supported`. La autorización del administrador (`consumes`) sigue siendo obligatoria; no se revisan permisos de usuario porque no hay usuario.
 
 | Evento | `payload` |
 |---|---|
@@ -144,6 +177,14 @@ export const handlers = {
 | `inventory.item.updated` | `{ id, name }` |
 | `contacts.contact.created` | `{ id }` |
 | `projects.task.created` | `{ id, projectId, title }` |
+| `calendar.event.created` | `{ id, title, startAt, sourceModule, sourceEntityId }` |
+| `calendar.event.updated` | `{ id, title, startAt, sourceModule, sourceEntityId }` |
+| `calendar.event.cancelled` | `{ id, title, startAt, sourceModule, sourceEntityId }` |
+| `files.file.created` | `{ id, name, mimeType }` (solo archivos subidos a Archivos, no adjuntos de registros) |
+| `fleet.vehicle.created` | `{ id, plate, status }` |
+| `fleet.vehicle.updated` | `{ id, plate, status }` |
+
+Con `sourceModule` sabes si un evento de calendario lo creó tu módulo (por ejemplo, para marcar tu orden como reagendada cuando alguien mueve la cita desde el calendario). Libro de cuentas y Finanzas personales no publican eventos: su información depende del acceso por cuenta o cartera de cada persona.
 
 - La entrega es **al menos una vez**: tu handler debe poder recibir el mismo evento dos veces sin duplicar datos.
 - Si tu handler falla, se reintenta con espera creciente (1, 2, 4… hasta 60 minutos) hasta 8 veces.

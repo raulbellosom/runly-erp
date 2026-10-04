@@ -113,3 +113,59 @@ applies. Its spec line "simular los siete servicios actuales" must change to
 - `node --test` for module-services, module-compiler contracts and
   developer-docs; `pnpm lint`.
 - Docs: `docs/developers/servicios-y-eventos.md` updated, ZIP docs regenerated.
+
+## 6. Addendum 2026-10-04 — ledger, fleet, pfm + phase 2
+
+### 6.1 Ledger, fleet and personal finance services
+
+Writes delegate to the module's existing MirAI actions
+(`routes/<module>/mirai-actions.js`): `prepare(args, actx)` validates and runs
+the per-record access checks (ledger `canWriteAccount`, pfm `canWriteWallet`,
+company scoping) without writing, then `execute(input, actx)` writes through
+the same service + effects the HTTP routes use. A `prepare` error becomes
+`400 rejected` with its message. Reads call the module services directly and
+map to stable English keys (never the Spanish LLM-facing tool output).
+
+| Key | Backed by | Permission |
+|---|---|---|
+| `runly.ledger:accounts.list` | `readableAccounts` | `ledger.accounts.read` |
+| `runly.ledger:categories.list` | categories service | `ledger.categories.read` |
+| `runly.ledger:transactions.create` / `.update` | `ledger.transaction.create` / `.update` | `ledger.transactions.create` / `.update` |
+| `runly.fleet:vehicles.search` | fleet service | `fleet.vehicles.read` |
+| `runly.fleet:drivers.search` | driver service | `fleet.drivers.read` |
+| `runly.fleet:vehicles.create` / `.update` | `fleet.vehicle.create` / `.update` | `fleet.vehicles.create` / `.update` |
+| `runly.fleet:insurance.create` / `.update` | `fleet.insurance.create` / `.update` | `fleet.insurance.create` / `.update` |
+| `runly.pfm:wallets.list` | wallets service | `pfm.wallets.read` |
+| `runly.pfm:categories.list` | categories service | `pfm.categories.read` |
+| `runly.pfm:movements.create` / `.update` | `pfm.movement.create` / `.update` | `pfm.movements.create` / `.update` |
+
+Deletes and statement import stay out (import needs a chat attachment).
+A contract test asserts each action-backed contract uses the action's permission.
+
+Fix found while doing this: phase 1 calendar services skipped the route-level
+effects (activity, attendee invitations, realtime). They now call
+`createCalendarEventEffects` like the routes and MirAI do.
+
+### 6.2 Phase 2 — background calls, idempotency, more events
+
+- **`services` in event handlers.** The dispatcher passes
+  `services = moduleServices.forSystem(moduleKey, companyId)` to
+  `api/events.js` handlers. It is never exposed on `moduleContext` (a route
+  could otherwise pick any company). Only contracts flagged `system: true`
+  run there (no user: grant only, `actorId` null, audit `metadata.system`).
+  System-capable: notifications.send, contacts read/search/create/update,
+  inventory read/search/update, projects tasks.update, fleet vehicles.search.
+  Anything needing a person (calendar owner, ledger/pfm ACLs, user Files,
+  task creator) answers `403 system_not_supported`.
+- **Idempotency.** Every mutating service accepts `idempotencyKey`
+  (string, max 200). The gateway looks up a previous successful audit row for
+  (company, module, service, key) and returns its stored result instead of
+  writing again. No schema change (audit_log metadata, indexed by module).
+- **New domain events** (published where every path converges):
+  `calendar.event.created|updated|cancelled` (calendar effects, payload
+  `{ id, title, startAt, sourceModule, sourceEntityId }`), `files.file.created`
+  (Files-explorer uploads only, `{ id, name, mimeType }`),
+  `fleet.vehicle.created|updated` (fleet service, `{ id, plate, status }`).
+  Ledger/pfm publish no events: their per-account/per-wallet ACLs would leak
+  to subscribers.
+- **Deferred to phase 3:** Builder no-code automations.
