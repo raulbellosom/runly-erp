@@ -11,6 +11,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { runly } from "../lib/runly";
 import { ModuleIcon } from "./ModuleCard";
 import { buildCommandItems } from "../lib/commandPalette";
+import { useQuickNoteStore } from "../modules/runly.notes/quick/quickNoteStore";
 
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 200;
@@ -65,7 +66,8 @@ export function CommandPalette({ activeModule }) {
 
   function runItem(item) {
     if (!item || item.blocked) return;
-    navigate(item.target);
+    if (item.action === "quick-note") useQuickNoteStore.getState().open();
+    else navigate(item.target);
     closeCommand();
     setQuery("");
   }

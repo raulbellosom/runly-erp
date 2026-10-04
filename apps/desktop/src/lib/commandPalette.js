@@ -218,6 +218,27 @@ export function buildCommandItems({
     );
   rawSections.push({ id: "tools", title: "Herramientas", items: toolItems });
 
+  if (availableModules.some((m) => m.key === "runly.notes")) {
+    rawSections.push({
+      id: "actions",
+      title: "Acciones rápidas",
+      items: [
+        {
+          key: "action:quick-note",
+          kind: "action",
+          action: "quick-note",
+          title: "Nota rápida",
+          subtitle: "Abre el bloc flotante de notas (Ctrl+Alt+N)",
+          keywords: ["nota", "notas", "apunte", "rapida", "bloc"],
+          icon: "NotebookPen",
+          color: undefined,
+          target: null,
+          blocked: false,
+        },
+      ],
+    });
+  }
+
   rawSections.push({
     id: "pages",
     title: "Páginas",
