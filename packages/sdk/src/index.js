@@ -437,6 +437,16 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
           // Do NOT set Content-Type — fetch sets the multipart boundary automatically
           body: formData,
         }),
+      // Pre-update backups of the module's tables (core.modules.manage).
+      backups: (key, token) =>
+        request(`/modules/${encodeURIComponent(key)}/backups`, {
+          headers: withAuthHeaders(token),
+        }),
+      restoreBackup: (key, backupId, token) =>
+        request(`/modules/${encodeURIComponent(key)}/backups/${encodeURIComponent(backupId)}/restore`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+        }),
       purgeModule: (key, token, confirmation = "ACEPTO") =>
         request(`/modules/${encodeURIComponent(key)}/purge`, {
           method: "DELETE",

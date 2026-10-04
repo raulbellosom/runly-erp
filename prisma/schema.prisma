@@ -376,6 +376,24 @@ model ModuleMigration {
   @@map("module_migration")
 }
 
+// Pre-update copy of an RME3 module's tables (spec 2026-10-03-rme3-module-platform-v2 §10.6).
+// Tables live in schema runly_backup; the worker drops them after expiresAt.
+model ModuleSchemaBackup {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  moduleKey   String    @map("module_key")
+  versionFrom String?   @map("version_from")
+  versionTo   String?   @map("version_to")
+  tables      Json
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime  @map("expires_at")
+  restoredAt  DateTime? @map("restored_at")
+
+  @@index([moduleKey, createdAt])
+  @@index([expiresAt])
+  @@map("module_schema_backup")
+}
+
 model Company {
   id String @id @default(uuid(7)) @db.Uuid
   name           String

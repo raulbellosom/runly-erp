@@ -9,6 +9,8 @@ import {
   operationBlocker,
   preflightQueries,
 } from '@runly/module-engine'
+import { createModuleBackupService } from './module-backup-service.js'
+import { DATA_MIGRATION_PREFIX, planDataMigrations, runDataMigrations } from './module-data-migration-service.js'
 
 const IDENTIFIER_RE = /^[a-z][a-z0-9_]*$/
 const CORE_TABLE_NAMES = new Set(
@@ -55,6 +57,7 @@ export class ModuleSchemaMigrationError extends Error {
 }
 
 export function createModuleSchemaMigrationService({ prisma }) {
+  const backupSvc = createModuleBackupService({ prisma })
   async function inspectTableSchema(tableName, db = prisma) {
     const table = safeIdentifier(tableName, 'table name')
     // ::text — @prisma/adapter-pg (the driver adapter this service runs
@@ -115,7 +118,7 @@ export function createModuleSchemaMigrationService({ prisma }) {
 
   // decisions: { [operation.id]: { backfill?, onConversionFailure? } } chosen
   // by the admin in the update report (spec §12.3).
-  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null, decisions = {} }) {
+  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null, decisions = {}, dataMigrationFiles = [] }) {
     const persistedRows = moduleRow?.status === 'INSTALLED'
       ? await prisma.runlyModel.findMany({
           where: { moduleKey },
@@ -166,12 +169,20 @@ export function createModuleSchemaMigrationService({ prisma }) {
     for (const removed of previousByTable.values()) {
       operations.push({ type: 'DROP_TABLE', table: removed.tableName, model: removed.name, safety: 'DESTRUCTIVE' })
     }
-    const required = operations.length > 0
-    const blockers = operations
-      .map((operation) => ({ id: operation.id, reason: operationBlocker(operation, decisions[operation.id]) }))
-      .filter((entry) => entry.reason)
+    const ledger = dataMigrationFiles.length
+      ? await prisma.moduleMigration.findMany({ where: { moduleKey, filename: { startsWith: DATA_MIGRATION_PREFIX } }, select: { filename: true, checksum: true } })
+      : []
+    const data = planDataMigrations(dataMigrationFiles, ledger)
+    const dataMigrations = { pending: data.pending.map((file) => file.name), applied: data.applied, blockers: data.blockers }
+    const required = operations.length > 0 || data.pending.length > 0
+    const blockers = [
+      ...operations
+        .map((operation) => ({ id: operation.id, reason: operationBlocker(operation, decisions[operation.id]) }))
+        .filter((entry) => entry.reason),
+      ...data.blockers.map((entry) => ({ id: `DATA_MIGRATION:${entry.name}`, reason: entry.reason })),
+    ]
     const canAutoApply = drift.length === 0 && blockers.length === 0
-    const core = { moduleKey, models, operations, drift, warnings, decisions }
+    const core = { moduleKey, models, operations, drift, warnings, decisions, dataMigrations }
     const planHash = createHash('sha256').update(JSON.stringify(core)).digest('hex')
     return {
       ...core,
@@ -185,6 +196,9 @@ export function createModuleSchemaMigrationService({ prisma }) {
       filename: `schema__${planHash.slice(0, 24)}.sql`,
       sql: canAutoApply ? compileMigrationPlan({ operations }, decisions) : [],
       baselineCreated: !required && warnings.some((warning) => warning.type === 'BASELINE_COLUMN'),
+      versionFrom: moduleRow?.version ?? null,
+      // Sources stay out of planHash/audit; only the apply step reads them.
+      dataMigrationSources: data.pending,
     }
   }
 
@@ -192,53 +206,96 @@ export function createModuleSchemaMigrationService({ prisma }) {
     if (plan.drift.length) throw new ModuleSchemaMigrationError('SCHEMA_DRIFT_DETECTED', { details: plan })
     if (!plan.required) return { applied: false, reason: 'no_changes', plan }
     if (!plan.canAutoApply) throw new ModuleSchemaMigrationError('SCHEMA_MIGRATION_UNSUPPORTED', { details: plan })
+    // Backup, DDL, verification and data migrations commit or roll back together.
     return prisma.$transaction(async (tx) => {
-      const existing = await tx.moduleMigration.findUnique({
-        where: { moduleKey_filename: { moduleKey: plan.moduleKey, filename: plan.filename } },
-      })
-      if (existing) return { applied: false, reason: 'already_applied', migration: existing, plan }
-      for (const statement of plan.sql) await tx.$executeRawUnsafe(statement)
-      for (const model of plan.models) {
-        const expected = model.desiredSchema
-        const actual = await inspectTableSchema(model.table, tx)
-        if (!actual.exists) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table } })
-        const actualByName = new Map(actual.columns.map((column) => [column.name, column]))
-        const mismatch = expected.columns.find((column) => {
-          const found = actualByName.get(column.name)
-          return !found
-            || found.sqlType !== column.sqlType
-            || found.nullable !== column.nullable
-            || !defaultsMatch(column.default, found.default)
-        })
-        if (mismatch) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, column: mismatch.name } })
-        const actualIndexes = new Map(actual.indexes.map((index) => [index.name, index]))
-        const missingIndex = expected.indexes.find((index) => {
-          const found = actualIndexes.get(index.name)
-          return !found || found.unique !== index.unique || JSON.stringify(found.fields) !== JSON.stringify(index.fields)
-        })
-        if (missingIndex) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, index: missingIndex.name } })
-      }
-      const checksum = createHash('sha256').update(plan.sql.join('\n')).digest('hex')
-      const migration = await tx.moduleMigration.create({
-        data: { moduleKey: plan.moduleKey, filename: plan.filename, checksum },
-      })
-      if (tx.auditLog?.create) {
-        await tx.auditLog.create({
-          data: {
-            actorId,
-            moduleKey: plan.moduleKey,
-            entityType: 'ModuleMigration',
-            entityId: migration.id,
-            action: 'core.module.schema.migrate',
-            before: null,
-            after: JSON.stringify({ planHash: plan.planHash, safety: plan.safety, operations: plan.operations }),
-            metadata: null,
-          },
-        })
-      }
-      return { applied: true, migration, plan }
+      const existing = plan.operations.length
+        ? await tx.moduleMigration.findUnique({
+            where: { moduleKey_filename: { moduleKey: plan.moduleKey, filename: plan.filename } },
+          })
+        : null
+      const schemaPending = plan.operations.length > 0 && !existing
+      const dataPending = plan.dataMigrationSources ?? []
+      if (!schemaPending && !dataPending.length) return { applied: false, reason: 'already_applied', migration: existing, plan }
+      const backup = await snapshotBeforeUpdate(tx, plan, actorId)
+      if (schemaPending) await applySchemaStatements(tx, plan)
+      const dataMigrationsRan = await runDataMigrations(tx, { moduleKey: plan.moduleKey, pending: dataPending })
+      const migration = schemaPending ? await recordSchemaMigration(tx, plan, actorId, backup) : existing
+      return { applied: true, migration, backupId: backup?.id ?? null, dataMigrationsRan, plan }
+    }, { maxWait: 10_000, timeout: 120_000 })
+  }
+
+  // Skipped (with a warning) until the module_schema_backup migration is applied.
+  async function snapshotBeforeUpdate(tx, plan, actorId) {
+    const [{ ready }] = await tx.$queryRawUnsafe(`SELECT to_regclass('public.module_schema_backup') IS NOT NULL AS ready`)
+    if (!ready || !tx.moduleSchemaBackup) {
+      console.warn('[module-schema] module_schema_backup table missing; update applied without a backup')
+      return null
+    }
+    const renames = {}
+    for (const operation of plan.operations) {
+      if (operation.type === 'RENAME_COLUMN') (renames[operation.table] ??= {})[operation.column] = operation.from
+    }
+    return backupSvc.snapshotModuleTables(tx, {
+      moduleKey: plan.moduleKey,
+      tables: plan.models.map((model) => model.table),
+      versionFrom: plan.versionFrom ?? null,
+      versionTo: plan.versionTo ?? null,
+      actorId,
+      renames,
     })
   }
 
-  return { inspectTableSchema, planModuleSchemaMigration, applyModuleSchemaMigration }
+  async function applySchemaStatements(tx, plan) {
+    for (const statement of plan.sql) await tx.$executeRawUnsafe(statement)
+    for (const model of plan.models) {
+      const expected = model.desiredSchema
+      const actual = await inspectTableSchema(model.table, tx)
+      if (!actual.exists) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table } })
+      const actualByName = new Map(actual.columns.map((column) => [column.name, column]))
+      const mismatch = expected.columns.find((column) => {
+        const found = actualByName.get(column.name)
+        return !found
+          || found.sqlType !== column.sqlType
+          || found.nullable !== column.nullable
+          || !defaultsMatch(column.default, found.default)
+      })
+      if (mismatch) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, column: mismatch.name } })
+      const actualIndexes = new Map(actual.indexes.map((index) => [index.name, index]))
+      const missingIndex = expected.indexes.find((index) => {
+        const found = actualIndexes.get(index.name)
+        return !found || found.unique !== index.unique || JSON.stringify(found.fields) !== JSON.stringify(index.fields)
+      })
+      if (missingIndex) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, index: missingIndex.name } })
+    }
+  }
+
+  async function recordSchemaMigration(tx, plan, actorId, backup) {
+    const checksum = createHash('sha256').update(plan.sql.join('\n')).digest('hex')
+    const migration = await tx.moduleMigration.create({
+      data: { moduleKey: plan.moduleKey, filename: plan.filename, checksum },
+    })
+    if (tx.auditLog?.create) {
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          moduleKey: plan.moduleKey,
+          entityType: 'ModuleMigration',
+          entityId: migration.id,
+          action: 'core.module.schema.migrate',
+          before: null,
+          after: JSON.stringify({ planHash: plan.planHash, safety: plan.safety, operations: plan.operations, backupId: backup?.id ?? null }),
+          metadata: null,
+        },
+      })
+    }
+    return migration
+  }
+
+  return {
+    inspectTableSchema,
+    planModuleSchemaMigration,
+    applyModuleSchemaMigration,
+    listBackups: backupSvc.listBackups,
+    restoreBackup: backupSvc.restoreBackup,
+  }
 }

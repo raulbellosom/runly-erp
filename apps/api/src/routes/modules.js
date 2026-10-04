@@ -43,6 +43,7 @@ import {
 } from "../services/module-dependency-utils.js";
 import { validateDashboardSchema, validateKanbanSchema, validateManifest } from "@runly/module-engine";
 import { del as cacheDel } from "../lib/cache.js";
+import { loadDataMigrationFiles } from "../services/module-data-migration-service.js";
 import {
   resolveModulesDir,
 } from "../services/module-upload-service.js";
@@ -726,6 +727,7 @@ export function createModulesRouter({
                 desiredModels: staged.models,
                 moduleRow,
                 decisions,
+                dataMigrationFiles: await loadDataMigrationFiles(staged.packageDir),
               })
             : {
                 required: false,
@@ -2567,6 +2569,28 @@ export function createModulesRouter({
       }
     },
   );
+
+  // GET /modules/:key/backups — pre-update copies of the module's tables
+  // (module-backup-service.js); POST .../restore puts their rows back.
+  app.get("/:key/backups", authMiddleware, requirePermission("core.modules.manage"), async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    try {
+      return c.json({ data: await schemaMigrationSvc.listBackups(key) });
+    } catch (err) {
+      return c.json({ error: err.code ?? err.message }, err.statusCode ?? 500);
+    }
+  });
+
+  app.post("/:key/backups/:backupId/restore", authMiddleware, requirePermission("core.modules.manage"), async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    try {
+      const actorId = c.get("userContext")?.profile?.id ?? null;
+      const result = await schemaMigrationSvc.restoreBackup({ moduleKey: key, backupId: c.req.param("backupId"), actorId });
+      return c.json({ data: result });
+    } catch (err) {
+      return c.json({ error: err.code ?? err.message }, err.statusCode ?? 500);
+    }
+  });
 
   // GET /modules/:key/preview/:previewId/bundle.js — preview bundle built by
   // /upload/check. No auth header is possible with import(); the previewId

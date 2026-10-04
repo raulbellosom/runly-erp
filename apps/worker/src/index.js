@@ -8,6 +8,7 @@ import pg from 'pg'
 import { createNotificationDeliveryWorker } from '../../api/src/services/notification-delivery-worker.js'
 import { createCalendarNotificationService } from '../../api/src/routes/calendar/calendar-notification-service.js'
 import { createSyncLogCleanupWorker } from '../../api/src/services/sync-cleanup-worker.js'
+import { createModuleBackupService } from '../../api/src/services/module-backup-service.js'
 import { resolveGoogleCalendarConfig } from '../../api/src/routes/calendar/google/google-config.js'
 import { createGoogleTokenCrypto } from '../../api/src/routes/calendar/google/google-token-crypto.js'
 import { createGoogleCalendarConnectionService } from '../../api/src/routes/calendar/google/google-connection-service.js'
@@ -73,6 +74,7 @@ const calendarNotificationService = createCalendarNotificationService({ prisma }
 const DELIVERY_INTERVAL_MS = Number(process.env.RUNLY_NOTIFICATION_DELIVERY_INTERVAL_MS ?? 30000)
 const syncCleanupWorker = createSyncLogCleanupWorker({ prisma })
 const SYNC_CLEANUP_INTERVAL_MS = syncCleanupWorker.SYNC_CLEANUP_INTERVAL_MS
+const moduleBackupService = createModuleBackupService({ prisma })
 const projectsNotifService = createProjectsNotificationService({
   prisma,
   notificationService: createNotificationService({ prisma }),
@@ -211,6 +213,17 @@ async function runDeliveryTick() {
   }
 }
 
+// Drops pre-update module backups older than their expiry (14 days).
+async function runModuleBackupCleanupTick() {
+  try {
+    const result = await moduleBackupService.dropExpiredBackups()
+    if (result.deleted > 0) console.log(`[worker] module backup cleanup ${formatLogTimestamp()} deleted=${result.deleted}`)
+  } catch (err) {
+    console.error('[worker] module backup cleanup tick failed:', err?.message ?? err)
+    if (isConnectionError(err)) await reconnect()
+  }
+}
+
 async function runSyncCleanupTick() {
   try {
     const result = await syncCleanupWorker.processExpiredLogs()
@@ -304,6 +317,10 @@ setInterval(() => {
 runSyncCleanupTick()
 setInterval(() => {
   runSyncCleanupTick()
+}, SYNC_CLEANUP_INTERVAL_MS)
+runModuleBackupCleanupTick()
+setInterval(() => {
+  runModuleBackupCleanupTick()
 }, SYNC_CLEANUP_INTERVAL_MS)
 runTasksDueSoonTick()
 setInterval(() => {

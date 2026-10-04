@@ -10,6 +10,7 @@
 // docs/superpowers/specs/2026-09-27-rme3-no-code-module-builder-architecture.md.
 import path from 'node:path'
 import { createModuleSchemaMigrationService } from './module-schema-migration-service.js'
+import { loadDataMigrationFiles } from './module-data-migration-service.js'
 import { createModuleMetadataService } from './module-metadata-service.js'
 import { createModuleLifecycleService } from './module-lifecycle-service.js'
 import { createConnectionLifecycle } from './connections/connection-lifecycle.js'
@@ -44,6 +45,7 @@ export function createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cac
                 desiredModels: staged.models,
                 moduleRow,
                 decisions,
+                dataMigrationFiles: await loadDataMigrationFiles(staged.packageDir),
               })
             : { required: false, canAutoApply: true, safety: 'SAFE', operations: [], drift: [], warnings: [] }
           return {
