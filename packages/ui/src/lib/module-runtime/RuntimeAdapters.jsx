@@ -6,5 +6,8 @@ const browserFetch = (...args) => globalThis.fetch(...args);
 export const RuntimeAdaptersProvider = RuntimeAdapters.Provider;
 export function useRuntimeAdapters() { return useContext(RuntimeAdapters); }
 export function useRuntimeFetch() {
-  return useRuntimeAdapters()?.transport.fetch ?? browserFetch;
+  const adapters = useRuntimeAdapters();
+  if (!adapters) return browserFetch;
+  if (typeof adapters.transport?.fetch !== 'function') throw new Error('RUNTIME_TRANSPORT_REQUIRED');
+  return adapters.transport.fetch;
 }

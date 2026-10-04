@@ -164,6 +164,8 @@ export function RunlyTable({
       cancelled = true;
     };
   }, [
+    adapters,
+    runtimeFetch,
     apiBaseUrl,
     tableKey,
     token,
@@ -193,7 +195,7 @@ export function RunlyTable({
         body: JSON.stringify(config),
       }).catch(() => {});
     }, 800);
-  }, [runtimeFetch, apiBaseUrl, tableKey, token, preferenceScope, companyId]);
+  }, [adapters, runtimeFetch, apiBaseUrl, tableKey, token, preferenceScope, companyId]);
 
   const handleReorderColumns = useCallback(
     (activeKey, overKey) => {
@@ -220,7 +222,7 @@ export function RunlyTable({
         headers: buildApiHeaders(token, companyId),
       }).catch(() => {});
     }
-  }, [resetToDefaults, apiBaseUrl, tableKey, token, companyId]);
+  }, [adapters, runtimeFetch, resetToDefaults, apiBaseUrl, tableKey, token, companyId]);
 
   const handlePageSizeChange = useCallback(
     (size) => {
@@ -291,6 +293,7 @@ export function RunlyTable({
           throw new Error(body || "No se pudo cargar la información.");
         }
         const payload = await response.json();
+        if (controller.signal.aborted) return;
         const nextRowsRaw = Array.isArray(payload?.data) ? payload.data : [];
         const nextRows = withUniqueRowKeys(nextRowsRaw);
         const nextPagination = readPagination(

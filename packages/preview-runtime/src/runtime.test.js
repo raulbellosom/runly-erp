@@ -6,6 +6,16 @@ import { resolveBlueprintPresentation } from './presentation.js';
 import { resolveRouteInfo, selectBlueprints } from './resolver.js';
 import { createRunlyClient, createAtlasClient } from '../../sdk/src/index.js';
 import { createErpAdapters } from './erp-adapters.js';
+import { navigationTarget } from './navigation.js';
+
+test('shared navigation preserves sheet create suppression and encoded deep links', () => {
+  const routeInfo = { moduleRoutePath: '/app/m/custom.test/tasks' };
+  assert.equal(navigationTarget({ routeInfo, mode: 'create', isSheetMode: true }), null);
+  assert.equal(navigationTarget({ routeInfo, mode: 'create' }), routeInfo.moduleRoutePath + '/new');
+  assert.equal(navigationTarget({ routeInfo, mode: 'edit', recordId: 'a/b' }), routeInfo.moduleRoutePath + '/a%2Fb/edit');
+  assert.equal(navigationTarget({ routeInfo, mode: 'detail', recordId: 'a/b', isSheetMode: true }), routeInfo.moduleRoutePath + '/a%2Fb');
+  assert.throws(() => createRuntimeSession({ id: 'bad', transport: { fetch() {} }, preferences: {}, resources: {} }), TypeError);
+});
 
 test('ERP transport preserves credentials and refuses other origins', async () => {
   let received;

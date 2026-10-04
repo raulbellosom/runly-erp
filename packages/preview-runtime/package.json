@@ -10,7 +10,8 @@
     "./externals": "./src/externals.js",
     "./session": "./src/session.js",
     "./styles": "./src/styles.js",
-    "./css": "./src/css.js"
+    "./css": "./src/css.js",
+    "./navigation": "./src/navigation.js"
   },
   "dependencies": {
     "@runly/ui": "workspace:*"

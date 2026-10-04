@@ -1,10 +1,13 @@
 export const PREVIEW_RUNTIME_CONTRACT = Object.freeze({
   schemaVersion: 1,
   implementation: 'rme3-preview-contract1',
+  scope: 'trusted-declarative-fixtures',
+  transportContract: 'fetch-response-v1',
   views: Object.freeze(['TABLE', 'FORM', 'DETAIL', 'PAGE', 'DASHBOARD', 'KANBAN']),
   adapters: Object.freeze(['transport.fetch', 'preferences', 'resources']),
   customExecution: false,
   backendExecution: false,
+  unsupported: Object.freeze(['CUSTOM', 'relations', 'audit', 'attachments', 'files', 'services', 'automations']),
 });
 export function unsupported(capability) {
   return Object.assign(new Error(`Capacidad no soportada: ${capability}`), { code: 'PREVIEW_UNSUPPORTED', capability });

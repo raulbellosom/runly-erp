@@ -36,5 +36,5 @@ test('runtime capability inventory matches actual ERP externals and integrations
   assert.deepEqual([...catalog.matchAll(/^    '(runly\.[^']+:[^']+)':/gm)].map((m) => m[1]).sort(), [...SERVICE_KEYS].sort())
   const events = await import('../../../../apps/api/src/services/domain-events/events.js')
   assert.equal(events.DOMAIN_EVENTS, DOMAIN_EVENTS)
-  assert.equal(RME3_CAPABILITIES.runtime.previewAvailable, false)
+  assert.equal(RME3_CAPABILITIES.runtime.previewAvailable, true)
 })

@@ -33,7 +33,7 @@ import { CustomViewHost } from "./CustomViewHost.jsx";
 
 const API_BASE_URL = getApiUrl();
 
-import { createErpAdapters, BlueprintRenderer, normalizeKind, getBlueprintKind, getLastSegment, collapseWildcardPath, parseModeFromSegments, parseFallbackRouteInfo, getPagePath, resolveRouteInfo, matchesEntity, matchesCollectionPath, selectBlueprints, resolveNavItem, resolvePageTitle, resolveEmptyLabel, resolvePageDescription, getModuleRootPath, resolveGroupSegment, resolveCollectionPathFromPagePath, resolveGroupedTabs, isNamespacedComponentKey, collectNamespacedComponentKeys, collectMissingComponentReferences } from '@runly/preview-runtime';
+import { navigationTarget, createErpAdapters, BlueprintRenderer, normalizeKind, getBlueprintKind, getLastSegment, collapseWildcardPath, parseModeFromSegments, parseFallbackRouteInfo, getPagePath, resolveRouteInfo, matchesEntity, matchesCollectionPath, selectBlueprints, resolveNavItem, resolvePageTitle, resolveEmptyLabel, resolvePageDescription, getModuleRootPath, resolveGroupSegment, resolveCollectionPathFromPagePath, resolveGroupedTabs, isNamespacedComponentKey, collectNamespacedComponentKeys, collectMissingComponentReferences } from '@runly/preview-runtime';
 const extractFields = extractBlueprintFields;
 
 export function BlueprintCrudScreen() {
@@ -294,27 +294,8 @@ export function BlueprintCrudScreen() {
 
   const handleNavigate = useCallback(
     ({ mode, recordId }) => {
-      // In sheet mode, suppress URL navigation ONLY for "create" mode.
-      // Opening a new-record sheet should not navigate to /new — the user
-      // is still on the list view and the sheet is a UI overlay.
-      // Detail and edit still update the URL so deep links and browser-back
-      // work correctly (e.g. /accounts/:id loads the AccountScreen).
-      if (isSheetMode && mode === "create") return;
-
-      const basePath =
-        routeInfo.moduleRoutePath ||
-        (routeInfo.collectionPath
-          ? `/app/m/${moduleKey}/${routeInfo.collectionPath}`
-          : null);
-      if (!basePath) return;
-
-      let targetPath = basePath;
-      if (mode === "create") {
-        targetPath = `${basePath}/new`;
-      } else if ((mode === "detail" || mode === "edit") && recordId) {
-        targetPath = `${basePath}/${encodeURIComponent(String(recordId))}`;
-        if (mode === "edit") targetPath = `${targetPath}/edit`;
-      }
+      const targetPath = navigationTarget({ moduleKey, routeInfo, mode, recordId, isSheetMode });
+      if (!targetPath) return;
 
       if (targetPath !== locationPathnameRef.current) {
         navigate(targetPath, { replace: true });

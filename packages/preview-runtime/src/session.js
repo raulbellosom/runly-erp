@@ -2,7 +2,7 @@ import { unsupported } from './contracts.js';
 
 export function createRuntimeSession({ id, transport, preferences, resources } = {}) {
   if (!id || typeof transport?.fetch !== 'function') throw new TypeError('Runtime session requires id and transport.fetch');
-  if (!preferences || !resources) throw new TypeError('Runtime session requires preferences and resources adapters');
+  if (!['get', 'set', 'remove'].every((key) => typeof preferences?.[key] === 'function') || typeof resources?.resolve !== 'function') throw new TypeError('Runtime session requires preferences and resources adapters');
   const registry = new Map();
   let disposed = false;
   const requireLive = () => { if (disposed) throw unsupported('disposed-session'); };
@@ -17,6 +17,7 @@ export function createRuntimeSession({ id, transport, preferences, resources } =
       else if (method === 'PUT') data = await preferences.set(key, JSON.parse(options.body));
       else if (method === 'DELETE') data = await preferences.remove(key);
       else throw unsupported(`preferences.${method}`);
+      requireLive();
       return Response.json({ data: data ?? null });
     }
     const response = await transport.fetch(url, options);

@@ -7,6 +7,7 @@ export { createRuntimeSession } from './session.js';
 export { createErpAdapters } from './erp-adapters.js';
 export { resolveBlueprintPresentation } from './presentation.js';
 export * from './resolver.js';
+export { navigationTarget } from './navigation.js';
 
 // ERP and external hosts use exactly the same original renderer dispatch.
 export const BlueprintRenderer = forwardRef(function BlueprintRenderer({ kind = 'TABLE', adapters, ...props }, ref) {
