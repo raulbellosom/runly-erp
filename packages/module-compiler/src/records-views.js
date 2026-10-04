@@ -1,7 +1,7 @@
 // Normalization + reference validation for the records view kinds (CARDS,
 // CALENDAR, TIMELINE, REPORT). Kept out of definition.js so that file stays
 // focused on the module-level contract; mirrors the Kanban helpers there.
-import { RECORDS_VIEW_DATE_FIELD_TYPES, RECORDS_VIEW_KINDS, validateRecordsViewSchema } from '@runly/module-engine'
+import { RECORDS_VIEW_DATE_FIELD_TYPES, RECORDS_VIEW_KINDS, validateRecordsViewSchema } from '@runly/module-engine/browser'
 import { moduleSlug, toKebab } from './templates/helpers.js'
 
 export { RECORDS_VIEW_KINDS }

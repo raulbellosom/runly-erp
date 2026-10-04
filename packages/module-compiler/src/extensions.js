@@ -5,7 +5,7 @@
 // package differs from what the Builder generates only by such extensions.
 // See docs/superpowers/specs/2026-09-28-rme3-builder-code-extensions-design.md.
 
-import { isDeveloperDocPath } from './developer-docs.js'
+import { isDeveloperDocPath } from './developer-doc-paths.js'
 
 export const EXTENSIONS_MAX_BYTES = 1.5 * 1024 * 1024
 export const DEFINITION_FILE = '.module-definition.json'
@@ -43,7 +43,7 @@ export function validateExtensions(definition, permissionKeys, errors) {
     if (paths.has(file?.path)) errors.push(diagnostic(`${path}.path`, 'EXTENSION_DUPLICATE_PATH', `Duplicate extension file "${file?.path}".`))
     paths.add(file?.path)
     if (typeof file?.content !== 'string' || UNSAFE_TEXT.test(file.content)) errors.push(diagnostic(`${path}.content`, 'EXTENSION_NOT_TEXT', `"${file?.path}" must be a text file.`))
-    else bytes += Buffer.byteLength(file.content)
+    else bytes += new TextEncoder().encode(file.content).byteLength
   })
   if (bytes > EXTENSIONS_MAX_BYTES) errors.push(diagnostic(`${base}.files`, 'EXTENSIONS_TOO_LARGE', 'Code extensions exceed 1.5 MB.'))
   ;(extensions.views ?? []).forEach((view, index) => {

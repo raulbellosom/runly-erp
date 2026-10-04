@@ -1,4 +1,4 @@
-import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, RESERVED_NAMESPACES, isModuleIconName, validateDashboardSchema, validateKanbanSchema } from '@runly/module-engine'
+import { FIELD_TYPES, KANBAN_GROUP_FIELD_TYPES, KANBAN_MAX_COLUMNS, RESERVED_NAMESPACES, isModuleIconName, validateDashboardSchema, validateKanbanSchema } from '@runly/module-engine/browser'
 import { moduleSlug, permKey, toKebab } from './templates/helpers.js'
 import { isRecordsViewKind, normalizeRecordsView, validateRecordsView } from './records-views.js'
 import { validateEntityLayout, validateFileFieldOptions } from './layout.js'
@@ -56,6 +56,9 @@ export function validateModuleDefinition(definition) {
   if (!Array.isArray(definition.entities) || !definition.entities.length) {
     errors.push(diagnostic('entities', 'REQUIRED', 'At least one entity is required.'))
     return { valid: false, errors, warnings }
+  }
+  for (const key of ['consumes', 'events']) {
+    if (definition[key] !== undefined) errors.push(diagnostic(key, 'BUILDER_INTEGRATION_UNSUPPORTED', `${key} is supported in manual manifests but not preserved by ModuleDefinition v1.`))
   }
   const entityKeys = new Set()
   definition.entities.forEach((entity, entityIndex) => {

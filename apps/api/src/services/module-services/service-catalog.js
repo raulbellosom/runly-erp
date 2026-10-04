@@ -94,11 +94,7 @@ export function createServiceCatalog({ prisma }) {
 }
 
 // Static metadata (labels, owning module) for consent dialogs and docs.
-export const SERVICE_KEYS = Object.freeze([
-  'runly.inventory:items.read', 'runly.inventory:items.search',
-  'runly.contacts:contacts.read', 'runly.contacts:contacts.search', 'runly.contacts:contacts.create',
-  'runly.projects:tasks.read', 'runly.projects:tasks.create',
-])
+export { SERVICE_KEYS } from '@runly/module-engine/contracts'
 
 export function splitServiceKey(serviceKey) {
   const [moduleKey, name] = String(serviceKey ?? '').split(':')

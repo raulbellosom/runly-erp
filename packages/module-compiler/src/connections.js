@@ -2,7 +2,7 @@
 // `connections` contract (packages/module-engine/src/manifest-connections.js),
 // emitted verbatim into module.manifest.js. Spec
 // docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md §15.1.
-import { validateConnections } from '@runly/module-engine'
+import { validateConnections } from '@runly/module-engine/browser'
 
 // Targets whose owning module has a "Conexiones" screen; the API accepts other
 // relation targets but nobody could activate them yet.

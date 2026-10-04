@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "key": "custom.inspection",
+  "name": "Inspección",
+  "version": "1.0.0",
+  "icon": "Boxes",
+  "color": "#2563EB",
+  "pwa": { "shortName": "Inspección", "startPath": "/samples" },
+  "entities": [{
+    "key": "sample", "label": "Muestra", "pluralLabel": "Muestras",
+    "fields": [{ "key": "name", "label": "Nombre", "type": "text", "required": true,
+      "fieldId": "01900000-0000-7000-8000-000000000001" }]
+  }]
+}

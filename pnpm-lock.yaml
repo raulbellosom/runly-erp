@@ -46,6 +46,9 @@ importers:
       '@runly/core':
         specifier: workspace:*
         version: link:packages/core
+      '@runly/module-compiler':
+        specifier: workspace:*
+        version: link:packages/module-compiler
       '@runly/module-engine':
         specifier: workspace:*
         version: link:packages/module-engine
@@ -491,8 +494,11 @@ importers:
       '@runly/module-engine':
         specifier: workspace:*
         version: link:../module-engine
+      acorn:
+        specifier: 8.16.0
+        version: 8.16.0
       jszip:
-        specifier: ^3.10.1
+        specifier: 3.10.1
         version: 3.10.1
     devDependencies:
       esbuild:

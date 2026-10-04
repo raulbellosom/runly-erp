@@ -5,12 +5,10 @@
 //
 // Usage: node scripts/catalog/sign-package.mjs <module.zip> --url <packageUrl>
 //          [--key ~/.runly/catalog-signing-key.pem] [--changelog "texto"]
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, openSync, fstatSync, readSync, closeSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
-import { randomUUID } from 'node:crypto'
-import JSZip from 'jszip'
+import { inspectModuleZip, DEFAULT_INSPECTION_LIMITS } from '@runly/module-compiler/inspection'
 import { sha256Of, signEntry } from '../../apps/api/src/services/catalog/catalog-crypto.js'
 
 const args = process.argv.slice(2)
@@ -18,21 +16,29 @@ const option = (name, fallback = null) => { const i = args.indexOf(`--${name}`);
 const zipPath = args.find((arg, index) => !arg.startsWith('--') && !args[index - 1]?.startsWith('--'))
 if (!zipPath) { console.error('Usage: sign-package.mjs <module.zip> --url <packageUrl> [--key path] [--changelog text]'); process.exit(1) }
 const keyPath = path.resolve(option('key', path.join(os.homedir(), '.runly', 'catalog-signing-key.pem')))
-const buffer = readFileSync(zipPath)
-
-// Import the manifest from a temp copy inside the repo so @runly/module-engine resolves.
-const zip = await JSZip.loadAsync(buffer)
-const manifestFile = zip.file('module.manifest.js')
-if (!manifestFile) { console.error('The ZIP has no module.manifest.js at its root.'); process.exit(1) }
-const tmp = path.resolve('node_modules', '.cache', 'runly-sign', randomUUID())
-mkdirSync(tmp, { recursive: true })
-let manifest
+const descriptor = openSync(zipPath, 'r')
+let buffer
 try {
-  writeFileSync(path.join(tmp, 'module.manifest.mjs'), await manifestFile.async('string'))
-  manifest = (await import(pathToFileURL(path.join(tmp, 'module.manifest.mjs')).href)).default
-} finally {
-  rmSync(tmp, { recursive: true, force: true })
+  const stat = fstatSync(descriptor)
+  if (!stat.isFile() || stat.size > DEFAULT_INSPECTION_LIMITS.zipBytes) throw new Error('ZIP must be a file of at most 25 MiB.')
+  const bytes = Buffer.alloc(stat.size + 1)
+  let offset = 0
+  while (offset < bytes.length) {
+    const count = readSync(descriptor, bytes, offset, bytes.length - offset, null)
+    if (!count) break
+    offset += count
+  }
+  if (offset !== stat.size) throw new Error('ZIP changed during reading.')
+  buffer = bytes.subarray(0, offset)
+} finally { closeSync(descriptor) }
+
+// Inspect before reading the signing key. Never load JavaScript from the ZIP.
+const report = inspectModuleZip(buffer)
+if (!report.valid) {
+  console.error(JSON.stringify(report.diagnostics, null, 2))
+  process.exit(1)
 }
+const manifest = report.manifest
 
 const sha256 = sha256Of(buffer)
 const entry = {

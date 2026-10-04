@@ -5,13 +5,27 @@
   "private": true,
   "exports": {
     ".": "./src/index.js",
-    "./layout-views": "./src/templates/layout-views.js"
+    "./layout-views": "./src/templates/layout-views.js",
+    "./browser": "./src/browser.js",
+    "./server": "./src/index.js",
+    "./contracts": "./src/contracts.js",
+    "./inspection": "./src/inspection/index.js",
+    "./compile": "./src/compiler.js",
+    "./archive": "./src/archive.js"
   },
   "dependencies": {
     "@runly/module-engine": "workspace:*",
-    "jszip": "^3.10.1"
+    "jszip": "3.10.1",
+    "acorn": "8.16.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
-  }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test src/__tests__/*.test.js"
+  },
+  "license": "UNLICENSED"
 }

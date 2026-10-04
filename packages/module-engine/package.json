@@ -4,12 +4,21 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./browser": "./src/browser.js",
+    "./server": "./src/index.js",
+    "./contracts": "./src/contracts.js"
   },
   "description": "Runly Module Engine v3 \u2014 defineRunlyModule, defineModel, defineView, definePage, SQL generator, checksum",
   "license": "UNLICENSED",
   "dependencies": {
     "@runly/core": "workspace:*",
     "@atlas/core": "workspace:@runly/core@*"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test src/__tests__/*.test.js"
   }
 }
