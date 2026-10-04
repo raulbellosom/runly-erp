@@ -105,12 +105,15 @@ test('invalid automation shapes and UUID literals yield diagnostics and block co
     (a) => { a.action.args = null },
     (a) => { a.action.args.sourceEntityId = { from: 'value', value: 'not-a-uuid' } },
     (a) => { a.action.service = '__proto__' },
+    (a) => { a.action.args.toString = { from: 'value', value: 'ignored' } },
+    (a) => { a.trigger = { type: 'event', event: 'toString' }; a.action = { service: 'runly.contacts:contacts.create', args: { name: { from: 'value', value: 'Ana' } } } },
   ]) {
     const input = structuredClone(BASE)
     change(input.automations[0])
     assert.equal(validateModuleDefinition(input).valid, false)
     assert.throws(() => compileModule(input))
   }
+  assert.ok(codes({ ...BASE, automations: null }).includes('AUTOMATIONS_INVALID'))
 })
 
 test('generated runtime maps args, conditions and idempotency', async () => {

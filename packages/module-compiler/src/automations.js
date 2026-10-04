@@ -70,7 +70,7 @@ function validateArgs(automation, { base, fieldNames, trigger, contract, errors 
   if (!args || typeof args !== 'object' || Array.isArray(args)) { errors.push(diagnostic(`${base}.action.args`, 'AUTOMATION_ARGS_INVALID', 'Args must be an object.')); return }
   for (const [name, source] of Object.entries(args)) {
     const path = `${base}.action.args.${name}`
-    if (!contract.args[name] || name === 'idempotencyKey') { errors.push(diagnostic(path, 'AUTOMATION_ARG_UNKNOWN', `The service does not accept "${name}".`)); continue }
+    if (!Object.hasOwn(contract.args, name) || name === 'idempotencyKey') { errors.push(diagnostic(path, 'AUTOMATION_ARG_UNKNOWN', `The service does not accept "${name}".`)); continue }
     if (!source || !AUTOMATION_ARG_SOURCES.includes(source.from)) { errors.push(diagnostic(path, 'AUTOMATION_ARG_INVALID', `Source must be one of ${AUTOMATION_ARG_SOURCES.join(', ')}.`)); continue }
     if (source.from === 'field' && !fieldNames.has(source.field)) errors.push(diagnostic(path, 'AUTOMATION_FIELD_NOT_FOUND', `Field "${source.field}" is not available for this trigger.`))
     if (source.from === 'template') {
@@ -97,7 +97,7 @@ function validateArgs(automation, { base, fieldNames, trigger, contract, errors 
 
 export function validateDefinitionAutomations(definition, errors) {
   const list = definition.automations
-  if (list === undefined || list === null) return
+  if (list === undefined) return
   if (!Array.isArray(list)) { errors.push(diagnostic('automations', 'AUTOMATIONS_INVALID', 'automations must be an array.')); return }
   if (list.length > MAX_AUTOMATIONS) errors.push(diagnostic('automations', 'AUTOMATIONS_LIMIT', `At most ${MAX_AUTOMATIONS} automations.`))
   const entities = new Map((definition.entities ?? []).map((entity) => [entityKey(entity), entity]))
@@ -119,8 +119,8 @@ export function validateDefinitionAutomations(definition, errors) {
       else fieldNames = new Set((entity.fields ?? []).map(fieldKey))
       if (!RECORD_TRIGGER_ON.includes(trigger.on)) errors.push(diagnostic(`${base}.trigger.on`, 'AUTOMATION_TRIGGER_INVALID', `on must be one of ${RECORD_TRIGGER_ON.join(', ')}.`))
     } else if (trigger.type === 'event') {
-      if (!DOMAIN_EVENTS[trigger.event]) errors.push(diagnostic(`${base}.trigger.event`, 'AUTOMATION_EVENT_UNKNOWN', `Unknown event "${trigger.event}".`))
-      fieldNames = new Set(DOMAIN_EVENT_PAYLOADS[trigger.event] ?? [])
+      if (!Object.hasOwn(DOMAIN_EVENTS, trigger.event ?? '')) errors.push(diagnostic(`${base}.trigger.event`, 'AUTOMATION_EVENT_UNKNOWN', `Unknown event "${trigger.event}".`))
+      fieldNames = new Set(Object.hasOwn(DOMAIN_EVENT_PAYLOADS, trigger.event ?? '') ? DOMAIN_EVENT_PAYLOADS[trigger.event] : [])
     } else {
       errors.push(diagnostic(`${base}.trigger.type`, 'AUTOMATION_TRIGGER_INVALID', 'Trigger type must be record or event.'))
     }
