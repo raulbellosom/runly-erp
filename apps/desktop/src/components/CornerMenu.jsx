@@ -74,7 +74,13 @@ function MenuItem({ item, pos, active, delay, onSelect }) {
   );
 }
 
-// Mobile corner menu: pull the grip in the bottom-left corner outward and an
+// Bottom-right corner (the left edge is the browser/OS back-swipe gesture):
+// the arc fans up and to the left.
+function mirror(p) {
+  return { x: -p.x, y: p.y };
+}
+
+// Mobile corner menu: pull the grip in the bottom-right corner outward and an
 // arc of options fans out. Inner ring = quick actions, outer ring = favorite
 // (then recent) apps. Release over an option runs it; a plain tap opens the
 // menu so options can be tapped instead.
@@ -129,7 +135,7 @@ export function CornerMenu() {
     const rect = gripRef.current.getBoundingClientRect();
     // Origin sits a little inside the corner so labels of the first/last
     // items (nearly vertical / horizontal) never fall off the screen edge.
-    const origin = { x: rect.left + 30, y: rect.bottom - 44 };
+    const origin = { x: rect.right - 30, y: rect.bottom - 44 };
     gestureRef.current = { start: { x: e.clientX, y: e.clientY }, moved: false };
     e.currentTarget.setPointerCapture(e.pointerId);
     setMenu({ origin, mode: "drag" });
@@ -142,7 +148,9 @@ export function CornerMenu() {
     if (!g || !menu) return;
     if (Math.hypot(e.clientX - g.start.x, e.clientY - g.start.y) > TAP_MAX_MOVE) g.moved = true;
     setFinger({ x: e.clientX, y: e.clientY });
-    const next = pickCornerItem(e.clientX - menu.origin.x, e.clientY - menu.origin.y, counts);
+    // Bottom-right corner: mirror x so the shared geometry (which fans up and
+    // to the right) fans up and to the left instead.
+    const next = pickCornerItem(menu.origin.x - e.clientX, e.clientY - menu.origin.y, counts);
     setSelection((prev) => {
       if (next && (prev?.ring !== next.ring || prev?.index !== next.index)) vibrate(6);
       return next;
@@ -192,18 +200,22 @@ export function CornerMenu() {
           onPointerUp={onPointerUp}
           onPointerCancel={close}
           className={cn(
-            "fixed bottom-0 left-0 flex h-14 w-14 touch-none select-none items-end justify-start",
+            "fixed bottom-0 right-0 flex h-14 w-14 touch-none select-none items-end justify-end",
             menu && "opacity-0",
           )}
           style={{
             zIndex: Z_CORNER,
-            paddingLeft: "max(6px, env(safe-area-inset-left))",
+            paddingRight: "max(6px, env(safe-area-inset-right))",
             paddingBottom: "max(6px, env(safe-area-inset-bottom))",
           }}
         >
           <span
             aria-hidden
-            className="block h-7 w-7 rounded-tr-full border-r-2 border-t-2 border-(--brand-primary)/70 bg-(--brand-primary)/15 shadow-sm backdrop-blur-sm"
+            className="block h-12 w-12"
+            style={{
+              background:
+                "radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--brand-primary) 55%, transparent) 0%, color-mix(in srgb, var(--brand-primary) 18%, transparent) 45%, transparent 72%)",
+            }}
           />
         </button>
       )}
@@ -257,7 +269,7 @@ export function CornerMenu() {
 
             <p
               aria-live="polite"
-              className="pointer-events-none absolute left-4 font-semibold text-white drop-shadow"
+              className="pointer-events-none absolute right-4 text-right font-semibold text-white drop-shadow"
               style={{ top: menu.origin.y - CORNER_RINGS[1].radius - 84 }}
             >
               <span className="block text-[11px] font-medium uppercase tracking-wider text-white/60">
@@ -272,7 +284,7 @@ export function CornerMenu() {
                   <MenuItem
                     key={item.id}
                     item={item}
-                    pos={itemOffset(i, items.length, CORNER_RINGS[ringIdx].radius)}
+                    pos={mirror(itemOffset(i, items.length, CORNER_RINGS[ringIdx].radius))}
                     active={selection?.ring === ringIdx && selection?.index === i}
                     delay={(ringIdx * 3 + i) * 0.025}
                     onSelect={() => run(item)}
@@ -284,7 +296,7 @@ export function CornerMenu() {
               {rings.map((items, ringIdx) =>
                 (menu.mode === "tap" || ringIdx === 0) &&
                 items.map((item, i) => {
-                  const p = itemOffset(i, items.length, CORNER_RINGS[ringIdx].radius);
+                  const p = mirror(itemOffset(i, items.length, CORNER_RINGS[ringIdx].radius));
                   return (
                     <motion.span
                       key={`label-${item.id}`}
