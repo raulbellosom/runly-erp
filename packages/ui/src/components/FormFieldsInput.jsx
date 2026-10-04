@@ -6,7 +6,8 @@
 // every existing import path (package index and sibling components) keeps
 // working without edits.
 import { useState, useEffect, forwardRef, useId } from "react";
-import { Eye, EyeOff, Check } from "lucide-react";
+import { Eye, EyeOff, Check, KeyRound, Type, Hash } from "lucide-react";
+import { autoFieldIcon } from "../lib/field-icon-inference.js";
 import { cn } from "../lib/utils.js";
 import { useOverlayAutoComplete } from "./overlay-surface-context.js";
 import {
@@ -28,7 +29,7 @@ export const TextField = forwardRef(function TextField(
     validate,
     onBlur,
     id,
-    icon,
+    icon: iconProp,
     className,
     autoComplete,
     ...props
@@ -38,6 +39,8 @@ export const TextField = forwardRef(function TextField(
   const [localError, setLocalError] = useState("");
   const error = externalError || localError;
   const resolvedAutoComplete = useOverlayAutoComplete(autoComplete);
+  // No `icon` prop: infer one from name/label (`icon={null}` opts out).
+  const icon = autoFieldIcon(iconProp, { label, name: props.name, id }, Type);
 
   function handleBlur(e) {
     if (validate) setLocalError(validate(e.target.value) || "");
@@ -120,13 +123,14 @@ export function PasswordField({
   validate,
   onBlur,
   id,
-  icon,
+  icon: iconProp,
   showStrength = false,
   value,
   onChange,
   className,
   ...props
 }) {
+  const icon = iconProp === undefined && label ? KeyRound : iconProp;
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const [visible, setVisible] = useState(false);
@@ -355,7 +359,7 @@ export const NumberField = forwardRef(function NumberField(
     onBlur,
     onKeyDown,
     id,
-    icon,
+    icon: iconProp,
     prefix,
     suffix,
     className,
@@ -365,6 +369,7 @@ export const NumberField = forwardRef(function NumberField(
   },
   ref,
 ) {
+  const icon = prefix ? iconProp : autoFieldIcon(iconProp, { label, name: props.name, id }, Hash);
   const [localError, setLocalError] = useState("");
   const error = externalError || localError;
 

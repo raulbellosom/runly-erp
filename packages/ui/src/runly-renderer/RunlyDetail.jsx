@@ -24,6 +24,7 @@ import { HeroContainer } from "./runly-detail-hero.jsx";
 import { resolveSchemaTabs, tabOfSection } from "./schema-tabs.js";
 import { isElementVisible, matchesVisibilityRule, visibleSections as filterVisibleSections } from "./visibility-rules.js";
 import { SchemaTabBar } from "./SchemaTabBar.jsx";
+import { resolveFieldIcon } from "./field-icons.js";
 import { cn } from "../lib/utils.js";
 
 const STATUS_LABELS = {
@@ -470,7 +471,8 @@ function gridClass(columns) {
 
 
 function FieldLabel({ field }) {
-  const Icon = resolveIcon(field?.icon) ?? null;
+  // Explicit blueprint icon first, else one inferred from the field.
+  const Icon = resolveIcon(field?.icon) ?? resolveFieldIcon({ ...field, icon: null });
 
   if (!Icon) {
     return <>{field.label}</>;

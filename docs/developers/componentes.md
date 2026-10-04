@@ -339,6 +339,8 @@ Menú de acciones. Se compone con `DropdownMenuTrigger`, `DropdownMenuContent`, 
 
 Todos aceptan `label`, `required`, `error` (texto rojo bajo el campo), `hint` (ayuda), `disabled` y `className`.
 
+Icono automático: `TextField`, `NumberField`, `PasswordField` y los selectores (`SelectField`, `ComboboxField`, `CreatableComboboxField`, `RelationSelectField`) muestran un icono representativo a la izquierda aunque no pases `icon`: se deduce del `name` y del `label` (por ejemplo "Correo" → sobre, "Teléfono" → teléfono, "Dirección" → pin, "Puesto" → maletín). Solo ocurre si el campo tiene `label`. Pasa `icon={Otro}` para elegir uno o `icon={null}` para quitarlo.
+
 ### TextField
 
 Texto de una línea. Además acepta todas las props de un input (`value`, `onChange`, `type`, `placeholder`, `maxLength`…) y `icon` (componente lucide al inicio).
@@ -348,7 +350,7 @@ Texto de una línea. Además acepta todas las props de un input (`value`, `onCha
 | `value` | string | Valor |
 | `onChange` | `(event) => void` | **Recibe el evento**: usa `e.target.value` |
 | `type` | `text` · `email` · `number` · `password` · `url` | Tipo de dato |
-| `icon` | componente lucide | Icono a la izquierda |
+| `icon` | componente lucide · `null` | Icono a la izquierda (automático si se omite; `null` lo quita) |
 | `validate` | `(value) => string` | Valida al salir del campo; devuelve el mensaje de error o `''` |
 
 ```jsx

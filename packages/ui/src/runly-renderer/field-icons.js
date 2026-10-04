@@ -1,18 +1,37 @@
 // Field icons for RunlyForm inputs and RunlyDetail labels: any lucide icon by
-// name ("MapPin" or "map-pin"), else a sensible default for the field type so
-// every input says at a glance what it holds.
+// name ("MapPin" or "map-pin"), else one inferred from the field so every
+// input says at a glance what it holds — even when the blueprint declares
+// a plain `type: "text"` and no `icon`.
+//
+// Resolution order: explicit `icon` -> strong type default (date, email...)
+// -> field name/key -> field label (Spanish) -> weak type fallback.
 import * as Lucide from "lucide-react";
+import { inferFieldIcon } from "../lib/field-icon-inference.js";
 
-const TYPE_DEFAULTS = {
+export { inferFieldIcon };
+
+const STRONG_TYPE_DEFAULTS = {
   date: Lucide.CalendarDays,
   datetime: Lucide.CalendarDays,
   email: Lucide.Mail,
   phone: Lucide.Phone,
-  number: Lucide.Hash,
-  integer: Lucide.Hash,
-  decimal: Lucide.DollarSign,
   currency: Lucide.DollarSign,
   url: Lucide.Link2,
+};
+
+const WEAK_TYPE_DEFAULTS = {
+  number: Lucide.Hash,
+  integer: Lucide.Hash,
+  decimal: Lucide.Hash,
+  text: Lucide.Type,
+  textarea: Lucide.AlignLeft,
+  markdown: Lucide.AlignLeft,
+  select: Lucide.List,
+  relation: Lucide.Link2,
+  boolean: Lucide.ToggleLeft,
+  file: Lucide.Paperclip,
+  color: Lucide.Palette,
+  "hex-color": Lucide.Palette,
 };
 
 // `icons` holds the canonical names; aliases (Building2, ...) are only
@@ -34,5 +53,11 @@ export function lucideByName(name) {
 }
 
 export function resolveFieldIcon(field) {
-  return lucideByName(field?.icon) ?? TYPE_DEFAULTS[field?.type] ?? null;
+  return (
+    lucideByName(field?.icon) ??
+    STRONG_TYPE_DEFAULTS[field?.type] ??
+    inferFieldIcon(field) ??
+    WEAK_TYPE_DEFAULTS[field?.type] ??
+    null
+  );
 }

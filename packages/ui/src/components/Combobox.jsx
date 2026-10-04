@@ -23,7 +23,8 @@
 // full keyboard support and focus return to the trigger.
 import { forwardRef, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, List, X } from "lucide-react";
+import { autoFieldIcon } from "../lib/field-icon-inference.js";
 import { cn } from "../lib/utils.js";
 import { useIsolatedScroll } from "../hooks/useIsolatedScroll.js";
 import { useComboboxPopover } from "../hooks/useComboboxPopover.js";
@@ -79,7 +80,7 @@ export const Combobox = forwardRef(function Combobox(
     required,
     error,
     hint,
-    icon: LeadingIcon,
+    icon: LeadingIconProp,
     className,
     triggerClassName,
     options: rawOptions = [],
@@ -356,6 +357,13 @@ export const Combobox = forwardRef(function Combobox(
       </span>
     );
   }
+  // No `icon` prop: infer one from the label unless the options carry their
+  // own visuals (avatar/color/icon), which take the leading slot instead.
+  const hasOptionVisuals = options.some((o) => o.avatar !== undefined || o.color || o.icon);
+  const LeadingIcon =
+    LeadingIconProp === undefined && !hasOptionVisuals && !multiple
+      ? autoFieldIcon(undefined, { label, id }, List)
+      : LeadingIconProp;
   const leading = LeadingIcon ? (
     <LeadingIcon size={15} strokeWidth={1.75} className="shrink-0 text-muted-foreground" />
   ) : (
