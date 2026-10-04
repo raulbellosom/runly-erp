@@ -186,7 +186,7 @@ export function HomeFeaturedTile({
   );
 }
 
-// ---- Recent chip: pill shown inside the hero "Continuar" row ----
+// ---- Recent chip: pill shown in the header "Continuar" row ----
 export function HomeRecentChip({ module, onClick, isOfflineBlocked }) {
   return (
     <button
@@ -195,8 +195,8 @@ export function HomeRecentChip({ module, onClick, isOfflineBlocked }) {
       disabled={isOfflineBlocked}
       title={module.name}
       className={cn(
-        "flex min-h-11 max-w-56 items-center gap-2 rounded-full border border-white/10 bg-white/6 py-1 pl-1 pr-3.5 text-left text-sm font-medium text-white/90",
-        "transition-colors duration-200 hover:border-white/25 hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brand-primary)",
+        "flex min-h-10 max-w-56 items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1 pl-1 pr-3.5 text-left text-sm font-medium text-[hsl(var(--foreground))]",
+        "transition-colors duration-200 hover:border-[hsl(var(--muted-foreground))]/40 hover:bg-[hsl(var(--muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
         "disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer",
       )}
     >

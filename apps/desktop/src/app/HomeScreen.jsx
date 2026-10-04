@@ -8,8 +8,12 @@ import { AppViewControls } from "../components/AppViewControls";
 import { AppContextMenu } from "../components/AppContextMenu";
 import { ModuleListRow } from "../components/ModuleCard";
 import { filterModulesByQuery, readRecentModuleKeys } from "../lib/recentModules";
-import { HomeHero } from "./home/HomeHero";
+import { availableWidgets } from "../lib/homeWidgets";
+import { useHomeWidgetPrefs } from "../hooks/useHomeWidgetPrefs";
+import { HomeHeader } from "./home/HomeHeader";
 import { HomeAppTile, HomeFeaturedTile } from "./home/HomeAppTiles";
+import { HomeWidgetBoard, HomeWidgetCustomizer } from "./home/HomeWidgetBoard";
+import { HOME_WIDGETS } from "./home/widgets/registry";
 
 const RECENT_LIMIT = 6;
 const COMPACT_GRID = "grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
@@ -65,16 +69,26 @@ export function HomeScreen() {
 
   const firstName = userProfile?.firstName ?? userProfile?.displayName ?? "tú";
 
-  const recentModules = useMemo(() => {
-    const byKey = new Map(availableModules.map((m) => [m.key, m]));
-    return recentKeys.map((k) => byKey.get(k)).filter(Boolean).slice(0, RECENT_LIMIT);
-  }, [availableModules, recentKeys]);
 
   const results = useMemo(
     () => (query.trim() ? filterModulesByQuery(availableModules, query) : null),
     [availableModules, query],
   );
-  const favoriteCount = availableModules.filter((m) => isFavorite(m.key)).length;
+
+  const widgetPrefs = useHomeWidgetPrefs();
+  const modulesByKey = useMemo(
+    () => new Map(availableModules.map((m) => [m.key, m])),
+    [availableModules],
+  );
+  const offeredWidgets = useMemo(
+    () => availableWidgets(HOME_WIDGETS, modulesByKey.keys()),
+    [modulesByKey],
+  );
+  const shownWidgets = offeredWidgets.filter((w) => !widgetPrefs.hidden.includes(w.id));
+  const recentModules = useMemo(
+    () => recentKeys.map((k) => modulesByKey.get(k)).filter(Boolean).slice(0, RECENT_LIMIT),
+    [modulesByKey, recentKeys],
+  );
 
   // "/" focuses the app search from anywhere on Home (unless already typing).
   useEffect(() => {
@@ -131,11 +145,9 @@ export function HomeScreen() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 px-4 py-6 md:px-8 md:py-8">
-      <HomeHero
+      <HomeHeader
         ref={searchRef}
         firstName={firstName}
-        appCount={availableModules.length}
-        favoriteCount={favoriteCount}
         isOffline={modulesError}
         query={query}
         onQueryChange={setQuery}
@@ -143,7 +155,18 @@ export function HomeScreen() {
         recentModules={recentModules}
         onLaunch={launch}
         isOfflineBlocked={isOfflineBlocked}
+        actions={
+          <HomeWidgetCustomizer
+            widgets={offeredWidgets}
+            hidden={widgetPrefs.hidden}
+            onToggle={widgetPrefs.toggle}
+          />
+        }
       />
+
+      {!query && !modulesLoading && !widgetPrefs.isLoading && (
+        <HomeWidgetBoard widgets={shownWidgets} modulesByKey={modulesByKey} />
+      )}
 
       {modulesLoading ? (
         <div className="space-y-8">
