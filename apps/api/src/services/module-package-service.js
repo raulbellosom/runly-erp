@@ -25,7 +25,7 @@ async function readComponentFiles(packageDir) {
   await walk(root)
   return out
 }
-import { buildUpdateReport, invalidPackageReport } from './module-update-report.js'
+import { buildUpdateReport, describeStructure, invalidPackageReport } from './module-update-report.js'
 import { invalidateModuleCaches } from './module-cache-service.js'
 import { acquireModuleLock as acquireModuleLockWithRecovery, ModulePackageLockBusyError } from './module-package-lock-service.js'
 
@@ -205,14 +205,17 @@ export function createModulePackageService({
             operations: preflight.schemaMigration.operations,
           },
         })
+        // Client-facing plan: described rows for the decisions UI, no migration sources.
+        const { dataMigrationSources: _sources, ...planDetails } = preflight.schemaMigration
+        const details = { ...planDetails, structure: describeStructure(preflight.schemaMigration) }
         if (preflight.schemaMigration.drift?.length) {
           throw Object.assign(new Error('SCHEMA_DRIFT_DETECTED'), {
-            code: 'SCHEMA_DRIFT_DETECTED', statusCode: 409, details: preflight.schemaMigration,
+            code: 'SCHEMA_DRIFT_DETECTED', statusCode: 409, details,
           })
         }
         if (preflight.schemaMigration.required && !preflight.schemaMigration.canAutoApply) {
           throw Object.assign(new Error('SCHEMA_MIGRATION_UNSUPPORTED'), {
-            code: 'SCHEMA_MIGRATION_UNSUPPORTED', statusCode: 409, details: preflight.schemaMigration,
+            code: 'SCHEMA_MIGRATION_UNSUPPORTED', statusCode: 409, details,
           })
         }
       }

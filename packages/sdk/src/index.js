@@ -442,6 +442,16 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
         request(`/modules/${encodeURIComponent(key)}/backups`, {
           headers: withAuthHeaders(token),
         }),
+      archivedFields: (key, token) =>
+        request(`/modules/${encodeURIComponent(key)}/archived-fields`, {
+          headers: withAuthHeaders(token),
+        }),
+      purgeArchivedField: (key, { table, field }, token) =>
+        request(`/modules/${encodeURIComponent(key)}/archived-fields/purge`, {
+          method: "POST",
+          headers: withAuthHeaders(token),
+          body: JSON.stringify({ table, field, confirmation: "ELIMINAR" }),
+        }),
       restoreBackup: (key, backupId, token) =>
         request(`/modules/${encodeURIComponent(key)}/backups/${encodeURIComponent(backupId)}/restore`, {
           method: "POST",

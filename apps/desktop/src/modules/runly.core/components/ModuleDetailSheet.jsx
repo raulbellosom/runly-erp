@@ -50,6 +50,7 @@ import {
   isLocked,
   statusLabel,
 } from "../lib/moduleCatalogHelpers";
+import { ModuleBackupsSection } from "./ModuleBackupsSection";
 
 // ---- Sheet action panel ----
 function SheetActions({
@@ -544,6 +545,10 @@ export function ModuleDetailSheet({
                       ))}
                     </div>
                   </div>
+                )}
+
+                {module.key?.startsWith("custom.") && module.status === "INSTALLED" && (
+                  <ModuleBackupsSection moduleKey={module.key} token={token} />
                 )}
 
                 {/* Actions */}

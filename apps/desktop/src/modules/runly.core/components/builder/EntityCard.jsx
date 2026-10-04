@@ -25,6 +25,7 @@ import {
 import { EntityFieldList } from "./EntityFieldList";
 import { FieldSheet } from "./FieldSheet";
 import { LayoutDesignerSheet } from "./LayoutDesignerSheet";
+import { ArchivedFieldsPanel } from "./ArchivedFieldsPanel";
 
 // addField() only knows key/label/type; the extra attributes the sheet
 // collects (required, options, targetEntity) are applied to the field it
@@ -158,6 +159,7 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
               />
             )}
           </div>
+          <ArchivedFieldsPanel entity={entity} definition={definition} published={Boolean(publishedDefinition)} readOnly={readOnly} onChange={onChange} />
         </div>
       )}
 
@@ -189,7 +191,7 @@ export function EntityCard({ entity, definition, onChange, publishedDefinition, 
         title="Eliminar campo"
         description={
           confirmDeleteField && fieldExistedInPublished(publishedDefinition, entity.key, confirmDeleteField.key)
-            ? `"${confirmDeleteField.label}" ya existe en la versión publicada. Eliminarlo es un cambio destructivo y bloqueará la publicación.`
+            ? `"${confirmDeleteField.label}" ya existe en la versión publicada. Al publicar se archiva: deja de mostrarse, pero sus datos se conservan y puedes restaurarlo.`
             : `Se eliminará "${confirmDeleteField?.label}" del borrador.`
         }
         confirmLabel="Eliminar"

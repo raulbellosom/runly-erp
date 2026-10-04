@@ -239,7 +239,7 @@ export function FieldSheet({ open, onOpenChange, field, entity, definition, exis
           {existedInPublished && (
             <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Este campo ya existe en la versión publicada. Eliminarlo o cambiar su tipo puede bloquear la publicación.
+              Este campo ya existe en la versión publicada. Si lo eliminas se archiva con sus datos; si cambias su tipo, al publicar se convierten los registros y se te pedirá qué hacer con los que no se puedan convertir.
             </p>
           )}
           <div className="space-y-4">

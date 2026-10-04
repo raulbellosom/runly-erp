@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { runly } from "../../../../lib/runly";
 import { CustomViewPreview } from "./CustomViewPreview";
 import { DesignReviewList } from "./DesignReviewList";
+import { StructureChangesTable, missingDecisions } from "./StructureChangesTable";
 
 function ReportList({ icon: Icon, title, items, tone }) {
   if (!items?.length) return null;
@@ -45,9 +46,10 @@ function BuilderImpact({ builder }) {
   );
 }
 
-async function applyModuleZip({ moduleKey, file, token }) {
+async function applyModuleZip({ moduleKey, file, token, decisions }) {
   const formData = new FormData();
   formData.append("file", file);
+  if (decisions && Object.keys(decisions).length) formData.append("decisions", JSON.stringify(decisions));
   const toastId = toast.loading(`Aplicando ${moduleKey}...`);
   try {
     const result = await runly.modules.uploadModuleZip(moduleKey, formData, token);
@@ -78,12 +80,14 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
   const [checking, setChecking] = useState(true);
   const [checkError, setCheckError] = useState("");
   const [applying, setApplying] = useState(false);
+  const [decisions, setDecisions] = useState({});
 
   useEffect(() => {
     let cancelled = false;
     setChecking(true);
     setCheckError("");
     setReport(null);
+    setDecisions({});
     const formData = new FormData();
     formData.append("file", file);
     runly.modules.checkModuleZip(moduleKey, formData, token)
@@ -101,7 +105,7 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
 
   async function apply() {
     setApplying(true);
-    const result = await applyModuleZip({ moduleKey, file, token });
+    const result = await applyModuleZip({ moduleKey, file, token, decisions });
     setApplying(false);
     if (result && !report.installed) {
       toast.info("Falta instalarlo", { description: "Ve al Catálogo de módulos e instala el módulo para usarlo y ver sus pantallas con datos." });
@@ -158,7 +162,9 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
 
       <BuilderImpact builder={report.builder} />
       <ReportList icon={ShieldAlert} title="No se puede aplicar" items={report.blockers} tone="bg-red-500/10 text-red-700 dark:text-red-300" />
-      {report.valid !== false && (
+      {report.structure?.length > 0 ? (
+        <StructureChangesTable rows={report.structure} decisions={decisions} onChange={setDecisions} disabled={applying} />
+      ) : report.valid !== false && (
         report.changes.length ? (
           <ReportList icon={Database} title="Cambios en la estructura de datos" items={report.changes} tone="bg-emerald-500/10 text-emerald-800 dark:text-emerald-300" />
         ) : (
@@ -187,7 +193,7 @@ export function ModuleUpdateReview({ moduleKey, file, token, onApplied, onChange
 
       <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 pt-3">
         <Button variant="outline" onClick={onChangeFile} disabled={applying}>Elegir otro archivo</Button>
-        <Button onClick={apply} disabled={report.blocked || applying}>
+        <Button onClick={apply} disabled={report.blocked || applying || missingDecisions(report.structure, decisions).length > 0}>
           <Rocket className="h-4 w-4" />
           {applying ? "Aplicando..." : report.installed ? "Aplicar actualización" : "Subir módulo"}
         </Button>

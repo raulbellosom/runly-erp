@@ -23,6 +23,11 @@ import { AlertTriangle, Rocket, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { runly } from "../../../../lib/runly";
 import { compareVersions, versionOptions } from "../../lib/versionSuggestion";
+import { StructureChangesTable, missingDecisions } from "../module-update/StructureChangesTable";
+
+// A blocked plan only needs the admin's decisions when every blocker is one.
+const DECIDABLE = new Set(["backfill_required", "conversion_failing_rows"]);
+const needsOnlyDecisions = (plan) => !plan?.drift?.length && (plan?.blockers ?? []).length > 0 && plan.blockers.every((entry) => DECIDABLE.has(entry.reason));
 
 // Version step: suggests patch / minor / major from what changed since the
 // last publish (lib/versionSuggestion.js) and saves the chosen version into
@@ -77,10 +82,11 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
   const [blocked, setBlocked] = useState(null);
   const [result, setResult] = useState(null);
   const [version, setVersion] = useState(null);
+  const [decisions, setDecisions] = useState({});
   const plan = versionOptions({ publishedVersion, publishedDefinition, definition });
 
   useEffect(() => {
-    if (!open) { setImpact(null); setBlocked(null); setResult(null); setVersion(null); return; }
+    if (!open) { setImpact(null); setBlocked(null); setResult(null); setVersion(null); setDecisions({}); return; }
     const draftVersion = definition?.version;
     setVersion(publishedVersion && compareVersions(draftVersion, publishedVersion) > 0 ? draftVersion : plan.suggested);
     setLoading(true);
@@ -94,6 +100,7 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
 
   async function handlePublish() {
     setPublishing(true);
+    const pendingPlan = blocked && needsOnlyDecisions(blocked) ? blocked : null;
     setBlocked(null);
     try {
       if (version && version !== definition?.version) {
@@ -101,7 +108,7 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
         await runly.builder.updateDefinition(projectId, { definition: next }, token);
         onVersionChange?.(version);
       }
-      const res = await runly.builder.publishProject(projectId, token);
+      const res = await runly.builder.publishProject(projectId, token, pendingPlan ? { decisions } : {});
       setResult(res.data);
       toast.success(res.data.installed ? "Módulo instalado correctamente." : "Módulo actualizado correctamente.");
       onPublished?.();
@@ -166,21 +173,22 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
           </div>
         )}
 
-        {blocked && (
+        {blocked && needsOnlyDecisions(blocked) && (
+          <div className="space-y-2">
+            <p className="text-sm">Esta versión cambia datos que ya existen. Indica qué hacer y vuelve a publicar; el borrador y el módulo instalado siguen intactos.</p>
+            <StructureChangesTable rows={blocked.structure} decisions={decisions} onChange={setDecisions} disabled={publishing} />
+          </div>
+        )}
+
+        {blocked && !needsOnlyDecisions(blocked) && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Publicación bloqueada — cambios destructivos</AlertTitle>
+            <AlertTitle>Publicación bloqueada</AlertTitle>
             <AlertDescription>
               <p className="mb-1">El borrador no se publicó. El módulo instalado y tus cambios siguen intactos.</p>
-              {Array.isArray(blocked.operations) && blocked.operations.some((op) => op.safety === "DESTRUCTIVE" || op.safety === "UNSUPPORTED") && (
+              {Array.isArray(blocked.structure) && blocked.structure.some((row) => row.blocker) && (
                 <ul className="list-disc pl-4 space-y-0.5">
-                  {blocked.operations
-                    .filter((op) => op.safety === "DESTRUCTIVE" || op.safety === "UNSUPPORTED")
-                    .map((op, i) => (
-                      <li key={i}>
-                        {op.type} — {op.table}{op.column ? `.${op.column}` : ""}
-                      </li>
-                    ))}
+                  {blocked.structure.filter((row) => row.blocker).map((row) => <li key={row.id}>{row.description}</li>)}
                 </ul>
               )}
               {Array.isArray(blocked.drift) && blocked.drift.length > 0 && (
@@ -203,8 +211,8 @@ export function PublishDialog({ open, onOpenChange, projectId, token, moduleKey,
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{result ? "Cerrar" : "Cancelar"}</Button>
           {!result && (
-            <Button onClick={handlePublish} disabled={publishing || loading}>
-              {publishing ? "Publicando..." : version ? `Publicar v${version}` : "Publicar"}
+            <Button onClick={handlePublish} disabled={publishing || loading || (blocked && (!needsOnlyDecisions(blocked) || missingDecisions(blocked.structure, decisions).length > 0))}>
+              {publishing ? "Publicando..." : blocked ? "Publicar con estas decisiones" : version ? `Publicar v${version}` : "Publicar"}
             </Button>
           )}
         </DialogFooter>

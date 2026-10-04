@@ -748,3 +748,12 @@ curl -X POST http://localhost:4010/<slug>/<entity>s \
 | `views/vehicle.table.js` | TABLE view with custom component reference |
 | `views/vehicle.form.js` | FORM view with relation fields |
 | `components/index.js` | register() pattern for custom components |
+
+## Schema evolution on update (Platform v2 Phase 4)
+
+- Give every model field a stable `id` (UUID) and never change it: same `id` + new `name` = column rename with data kept.
+- Removing a field archives it (column and data kept, NOT NULL dropped); re-adding the same name restores it. Explicit drop: Builder > Campos archivados > Eliminar.
+- Required fields on populated tables, NOT NULL changes and type conversions with failing rows need admin decisions in the update report (`structure[]`), sent back as `decisions`.
+- Data migrations: `migrations/NNN-name.js` exporting `up({ sql, query, companyIds, moduleKey })`, self-contained (no imports), run once inside the update transaction; ledger `module_migration` as `data__<file>`.
+- A backup of the module tables (schema `runly_backup`, 14 days) is taken before every structural update; restore via `POST /modules/:key/backups/:id/restore`.
+- Full user-facing contract: `docs/developers/flujo-zip.md` > "Cambiar la estructura de un módulo instalado".

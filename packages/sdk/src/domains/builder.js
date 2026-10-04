@@ -56,8 +56,13 @@ export function createBuilderDomain({ request, requestBlob, withAuthHeaders }) {
     getPublishImpact: (id, token) =>
       request(`${projectPath(id)}/publish-impact`, { headers: withAuthHeaders(token) }),
 
-    publishProject: (id, token) =>
-      request(`${projectPath(id)}/publish`, { method: 'POST', headers: withAuthHeaders(token) }),
+    // decisions: schema migration choices ({ [operationId]: { backfill?, onConversionFailure? } }).
+    publishProject: (id, token, { decisions } = {}) =>
+      request(`${projectPath(id)}/publish`, {
+        method: 'POST',
+        headers: withAuthHeaders(token),
+        ...(decisions ? { body: JSON.stringify({ decisions }) } : {}),
+      }),
 
     listRevisions: (id, token) =>
       request(`${projectPath(id)}/revisions`, { headers: withAuthHeaders(token) }),

@@ -44,6 +44,7 @@ import {
 import { validateDashboardSchema, validateKanbanSchema, validateManifest } from "@runly/module-engine";
 import { del as cacheDel } from "../lib/cache.js";
 import { loadDataMigrationFiles } from "../services/module-data-migration-service.js";
+import { createModuleArchivedFieldsService } from "../services/module-archived-fields-service.js";
 import {
   resolveModulesDir,
 } from "../services/module-upload-service.js";
@@ -2587,6 +2588,30 @@ export function createModulesRouter({
       const actorId = c.get("userContext")?.profile?.id ?? null;
       const result = await schemaMigrationSvc.restoreBackup({ moduleKey: key, backupId: c.req.param("backupId"), actorId });
       return c.json({ data: result });
+    } catch (err) {
+      return c.json({ error: err.code ?? err.message }, err.statusCode ?? 500);
+    }
+  });
+
+  // Archived fields: removed by an update, column and data kept
+  // (module-archived-fields-service.js). Purge drops the column after a backup.
+  const archivedFieldsSvc = createModuleArchivedFieldsService({ prisma });
+  app.get("/:key/archived-fields", authMiddleware, requirePermission("core.modules.manage"), async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    try {
+      return c.json({ data: await archivedFieldsSvc.listArchivedFields(key) });
+    } catch (err) {
+      return c.json({ error: err.code ?? err.message }, err.statusCode ?? 500);
+    }
+  });
+
+  app.post("/:key/archived-fields/purge", authMiddleware, requirePermission("core.modules.manage"), async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    const body = await c.req.json().catch(() => ({}));
+    if (body?.confirmation !== "ELIMINAR") return c.json({ error: "CONFIRMATION_REQUIRED" }, 422);
+    try {
+      const actorId = c.get("userContext")?.profile?.id ?? null;
+      return c.json({ data: await archivedFieldsSvc.purgeArchivedField({ moduleKey: key, table: body.table, field: body.field, actorId }) });
     } catch (err) {
       return c.json({ error: err.code ?? err.message }, err.statusCode ?? 500);
     }

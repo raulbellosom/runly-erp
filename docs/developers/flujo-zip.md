@@ -56,7 +56,7 @@ docs/                     Esta documentación en Markdown, para leerla sin inter
 ### Reglas que no se deben romper
 
 - **La clave del módulo no cambia** (`custom.encuestas`). Es la identidad del módulo, de sus tablas y permisos.
-- **Tablas**: los cambios se hacen en `models/` con `defineModel`. Runly solo aplica cambios **aditivos** (tablas y columnas nuevas); quitar columnas, cambiar tipos o agregar un campo obligatorio a una tabla con registros **bloquea** la subida para no perder datos.
+- **Tablas**: los cambios se hacen en `models/` con `defineModel`; ver la sección *Cambiar la estructura de un módulo instalado* más abajo. Quitar una entidad completa sigue **bloqueado**.
 - **SQL**: en `api/` usa `prisma.$queryRaw` con plantillas etiquetadas (`` prisma.$queryRaw`SELECT … WHERE id = ${id}::uuid` ``), nunca concatenes texto. Los `id` los genera la base (`uuidv7()`); usa `INSERT … RETURNING *`.
 - **Empresa**: toda consulta filtra por `company_id` de la empresa activa.
 - **Borrado**: no se borran registros; se desactivan con `enabled = false`.
@@ -72,10 +72,48 @@ docs/                     Esta documentación en Markdown, para leerla sin inter
 
 Para saber qué cambiaste, Runly regenera el paquete a partir de `.module-definition.json` y lo compara con tu ZIP: los archivos generados deben quedar idénticos (se ignoran diferencias de fin de línea), y solo se aceptan como extensiones del modo mixto los archivos y entradas descritos arriba. Límite de extensiones: 1.5 MB de texto.
 
+## Cambiar la estructura de un módulo instalado
+
+Cada campo puede llevar un `id` fijo (UUID). El Constructor lo pone solo (`fieldId`); en un paquete hecho a mano agrégalo tú y **no lo cambies nunca**:
+
+```js
+fields: [
+  { id: '0192f3a1-7c2e-7d10-9a4b-1f2e3d4c5b6a', name: 'matricula', type: 'text', label: 'Matrícula' },
+]
+```
+
+| Cambio en `models/` | Qué hace Runly |
+|---|---|
+| Campo nuevo opcional, o con `default` | Agrega la columna. |
+| Campo nuevo **obligatorio** en una tabla con registros | Te pide el valor para los registros existentes. |
+| Renombrar un campo **con el mismo `id`** | Renombra la columna y conserva los datos. Sin `id`, el nombre viejo se archiva y el nuevo nace vacío. |
+| Quitar un campo | Lo **archiva**: deja de mostrarse y de ser obligatorio, pero sus datos se conservan. Si lo vuelves a agregar con el mismo nombre, regresa con sus datos. Para borrarlo de verdad: Constructor > entidad > *Campos archivados* > *Eliminar*. |
+| Hacer obligatorio un campo | Si hay registros vacíos, te pide el valor para llenarlos. |
+| Cambiar el tipo | Texto ↔ número, decimal, fecha, fecha y hora, sí/no; número ↔ decimal; fecha ↔ fecha y hora; selección → selección múltiple, entre otros. Si hay valores que no se pueden convertir, puedes dejarlos vacíos (solo en campos opcionales) o cancelar. Los demás cambios de tipo se bloquean. |
+| Índice único nuevo | Se bloquea si ya hay valores repetidos (corrígelos antes). |
+| Quitar un índice | Se elimina; no se pierden datos. |
+
+Antes de aplicar, Runly guarda un **respaldo** de las tablas del módulo por 14 días (Módulos > detalle del módulo > *Respaldos antes de actualizar*). El respaldo, los cambios de estructura y las migraciones de datos corren en **una sola transacción**: si algo falla, no se aplica nada y el módulo sigue en la versión anterior.
+
+### Migraciones de datos
+
+Para transformar datos al actualizar (llenar un campo nuevo a partir de otros, normalizar valores), agrega archivos `migrations/NNN-descripcion.js`. Corren una sola vez, en orden de nombre, después de los cambios de estructura:
+
+```js
+// migrations/001-estado-inicial.js
+export async function up({ sql, query, companyIds, moduleKey }) {
+  await sql`UPDATE "taller_orden" SET estado = 'abierta' WHERE estado IS NULL`
+}
+```
+
+- `sql` ejecuta y `query` consulta, con plantillas etiquetadas (valores parametrizados).
+- El archivo debe ser **autocontenido**: sin `import`.
+- No edites una migración ya aplicada: la actualización se bloquea. Crea otra con un número mayor.
+
 ## Qué revisa Runly antes de aplicar
 
-- **Bloquea** si el paquete no es válido (falta el manifiesto, la clave no coincide, un archivo no se puede leer), si la estructura instalada fue modificada fuera de Runly, o si un cambio de tablas perdería datos.
-- Lista los **cambios de estructura** seguros (tablas o columnas nuevas).
+- **Bloquea** si el paquete no es válido (falta el manifiesto, la clave no coincide, un archivo no se puede leer), si la estructura instalada fue modificada fuera de Runly, si se quitaría una entidad completa o si editaste una migración de datos ya aplicada.
+- Muestra los **cambios de estructura** con su estado (*Seguro*, *Requiere dato*, *Revisión*) y te pide las decisiones pendientes antes de aplicar.
 - **Avisa** si no aumentaste la versión, si faltan dependencias para instalar o si tus componentes no compilan (con el error de esbuild, archivo y línea).
 - Indica si el proyecto del Constructor **sigue en modo visual/mixto** (guardará tus pantallas) o **pasará a modo desarrollador** (y por qué archivos).
 - Muestra una **vista previa** de tus vistas `CUSTOM`, con datos reales si el módulo está instalado.
