@@ -82,7 +82,8 @@
   },
   "devDependencies": {
     "concurrently": "latest",
-    "eslint": "^9"
+    "eslint": "^9",
+    "playwright": "^1"
   },
   "pnpm": {
     "overrides": {

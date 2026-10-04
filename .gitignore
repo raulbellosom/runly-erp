@@ -104,3 +104,6 @@ infra/installer/livekit/reverse-proxy.nginx.conf
 
 # Per-machine record of the last commit released per Docker image (build-push.mjs).
 infra/docker/.release-state.json
+
+# Local E2E runs (Playwright screenshots, state)
+.e2e/
