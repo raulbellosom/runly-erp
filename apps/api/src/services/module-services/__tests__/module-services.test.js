@@ -36,6 +36,39 @@ test('a call needs the grant, the user permission and an active company', async 
   await assert.rejects(granted.forRequest(ctx({ isAdmin: true }), 'custom.crm').call('runly.nope:x.y'), (error) => error.code === 'unknown_service')
 })
 
+const ID = '0190a7b2-1c3d-7e4f-8a9b-0c1d2e3f4a5b'
+
+test('arguments are validated against the shared contract (422)', async () => {
+  const services = createModuleServices({ prisma: prismaWithGrants(['runly.calendar:events.create']) })
+  await assert.rejects(
+    services.forRequest(ctx({ isAdmin: true }), 'custom.crm').call('runly.calendar:events.create', { title: '', startAt: 'x' }),
+    (error) => error.status === 422 && error.code === 'invalid_args' && Boolean(error.fields.title && error.fields.startAt),
+  )
+})
+
+test('scope own: a module cannot touch calendar events it did not create', async () => {
+  const prisma = prismaWithGrants(['runly.calendar:events.cancel'])
+  const seen = []
+  prisma.calendarEvent = { findFirst: async ({ where }) => { seen.push(where); return null } }
+  const api = createModuleServices({ prisma }).forRequest(ctx({ permissions: ['calendar.events.update'] }), 'custom.crm')
+  await assert.rejects(api.call('runly.calendar:events.cancel', { id: ID }), (error) => error.status === 404)
+  assert.deepEqual(seen[0], { id: ID, sourceModule: 'custom.crm', enabled: true })
+})
+
+test('tasks.update checks the task belongs to the active company', async () => {
+  const prisma = prismaWithGrants(['runly.projects:tasks.update'])
+  const seen = []
+  prisma.task = { findFirst: async ({ where }) => { seen.push(where); return null } }
+  const api = createModuleServices({ prisma }).forRequest(ctx({ permissions: ['projects.task.update'] }), 'custom.crm')
+  await assert.rejects(api.call('runly.projects:tasks.update', { id: ID, title: 'X' }), (error) => error.status === 404)
+  assert.deepEqual(seen[0], { id: ID, project: { companyId: 'c1' } })
+})
+
+test('notifications.send needs no permission, only the grant', async () => {
+  const api = createModuleServices({ prisma: prismaWithGrants([]) }).forRequest(ctx(), 'custom.crm')
+  await assert.rejects(api.call('runly.notifications:notifications.send', { userIds: [ID], title: 'Hola' }), (error) => error.code === 'service_not_granted')
+})
+
 test('module() exposes the services of one module as methods', () => {
   const api = createModuleServices({ prisma: prismaWithGrants([]) }).forRequest(ctx(), 'custom.crm')
   const inventory = api.module('runly.inventory')

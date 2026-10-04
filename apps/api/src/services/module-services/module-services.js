@@ -8,10 +8,15 @@
 // Every call checks (1) an admin granted that service to the calling module
 // (ModuleServiceGrant, instance-wide or for the active company), (2) the user
 // holds the service's permission, (3) it runs in the request's active company.
-// Writing services are audited.
+// Arguments are then validated and stripped against the shared contract
+// (422 invalid_args). Writing services are audited.
+import { validateServiceArgs } from '@runly/module-engine/contracts'
+import { tenantActiveContext } from '../../lib/active-context.js'
 import { ModuleServiceError, SERVICE_KEYS, createServiceCatalog, splitServiceKey } from './service-catalog.js'
 
-const can = (user, permission) => Boolean(user?.isAdmin || user?.permissionSet?.has?.(permission))
+// permission null: any member of the active company (the request already
+// passed the tenant middleware).
+const can = (user, permission) => permission === null || Boolean(user?.isAdmin || user?.permissionSet?.has?.(permission))
 
 // Manifest `consumes: { 'runly.inventory': ['items.read'] }` -> service keys.
 export function consumedServiceKeys(manifest) {
@@ -20,9 +25,9 @@ export function consumedServiceKeys(manifest) {
   return Object.entries(consumes).flatMap(([moduleKey, names]) => (Array.isArray(names) ? names : []).map((name) => `${moduleKey}:${name}`))
 }
 
-export function createModuleServices({ prisma }) {
+export function createModuleServices({ prisma, filesService = null }) {
   let catalog = null
-  const services = () => (catalog ??= createServiceCatalog({ prisma }))
+  const services = () => (catalog ??= createServiceCatalog({ prisma, filesService }))
 
   async function grantedKeys(moduleKey, companyId) {
     const rows = await prisma.moduleServiceGrant.findMany({
@@ -46,10 +51,17 @@ export function createModuleServices({ prisma }) {
         throw new ModuleServiceError(`Este módulo no tiene autorización para "${service.label}". Un administrador debe autorizarlo en Módulos.`, 403, 'service_not_granted')
       }
       if (!can(user, service.permission)) throw new ModuleServiceError(`No tienes permiso para "${service.label}".`, 403, 'permission_denied')
-      const result = await service.handler({ companyId, actorId, actorAuthId }, args)
+      const parsed = validateServiceArgs(serviceKey, args)
+      if (!parsed.ok) {
+        const error = new ModuleServiceError(`Datos no válidos para "${service.label}".`, 422, 'invalid_args')
+        error.fields = parsed.errors
+        throw error
+      }
+      const activeContext = tenantActiveContext(c)
+      const result = await service.handler({ companyId, actorId, actorAuthId, moduleKey, activeContext }, parsed.value)
       if (service.mutates) {
         await prisma.auditLog.create({
-          data: { companyId, actorId, moduleKey, entityType: 'ModuleService', entityId: result?.id ?? null, action: `module.service.${serviceKey}`, before: null, after: result ?? null, metadata: { caller: moduleKey } },
+          data: { companyId, actorId, moduleKey, entityType: 'ModuleService', entityId: result?.id ?? null, action: `module.service.${serviceKey}`, before: null, after: result ?? null, metadata: { caller: moduleKey, sourceEntityId: parsed.value.sourceEntityId ?? null } },
         }).catch((error) => console.error('[module-services] audit failed:', error?.message))
       }
       return result

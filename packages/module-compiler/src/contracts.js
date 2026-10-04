@@ -1,4 +1,4 @@
-import { RME3_ENGINE_CONTRACT, SERVICE_KEYS, DOMAIN_EVENTS } from '@runly/module-engine/contracts'
+import { RME3_ENGINE_CONTRACT, SERVICE_KEYS, SERVICE_CONTRACTS, DOMAIN_EVENTS } from '@runly/module-engine/contracts'
 import { EXTERNAL_RELATION_TARGETS } from './external-relations.js'
 import runtimeCatalog from './runtime-catalog.json' with { type: 'json' }
 
@@ -36,7 +36,7 @@ export const RUNTIME_CONTRACT = Object.freeze({
 export const RME3_CAPABILITIES = Object.freeze({
   schemaVersion: CAPABILITIES_VERSION,
   engine: RME3_ENGINE_CONTRACT, compiler: COMPILER_CONTRACT, runtime: RUNTIME_CONTRACT,
-  services: SERVICE_KEYS, events: Object.freeze(Object.keys(DOMAIN_EVENTS)),
+  services: SERVICE_KEYS, serviceContracts: SERVICE_CONTRACTS, events: Object.freeze(Object.keys(DOMAIN_EVENTS)),
   connectionTargets: Object.freeze(Object.keys(EXTERNAL_RELATION_TARGETS)),
   inspection: Object.freeze({ executesUserCode: false, evidence: 'static', declarationFormat: 'rme3-js-literals-v1' }),
 })

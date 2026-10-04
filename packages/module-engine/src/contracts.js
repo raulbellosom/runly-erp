@@ -3,11 +3,7 @@ import { BLUEPRINT_KINDS, FIELD_TYPES, MODULE_KINDS } from './constants.js'
 export const RME3_CONTRACT_VERSION = 1
 export const RME3_ENGINE_VERSION = '0.1.0'
 // Shared metadata only. Handlers remain inside the ERP API.
-export const SERVICE_KEYS = Object.freeze([
-  'runly.inventory:items.read', 'runly.inventory:items.search',
-  'runly.contacts:contacts.read', 'runly.contacts:contacts.search', 'runly.contacts:contacts.create',
-  'runly.projects:tasks.read', 'runly.projects:tasks.create',
-])
+export { SERVICE_CONTRACTS, SERVICE_KEYS, validateServiceArgs } from './service-contracts.js'
 export const DOMAIN_EVENTS = Object.freeze({
   'inventory.item.created': 'Se creó un artículo de inventario',
   'inventory.item.updated': 'Se actualizó un artículo de inventario',
