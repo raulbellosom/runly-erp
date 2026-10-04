@@ -61,6 +61,8 @@ test('valid automations compile into manifest, runtime, events and route hooks',
   const routes = fileOf(compiled, 'api/orden-routes.js')
   assert.match(routes, /on: 'create', record: created/)
   assert.match(routes, /const previous = await service.getOrdenById/)
+  // Active company from the tenant middleware, not the first membership.
+  assert.match(routes, /c\.get\('companyId'\) \?\? c\.get\('userContext'\)/)
   for (const file of ['api/orden-routes.js', 'api/automations.js', 'api/events.js', 'module.manifest.js']) {
     assert.doesNotThrow(() => acorn.parse(fileOf(compiled, file), { ecmaVersion: 'latest', sourceType: 'module' }), file)
   }

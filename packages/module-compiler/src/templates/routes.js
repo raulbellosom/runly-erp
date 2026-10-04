@@ -51,8 +51,10 @@ function getValidationErrorMessage(error) {
   return path ? \`Datos invalidos en \${path}: \${issue.message}\` : \`Datos invalidos: \${issue.message}\`
 }
 
+// The request's active company (set by requirePermission). memberships[0] is
+// only a fallback for hosts that predate c.get('companyId').
 function getCompanyIdFromContext(c) {
-  const companyId = c.get('userContext')?.memberships?.[0]?.companyId
+  const companyId = c.get('companyId') ?? c.get('userContext')?.memberships?.[0]?.companyId
   return typeof companyId === 'string' && companyId.trim() ? companyId.trim() : null
 }
 
