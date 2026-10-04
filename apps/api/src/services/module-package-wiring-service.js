@@ -46,6 +46,7 @@ export function createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cac
                 moduleRow,
                 decisions,
                 dataMigrationFiles: await loadDataMigrationFiles(staged.packageDir),
+                manifest: staged.manifest,
               })
             : { required: false, canAutoApply: true, safety: 'SAFE', operations: [], drift: [], warnings: [] }
           return {

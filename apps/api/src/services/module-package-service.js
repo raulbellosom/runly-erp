@@ -206,7 +206,7 @@ export function createModulePackageService({
           },
         })
         // Client-facing plan: described rows for the decisions UI, no migration sources.
-        const { dataMigrationSources: _sources, ...planDetails } = preflight.schemaMigration
+        const { dataMigrationSources: _sources, connectionSpecs: _specs, ...planDetails } = preflight.schemaMigration
         const details = { ...planDetails, structure: describeStructure(preflight.schemaMigration) }
         if (preflight.schemaMigration.drift?.length) {
           throw Object.assign(new Error('SCHEMA_DRIFT_DETECTED'), {

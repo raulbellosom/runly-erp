@@ -729,6 +729,7 @@ export function createModulesRouter({
                 moduleRow,
                 decisions,
                 dataMigrationFiles: await loadDataMigrationFiles(staged.packageDir),
+                manifest: staged.manifest,
               })
             : {
                 required: false,

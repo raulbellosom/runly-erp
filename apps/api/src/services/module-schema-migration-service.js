@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import {
+  buildBackfillSql,
+  buildConnectionSql,
   classifyOperation,
+  connectionObjectNames,
   compileMigrationPlan,
   diffModelSchemas,
   hashNormalizedSchema,
@@ -10,6 +13,7 @@ import {
   preflightQueries,
 } from '@runly/module-engine'
 import { createModuleBackupService } from './module-backup-service.js'
+import { createConnectionLifecycle } from './connections/connection-lifecycle.js'
 import { DATA_MIGRATION_PREFIX, planDataMigrations, runDataMigrations } from './module-data-migration-service.js'
 
 const IDENTIFIER_RE = /^[a-z][a-z0-9_]*$/
@@ -58,6 +62,7 @@ export class ModuleSchemaMigrationError extends Error {
 
 export function createModuleSchemaMigrationService({ prisma }) {
   const backupSvc = createModuleBackupService({ prisma })
+  const connectionLifecycle = createConnectionLifecycle({ prisma })
   async function inspectTableSchema(tableName, db = prisma) {
     const table = safeIdentifier(tableName, 'table name')
     // ::text — @prisma/adapter-pg (the driver adapter this service runs
@@ -118,7 +123,7 @@ export function createModuleSchemaMigrationService({ prisma }) {
 
   // decisions: { [operation.id]: { backfill?, onConversionFailure? } } chosen
   // by the admin in the update report (spec §12.3).
-  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null, decisions = {}, dataMigrationFiles = [] }) {
+  async function planModuleSchemaMigration({ moduleKey, desiredModels, moduleRow = null, decisions = {}, dataMigrationFiles = [], manifest = null }) {
     const persistedRows = moduleRow?.status === 'INSTALLED'
       ? await prisma.runlyModel.findMany({
           where: { moduleKey },
@@ -199,6 +204,7 @@ export function createModuleSchemaMigrationService({ prisma }) {
       versionFrom: moduleRow?.version ?? null,
       // Sources stay out of planHash/audit; only the apply step reads them.
       dataMigrationSources: data.pending,
+      connectionSpecs: resolveConnectionSpecs(moduleKey, manifest, desiredModels),
     }
   }
 
@@ -217,11 +223,48 @@ export function createModuleSchemaMigrationService({ prisma }) {
       const dataPending = plan.dataMigrationSources ?? []
       if (!schemaPending && !dataPending.length) return { applied: false, reason: 'already_applied', migration: existing, plan }
       const backup = await snapshotBeforeUpdate(tx, plan, actorId)
+      const droppedTriggers = await dropConnectionTriggers(tx, plan.moduleKey)
       if (schemaPending) await applySchemaStatements(tx, plan)
       const dataMigrationsRan = await runDataMigrations(tx, { moduleKey: plan.moduleKey, pending: dataPending })
+      await rebuildConnections(tx, plan, droppedTriggers)
       const migration = schemaPending ? await recordSchemaMigration(tx, plan, actorId, backup) : existing
       return { applied: true, migration, backupId: backup?.id ?? null, dataMigrationsRan, plan }
     }, { maxWait: 10_000, timeout: 120_000 })
+  }
+
+  // Connection specs of the NEW version, rebuilt at the end of the apply
+  // transaction. null when unknown (the post-publish sync recreates them).
+  function resolveConnectionSpecs(moduleKey, manifest, desiredModels) {
+    if (!manifest?.connections?.length) return null
+    try {
+      return connectionLifecycle.resolveDeclared(moduleKey, manifest, desiredModels).map((entry) => entry.spec)
+    } catch {
+      return null
+    }
+  }
+
+  // Connection triggers name the module's columns in their function body: a
+  // rename or a backfill UPDATE would hit the old trigger. Drop them before
+  // the DDL and recreate them (with the new columns) before commit.
+  async function dropConnectionTriggers(tx, moduleKey) {
+    if (!tx.moduleConnection?.findMany) return []
+    const rows = await tx.moduleConnection.findMany({ where: { moduleKey }, select: { connectionKey: true, sourceTable: true }, distinct: ['connectionKey'] })
+    for (const row of rows) {
+      const names = connectionObjectNames(moduleKey, row.connectionKey)
+      await tx.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${names.trigger}" ON public."${row.sourceTable}"`)
+    }
+    return rows
+  }
+
+  async function rebuildConnections(tx, plan, dropped) {
+    if (plan.connectionSpecs) {
+      for (const spec of plan.connectionSpecs) {
+        for (const statement of buildConnectionSql(spec)) await tx.$executeRawUnsafe(statement)
+        await tx.$executeRawUnsafe(buildBackfillSql(spec))
+      }
+    } else if (dropped.length) {
+      console.warn(`[module-schema] ${plan.moduleKey}: connection triggers dropped; the post-publish sync recreates them`)
+    }
   }
 
   // Skipped (with a warning) until the module_schema_backup migration is applied.
