@@ -20,6 +20,7 @@ import { generateKanbanView, kanbanFileName } from './templates/kanban.js'
 import { generateRecordsView, recordsViewFileName } from './templates/records-view.js'
 import { isRecordsViewKind } from './records-views.js'
 import { generatePublicApi, generatePublicLinkView, publicLinkViewFile } from './public-links.js'
+import { generateAutomationEvents, generateAutomationsModule, hasAutomations, hasEventAutomations } from './templates/automations.js'
 
 function toTemplateConfig(definition) {
   return {
@@ -74,6 +75,8 @@ export function compileModule(rawDefinition) {
     add('api/public.js', generatePublicApi(definition))
     for (const link of definition.publicLinks) add(publicLinkViewFile(link), generatePublicLinkView(definition, link))
   }
+  if (hasAutomations(config)) add('api/automations.js', generateAutomationsModule(config))
+  if (hasEventAutomations(config)) add('api/events.js', generateAutomationEvents())
   // Hand-written React screens kept by the Builder (extensions.js).
   for (const file of definition.extensions?.files ?? []) add(file.path, file.content)
   if (config.preset === 'crud-custom') {

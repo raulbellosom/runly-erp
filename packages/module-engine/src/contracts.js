@@ -17,6 +17,21 @@ export const DOMAIN_EVENTS = Object.freeze({
   'fleet.vehicle.created': 'Se creó un vehículo de la flota',
   'fleet.vehicle.updated': 'Se actualizó un vehículo de la flota',
 })
+// Payload keys of each domain event (Builder automations, Developer Hub).
+const CALENDAR_EVENT_PAYLOAD = Object.freeze(['id', 'title', 'startAt', 'sourceModule', 'sourceEntityId'])
+const VEHICLE_PAYLOAD = Object.freeze(['id', 'plate', 'status'])
+export const DOMAIN_EVENT_PAYLOADS = Object.freeze({
+  'inventory.item.created': Object.freeze(['id', 'name', 'assetTag']),
+  'inventory.item.updated': Object.freeze(['id', 'name']),
+  'contacts.contact.created': Object.freeze(['id']),
+  'projects.task.created': Object.freeze(['id', 'projectId', 'title']),
+  'calendar.event.created': CALENDAR_EVENT_PAYLOAD,
+  'calendar.event.updated': CALENDAR_EVENT_PAYLOAD,
+  'calendar.event.cancelled': CALENDAR_EVENT_PAYLOAD,
+  'files.file.created': Object.freeze(['id', 'name', 'mimeType']),
+  'fleet.vehicle.created': VEHICLE_PAYLOAD,
+  'fleet.vehicle.updated': VEHICLE_PAYLOAD,
+})
 
 export const RME3_ENGINE_CONTRACT = Object.freeze({
   schemaVersion: RME3_CONTRACT_VERSION,

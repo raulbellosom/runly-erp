@@ -3,6 +3,7 @@ import { hasFileSupport } from './layout-views.js'
 import { hasConditionalRequired } from './visibility.js'
 import { externalRelations } from './relations.js'
 import { isSameModuleRelation } from '../relations.js'
+import { recordAutomationsFor } from './automations.js'
 
 export function generateRoutes(config, entity) {
   const slug = moduleSlug(config.key)
@@ -14,6 +15,10 @@ export function generateRoutes(config, entity) {
   const withFiles = hasFileSupport(entity)
   const withVisibility = hasConditionalRequired(entity)
   const withExternal = externalRelations(entity).length > 0
+  // Builder automations triggered by this entity (templates/automations.js).
+  const automations = recordAutomationsFor(config, entity.name)
+  const onCreate = automations.some((a) => a.trigger.on !== 'update')
+  const onUpdate = automations.some((a) => a.trigger.on !== 'create')
   const externalAssert = withExternal ? '      await assertExternalTargets(c, moduleContext, parsed.data)\n' : ''
   const missingCheck = (values) => withVisibility
     ? `      const missing = findMissingConditionalRequired(${values})\n      if (missing) return c.json({ error: \`El campo \${missing.label} es requerido.\` }, 400)\n`
@@ -35,6 +40,7 @@ import { ${errorClass} } from './service-helpers.js'
 ${withFiles ? `import { create${pascal}FileRouter, link${pascal}FileFields } from './${entity.name}-file-routes.js'
 ` : ''}${withVisibility ? `import { findMissingConditionalRequired } from './${entity.name}-visibility.js'
 ` : ''}${withExternal ? `import { assertExternalTargets, withExternalLabels } from './${entity.name}-relations.js'
+` : ''}${automations.length ? `import { runRecordAutomations } from './automations.js'
 ` : ''}
 const enabledSchema = z.object({ enabled: z.boolean() })
 
@@ -100,7 +106,8 @@ ${withExternal ? `      await withExternalLabels(c, moduleContext, [row])
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
 ${missingCheck('parsed.data')}${externalAssert}      const created = await service.create${pascal}({ companyId, data: parsed.data, actorId })
 ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
-` : ''}      return c.json({ data: created }, 201)
+` : ''}${onCreate ? `      const automations = await runRecordAutomations({ c, moduleContext, entity: '${entity.name}', on: 'create', record: created })
+      return c.json({ data: created, ...(automations.length ? { automations } : {}) }, 201)` : '      return c.json({ data: created }, 201)'}
     } catch (err) {
       return handleRouteError(c, err, { fallbackError: 'No se pudo crear el registro.', route: '${base}', moduleKey, operation: 'create${pascal}' })
     }
@@ -114,9 +121,11 @@ ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, created)
       const parsed = update${pascal}Schema.safeParse(body)
       if (!parsed.success) return c.json({ error: getValidationErrorMessage(parsed.error) }, 400)
 ${withVisibility ? `      const existing = await service.get${pascal}ById({ companyId, id: c.req.param('id') })
+` : ''}${onUpdate ? `      const previous = ${withVisibility ? 'existing' : `await service.get${pascal}ById({ companyId, id: c.req.param('id') })`}
 ` : ''}${missingCheck('{ ...existing, ...parsed.data }')}${externalAssert}      const updated = await service.update${pascal}({ companyId, id: c.req.param('id'), data: parsed.data, actorId })
 ${withFiles ? `      await link${pascal}FileFields(c, moduleContext, updated)
-` : ''}      return c.json({ data: updated })
+` : ''}${onUpdate ? `      const automations = await runRecordAutomations({ c, moduleContext, entity: '${entity.name}', on: 'update', record: updated, previous })
+      return c.json({ data: updated, ...(automations.length ? { automations } : {}) })` : '      return c.json({ data: updated })'}
     } catch (err) {
       return handleRouteError(c, err, { fallbackError: 'No se pudo actualizar el registro.', route: '${base}/:id', moduleKey, operation: 'update${pascal}' })
     }

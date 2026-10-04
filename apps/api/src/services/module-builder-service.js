@@ -17,6 +17,7 @@ import {
   normalizeModuleDefinition,
   validateModuleDefinition,
   assignFieldIds,
+  automationServiceKeys,
 } from '@runly/module-compiler'
 import { validateManifest, RESERVED_NAMESPACES } from '@runly/module-engine'
 import { resolveModulesDir } from './module-upload-service.js'
@@ -25,6 +26,7 @@ import { invalidateModuleCaches } from './module-cache-service.js'
 import { buildDefinitionFromTemplate, BUILDER_TEMPLATE_CATALOG, BUILDER_TEMPLATE_KEYS } from './module-builder-templates.js'
 import { buildPreview } from './module-builder-preview-service.js'
 import { createBuilderPackageSync } from './module-builder-package-sync.js'
+import { createModuleServices } from './module-services/module-services.js'
 
 export class ModuleBuilderError extends Error {
   constructor(message, { code, statusCode = 400, details = null } = {}) {
@@ -127,6 +129,7 @@ function serializeProject(project) {
 export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoader = null, cacheDel = () => {} }) {
   const wiring = createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cacheDel })
   const packageSync = createBuilderPackageSync({ prisma })
+  const moduleServices = createModuleServices({ prisma })
 
   async function requireProject({ companyId, projectId }) {
     // A malformed :id path param (not a UUID) used to reach Prisma's
@@ -287,7 +290,20 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
     }
   }
 
-  async function publishProject({ companyId, actorId, projectId, decisions = {} }) {
+  // Services the automations call (spec 2026-10-04-builder-automations §4.4):
+  // publishing is the consent when the publisher manages modules; otherwise
+  // they stay pending for an administrator (Módulos > detalle del módulo).
+  async function syncAutomationGrants({ moduleKey, definition, actorId, canGrant }) {
+    const services = automationServiceKeys(definition)
+    if (canGrant) {
+      await moduleServices.setGrants({ moduleKey, serviceKeys: services, grantedBy: actorId })
+      return { services, pendingGrants: [] }
+    }
+    const granted = new Set((await moduleServices.listGrants(moduleKey)).map((grant) => grant.serviceKey))
+    return { services, pendingGrants: services.filter((key) => !granted.has(key)) }
+  }
+
+  async function publishProject({ companyId, actorId, projectId, decisions = {}, canGrant = false }) {
     const project = await requireProject({ companyId, projectId })
     if (project.detachedAt) {
       throw new ModuleBuilderError('Este proyecto está en modo desarrollador: instala su código desde Módulos > Subir módulo.', { code: 'BUILDER_PROJECT_DETACHED', statusCode: 409 })
@@ -361,9 +377,12 @@ export function createModuleBuilderService({ prisma, bundlerSvc = null, routeLoa
         updatedById: actorId,
       },
     })
+    const grants = await syncAutomationGrants({ moduleKey: project.moduleKey, definition: compiled.definition, actorId, canGrant })
     return {
       project: serializeProject(updated),
       outcome: publishResult.outcome,
+      services: grants.services,
+      pendingGrants: grants.pendingGrants,
       publicationPlan: publishResult.publicationPlan,
       schemaMigration: publishResult.schemaMigration,
       installed: Boolean(installResult),

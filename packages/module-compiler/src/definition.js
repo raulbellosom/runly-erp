@@ -6,6 +6,7 @@ import { validateRelations } from './relations.js'
 import { validateExtensions } from './extensions.js'
 import { validatePublicLinks } from './public-links.js'
 import { validateDefinitionConnections } from './connections.js'
+import { normalizeAutomations, validateDefinitionAutomations } from './automations.js'
 import { externalRelationDependencies, externalTarget } from './external-relations.js'
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/
@@ -134,6 +135,7 @@ export function validateModuleDefinition(definition) {
   validateExtensions(definition, permissionKeys, errors)
   validatePublicLinks(definition, permissionKeys, errors)
   validateDefinitionConnections(definition, errors)
+  validateDefinitionAutomations(definition, errors)
   for (const [permissionIndex, permission] of (definition.permissions ?? []).entries()) {
     const slug = definition.key?.split('.').pop()
     if (!permission.key?.startsWith(`${slug}.`)) errors.push(diagnostic(`permissions[${permissionIndex}].key`, 'PERMISSION_NAMESPACE_ESCAPE', 'Permission must stay inside the module slug namespace.'))
@@ -230,6 +232,7 @@ export function normalizeModuleDefinition(input) {
   if (input.extensions) definition.extensions = input.extensions
   if (input.publicLinks?.length) definition.publicLinks = input.publicLinks
   if (input.connections?.length) definition.connections = input.connections
+  if (input.automations?.length) definition.automations = normalizeAutomations(input.automations)
   definition.navigation = input.navigation ?? definition.entities.map((entity) => ({
     label: entity.pluralLabel,
     icon: definition.icon,

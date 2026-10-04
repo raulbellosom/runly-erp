@@ -206,7 +206,9 @@ export function createBuilderRouter({ prisma, requirePermission, bundlerSvc = nu
         const body = await c.req.json().catch(() => ({}))
         // Schema migration decisions from the publish dialog (schema-diff.js).
         const decisions = body?.decisions && typeof body.decisions === 'object' && !Array.isArray(body.decisions) ? body.decisions : {}
-        const result = await svc.publishProject({ companyId: c.get('companyId'), actorId: actor(c), projectId: c.req.param('id'), decisions })
+        const user = c.get('userContext')
+        const canGrant = Boolean(user?.isAdmin || user?.permissionSet?.has?.('core.modules.manage'))
+        const result = await svc.publishProject({ companyId: c.get('companyId'), actorId: actor(c), projectId: c.req.param('id'), decisions, canGrant })
         const { actorName } = getActivityContext(c)
         await publishActivityFromContext(prisma, c, {
           type: 'core.module.builder.publish',

@@ -26,3 +26,4 @@ export { BUILDER_CONNECTION_TARGETS, CONNECTION_FIELD_EXCLUDED_TYPES } from './c
 export { assignFieldIds, uuidv7 } from './field-ids.js'
 export { EXAMPLES_DIR, goldenScreenFiles } from './templates/golden-screens.js'
 export { buildStarterPackage, createStarterDefinition, StarterPackageError, STARTER_KEY_RE } from './starter-package.js'
+export { automationConsumes, automationEventKeys, automationServiceKeys, validateDefinitionAutomations } from './automations.js'
