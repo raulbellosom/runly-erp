@@ -107,6 +107,7 @@ import { createRelationTargetsService } from "./services/relation-targets-servic
 import { createRelationTargetsRouter } from "./routes/relation-targets-routes.js";
 import { createConnectionsRouter } from "./routes/connections-routes.js";
 import { createTrashRouter } from "./routes/trash-routes.js";
+import { createCatalogRouter as createModuleCatalogRouter } from "./routes/catalog-routes.js";
 import { createDistServeService } from "./services/dist-serve-service.js";
 import { createNotificationDeliveryWorker } from "./services/notification-delivery-worker.js";
 import { createNotificationService } from "./services/notification-service.js";
@@ -2388,6 +2389,7 @@ function mountWithAuth(baseApp, router) {
 
 mountWithAuth(app, createCompanyRouter({ prisma, supabaseAdmin, requirePermission, cacheDel }));
 mountWithAuth(app, createBuilderRouter({ prisma, requirePermission, bundlerSvc: bundlerService, routeLoader, cacheDel }));
+mountWithAuth(app, createModuleCatalogRouter({ prisma, requirePermission, bundlerSvc: bundlerService, routeLoader, cacheDel }));
 mountWithAuth(app, createContactsRouter({ prisma, requirePermission, supabaseAdmin, storageBucket: STORAGE_BUCKET_NAME }));
 mountWithAuth(app, createHrRouter({ prisma, supabaseAdmin, requirePermission }));
 mountWithAuth(app, createHelpRouter({ prisma, requirePermission }));

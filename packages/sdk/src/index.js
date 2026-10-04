@@ -8,6 +8,7 @@ import { createBuilderDomain } from "./domains/builder.js";
 import { createCanvasDomain } from "./domains/canvas.js";
 import { createConnectionsDomain } from "./domains/connections.js";
 import { createTrashDomain } from "./domains/trash.js";
+import { createModuleCatalogDomain } from "./domains/module-catalog.js";
 export { createCompanyFetch } from "./company-fetch.js";
 
 export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
@@ -2081,6 +2082,7 @@ export function createRunlyClient({ baseUrl, getActiveCompanyId } = {}) {
     canvas: createCanvasDomain({ request, withAuthHeaders, toQueryString }),
     connections: createConnectionsDomain({ request, withAuthHeaders, toQueryString }),
     trash: createTrashDomain({ request, withAuthHeaders, toQueryString }),
+    moduleCatalog: createModuleCatalogDomain({ request, withAuthHeaders }),
     projects: {
       listProjects: (token) =>
         request("/projects", { headers: withAuthHeaders(token) }),
