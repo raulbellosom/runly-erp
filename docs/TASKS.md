@@ -1722,7 +1722,7 @@ Spec: `docs/superpowers/specs/2026-10-03-records-trash-design.md` · Plan: `docs
 - [x] API: provider registry (`apps/api/src/services/trash/`), generic provider for every soft-delete entity of installed RME3/Builder modules, core providers for inventory items, contacts and HR employees; `/trash` routes with `requireActiveCompany`; `core.records.purge` (and the previously undeclared `core.modules.manage`) declared; audit `core.records.restored|purged`; FK errors → 409 `in_use`. Verified: 2026-10-03 (unit 3/3, API services 716/716, backend E2E 11/11 incl. 1:1 calibration freed after purge and contact with restrict connection kept)
 - [x] UI: shell-added "Desactivados" sidebar entry for modules with providers, `TrashScreen` (entity selector, server search, Reactivar, Eliminar with two confirmations), breadcrumb label. Verified: 2026-10-03 (Playwright 7/7, `vite build`, eslint)
 - [x] Docs: help page `runly.core/views/desactivados.md`, `docs/developers/solucion-problemas.md` (regenerated)
-- [ ] Owner: "Sincronizar módulos" once so the new permissions exist for role assignment (admins already have them).
+- [x] Owner: "Sincronizar módulos" once so the new permissions exist for role assignment. Done by the owner 2026-10-04 (POST /modules/sync 200).
 - [ ] Next providers: calendar events, fleet vehicles/drivers, canvas boards, purchases, documents, files (same contract).
 
 ## RME3 Module Platform v2 (2026-10-03)
