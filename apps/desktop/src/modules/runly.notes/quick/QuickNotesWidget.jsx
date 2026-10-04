@@ -37,9 +37,11 @@ const NoteEditor = lazy(() =>
 
 // Above the call room (z-46) and the chat hub (z-45), below modals (z-50).
 const Z_QUICK_NOTES = 48;
-const PANEL_SIZE = { width: 340, height: 400 };
-const PANEL_SIZE_EXPANDED = { width: 480, height: 560 };
+// Sized for the full Notes editor (toolbar included).
+const PANEL_SIZE = { width: 420, height: 480 };
+const PANEL_SIZE_EXPANDED = { width: 640, height: 640 };
 const BUBBLE_SIZE = { width: 48, height: 48 };
+const NARROW_BREAKPOINT = 640;
 export const QUICK_NOTE_SHORTCUT_LABEL = "Ctrl+Alt+N";
 
 function viewportSize() {
@@ -104,12 +106,26 @@ function noteTitle(note) {
 
 function QuickNotesPanel() {
   const navigate = useNavigate();
-  const { expanded, panelPos, setPanelPos, minimize, close, toggleExpanded } = useQuickNoteStore();
-  const { folder, notes, note, isLoading, isError, createNote, selectNote, creating } =
-    useQuickNotes({ enabled: true });
-  const size = expanded ? PANEL_SIZE_EXPANDED : PANEL_SIZE;
-  const pos = clampToViewport(panelPos ?? defaultPosition(size, viewportSize()), size, viewportSize());
-  const { dragging, handlers } = useDraggable({ pos, size, onMove: setPanelPos });
+  const { expanded, panelPos, setPanelPos, mobileY, setMobileY, minimize, close, toggleExpanded } =
+    useQuickNoteStore();
+  const { notes, note, isLoading, isError, createNote, selectNote, creating } = useQuickNotes({
+    enabled: true,
+  });
+  const vp = viewportSize();
+  // Phones: full width, only dragged up/down (no resize; starts near the top,
+  // clear of the on-screen keyboard). Larger screens: free-floating window.
+  const narrow = vp.width < NARROW_BREAKPOINT;
+  const size = narrow
+    ? { width: vp.width - 16, height: Math.min(480, Math.round(vp.height * 0.6)) }
+    : expanded ? PANEL_SIZE_EXPANDED : PANEL_SIZE;
+  const pos = narrow
+    ? { x: 8, y: clampToViewport({ x: 8, y: mobileY ?? 64 }, size, vp, 8).y }
+    : clampToViewport(panelPos ?? defaultPosition(size, vp), size, vp);
+  const { dragging, handlers } = useDraggable({
+    pos,
+    size,
+    onMove: narrow ? (p) => setMobileY(p.y) : setPanelPos,
+  });
   const sectionRef = useRef(null);
 
   // Ready to type: focus the editor once the note's editor has mounted.
@@ -159,15 +175,15 @@ function QuickNotesPanel() {
             <button
               type="button"
               data-no-drag
-              aria-label="Cambiar de nota rápida"
-              title="Cambiar de nota rápida"
+              aria-label="Cambiar de nota"
+              title="Cambiar de nota"
               className="flex h-7 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
             >
               <ChevronDown size={14} aria-hidden />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuLabel>Notas rápidas</DropdownMenuLabel>
+          <DropdownMenuContent align="start" className="max-h-80 w-72 overflow-y-auto">
+            <DropdownMenuLabel>Mis notas</DropdownMenuLabel>
             {notes.map((n) => (
               <DropdownMenuItem key={n.id} onSelect={() => selectNote(n.id)}>
                 <span className={cn("truncate", n.id === note?.id && "font-semibold")}>{noteTitle(n)}</span>
@@ -176,12 +192,12 @@ function QuickNotesPanel() {
             {notes.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem onSelect={() => createNote()}>
               <Plus size={14} aria-hidden />
-              Nueva nota rápida
+              Nueva nota
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <span className="flex-1" />
-        <HeaderButton label="Nueva nota rápida" onClick={() => createNote()}>
+        <HeaderButton label="Nueva nota" onClick={() => createNote()}>
           <Plus size={15} />
         </HeaderButton>
         {note && (
@@ -189,7 +205,7 @@ function QuickNotesPanel() {
             label="Abrir en Notas"
             onClick={() => {
               const params = new URLSearchParams({ note: note.id });
-              if (folder?.id) params.set("folder", folder.id);
+              if (note.folder_id) params.set("folder", note.folder_id);
               navigate(`/app/m/runly.notes?${params}`);
               minimize();
             }}
@@ -197,9 +213,11 @@ function QuickNotesPanel() {
             <ExternalLink size={14} />
           </HeaderButton>
         )}
-        <HeaderButton label={expanded ? "Reducir" : "Ampliar"} onClick={toggleExpanded}>
-          {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </HeaderButton>
+        {!narrow && (
+          <HeaderButton label={expanded ? "Reducir" : "Ampliar"} onClick={toggleExpanded}>
+            {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </HeaderButton>
+        )}
         <HeaderButton label="Minimizar" onClick={minimize}>
           <Minus size={15} />
         </HeaderButton>
@@ -211,11 +229,11 @@ function QuickNotesPanel() {
       <div className="min-h-0 flex-1">
         {isError ? (
           <p className="p-4 text-sm text-[hsl(var(--muted-foreground))]">
-            No se pudieron cargar tus notas rápidas.
+            No se pudieron cargar tus notas.
           </p>
         ) : note && !creating ? (
           <Suspense fallback={<EditorSkeleton />}>
-            <NoteEditor key={note.id} note={note} compact />
+            <NoteEditor key={note.id} note={note} />
           </Suspense>
         ) : isLoading || creating ? (
           <EditorSkeleton />
@@ -224,7 +242,7 @@ function QuickNotesPanel() {
 
       <footer className="flex shrink-0 items-center justify-between border-t border-[hsl(var(--border))] px-3 py-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
         <span>Se guarda automáticamente</span>
-        <kbd className="font-mono">{QUICK_NOTE_SHORTCUT_LABEL}</kbd>
+        {!narrow && <kbd className="font-mono">{QUICK_NOTE_SHORTCUT_LABEL}</kbd>}
       </footer>
     </section>
   );

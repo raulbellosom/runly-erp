@@ -22,6 +22,7 @@ import { usePushAutoSubscribe } from "../hooks/usePushAutoSubscribe.js";
 import { runly } from '../lib/runly.js'
 import { FloatingChatHub } from '../modules/runly.chat/components/FloatingChatHub.jsx'
 import { QuickNotesWidget } from '../modules/runly.notes/quick/QuickNotesWidget.jsx'
+import { CornerMenu } from '../components/CornerMenu.jsx'
 import { MODULE_SIDEBAR_SLOTS } from './sidebar-slots.js'
 import { useModuleNavBadges } from './useModuleNavBadges.js'
 import { useServiceWorkerNotifications } from './useServiceWorkerNotifications.js'
@@ -368,6 +369,7 @@ export function RunlyApp() {
         <CommandPalette activeModule={activeModule} />
         <FloatingChatHub />
         <QuickNotesWidget />
+        <CornerMenu />
       </div>
       </ModuleBundleLoader>
     </OfflineProvider>

@@ -11,6 +11,7 @@ export const useQuickNoteStore = create(
       expanded: false,
       panelPos: null, // { x, y } top-left; null = default spot
       bubblePos: null,
+      mobileY: null, // phones: panel is full width, only its top is draggable
       noteId: null,
 
       open: () => set({ isOpen: true, minimized: false }),
@@ -26,16 +27,18 @@ export const useQuickNoteStore = create(
         }),
       setPanelPos: (panelPos) => set({ panelPos }),
       setBubblePos: (bubblePos) => set({ bubblePos }),
+      setMobileY: (mobileY) => set({ mobileY }),
       setNoteId: (noteId) => set({ noteId }),
     }),
     {
       name: "runly.quickNotes",
-      partialize: ({ isOpen, minimized, expanded, panelPos, bubblePos, noteId }) => ({
+      partialize: ({ isOpen, minimized, expanded, panelPos, bubblePos, mobileY, noteId }) => ({
         isOpen,
         minimized,
         expanded,
         panelPos,
         bubblePos,
+        mobileY,
         noteId,
       }),
     },

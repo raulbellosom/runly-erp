@@ -4,11 +4,16 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { runly } from "../../../lib/runly";
 import { useQuickNoteStore } from "./quickNoteStore";
 
-export const QUICK_NOTES_FOLDER = "Notas rápidas";
-const LIST_SIZE = 12;
+const LIST_SIZE = 30;
 
-// Quick notes live in a regular runly.notes folder ("Notas rápidas"), so they
-// show up, sync and can be organized in the Notes module like any other note.
+// Canvas notes need the whiteboard surface; the floating pad only edits
+// document notes.
+export function isDocumentNote(note) {
+  return (note?.note_type ?? note?.noteType ?? "document") !== "canvas";
+}
+
+// The floating pad works on the user's regular notes (same list as the Notes
+// module, most recent first) and creates new ones there.
 export function useQuickNotes({ enabled }) {
   const { session } = useAuth();
   const token = session?.access_token;
@@ -19,49 +24,33 @@ export function useQuickNotes({ enabled }) {
   const autoCreatedRef = useRef(false);
   const active = Boolean(enabled && token);
 
-  const foldersQuery = useQuery({
-    queryKey: ["notes", "quick", "folders", token],
-    queryFn: () => runly.notes.listFolders(token),
-    enabled: active,
-    staleTime: 300_000,
-  });
-  const folder =
-    (foldersQuery.data?.folders ?? []).find(
-      (f) => f.name === QUICK_NOTES_FOLDER && !f.parent_folder_id,
-    ) ?? null;
-
   const listQuery = useQuery({
-    queryKey: ["notes", "quick", "list", folder?.id, token],
-    queryFn: () => runly.notes.list({ folderId: folder.id, trashed: false, pageSize: LIST_SIZE }, token),
-    enabled: active && Boolean(folder?.id),
+    queryKey: ["notes", "quick", "recent", token],
+    queryFn: () => runly.notes.list({ trashed: false, archived: false, pageSize: LIST_SIZE }, token),
+    enabled: active,
     staleTime: 30_000,
   });
-  const notes = listQuery.data?.notes ?? [];
+  const notes = (listQuery.data?.notes ?? []).filter(isDocumentNote);
 
+  // Same key and raw shape as the Notes module's useNote, so both share cache.
   const noteQuery = useQuery({
     queryKey: ["notes", noteId],
     queryFn: () => runly.notes.get(noteId, token),
     enabled: active && Boolean(noteId),
-    select: (res) => res?.note ?? res,
     retry: false,
   });
+  const note = noteQuery.data?.note ?? null;
 
-  // A stored id from another company, or a trashed note: forget it.
+  // A stored id from another company, a trashed note or a canvas: forget it.
   useEffect(() => {
-    if (noteQuery.isError) setNoteId(null);
-  }, [noteQuery.isError, setNoteId]);
+    if (noteQuery.isError || (note && !isDocumentNote(note))) setNoteId(null);
+  }, [noteQuery.isError, note, setNoteId]);
 
   const createNote = useCallback(async () => {
     if (!token || creating) return;
     setCreating(true);
     try {
-      let folderId = folder?.id;
-      if (!folderId) {
-        const res = await runly.notes.createFolder({ name: QUICK_NOTES_FOLDER, icon: "Zap" }, token);
-        folderId = res?.folder?.id;
-        queryClient.invalidateQueries({ queryKey: ["notes", "quick", "folders"] });
-      }
-      const res = await runly.notes.create({ title: "", content: "", folderId }, token);
+      const res = await runly.notes.create({ title: "", content: "" }, token);
       const created = res?.note;
       if (created?.id) {
         queryClient.setQueryData(["notes", created.id], { note: created });
@@ -71,27 +60,25 @@ export function useQuickNotes({ enabled }) {
     } finally {
       setCreating(false);
     }
-  }, [token, creating, folder?.id, queryClient, setNoteId]);
+  }, [token, creating, queryClient, setNoteId]);
 
-  // First open: fall back to the newest quick note, or create one so the user
-  // can type immediately.
-  const listSettled = foldersQuery.isSuccess && (!folder || listQuery.isSuccess);
+  // First open: continue with the most recent note, or create one when the
+  // user has none yet, so typing can start immediately.
   useEffect(() => {
-    if (!active || noteId || !listSettled) return;
+    if (!active || noteId || !listQuery.isSuccess) return;
     if (notes.length > 0) {
       setNoteId(notes[0].id);
     } else if (!autoCreatedRef.current) {
       autoCreatedRef.current = true;
       createNote();
     }
-  }, [active, noteId, listSettled, notes, setNoteId, createNote]);
+  }, [active, noteId, listQuery.isSuccess, notes, setNoteId, createNote]);
 
   return {
-    folder,
     notes,
-    note: noteId ? noteQuery.data ?? null : null,
-    isLoading: foldersQuery.isLoading || listQuery.isLoading || noteQuery.isLoading || creating,
-    isError: foldersQuery.isError,
+    note: noteId && note && isDocumentNote(note) ? note : null,
+    isLoading: listQuery.isLoading || noteQuery.isLoading || creating,
+    isError: listQuery.isError,
     createNote,
     selectNote: setNoteId,
     creating,

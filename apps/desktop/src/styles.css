@@ -715,19 +715,6 @@ body,
 .note-sheet-inset {
   padding-inline: var(--note-sheet-padding, 2rem);
 }
-/* Compact NoteEditor (floating quick notes): no icon row and a small panel,
-   so the first-line title is smaller, unindented and flush with the top. */
-.note-compact {
-  --note-title-lh: 1.75rem;
-  --note-title-top: 0;
-  --note-title-indent: 0;
-  --note-sheet-padding: 1rem;
-}
-.note-compact .tiptap > p:first-child {
-  font-size: 1.0625rem !important;
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.5rem;
-}
 @media (max-width: 639px) {
   .note-sheet {
     --note-body-font-size: 0.875rem;

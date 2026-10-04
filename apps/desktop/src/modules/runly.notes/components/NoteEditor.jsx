@@ -64,10 +64,7 @@ function colorForUser(seed) {
 // dropped and switching notes would leave stale content on screen — the
 // editor instance would outlive the note it was built for. Keying the surface
 // by note.id and gating on the engine fixes both.
-// compact: chrome-less variant (no toolbar, cover, icon row or paper sheet) for
-// small hosts such as the floating quick-notes panel. Same Y.js engine and
-// autosave as the full editor, so edits sync live with runly.notes.
-export function NoteEditor({ note, readOnly = false, viewOnly = false, scrollable = true, zoom = 100, publicSlug = null, compact = false }) {
+export function NoteEditor({ note, readOnly = false, viewOnly = false, scrollable = true, zoom = 100, publicSlug = null }) {
   const { session, userProfile } = useAuth()
   const token = session?.access_token
 
@@ -128,7 +125,6 @@ export function NoteEditor({ note, readOnly = false, viewOnly = false, scrollabl
         viewOnly={viewOnly}
         scrollable={scrollable}
         zoom={zoom}
-        compact={compact}
         token={token}
         session={session}
         userProfile={userProfile}
@@ -151,7 +147,6 @@ export function NoteEditor({ note, readOnly = false, viewOnly = false, scrollabl
       viewOnly={viewOnly}
       scrollable={scrollable}
       zoom={zoom}
-      compact={compact}
       token={token}
       session={session}
       userProfile={userProfile}
@@ -179,7 +174,7 @@ function EditorLoading({ scrollable }) {
 // Everything below is a single editor instance for one note. It is mounted with
 // key={note.id} by NoteEditor, so every hook/ref here is scoped to one note and
 // torn down cleanly on switch.
-function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, compact = false, token, session, userProfile, engine }) {
+function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, token, session, userProfile, engine }) {
   const viewing = readOnly || viewOnly
   const interaction = useMemo(() => ({ viewing }), [viewing])
   const [toolbarHost, setToolbarHost] = useState(null)
@@ -580,12 +575,10 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, c
       onSelectionUpdate={handleSelectionUpdate}
       editorProps={{
         attributes: {
-          class: compact
-            ? 'focus:outline-none px-4 py-3 min-h-full text-sm'
-            : 'focus:outline-none note-sheet-inset pb-6 min-h-full',
+          class: 'focus:outline-none note-sheet-inset pb-6 min-h-full',
         },
       }}
-      slotBefore={compact ? null :
+      slotBefore={
         <>
           {note.cover_url ? cover : !viewing && toolbarHost ? createPortal(cover, toolbarHost) : null}
           {!viewing && toolbarHost && createPortal(
@@ -643,26 +636,10 @@ function NoteEditorSurface({ note, readOnly, viewOnly, scrollable, zoom = 100, c
         </>
       }
     >
-      {!viewing && !compact && <TableFloatingMenu />}
-      {!viewing && !compact && <TableDragHandles />}
+      {!viewing && <TableFloatingMenu />}
+      {!viewing && <TableDragHandles />}
     </EditorProvider>
   )
-
-  if (compact) {
-    return (
-      <div ref={containerRef} className="flex h-full min-h-0 flex-col overflow-hidden">
-        <NoteInteractionContext.Provider value={interaction}>
-          <div
-            ref={scrollRef}
-            className="note-compact flex-1 min-h-0 overflow-auto overscroll-contain"
-            onClick={viewing ? undefined : handleContainerClick}
-          >
-            {editorProvider}
-          </div>
-        </NoteInteractionContext.Provider>
-      </div>
-    )
-  }
 
   function handleContainerClick(e) {
     if (shouldFocusDocumentEnd(e.target, e.currentTarget)) {
