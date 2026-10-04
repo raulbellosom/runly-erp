@@ -24,10 +24,10 @@ export function createTrashRegistry({ prisma }) {
     const providers = CORE_TRASH_PROVIDERS.filter((provider) => activeKeys.has(provider.moduleKey))
     const custom = active.filter((mod) => /^(custom|community)\./.test(mod.key))
     if (custom.length) {
-      const models = await prisma.runlyModel.findMany({ where: { moduleKey: { in: custom.map((mod) => mod.key) } }, select: { moduleKey: true, schema: true } })
+      const models = await prisma.runlyModel.findMany({ where: { moduleKey: { in: custom.map((mod) => mod.key) } }, select: { moduleKey: true, schema: true, label: true, pluralLabel: true } })
       for (const row of models) {
         const mod = custom.find((item) => item.key === row.moduleKey)
-        const provider = createRme3TrashProvider({ moduleKey: mod.key, moduleName: mod.name, manifest: mod.manifest, model: row.schema ?? {} })
+        const provider = createRme3TrashProvider({ moduleKey: mod.key, moduleName: mod.name, manifest: mod.manifest, model: { ...(row.schema ?? {}), label: row.label ?? row.schema?.label, pluralLabel: row.pluralLabel ?? row.schema?.pluralLabel } })
         if (provider) providers.push(provider)
       }
     }

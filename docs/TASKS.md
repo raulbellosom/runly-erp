@@ -1715,6 +1715,16 @@ Specs: `docs/superpowers/specs/2026-09-30-mirai-actions-design.md`, `2026-09-30-
 - **No verificado**: ningún flujo probado con el modelo real ni en la app (falta reiniciar la API y la aceptación manual de cada spec, sección "Acceptance"). Por eso nada se marca `[x]`.
 - Pendiente: módulos sin capacidad (archivos, documentos, punto de venta, sitio web, growth) y módulos RME3 personalizados; borrar con migración las tablas sin uso de los asistentes anteriores (hilos de PFM, `inventory_assistant_thread`) y el permiso `pfm.assistant.use` cuando el usuario lo confirme.
 
+## Desactivados — deactivated records (2026-10-03)
+
+Spec: `docs/superpowers/specs/2026-10-03-records-trash-design.md` · Plan: `docs/superpowers/plans/2026-10-03-records-trash.md`
+
+- [x] API: provider registry (`apps/api/src/services/trash/`), generic provider for every soft-delete entity of installed RME3/Builder modules, core providers for inventory items, contacts and HR employees; `/trash` routes with `requireActiveCompany`; `core.records.purge` (and the previously undeclared `core.modules.manage`) declared; audit `core.records.restored|purged`; FK errors → 409 `in_use`. Verified: 2026-10-03 (unit 3/3, API services 716/716, backend E2E 11/11 incl. 1:1 calibration freed after purge and contact with restrict connection kept)
+- [x] UI: shell-added "Desactivados" sidebar entry for modules with providers, `TrashScreen` (entity selector, server search, Reactivar, Eliminar with two confirmations), breadcrumb label. Verified: 2026-10-03 (Playwright 7/7, `vite build`, eslint)
+- [x] Docs: help page `runly.core/views/desactivados.md`, `docs/developers/solucion-problemas.md` (regenerated)
+- [ ] Owner: "Sincronizar módulos" once so the new permissions exist for role assignment (admins already have them).
+- [ ] Next providers: calendar events, fleet vehicles/drivers, canvas boards, purchases, documents, files (same contract).
+
 ## RME3 Module Platform v2 (2026-10-03)
 
 Spec: `docs/superpowers/specs/2026-10-03-rme3-module-platform-v2-design.md` · Plan: `docs/superpowers/plans/2026-10-03-rme3-module-platform-v2.md`

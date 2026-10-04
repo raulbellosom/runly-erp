@@ -26,6 +26,7 @@ import { useModuleNavBadges } from './useModuleNavBadges.js'
 import { useServiceWorkerNotifications } from './useServiceWorkerNotifications.js'
 import { useHelpTip } from './useHelpTip.js'
 import { RecordConnectionsButton } from '../shell/connections/RecordConnectionsButton.jsx'
+import { useTrashProviders, withTrashNavigation } from '../shell/trash/useTrashProviders.js'
 
 const MiraiSidebarHost = lazy(() =>
   import("../modules/runly.chat/components/MiraiSidebarHost.jsx").then((m) => ({ default: m.MiraiSidebarHost })),
@@ -215,6 +216,9 @@ export function RunlyApp() {
   }, [activeModule?.key])
 
   const navBadges = useModuleNavBadges(activeModule?.key)
+  // Shell-added "Desactivados" entry for modules with deactivated-record support.
+  const trashProviders = useTrashProviders(activeModule?.key).data
+  const sidebarModule = useMemo(() => withTrashNavigation(activeModule, trashProviders), [activeModule, trashProviders])
   const helpTip = useHelpTip()
 
   return (
@@ -265,7 +269,7 @@ export function RunlyApp() {
             ) : (
               <ModuleSidebar
                 key={activeModule?.key}
-                module={activeModule}
+                module={sidebarModule}
                 currentPath={location.pathname}
                 onNavigate={(path) => navigate(path)}
                 collapsed={collapsed}

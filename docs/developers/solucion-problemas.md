@@ -51,6 +51,13 @@ order: 8
 | 409 *Otra persona modificó …* | Edición concurrente de la misma sección. | *Recargar* y repetir el cambio. |
 | 409 *No se puede eliminar: tiene registros relacionados* | Conexión `related` con `onTargetDelete: 'restrict'`. | Elimina o reasigna primero esos registros. |
 
+## Registros desactivados
+
+- **Desactivé un registro y quiero verlo o borrarlo.** Abre la sección **Desactivados** del menú de tu módulo (la agrega Runly en todo módulo con entidades de eliminación suave; no hace falta declararla). Desde ahí se reactiva o se elimina definitivamente.
+- **No aparece la sección.** La entidad debe tener *Eliminación suave* activada y el permiso `<modulo>.<entidad>.delete` (o `.update`) declarado; el usuario necesita ese permiso.
+- **"Otros registros dependen de este".** Una relación o una conexión con *Impedir la eliminación* apunta al registro. Elimina o reasigna primero esos registros.
+- **Borrar desde tu API.** No borres filas en tus rutas: desactívalas (`enabled = false`) y deja el borrado definitivo a Desactivados, que respeta permisos, empresa y bitácora.
+
 ## Si nada de esto aplica
 
 Usa **Reportar bug** desde la pantalla con el problema e incluye: la versión del módulo, qué hiciste y el mensaje exacto (o una captura de la consola del navegador).

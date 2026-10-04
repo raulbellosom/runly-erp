@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useRuntimeModules } from "../app/useRuntimeModules";
+import { TRASH_SUBPATH } from "../shell/trash/useTrashProviders.js";
 
 const STATIC_LABELS = {
   "/app/profile": "Mi perfil",
@@ -49,6 +50,8 @@ function buildCrumbs(pathname, moduleMap) {
     // UUID sub-path = detail page; use the root nav item label as context
     const rootNav = navItems.find((n) => n.path === "/");
     subLabel = rootNav ? `${rootNav.label} · Detalle` : "Detalle";
+  } else if (subPath === TRASH_SUBPATH) {
+    subLabel = "Desactivados";
   } else {
     subLabel = rawSub;
   }

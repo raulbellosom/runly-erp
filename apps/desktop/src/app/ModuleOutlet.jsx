@@ -9,6 +9,9 @@ import { useRuntimeModules } from "./useRuntimeModules";
 import { isModuleAvailable } from "../lib/runtimeModules";
 import { applyBrandTheme } from "../lib/brandTheme.js";
 import { useBrandingStore } from "../stores/branding.js";
+import { TRASH_SUBPATH } from "../shell/trash/useTrashProviders.js";
+
+const TrashScreen = lazy(() => import("../shell/trash/TrashScreen.jsx").then((m) => ({ default: m.TrashScreen })));
 
 const SCREEN_MAP = {
   "runly.core:/modules": lazy(
@@ -630,6 +633,15 @@ export function ModuleOutlet() {
 
   if (!isModuleAvailable(module)) {
     return null;
+  }
+  // Shell-level "Desactivados" of every module (it is not in the manifest's
+  // navigation; the API checks permissions per provider).
+  if (subPath === TRASH_SUBPATH && requestedModuleKey === moduleKey) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <TrashScreen moduleKey={moduleKey} moduleName={module.name} />
+      </Suspense>
+    );
   }
   if (!isPathAllowedByNavigation(module, subPath)) {
     return (
