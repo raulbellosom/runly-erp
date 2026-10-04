@@ -308,11 +308,9 @@ html {
   }
   .command-item-active {
     background: var(--brand-soft);
-    box-shadow: inset 0 0 0 1px rgba(253, 96, 22, 0.35);
   }
   .dark .command-item-active {
-    background: rgba(253, 96, 22, 0.16);
-    box-shadow: inset 0 0 0 1px rgba(253, 96, 22, 0.3);
+    background: hsl(var(--muted));
   }
 
   .glass-shell {
