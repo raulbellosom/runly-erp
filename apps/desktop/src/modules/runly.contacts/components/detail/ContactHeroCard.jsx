@@ -17,7 +17,7 @@ import {
   Pencil,
   Phone,
   Ticket,
-  Trash2,
+  PowerOff,
   TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -136,8 +136,8 @@ export function ContactHeroCard({
             secondary={[
               { label: "Volver a contactos", icon: <ArrowLeft className="h-4 w-4" />, onClick: onBack },
               canDelete && {
-                label: "Eliminar",
-                icon: <Trash2 className="h-4 w-4" />,
+                label: "Desactivar",
+                icon: <PowerOff className="h-4 w-4" />,
                 onClick: onDelete,
                 destructive: true,
               },

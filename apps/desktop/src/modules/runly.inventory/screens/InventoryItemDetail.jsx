@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { RunlyDetail, ErrorState, ConfirmDialog, DetailActionBar, Button, DetailSkeleton } from '@runly/ui'
-import { ArrowLeft, Trash2, Sparkles } from 'lucide-react'
+import { ArrowLeft, PowerOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
@@ -51,7 +51,7 @@ export default function InventoryItemDetail() {
 
   const handleDelete = async () => {
     await deleteItem.mutateAsync(id)
-    toast.success('Activo eliminado correctamente')
+    toast.success('Activo desactivado', { description: 'Puedes reactivarlo o eliminarlo definitivamente en Desactivados.' })
     navigate('/app/m/runly.inventory/inventory')
   }
 
@@ -82,8 +82,8 @@ export default function InventoryItemDetail() {
                 onClick: () => navigate('/app/m/runly.inventory/inventory'),
               },
               {
-                label: 'Eliminar',
-                icon: <Trash2 className="h-4 w-4" />,
+                label: 'Desactivar',
+                icon: <PowerOff className="h-4 w-4" />,
                 onClick: () => setDeleteOpen(true),
                 destructive: true,
               },
@@ -94,9 +94,9 @@ export default function InventoryItemDetail() {
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="Eliminar activo"
-        description={`Esta acción eliminará permanentemente "${item.name}" (${item.assetTag}). No se puede deshacer.`}
-        confirmLabel="Eliminar"
+        title="Desactivar activo"
+        description={`"${item.name}" (${item.assetTag}): Dejará de mostrarse en el inventario; sus datos se conservan. Podrás reactivarlo o eliminarlo definitivamente en Inventario > Desactivados.`}
+        confirmLabel="Desactivar"
         onConfirm={handleDelete}
       />
     </div>

@@ -76,6 +76,8 @@ export function RunlyTable({
   onView,
   onEdit,
   onDelete,
+  // Row menu text for onDelete; screens whose delete only deactivates pass "Desactivar".
+  deleteLabel = "Eliminar",
   onToggleEnabled = null,
   canDeleteRow = null,
   refreshSignal = 0,
@@ -366,7 +368,7 @@ export function RunlyTable({
           onClick: () => onToggleEnabled(row),
         },
         onDelete && {
-          label: "Eliminar",
+          label: deleteLabel,
           icon: Trash2,
           variant: "destructive",
           onClick: () => onDelete(row),
@@ -424,7 +426,9 @@ export function RunlyTable({
           label:
             chosen.kind === "toggle"
               ? (row.enabled ? "Desactivar" : "Activar")
-              : (label || "Accion"),
+              : chosen.kind === "delete" && deleteLabel !== "Eliminar"
+                ? deleteLabel
+                : (label || "Accion"),
           icon: chosen.icon,
           variant: chosen.variant,
           onClick: chosen.run,

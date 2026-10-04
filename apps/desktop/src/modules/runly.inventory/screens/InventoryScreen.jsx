@@ -149,7 +149,7 @@ export default function InventoryScreen() {
       setConfirmDelete(null)
       setRefreshSignal(s => s + 1)
       queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] })
-      toast.success('Activo eliminado')
+      toast.success('Activo desactivado', { description: 'Puedes reactivarlo o eliminarlo definitivamente en Desactivados.' })
     },
     onError: err => toast.error(err?.message ?? 'No se pudo eliminar el activo'),
   })
@@ -204,6 +204,7 @@ export default function InventoryScreen() {
         }}
         onEdit={row => navigate(`/app/m/runly.inventory/inventory/${row.id}/edit`)}
         onDelete={row => setConfirmDelete(row)}
+        deleteLabel="Desactivar"
         refreshSignal={refreshSignal}
       />
 
@@ -221,10 +222,10 @@ export default function InventoryScreen() {
       <ConfirmDialog
         open={Boolean(confirmDelete)}
         onOpenChange={v => !v && setConfirmDelete(null)}
-        title="Eliminar activo"
-        description="El activo sera desactivado. Esta accion no se puede deshacer facilmente."
+        title="Desactivar activo"
+        description="Dejará de mostrarse en el inventario; sus datos se conservan. Podrás reactivarlo o eliminarlo definitivamente en Inventario > Desactivados."
         detail={confirmDelete ? `${confirmDelete.assetTag} — ${confirmDelete.name}` : ''}
-        confirmLabel="Eliminar"
+        confirmLabel="Desactivar"
         onConfirm={() => deleteMutation.mutate(confirmDelete.id)}
         loading={deleteMutation.isPending}
       />

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RunlyTable, Button, ConfirmDialog, ErrorState, PageHeader } from "@runly/ui";
-import { FileSpreadsheet, FileText, Power, PowerOff, Trash2, UserPlus } from "lucide-react";
+import { FileSpreadsheet, FileText, Power, PowerOff, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActiveCompany } from "../../../company/ActiveCompanyProvider";
@@ -45,9 +45,7 @@ export default function ContactsScreen() {
   const canReadContacts = hasPermission("contacts.contacts.read");
   const canCreateContacts = hasPermission("contacts.contacts.create");
   const canUpdateContacts = hasPermission("contacts.contacts.update");
-  const canDeleteContacts = hasPermission("contacts.contacts.delete");
 
-  const [confirmDelete, setConfirmDelete] = useState(null);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [bulkState, setBulkState] = useState(null);
   const navigate = useNavigate();
@@ -95,15 +93,6 @@ export default function ContactsScreen() {
   const openDetail = (contact) => navigate(`${basePath}/${contact.id}`);
   const openEdit = (contact) => navigate(`${basePath}/${contact.id}/edit`);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => runly.contacts.delete(id, token),
-    onSuccess: () => {
-      setConfirmDelete(null);
-      setRefreshSignal((s) => s + 1);
-      toast.success("Contacto eliminado");
-    },
-    onError: (err) => toast.error(err?.message || "No se pudo eliminar el contacto"),
-  });
 
   const bulkEnabledMutation = useMutation({
     mutationFn: ({ ids, enabled }) =>
@@ -116,15 +105,6 @@ export default function ContactsScreen() {
     onError: () => toast.error("No se pudo actualizar el estado de los contactos"),
   });
 
-  const bulkDeleteMutation = useMutation({
-    mutationFn: (ids) => runly.contacts.deleteContactsBulk(ids, token),
-    onSuccess: () => {
-      setRefreshSignal((s) => s + 1);
-      setBulkState(null);
-      toast.success("Contactos eliminados");
-    },
-    onError: (err) => toast.error(err?.message || "No se pudieron eliminar los contactos"),
-  });
 
   const toggleEnabledMutation = useMutation({
     mutationFn: ({ id, enabled }) => runly.contacts.setEnabled(id, enabled, token),
@@ -185,13 +165,8 @@ export default function ContactsScreen() {
           setBulkState({ type: "enable", rows: selectedRows, enabled: enabling }),
       };
     }),
-    canDeleteContacts && ((selectedRows) => ({
-      label: "Eliminar",
-      icon: Trash2,
-      variant: "destructive",
-      onClick: () => setBulkState({ type: "delete", rows: selectedRows }),
-    })),
-  ].filter(Boolean), [token, canUpdateContacts, canDeleteContacts]);
+    // Permanent deletion lives in Contactos > Desactivados.
+  ].filter(Boolean), [token, canUpdateContacts]);
 
   if (!canReadContacts) {
     return (
@@ -241,52 +216,35 @@ export default function ContactsScreen() {
         onEdit={canUpdateContacts ? openEdit : undefined}
         onToggleEnabled={canUpdateContacts ? (row) =>
           toggleEnabledMutation.mutate({ id: row.id, enabled: !row.enabled }) : undefined}
-        onDelete={canDeleteContacts ? (row) => setConfirmDelete(row) : undefined}
         refreshSignal={refreshSignal}
         bulkActions={bulkActions}
       />
 
-      <ConfirmDialog
-        open={Boolean(confirmDelete)}
-        onOpenChange={(v) => !v && setConfirmDelete(null)}
-        title="Eliminar contacto"
-        description="El contacto sera eliminado permanentemente. Esta accion no se puede deshacer."
-        detail={confirmDelete?.name}
-        confirmLabel="Eliminar"
-        onConfirm={() => deleteMutation.mutate(confirmDelete.id)}
-        loading={deleteMutation.isPending}
-      />
 
       <ConfirmDialog
         open={Boolean(bulkState)}
         onOpenChange={(v) => !v && setBulkState(null)}
         title={
-          bulkState?.type === "delete"
-            ? "Eliminar contactos seleccionados"
-            : bulkState?.enabled
+          bulkState?.enabled
               ? "Activar contactos seleccionados"
               : "Desactivar contactos seleccionados"
         }
         description={
-          bulkState?.type === "delete"
-            ? "Esta accion elimina los contactos de forma permanente."
-            : "Se actualizara el estado de los contactos seleccionados."
+          bulkState?.enabled
+            ? "Se activaran los contactos seleccionados."
+            : "Dejaran de mostrarse; puedes reactivarlos o eliminarlos definitivamente en Desactivados."
         }
         detail={`${bulkState?.rows?.length ?? 0} contactos seleccionados`}
-        confirmLabel={bulkState?.type === "delete" ? "Eliminar" : "Confirmar"}
+        confirmLabel="Confirmar"
         onConfirm={() => {
           const ids = (bulkState?.rows ?? []).map((r) => r.id).filter(Boolean);
           if (!ids.length) {
             setBulkState(null);
             return;
           }
-          if (bulkState?.type === "delete") {
-            bulkDeleteMutation.mutate(ids);
-          } else {
-            bulkEnabledMutation.mutate({ ids, enabled: Boolean(bulkState?.enabled) });
-          }
+          bulkEnabledMutation.mutate({ ids, enabled: Boolean(bulkState?.enabled) });
         }}
-        loading={bulkDeleteMutation.isPending || bulkEnabledMutation.isPending}
+        loading={bulkEnabledMutation.isPending}
       />
     </div>
   );

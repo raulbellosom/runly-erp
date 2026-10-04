@@ -94,14 +94,15 @@ export default function ContactDetailScreen() {
     label: contact?.name,
   });
 
+  // Deactivates; permanent deletion lives in Contactos > Desactivados.
   const deleteMutation = useMutation({
-    mutationFn: () => runly.contacts.delete(contactId, token),
+    mutationFn: () => runly.contacts.setEnabled(contactId, false, token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      toast.success("Contacto eliminado");
+      toast.success("Contacto desactivado", { description: "Puedes reactivarlo o eliminarlo definitivamente en Desactivados." });
       navigate(LIST_PATH);
     },
-    onError: (err) => toast.error(err?.message || "No se pudo eliminar el contacto"),
+    onError: (err) => toast.error(err?.message || "No se pudo desactivar el contacto"),
   });
 
   function setTab(next) {
@@ -231,10 +232,10 @@ export default function ContactDetailScreen() {
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Eliminar contacto"
-        description="El contacto será eliminado permanentemente junto con sus medios, direcciones y personas. Esta acción no se puede deshacer."
+        title="Desactivar contacto"
+        description="Dejará de mostrarse en la lista; sus datos se conservan. Podrás reactivarlo o eliminarlo definitivamente en Contactos > Desactivados."
         detail={contact.name}
-        confirmLabel="Eliminar"
+        confirmLabel="Desactivar"
         onConfirm={() => deleteMutation.mutate()}
         loading={deleteMutation.isPending}
       />

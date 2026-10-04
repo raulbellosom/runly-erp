@@ -79,7 +79,7 @@ export default function EventDetailModal({
   async function doDelete() {
     try {
       await deleteEvent.mutateAsync(event._baseEventId ?? event.id);
-      toast.success("Evento eliminado");
+      toast.success("Evento eliminado", { description: "Si fue un error, recupéralo en Calendario > Desactivados." });
       setConfirmOpen(false);
       onClose();
     } catch (err) {

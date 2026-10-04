@@ -87,7 +87,7 @@ export default function InventoryItemForm() {
 
   const handleDelete = async () => {
     await deleteItem.mutateAsync(id)
-    toast.success('Activo eliminado correctamente')
+    toast.success('Activo desactivado', { description: 'Puedes reactivarlo o eliminarlo definitivamente en Desactivados.' })
     navigate('/app/m/runly.inventory/inventory')
   }
 
@@ -143,7 +143,7 @@ export default function InventoryItemForm() {
                   onClick={() => setDeleteOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" />
-                  Eliminar activo
+                  Desactivar activo
                 </Button>
               </div>
             ) : null
@@ -167,9 +167,9 @@ export default function InventoryItemForm() {
         <ConfirmDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
-          title="Eliminar activo"
-          description={`Esta acción eliminará permanentemente "${editItem.name}" (${editItem.assetTag}). No se puede deshacer.`}
-          confirmLabel="Eliminar"
+          title="Desactivar activo"
+          description={`"${editItem.name}" (${editItem.assetTag}): Dejará de mostrarse en el inventario; sus datos se conservan. Podrás reactivarlo o eliminarlo definitivamente en Inventario > Desactivados.`}
+          confirmLabel="Desactivar"
           onConfirm={handleDelete}
         />
       ) : null}
