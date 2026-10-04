@@ -45,6 +45,7 @@ import { validateDashboardSchema, validateKanbanSchema, validateManifest } from 
 import { del as cacheDel } from "../lib/cache.js";
 import { loadDataMigrationFiles } from "../services/module-data-migration-service.js";
 import { createModuleArchivedFieldsService } from "../services/module-archived-fields-service.js";
+import { consumedServiceKeys, createModuleServices } from "../services/module-services/module-services.js";
 import {
   resolveModulesDir,
 } from "../services/module-upload-service.js";
@@ -2594,6 +2595,27 @@ export function createModulesRouter({
     }
   });
 
+  // Services of other modules this module may call (module-services.js):
+  // what its manifest asks for (`consumes`) and what an admin granted.
+  const moduleServicesSvc = createModuleServices({ prisma });
+  app.get("/:key/service-grants", authMiddleware, requirePermission("core.modules.manage"), async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    const row = await prisma.runlyModule.findUnique({ where: { key }, select: { manifest: true } });
+    const grants = await moduleServicesSvc.listGrants(key);
+    return c.json({ data: {
+      requested: moduleServicesSvc.describe(consumedServiceKeys(row?.manifest)),
+      granted: moduleServicesSvc.describe(grants.map((grant) => grant.serviceKey)),
+    } });
+  });
+
+  app.put("/:key/service-grants", authMiddleware, requirePermission("core.modules.manage"), async (c) => {
+    const key = await resolvePersistedModuleKey(prisma, c.req.param("key"));
+    const body = await c.req.json().catch(() => ({}));
+    const services = Array.isArray(body?.services) ? body.services.map(String) : [];
+    const grants = await moduleServicesSvc.setGrants({ moduleKey: key, serviceKeys: services, grantedBy: c.get("userContext")?.profile?.id ?? null });
+    return c.json({ data: moduleServicesSvc.describe(grants.map((grant) => grant.serviceKey)) });
+  });
+
   // Archived fields: removed by an update, column and data kept
   // (module-archived-fields-service.js). Purge drops the column after a backup.
   const archivedFieldsSvc = createModuleArchivedFieldsService({ prisma });
@@ -2749,6 +2771,8 @@ export function createModulesRouter({
           actorId,
           confirmation: body?.confirmation ?? null,
         });
+        // A reinstalled module must ask for consent again.
+        await moduleServicesSvc.revokeAll(key).catch(() => null);
         return c.json({ data });
       } catch (err) {
         return c.json(

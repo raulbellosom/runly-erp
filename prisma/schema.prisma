@@ -394,6 +394,49 @@ model ModuleSchemaBackup {
   @@map("module_schema_backup")
 }
 
+// Services of other modules a module may call (spec 2026-10-03-rme3-module-platform-v2 §10.7),
+// granted by an admin (catalog install consent or module settings). companyId null = all companies.
+model ModuleServiceGrant {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  companyId  String?  @map("company_id") @db.Uuid
+  moduleKey  String   @map("module_key")
+  serviceKey String   @map("service_key")
+  grantedBy  String?  @map("granted_by") @db.Uuid
+  grantedAt  DateTime @default(now()) @map("granted_at")
+
+  @@unique([moduleKey, serviceKey, companyId])
+  @@index([moduleKey])
+  @@map("module_service_grant")
+}
+
+// Last fetched official catalog index (one row), for offline listing and ETag revalidation.
+model ModuleCatalogCache {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  url       String   @unique
+  etag      String?
+  payload   Json
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@map("module_catalog_cache")
+}
+
+// Domain events written in the same transaction as the change and delivered by the worker
+// to subscribed modules (manifest events.subscribes, api/events.js).
+model DomainEventOutbox {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  event       String
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at")
+
+  @@index([processedAt, nextAttemptAt])
+  @@map("domain_event_outbox")
+}
+
 model Company {
   id String @id @default(uuid(7)) @db.Uuid
   name           String

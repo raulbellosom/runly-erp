@@ -84,7 +84,7 @@ class RouteCollisionError extends Error {
   }
 }
 
-export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null, relationsCapability = null, aiCapability = null }) {
+export function createRouteLoaderService({ prisma, authMiddleware, requirePermission, cache = null, filesCapability = null, relationsCapability = null, aiCapability = null, moduleServices = null }) {
   let moduleRoots = null
   const routerMap = new Map()
   // Optional api/public.js routers, served only through the module public-link
@@ -393,6 +393,9 @@ export function createRouteLoaderService({ prisma, authMiddleware, requirePermis
         files: filesCapability ? filesCapability(moduleKey) : null,
         // Relations to system entities (relation-targets-service.js).
         relations: relationsCapability,
+        // Services of other modules, gated by admin grants + user permissions
+        // (module-services/module-services.js).
+        services: moduleServices ? { forRequest: (c) => moduleServices.forRequest(c, moduleKey) } : null,
         // MirAI tool loop + internet lookup limited to the manifest's
         // `ai.publicLookup` fields (services/ai/module-ai-capability.js).
         ai: aiCapability ? aiCapability(moduleKey, moduleRow.manifest ?? null) : null,

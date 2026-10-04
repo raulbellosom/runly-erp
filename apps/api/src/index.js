@@ -99,6 +99,7 @@ import { createModuleBundlerService } from "./services/module-bundler-service.js
 import { createModuleLifecycleService } from "./services/module-lifecycle-service.js";
 import { coreModules } from "./manifests/official/core-modules.js";
 import { createRouteLoaderService } from "./services/route-loader-service.js";
+import { createModuleServices } from "./services/module-services/module-services.js";
 import { createModuleFilesCapability } from "./services/module-files-service.js";
 import { createModuleAiCapability } from "./services/ai/module-ai-capability.js";
 import { createMiraiService } from "./routes/chat/mirai-service.js";
@@ -796,12 +797,14 @@ async function resolveCanvasEntityLink({ authUserId, companyId, moduleKey, entit
   return resolved.get(String(entityId)) ?? null;
 }
 
+const moduleServices = createModuleServices({ prisma });
 const routeLoader = createRouteLoaderService({
   prisma,
   authMiddleware,
   requirePermission,
   filesCapability: createModuleFilesCapability({ prisma, filesService, supabaseAdmin }),
   relationsCapability: relationTargets.capability(),
+  moduleServices,
   // MirAI tool loop + shared public lookup for RME3 modules (lazy).
   aiCapability: createModuleAiCapability({ prisma, createMirai: () => createMiraiService({ prisma, env: process.env }) }),
   cache: {
