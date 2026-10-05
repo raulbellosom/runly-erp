@@ -266,7 +266,6 @@ html {
      white sheet; the viewer needs real see-through glass in both themes. */
   .glass-viewer {
     backdrop-filter: blur(24px) saturate(140%);
-    -webkit-backdrop-filter: blur(24px) saturate(140%);
     background: rgba(241, 245, 249, 0.42);
     isolation: isolate;
   }
@@ -282,7 +281,6 @@ html {
      backdrop root and the blur only pops in once the fade ends. */
   .glass-overlay {
     backdrop-filter: blur(24px) saturate(140%);
-    -webkit-backdrop-filter: blur(24px) saturate(140%);
     background: rgba(241, 245, 249, 0.42);
     border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: var(--glass-shadow);
@@ -297,12 +295,10 @@ html {
   .overlay-scrim {
     background: rgba(15, 23, 42, 0.18);
     backdrop-filter: blur(6px) saturate(140%);
-    -webkit-backdrop-filter: blur(6px) saturate(140%);
   }
   .dark .overlay-scrim {
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
   }
   .overlay-item-active {
     background: var(--brand-soft);
