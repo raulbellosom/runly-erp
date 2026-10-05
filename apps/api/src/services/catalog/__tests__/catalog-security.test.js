@@ -76,12 +76,12 @@ test('explicit local file catalogs retain bounded reads and reject path/symlink 
  await assert.rejects(readCatalogBytes(pathToFileURL(join(local,'escape','outside.json')),{localRoot:local}),/LOCAL_PATH_REJECTED/)
 })
 
-function fixture() {
+function fixture({official=false}={}) {
  let cached=null,current=null,mode='online',installed=0,published=0
  const configs=new Map([['catalog.url','https://catalog.example/index.json'],['catalog.publicKeys',JSON.stringify([publicKey])]])
  const grant={deleteMany:async()=>{},findMany:async()=>[],create:async()=>{}}
  const prisma={instanceConfig:{findUnique:async({where})=>({value:configs.get(where.key)}),upsert:async()=>{}},moduleCatalogCache:{findUnique:async()=>cached,upsert:async({create})=>{cached={...create,fetchedAt:new Date()}},update:async()=>{}},runlyModule:{findMany:async()=>current?[current]:[],findUnique:async()=>current},moduleServiceGrant:grant,$transaction:async fn=>fn({moduleServiceGrant:grant})}
- const service=createCatalogService({prisma,officialKeys:[],readBytes:async(url,{headers})=>{
+ const service=createCatalogService({prisma,officialKeys:official?[publicKey]:[],readBytes:async(url,{headers})=>{
   if(mode==='offline') throw new Error('network offline')
   if(url.endsWith('index.json')) return mode==='etag'&&headers['If-None-Match']?{status:304}:{status:200,buffer:Buffer.from(JSON.stringify(index)),etag:'fixture'}
   return {status:200,buffer:zip}
@@ -95,6 +95,13 @@ test('ETag/cache/offline retain verified evidence; managed key cannot claim offi
  f.setMode('etag');assert.equal((await f.service.list()).offline,false)
  f.setMode('offline');const offline=await f.service.list();assert.equal(offline.offline,true);assert.equal(offline.modules[0].verified,true)
  await assert.rejects(f.service.install({key:entry.key}),/Sin conexión/)
+})
+test('only the pinned key classifies a verified package as official',async()=>{
+ // Synthetic constructor pin only; the real production trust anchor is unchanged.
+ const pinned=fixture({official:true}),managed=fixture()
+ assert.equal((await pinned.service.list()).modules[0].official,true)
+ assert.equal((await managed.service.list()).modules[0].official,false)
+ assert.equal((await pinned.service.install({key:entry.key})).official,true)
 })
 test('install and update use exact verified ZIP; unexpected grants fail before publishing',async()=>{
  const f=fixture()
