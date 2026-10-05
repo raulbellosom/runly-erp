@@ -38,6 +38,15 @@ test('rechaza archivos privados y credenciales reconocibles', () => {
   assert.equal(inspectFile('docs/guide.md', credential)[0].rule, 'credential-pattern')
 })
 
+test('SSRF protocol constants have an exact exception, never arbitrary infrastructure', () => {
+  const policy = 'apps/api/src/services/catalog/catalog-download.js'
+  const reserved = ['169', '254', '169', '254'].join('.')
+  assert.deepEqual(inspectFile(policy, reserved), [])
+  assert.equal(inspectFile('docs/example.md', reserved)[0].rule, 'non-example-ipv4')
+  const real = ['172', '30', '4', '5'].join('.')
+  assert.equal(inspectFile(policy, real)[0].rule, 'non-example-ipv4')
+})
+
 test('la comprobación staged lee el índice, aunque el archivo de trabajo esté limpio', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'runly-privacy-test-'))
   const cli = fileURLToPath(new URL('../check-repository-privacy.mjs', import.meta.url))

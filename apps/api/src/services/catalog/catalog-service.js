@@ -4,8 +4,9 @@
 // update a module: download, verify size + SHA-256 + Ed25519 signature, then
 // the regular package pipeline (publish + install) and the admin's service
 // grants. "Oficial" comes from the verified signature, never from the manifest.
-import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
+import { inspectModuleZip } from '@runly/module-compiler/inspection'
 import { randomUUID } from 'node:crypto'
 import { resolveModulesDir } from '../module-upload-service.js'
 import { createModulePackageWiring } from '../module-package-wiring-service.js'
@@ -13,6 +14,8 @@ import { invalidateModuleCaches } from '../module-cache-service.js'
 import { consumedServiceKeys, createModuleServices } from '../module-services/module-services.js'
 import { CatalogVerificationError, verifyPackage } from './catalog-crypto.js'
 import { DEFAULT_CATALOG_URL, OFFICIAL_CATALOG_PUBLIC_KEYS } from './catalog-public-key.js'
+import { readCatalogBytes, CatalogDownloadError } from './catalog-download.js'
+import { validateCatalogIndex, verifyCatalogManifest } from './catalog-schema.js'
 
 export class CatalogError extends Error {
   constructor(message, status = 400, code = 'catalog_error', details = null) {
@@ -23,13 +26,23 @@ export class CatalogError extends Error {
   }
 }
 
-const KEY_RE = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/
-const MAX_PACKAGE_BYTES = 25 * 1024 * 1024
 
 export function compareVersions(a, b) {
   const parse = (value) => String(value ?? '0.0.0').split('.').map((part) => Number.parseInt(part, 10) || 0)
   const [x, y] = [parse(a), parse(b)]
   for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] - y[i]
+  const prerelease = value => String(value).split('+')[0].split('-').slice(1).join('-')
+  const ap = prerelease(a), bp = prerelease(b)
+  if (!ap || !bp) return ap === bp ? 0 : ap ? -1 : 1
+  const aa = ap.split('.'), bb = bp.split('.')
+  for (let i = 0; i < Math.max(aa.length, bb.length); i++) {
+    if (aa[i] === bb[i]) continue
+    if (aa[i] === undefined || bb[i] === undefined) return aa[i] === undefined ? -1 : 1
+    const an = /^\d+$/.test(aa[i]), bn = /^\d+$/.test(bb[i])
+    if (an && bn) return Number(aa[i]) - Number(bb[i])
+    if (an !== bn) return an ? -1 : 1
+    return aa[i] < bb[i] ? -1 : 1
+  }
   return 0
 }
 
@@ -39,13 +52,15 @@ export function installState(entry, installed) {
 }
 
 function sanitizeEntries(payload) {
-  const modules = Array.isArray(payload?.modules) ? payload.modules : []
-  return modules.filter((entry) => KEY_RE.test(entry?.key ?? '') && /^\d+\.\d+\.\d+$/.test(entry?.version ?? '') && /^[0-9a-f]{64}$/i.test(entry?.sha256 ?? '') && entry?.signature && entry?.packageUrl)
+  const latest = new Map()
+  for (const entry of validateCatalogIndex(payload).modules) if (!latest.has(entry.key) || compareVersions(entry.version, latest.get(entry.key).version) > 0) latest.set(entry.key, entry)
+  return [...latest.values()]
 }
 
-export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = null, cacheDel = () => {}, fetchImpl = globalThis.fetch }) {
-  const wiring = createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cacheDel })
+export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = null, cacheDel = () => {}, readBytes = readCatalogBytes, officialKeys = OFFICIAL_CATALOG_PUBLIC_KEYS, packageWiring = null }) {
+  const wiring = packageWiring ?? createModulePackageWiring({ prisma, bundlerSvc, routeLoader, cacheDel })
   const moduleServices = createModuleServices({ prisma })
+  const verified = new Map()
 
   async function config(key) {
     return (await prisma.instanceConfig.findUnique({ where: { key } }))?.value ?? null
@@ -56,43 +71,33 @@ export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = 
   async function trustedKeys() {
     let extra = []
     try { extra = JSON.parse((await config('catalog.publicKeys')) ?? '[]') } catch { extra = [] }
-    return { official: [...OFFICIAL_CATALOG_PUBLIC_KEYS], all: [...OFFICIAL_CATALOG_PUBLIC_KEYS, ...(Array.isArray(extra) ? extra : [])] }
+    return { official: [...officialKeys], all: [...officialKeys, ...(Array.isArray(extra) ? extra : [])] }
   }
 
   // file:// URLs are allowed so an instance can use a local or mounted catalog.
-  async function getBytes(url, headers = {}) {
-    if (url.startsWith('file://')) {
-      const buffer = await fs.readFile(fileURLToPath(url))
-      return { status: 200, buffer, etag: null }
-    }
-    const response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(20_000) })
-    if (response.status === 304) return { status: 304 }
-    if (!response.ok) throw new CatalogError(`El catálogo respondió ${response.status}.`, 502, 'catalog_unreachable')
-    const length = Number(response.headers.get('content-length') ?? 0)
-    if (length > MAX_PACKAGE_BYTES) throw new CatalogError('El paquete es demasiado grande.', 422, 'package_too_large')
-    return { status: 200, buffer: Buffer.from(await response.arrayBuffer()), etag: response.headers.get('etag') }
+  async function getBytes(url, headers = {}, maxBytes = 25 * 1024 * 1024) {
+    const configured = new URL(await catalogUrl())
+    const localRoot = configured.protocol === 'file:' ? dirname(fileURLToPath(configured)) : null
+    return readBytes(url, { headers, maxBytes, localRoot })
   }
 
   async function loadIndex() {
     const url = await catalogUrl()
     const cached = await prisma.moduleCatalogCache.findUnique({ where: { url } })
     try {
-      const result = await getBytes(url, cached?.etag ? { 'If-None-Match': cached.etag } : {})
+      const result = await getBytes(url, cached?.etag ? { 'If-None-Match': cached.etag } : {}, 1024 * 1024)
       if (result.status === 304 && cached) {
         await prisma.moduleCatalogCache.update({ where: { url }, data: { fetchedAt: new Date() } })
-        return { url, payload: cached.payload, offline: false, fetchedAt: new Date() }
+        return { url, payload: validateCatalogIndex(cached.payload), offline: false, fetchedAt: new Date() }
       }
-      const payload = JSON.parse(result.buffer.toString('utf8'))
+      const payload = validateCatalogIndex(JSON.parse(result.buffer.toString('utf8')))
       await prisma.moduleCatalogCache.upsert({ where: { url }, update: { payload, etag: result.etag, fetchedAt: new Date() }, create: { url, payload, etag: result.etag } })
       return { url, payload, offline: false, fetchedAt: new Date() }
     } catch (error) {
-      if (cached) return { url, payload: cached.payload, offline: true, fetchedAt: cached.fetchedAt }
+      if (error instanceof CatalogVerificationError || (error instanceof CatalogDownloadError && error.code !== 'CATALOG_UNREACHABLE') || error instanceof SyntaxError) throw error
+      if (cached) return { url, payload: validateCatalogIndex(cached.payload), offline: true, fetchedAt: cached.fetchedAt }
       throw error instanceof CatalogError ? error : new CatalogError('No se pudo conectar con el catálogo de módulos.', 502, 'catalog_unreachable')
     }
-  }
-
-  async function officialRecord(key) {
-    try { return JSON.parse((await config(`catalog.installed.${key}`)) ?? 'null') } catch { return null }
   }
 
   async function list() {
@@ -100,13 +105,28 @@ export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = 
     const entries = sanitizeEntries(index.payload)
     const installed = await prisma.runlyModule.findMany({ where: { key: { in: entries.map((entry) => entry.key) } }, select: { key: true, version: true, status: true } })
     const byKey = new Map(installed.map((row) => [row.key, row]))
-    const data = await Promise.all(entries.map(async (entry) => ({
-      ...entry,
+    const data = []
+    const deadline = Date.now() + 30_000
+    for (const entry of entries) {
+      const keys = await trustedKeys()
+      const identity = JSON.stringify([index.url, entry.key, entry.version, entry.sha256, entry.signature, keys])
+      let evidence = verified.get(identity)
+      if (!index.offline && (!evidence || evidence.expires < Date.now())) {
+        try {
+          if (Date.now() > deadline) throw new CatalogError('Verificación pendiente.',503,'catalog_verification_pending')
+          evidence = await downloadVerified(entry, index.url); verified.set(identity, { metadata: evidence.metadata, official: evidence.official, expires: Date.now() + 60_000 }); if (verified.size > 1000) verified.delete(verified.keys().next().value)
+        }
+        catch (error) { data.push({ key: entry.key, version: entry.version, name: entry.key, state: installState(entry, byKey.get(entry.key)), verified: false, official: false, error: error.code ?? 'catalog_unreachable', services: [], consumes: {}, events: [], connections: [] }); continue }
+      }
+      const metadata = evidence?.metadata ?? { key: entry.key, version: entry.version, name: entry.key, description: 'Paquete pendiente de verificación.', consumes: {}, events: [], connections: [] }
+      data.push({
+      ...metadata,
       state: installState(entry, byKey.get(entry.key)),
       installedVersion: byKey.get(entry.key)?.version ?? null,
-      official: Boolean((await officialRecord(entry.key))?.official),
-      services: moduleServices.describe(consumedServiceKeys({ consumes: entry.consumes })),
-    })))
+      official: evidence?.official === true, verified: Boolean(evidence),
+      services: evidence ? moduleServices.describe(consumedServiceKeys(metadata)) : [],
+      })
+    }
     return { modules: data, offline: index.offline, fetchedAt: index.fetchedAt }
   }
 
@@ -117,7 +137,9 @@ export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = 
     verifyPackage({ buffer, entry, publicKeys: keys.all })
     let official = false
     try { verifyPackage({ buffer, entry, publicKeys: keys.official }); official = true } catch { official = false }
-    return { buffer, official }
+    const report = inspectModuleZip(buffer)
+    const metadata = verifyCatalogManifest(entry, report)
+    return { buffer, official, metadata }
   }
 
   // install and update share the flow; `expect` guards against the wrong action.
@@ -131,7 +153,9 @@ export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = 
     if (expect === 'install' && state !== 'available') throw new CatalogError('El módulo ya está instalado.', 409, 'already_installed')
     if (expect === 'update' && state !== 'update') throw new CatalogError('No hay una versión más nueva para actualizar.', 409, 'no_update')
 
-    const { buffer, official } = await downloadVerified(entry, index.url)
+    const { buffer, official, metadata } = await downloadVerified(entry, index.url)
+    const requested = new Set(consumedServiceKeys(metadata))
+    if (!Array.isArray(grants) || new Set(grants).size !== grants.length || grants.some(grant => !requested.has(grant)) || moduleServices.describe(grants).some(service=>!service.known)) throw new CatalogError('Grant no solicitado por el ZIP verificado.', 422, 'catalog_unexpected_grant')
     const modulesDir = await resolveModulesDir()
     if (!modulesDir || !wiring.packageSvc) throw new CatalogError('Esta instancia no puede instalar paquetes de módulos.', 503, 'packages_unavailable')
     const publishResult = await wiring.packageSvc.publishZip({ key, fileBuffer: buffer, modulesDir, actorId, decisions })
@@ -144,8 +168,7 @@ export function createCatalogService({ prisma, bundlerSvc = null, routeLoader = 
       installed = true
     }
     // Only services the manifest asks for can be granted.
-    const requested = new Set(consumedServiceKeys(row?.manifest ?? {}))
-    await moduleServices.setGrants({ moduleKey: key, serviceKeys: grants.filter((grant) => requested.has(grant)), grantedBy: actorId })
+    await moduleServices.setGrants({ moduleKey: key, serviceKeys: grants, grantedBy: actorId })
     await prisma.instanceConfig.upsert({
       where: { key: `catalog.installed.${key}` },
       update: { value: JSON.stringify({ official, version: entry.version, sha256: entry.sha256, at: new Date().toISOString() }) },

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Signs a module ZIP for the official catalog and prints its index entry
+// Signs a ZIP for a managed/private catalog and prints its v1 index entry.
+// Official releases use Developer Hub review + confirmation + separate signer.
 // (docs/developers/catalogo.md). Reads key/name/version/... from the package's
 // module.manifest.js, so the entry always matches what will be installed.
 //
@@ -10,6 +11,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { inspectModuleZip, DEFAULT_INSPECTION_LIMITS } from '@runly/module-compiler/inspection'
 import { sha256Of, signEntry } from '../../apps/api/src/services/catalog/catalog-crypto.js'
+import {manifestCatalogMetadata,validateCatalogIndex} from '../../apps/api/src/services/catalog/catalog-schema.js'
 
 const args = process.argv.slice(2)
 const option = (name, fallback = null) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback }
@@ -57,5 +59,7 @@ const entry = {
   events: manifest.events?.subscribes ?? [],
   connections: (manifest.connections ?? []).map((connection) => ({ target: connection.target, kind: connection.kind, label: connection.label })),
   changelog: option('changelog', ''),
+  ...manifestCatalogMetadata(manifest),
 }
+validateCatalogIndex({schemaVersion:1,generatedAt:new Date().toISOString(),modules:[entry]})
 console.log(JSON.stringify(entry, null, 2))

@@ -11,6 +11,8 @@ export default [
       "docs/**",
       "**/*.min.js",
       "**/.vite/**",
+      "apps/api/bundles/**",
+      "modules/custom/.previews/**",
     ],
   },
   {

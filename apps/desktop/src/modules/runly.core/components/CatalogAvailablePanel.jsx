@@ -19,7 +19,7 @@ const EVENT_LABELS = {
   "contacts.contact.created": "Cuando se crea un contacto",
   "projects.task.created": "Cuando se crea una tarea de proyecto",
 };
-const formatSize = (bytes) => (bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+const formatSize = (bytes) => (!Number.isFinite(bytes) ? 'Tamaño pendiente de verificar' : bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
 function ConsentDialog({ entry, onOpenChange, token }) {
   const queryClient = useQueryClient();
@@ -59,6 +59,8 @@ function ConsentDialog({ entry, onOpenChange, token }) {
           </DialogDescription>
         </DialogHeader>
         <div className="-mx-6 min-h-0 flex-1 space-y-4 overflow-y-auto px-6">
+          <p className="text-xs break-all text-[hsl(var(--muted-foreground))]">ZIP verificado: {entry.sha256}</p>
+          {entry.capabilities?.length > 0 && <section><p className="text-sm font-medium">Capacidades verificadas</p><ul className="list-disc pl-5 text-sm">{entry.capabilities.map(capability => <li key={capability}>{capability}</li>)}</ul></section>}
           {entry.services.length > 0 && (
             <section className="space-y-2">
               <p className="text-sm font-medium">Datos de otros módulos que podrá usar</p>
@@ -91,7 +93,7 @@ function ConsentDialog({ entry, onOpenChange, token }) {
         </div>
         <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={mutation.isPending || blocked} onClick={() => mutation.mutate()}>
+          <Button disabled={mutation.isPending || blocked || !entry.verified} onClick={() => mutation.mutate()}>
             {mutation.isPending ? (isUpdate ? "Actualizando..." : "Instalando...") : isUpdate ? "Actualizar" : "Instalar"}
           </Button>
         </DialogFooter>
@@ -135,16 +137,17 @@ export function CatalogAvailablePanel({ token, canManage }) {
                   <span className="min-w-0">
                     <span className="flex items-center gap-1.5 font-semibold">
                       {entry.name}
-                      {entry.official && <BadgeCheck className="h-4 w-4 text-sky-600" aria-label="Oficial" />}
+                      {entry.verified && entry.official && <BadgeCheck className="h-4 w-4 text-sky-600" aria-label="Oficial verificado" />}
                     </span>
                     <span className="block text-xs text-[hsl(var(--muted-foreground))]">v{entry.version} · {formatSize(entry.size)}</span>
                   </span>
                 </div>
                 <p className="flex-1 text-sm text-[hsl(var(--muted-foreground))]">{entry.description}</p>
                 <div className="flex items-center justify-between gap-2">
-                  {entry.state === "installed" ? <Badge variant="secondary">Instalado</Badge> : <Badge variant="outline">{entry.state === "update" ? `Instalada v${entry.installedVersion}` : "Oficial"}</Badge>}
+                  <Badge variant="outline">{entry.verified ? entry.official ? "Oficial verificado" : "Catálogo administrado" : "Sin verificar"}</Badge>
+                  {entry.state === "installed" && <Badge variant="secondary">Instalado</Badge>}
                   {entry.state !== "installed" && canManage && (
-                    <Button size="sm" disabled={query.data?.offline} onClick={() => setSelected(entry)}>
+                    <Button size="sm" disabled={query.data?.offline || !entry.verified} onClick={() => setSelected(entry)}>
                       {entry.state === "update" ? "Actualizar" : "Instalar"}
                     </Button>
                   )}

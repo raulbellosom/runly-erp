@@ -24,7 +24,9 @@ export function signEntry({ key, version, sha256 }, privateKeyPem) {
 }
 
 function publicKeyOf(base64) {
-  return createPublicKey({ key: Buffer.from(String(base64).trim(), 'base64'), format: 'der', type: 'spki' })
+  const key=createPublicKey({ key: Buffer.from(String(base64).trim(), 'base64'), format: 'der', type: 'spki' })
+  if(key.asymmetricKeyType!=='ed25519')throw new CatalogVerificationError('La clave del catálogo debe ser Ed25519.')
+  return key
 }
 
 // Throws CatalogVerificationError unless the buffer is the signed package of `entry`.

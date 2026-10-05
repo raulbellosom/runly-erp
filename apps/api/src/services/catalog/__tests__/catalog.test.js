@@ -21,6 +21,12 @@ test('a signed package verifies with the trusted key only', () => {
   assert.throws(() => verifyPackage({ buffer, entry, publicKeys: [OTHER] }), /firma no es del catálogo oficial/)
 })
 
+test('non-Ed25519 trust anchors cannot verify a v1 catalog', () => {
+  const buffer=Buffer.from('zip bytes'),entry=signed(buffer)
+  const key=generateKeyPairSync('ec',{namedCurve:'prime256v1'}).publicKey.export({format:'der',type:'spki'}).toString('base64')
+  assert.throws(()=>verifyPackage({buffer,entry,publicKeys:[key]}),CatalogVerificationError)
+})
+
 test('tampered bytes, size or a re-labelled version are refused', () => {
   const buffer = Buffer.from('zip bytes')
   const entry = signed(buffer)
