@@ -13,7 +13,7 @@ const COMPONENTS = {
       onClick={(e) => {
         if (href && !href.startsWith("#")) {
           e.preventDefault();
-          window.open(href, "_blank");
+          window.open(href, "_blank", "noopener,noreferrer");
         }
       }}
       {...props}
