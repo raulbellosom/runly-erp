@@ -6,11 +6,11 @@ import {
 import { RME3_CAPABILITIES } from '../contracts.js'
 import { EXTERNAL_RELATION_TARGETS } from '../external-relations.js'
 import { compileModule } from '../compiler.js'
-import { DEFINITION_FILE } from '../extensions.js'
+import { DEFINITION_FILE, EXTENSIONS_MAX_BYTES, isExtensionFilePath } from '../extensions.js'
 import { isDeveloperDocPath } from '../developer-doc-paths.js'
 import { readZip, safePackagePath } from './zip.js'
 import { parseDeclaration, parseDataJson } from './declarations.js'
-import { INSPECTION_VERSION, inspectionLimits, InspectionError } from './limits.js'
+import { INSPECTION_VERSION, inspectionLimits, InspectionError, fail } from './limits.js'
 export { DEFAULT_INSPECTION_LIMITS, INSPECTION_VERSION } from './limits.js'
 
 const keyPattern = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/
@@ -199,5 +199,24 @@ export function inspectModuleZip(bytes, { limits: requestedLimits, expectedKey, 
 function safeRoute(route, prefix) {
   return typeof route === 'string' && (route === prefix || route.startsWith(`${prefix}/`)) &&
     !/[\\?#\x00-\x20%]/.test(route) && !route.split('/').some((part) => part === '.' || part === '..')
+}
+// CUSTOM sources as text for an isolated bundler: same verified ZIP reader and
+// limits as inspection, only extension paths (components/**, views/*.custom.js),
+// never extracted to disk and never imported/evaluated.
+export function readCustomSources(bytes, { limits: requestedLimits } = {}) {
+  const limits = inspectionLimits(requestedLimits)
+  const archive = readZip(bytes, limits)
+  const files = []
+  let total = 0
+  for (const [path, data] of archive.files) {
+    if (!isExtensionFilePath(path)) continue
+    total += data.length
+    if (total > EXTENSIONS_MAX_BYTES) fail('EXTENSIONS_TOO_LARGE', path, 'Las fuentes CUSTOM exceden 1.5 MB.')
+    let content
+    try { content = decoder.decode(data) } catch { fail('PACKAGE_TEXT_INVALID', path, 'El archivo debe ser UTF-8 válido.') }
+    if (content.includes(' ')) fail('EXTENSION_NOT_TEXT', path, 'El archivo CUSTOM debe ser texto.')
+    files.push({ path, content })
+  }
+  return { sha256: createHash('sha256').update(Buffer.from(bytes)).digest('hex'), files: files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0) }
 }
 export { parseDeclaration } from './declarations.js'

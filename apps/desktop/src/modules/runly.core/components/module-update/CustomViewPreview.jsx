@@ -2,10 +2,11 @@
 // loads the preview bundle built by POST /modules/:key/upload/check into a
 // temporary component registry (never the app's own) and mounts each view
 // with the real session props. Data comes from the currently installed API.
-import { Component, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { EmptyState, Skeleton, Tabs, TabsList, TabsTrigger } from "@runly/ui";
 import { AlertTriangle, MonitorPlay } from "lucide-react";
 import { toast } from "sonner";
+import { CustomViewBoundary, resolveCustomView } from "@runly/preview-runtime";
 import { getApiUrl } from "../../../../lib/runtimeConfig.js";
 import { createModuleComponentRegistry } from "../../../../lib/module-component-registry-core.js";
 import { useActiveCompany } from "../../../../company/ActiveCompanyProvider";
@@ -14,28 +15,14 @@ import { ensureModuleStylesheet } from "../../../../shell/ModuleBundleLoader.jsx
 const API_BASE_URL = getApiUrl();
 
 // The previewed code is the user's own: show its crash inside the frame
-// instead of taking the page down.
-class PreviewBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="space-y-1 rounded-xl bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
-          <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" /> Tu pantalla falló al mostrarse</p>
-          <pre className="whitespace-pre-wrap text-xs">{String(this.state.error?.message ?? this.state.error)}</pre>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+// instead of taking the page down (boundary shared with isolated hosts).
+function PreviewCrash(error) {
+  return (
+    <div className="space-y-1 rounded-xl bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
+      <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" /> Tu pantalla falló al mostrarse</p>
+      <pre className="whitespace-pre-wrap text-xs">{String(error?.message ?? error)}</pre>
+    </div>
+  );
 }
 
 export function CustomViewPreview({ moduleKey, previewId, views, token }) {
@@ -73,7 +60,7 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
   }
 
   const view = views.find((item) => item.key === active) ?? views[0];
-  const View = view.component ? state.registry.resolve(view.component) : null;
+  const View = resolveCustomView({ component: view.component }, state.registry).component;
 
   return (
     <div className="space-y-3">
@@ -86,7 +73,7 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
       )}
       <div className="max-h-[60vh] overflow-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))]" data-runly-module={moduleKey}>
         {View ? (
-          <PreviewBoundary key={view.key}>
+          <CustomViewBoundary key={view.key} fallback={PreviewCrash}>
             <View
               token={token}
               companyId={activeCompanyId}
@@ -94,7 +81,7 @@ export function CustomViewPreview({ moduleKey, previewId, views, token }) {
               moduleKey={moduleKey}
               navigate={() => toast.info("La navegación está desactivada en la vista previa.")}
             />
-          </PreviewBoundary>
+          </CustomViewBoundary>
         ) : (
           <p className="p-4 text-sm text-[hsl(var(--muted-foreground))]">
             El componente <code>{view.component ?? "(sin schema.component)"}</code> no está registrado en <code>components/index.js</code>. Revisa que la clave de <code>registry.register</code> coincida.

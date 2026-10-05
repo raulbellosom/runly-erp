@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import JSZip from 'jszip'
 import { compileModule, archiveModule, normalizeModuleDefinition, validateModuleDefinition } from '../index.js'
-import { inspectModuleZip, DEFAULT_INSPECTION_LIMITS } from '../inspection/index.js'
+import { inspectModuleZip, readCustomSources, DEFAULT_INSPECTION_LIMITS } from '../inspection/index.js'
 import { parseDeclaration, parseDataJson } from '../inspection/declarations.js'
 import { crc32 } from '../inspection/zip.js'
 import { RME3_CAPABILITIES } from '../contracts.js'
@@ -263,4 +263,20 @@ test('static signer preserves catalog v1 payload and verification using ephemera
     assert.equal(entry.size, validZip.length)
     assert.equal(verifyPackage({ buffer: validZip, entry, publicKeys: [publicKey.export({ format: 'der', type: 'spki' }).toString('base64')] }).sha256, entry.sha256)
   } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('CUSTOM sources are read as bounded text from the verified ZIP, never other paths', async () => {
+  const zip = new JSZip()
+  zip.file('module.manifest.js', manifestSource)
+  zip.file('components/index.js', "export async function register(r) { r.register('custom.x:A', () => null) }")
+  zip.file('components/nested/Card.jsx', 'export default function Card() { return null }')
+  zip.file('views/panel.custom.js', 'export default {}')
+  zip.file('api/index.js', 'throw new Error("never read")')
+  const bytes = await zip.generateAsync({ type: 'nodebuffer' })
+  const result = readCustomSources(bytes)
+  assert.deepEqual(result.files.map((f) => f.path), ['components/index.js', 'components/nested/Card.jsx', 'views/panel.custom.js'])
+  assert.match(result.sha256, /^[a-f0-9]{64}$/)
+  assert.throws(() => readCustomSources(rawZip([{ name: '../components/index.js', content: 'x' }])), (e) => e.diagnostic?.code === 'ZIP_UNSAFE_PATH')
+  assert.throws(() => readCustomSources(rawZip([{ name: 'components/big.js', content: 'a'.repeat(1.6 * 1024 * 1024) }])), (e) => e.diagnostic?.code === 'EXTENSIONS_TOO_LARGE')
+  assert.throws(() => readCustomSources(rawZip([{ name: 'components/bin.js', content: Buffer.from([0xff, 0xfe, 0x00]) }])), (e) => e.diagnostic?.code === 'PACKAGE_TEXT_INVALID')
 })

@@ -5,44 +5,39 @@ import { runly } from '../lib/runly'
 import { useAuth } from '../auth/AuthProvider'
 import { getApiUrl } from '../lib/runtimeConfig.js'
 
-// Module-scope so remounts and StrictMode double effects share one load per
-// bundle version instead of importing and registering it again. A load
-// without a known version is cached for the page session: a fresh
-// `?v=Date.now()` URL is a new ES module instance, whose components would
-// re-register as duplicates on every remount.
-const bundleLoads = new Map()
-const sessionVersion = String(Date.now())
-
 // Module utilities CSS (spec 2026-10-03-rme3-module-platform-v2 §12.1): one
 // <link> per id, replaced when the href changes so a republished module gets
 // fresh CSS. Returns the element so a caller can remove it (previews).
 import { ensureModuleStylesheet } from '@runly/preview-runtime/styles';
+import { createBundleLoader } from '@runly/preview-runtime/custom-bundles';
 export { ensureModuleStylesheet };
+
+// Module-scope so remounts and StrictMode double effects share one load per
+// bundle version instead of importing and registering it again. A load
+// without a known version is cached for the page session: a fresh
+// `?v=Date.now()` URL is a new ES module instance, whose components would
+// re-register as duplicates on every remount. The digest-keyed cache and
+// register() contract are shared with isolated preview hosts.
+const sessionVersion = String(Date.now())
+const installedBundles = createBundleLoader({
+  importModule: (url) => import(/* @vite-ignore */ url),
+  ensureStylesheet: ensureModuleStylesheet,
+  onDiagnostic: (diagnostic) => console.error(`[ModuleBundleLoader] failed to load bundle for ${diagnostic.module}:`, diagnostic.message),
+})
 
 export function loadBundle(key, bundleVersion) {
   const version = String(bundleVersion ?? sessionVersion)
-  const cacheKey = `${key}@${version}`
-  if (bundleLoads.has(cacheKey)) return bundleLoads.get(cacheKey)
-  ensureModuleStylesheet(key, `${getApiUrl()}/modules/${key}/bundle.css?v=${encodeURIComponent(version)}`)
   const bundleUrl = new URL(`${getApiUrl()}/modules/${key}/bundle.js`)
   bundleUrl.searchParams.set('web_origin', window.location.origin)
   // Bust stale browser module cache entries after runtime rewriting changes.
   bundleUrl.searchParams.set('v', version)
-  const promise = (async () => {
-    try {
-      const mod = await import(/* @vite-ignore */ bundleUrl.toString())
-      if (typeof mod.register === 'function') {
-        await mod.register(componentRegistry)
-      }
-      return { key, loaded: true }
-    } catch (err) {
-      bundleLoads.delete(cacheKey)
-      console.error(`[ModuleBundleLoader] failed to load bundle for ${key}:`, err.message)
-      return { key, loaded: false }
-    }
-  })()
-  bundleLoads.set(cacheKey, promise)
-  return promise
+  return installedBundles.load({
+    key,
+    version,
+    url: bundleUrl.toString(),
+    cssUrl: `${getApiUrl()}/modules/${key}/bundle.css?v=${encodeURIComponent(version)}`,
+    registry: componentRegistry,
+  }).then(({ key: loadedKey, loaded }) => ({ key: loadedKey, loaded }))
 }
 
 async function loadModuleBundles(blueprints) {

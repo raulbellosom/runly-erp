@@ -10,6 +10,7 @@ const BUNDLES_DIR = path.resolve(__dirname, '..', '..', 'bundles')
 const STORAGE_BUCKET = 'module-bundles'
 
 import { BUNDLE_EXTERNALS, BUNDLE_EXTERNAL_URL_PATTERNS } from '@runly/preview-runtime/externals';
+import { CUSTOM_BUNDLE_CONTRACT } from '@runly/preview-runtime/custom-bundles';
 export { BUNDLE_EXTERNALS, BUNDLE_EXTERNAL_URL_PATTERNS };
 
 const ESBUILD_EXTERNALS = [...BUNDLE_EXTERNALS, ...BUNDLE_EXTERNAL_URL_PATTERNS]
@@ -20,11 +21,12 @@ const ESBUILD_EXTERNALS = [...BUNDLE_EXTERNALS, ...BUNDLE_EXTERNAL_URL_PATTERNS]
 // esbuild must resolve them from the API's dependencies.
 const BUNDLE_NODE_PATHS = [path.resolve(__dirname, '..', '..', 'node_modules')]
 
+// Format/JSX/loaders come from the bundle contract shared with preview hosts.
 const ESBUILD_OPTIONS = {
   bundle: true,
-  format: 'esm',
-  jsx: 'automatic',
-  loader: { '.js': 'jsx', '.jsx': 'jsx' },
+  format: CUSTOM_BUNDLE_CONTRACT.format,
+  jsx: CUSTOM_BUNDLE_CONTRACT.jsx,
+  loader: { ...CUSTOM_BUNDLE_CONTRACT.loader },
   external: ESBUILD_EXTERNALS,
   nodePaths: BUNDLE_NODE_PATHS,
 }

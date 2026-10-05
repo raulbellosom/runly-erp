@@ -7,6 +7,9 @@ import { resolveRouteInfo, selectBlueprints } from './resolver.js';
 import { createRunlyClient, createAtlasClient } from '../../sdk/src/index.js';
 import { createErpAdapters } from './erp-adapters.js';
 import { navigationTarget } from './navigation.js';
+import { PREVIEW_RUNTIME_CONTRACT } from './contracts.js';
+import { CUSTOM_BUNDLE_CONTRACT, createComponentRegistry, createBundleLoader, resolveCustomView, bundleSourceMap } from './custom-bundles.js';
+import { BUNDLE_EXTERNALS } from './externals.js';
 
 test('shared navigation preserves sheet create suppression and encoded deep links', () => {
   const routeInfo = { moduleRoutePath: '/app/m/custom.test/tasks' };
@@ -66,4 +69,50 @@ test('SDK injected fetch preserves company/auth and Atlas identity', async () =>
   await client.blueprints.list('fixture-token');
   assert.equal(received[1].headers.Authorization, 'Bearer fixture-token');
   assert.equal(received[1].headers['X-Runly-Company-Id'], 'fixture-company');
+});
+
+test('CUSTOM registry keeps ERP alias semantics and can fence a module namespace', () => {
+  const A = () => null, B = () => null, warnings = [];
+  const erp = createComponentRegistry({ aliases: (key) => key === 'runly.fleet' ? ['runly.fleet', 'atlas.fleet'] : [key] });
+  erp.register('atlas.fleet:Badge', A);
+  assert.equal(erp.resolve('runly.fleet:Badge'), A);
+  erp.setActiveModules(['custom.other']);
+  assert.equal(erp.resolve('runly.fleet:Badge'), null);
+  const fenced = createComponentRegistry({ moduleKey: 'custom.demo', warn: (m) => warnings.push(m) });
+  fenced.register('custom.demo:Panel', A);
+  fenced.register('custom.other:Panel', B);
+  fenced.register('runly.core:Shell', B);
+  assert.deepEqual(fenced.list(), ['custom.demo:Panel']);
+  assert.equal(warnings.length, 2);
+  fenced.clear();
+  fenced.register('custom.demo:Late', A);
+  assert.equal(fenced.resolve('custom.demo:Late'), null);
+});
+
+test('bundle loader caches by identity, evicts failures and resolves CUSTOM views explicitly', async () => {
+  let imports = 0, fail = true;
+  const diagnostics = [];
+  const loader = createBundleLoader({ importModule: async () => { imports++; if (fail) throw new Error('boom'); return { register: (r) => r.register('custom.demo:Panel', () => 'ok') }; }, onDiagnostic: (d) => diagnostics.push(d.code) });
+  const registry = createComponentRegistry({ moduleKey: 'custom.demo' });
+  assert.equal((await loader.load({ key: 'custom.demo', version: 'sha-1', url: 'blob:x', registry })).loaded, false);
+  fail = false;
+  assert.equal((await loader.load({ key: 'custom.demo', version: 'sha-1', url: 'blob:x', registry })).loaded, true);
+  await loader.load({ key: 'custom.demo', version: 'sha-1', url: 'blob:x', registry });
+  assert.equal(imports, 2);
+  assert.deepEqual(diagnostics, ['CUSTOM_BUNDLE_LOAD_FAILED']);
+  assert.equal(resolveCustomView({ schema: { component: 'custom.demo:Panel' } }, registry, { moduleKey: 'custom.demo' }).component(), 'ok');
+  assert.equal(resolveCustomView({ schema: { component: 'custom.demo:Missing' } }, registry, { moduleKey: 'custom.demo' }).diagnostic.code, 'CUSTOM_COMPONENT_NOT_REGISTERED');
+  assert.equal(resolveCustomView({ schema: { component: 'custom.evil:Panel' } }, registry, { moduleKey: 'custom.demo' }).diagnostic.code, 'CUSTOM_COMPONENT_NAMESPACE');
+  assert.equal(resolveCustomView({ schema: {} }, registry).diagnostic.code, 'CUSTOM_COMPONENT_MISSING');
+});
+
+test('bundle contract mirrors ERP externals and contract v3 requires an isolated host', () => {
+  assert.deepEqual(CUSTOM_BUNDLE_CONTRACT.externals, BUNDLE_EXTERNALS);
+  assert.equal(CUSTOM_BUNDLE_CONTRACT.entry, 'components/index.js');
+  assert.equal(PREVIEW_RUNTIME_CONTRACT.customExecution, 'isolated-host-required');
+  assert.ok(!PREVIEW_RUNTIME_CONTRACT.unsupported.includes('CUSTOM'));
+  assert.ok(!PREVIEW_RUNTIME_CONTRACT.views.includes('CUSTOM'));
+  const source = bundleSourceMap(['// rme3:components/index.js', 'a', '// rme3:components/Panel.jsx', 'b'].join(String.fromCharCode(10)));
+  assert.equal(source(2), 'components/index.js');
+  assert.equal(source(4), 'components/Panel.jsx');
 });

@@ -19,7 +19,7 @@ se resuelven mediante su puerto. Cada sesión mantiene registry y ciclo de vida;
 `PreviewHost` recibe blueprints JSON, selección y callbacks de navegación,
 dashboard/Kanban. Posee QueryClient por sesión, limpia su caché al desmontarse
 y rechaza funciones pendientes antes de montar vistas. No carga bundles,
-ZIPs ni CUSTOM; relaciones, archivos, auditoría, attachments y servicios requieren
+ZIPs ni CUSTOM por sí mismo; relaciones, archivos, auditoría, attachments y servicios requieren
 extracciones posteriores. La presencia de un puerto de recursos no habilita Storage.
 
 Importar `@runly/ui/theme.css` y `@runly/ui/runtime.css`, generar utilities desde
@@ -31,6 +31,16 @@ externo decide scroll, anchos y tema; los estilos compartidos provienen del ERP.
 revisión Git, versión snapshot y digests del paquete/contrato, además del número
 de contrato. `externals` centraliza las mismas claves/shims para API y desktop;
 `css` y `styles` mantienen helpers originales de scoping/carga de estilos.
+
+`custom-bundles` (contrato 3) centraliza lo portable de CUSTOM: contrato de
+bundle (`components/index.js` con `register(registry)`, ESM, JSX automático,
+externals/aliases Atlas), registro por sesión con alias inyectados y cercado
+opcional por módulo, loader con caché por identidad/digest que no importa ni
+descarga por sí mismo (`importModule` y estilos son puertos del host),
+`resolveCustomView`, `CustomViewBoundary` y mapa de líneas a archivo. El ERP
+conserva autenticación, empresa activa, instalación y la API de bundles
+instalados; un host externo solo puede ejecutar CUSTOM con su propio
+aislamiento (`customExecution: 'isolated-host-required'`).
 
 Pruebas: `node --test packages/preview-runtime/src/runtime.test.js` desde el monorepo.
 Los fixtures externos y la prueba de pantalla ERP con adapters ficticios viven

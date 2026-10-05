@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo } from 'react';
+import { Component, forwardRef, useEffect, useMemo } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RunlyCrudView, RunlyDashboard, RunlyKanban, ErrorState, extractBlueprintFields, RuntimeAdaptersProvider } from '@runly/ui/preview';
 import { diagnoseBlueprints } from './contracts.js';
@@ -8,6 +8,18 @@ export { createErpAdapters } from './erp-adapters.js';
 export { resolveBlueprintPresentation } from './presentation.js';
 export * from './resolver.js';
 export { navigationTarget } from './navigation.js';
+export { CUSTOM_BUNDLE_CONTRACT, createComponentRegistry, createBundleLoader, resolveCustomView, bundleSourceMap, customDiagnostic } from './custom-bundles.js';
+
+// Third-party CUSTOM code may throw while rendering: contain it in its view.
+export class CustomViewBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { this.props.onError?.(error, info); }
+  render() {
+    if (this.state.error) return this.props.fallback ? this.props.fallback(this.state.error) : <ErrorState title="La pantalla CUSTOM falló al mostrarse" description={String(this.state.error?.message ?? this.state.error).slice(0, 500)} />;
+    return this.props.children;
+  }
+}
 
 // ERP and external hosts use exactly the same original renderer dispatch.
 export const BlueprintRenderer = forwardRef(function BlueprintRenderer({ kind = 'TABLE', adapters, ...props }, ref) {

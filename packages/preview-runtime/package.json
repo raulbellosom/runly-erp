@@ -11,7 +11,8 @@
     "./session": "./src/session.js",
     "./styles": "./src/styles.js",
     "./css": "./src/css.js",
-    "./navigation": "./src/navigation.js"
+    "./navigation": "./src/navigation.js",
+    "./custom-bundles": "./src/custom-bundles.js"
   },
   "dependencies": {
     "@runly/ui": "workspace:*"

@@ -1,14 +1,17 @@
 export const PREVIEW_RUNTIME_CONTRACT = Object.freeze({
-  schemaVersion: 2,
-  implementation: 'rme3-preview-contract2',
-  scope: 'trusted-declarative-fixtures',
+  schemaVersion: 3,
+  implementation: 'rme3-preview-contract3',
+  scope: 'trusted-declarative-and-isolated-custom',
   transportContract: 'fetch-response-v1',
   views: Object.freeze(['TABLE', 'FORM', 'DETAIL', 'PAGE', 'DASHBOARD', 'KANBAN']),
   adapters: Object.freeze(['transport.fetch', 'preferences', 'resources']),
-  customExecution: false,
+  // CUSTOM bundles are loaded through custom-bundles.js only by a host that
+  // provides its own isolation; the declarative renderer never executes them.
+  customExecution: 'isolated-host-required',
+  custom: Object.freeze({ kind: 'CUSTOM', bundleContract: 1, registry: 'per-session', loader: 'digest-cache', sdk: 'injected-transport', boundary: 'per-view' }),
   backendExecution: false,
   simulation: Object.freeze({ relations: 'declarative', connections: 'fields-related', services: 'official-simulator', events: 'deterministic', automations: 'pure-declarative' }),
-  unsupported: Object.freeze(['CUSTOM', 'audit', 'attachments', 'files', 'backend-handlers', 'SQL-transactions']),
+  unsupported: Object.freeze(['audit', 'attachments', 'files', 'backend-handlers', 'SQL-transactions']),
 });
 export function unsupported(capability) {
   return Object.assign(new Error(`Capacidad no soportada: ${capability}`), { code: 'PREVIEW_UNSUPPORTED', capability });
