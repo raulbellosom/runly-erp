@@ -33,6 +33,38 @@ import "@mdxeditor/editor/style.css";
 import { cn } from "../lib/utils.js";
 import { FieldWrapper } from "./form-field-base.jsx";
 
+// Shared Spanish defaults. Consumers may override MDXEditor's translation
+// callback without replacing the toolbar or changing Markdown serialization.
+const EDITOR_ES = {
+  'toolbar.blockTypes.paragraph': 'Párrafo', 'toolbar.blockTypes.quote': 'Cita',
+  'toolbar.blockTypes.heading': 'Encabezado {{level}}',
+  'toolbar.blockTypeSelect.selectBlockTypeTooltip': 'Seleccionar tipo de bloque',
+  'toolbar.blockTypeSelect.placeholder': 'Tipo de bloque',
+  'toolbar.bold': 'Negrita', 'toolbar.removeBold': 'Quitar negrita',
+  'toolbar.italic': 'Cursiva', 'toolbar.removeItalic': 'Quitar cursiva',
+  'toolbar.underline': 'Subrayado', 'toolbar.removeUnderline': 'Quitar subrayado',
+  'toolbar.strikethrough': 'Tachado', 'toolbar.removeStrikethrough': 'Quitar tachado',
+  'toolbar.superscript': 'Superíndice', 'toolbar.removeSuperscript': 'Quitar superíndice',
+  'toolbar.subscript': 'Subíndice', 'toolbar.removeSubscript': 'Quitar subíndice',
+  'toolbar.inlineCode': 'Código en línea', 'toolbar.removeInlineCode': 'Quitar formato de código',
+  'toolbar.link': 'Crear enlace', 'toolbar.table': 'Insertar tabla',
+  'toolbar.thematicBreak': 'Insertar separador', 'toolbar.codeBlock': 'Insertar bloque de código',
+  'toolbar.bulletedList': 'Lista con viñetas', 'toolbar.numberedList': 'Lista numerada',
+  'toolbar.checkList': 'Lista de tareas', 'toolbar.undo': 'Deshacer {{shortcut}}',
+  'toolbar.redo': 'Rehacer {{shortcut}}', 'toolbar.toggleGroup': 'Grupo de formato',
+  'codeBlock.language': 'Lenguaje del bloque de código', 'codeBlock.selectLanguage': 'Seleccionar lenguaje',
+  'dialog.close': 'Cerrar diálogo', 'dialogControls.save': 'Guardar', 'dialogControls.cancel': 'Cancelar',
+  'createLink.url': 'URL', 'createLink.urlPlaceholder': 'Selecciona o pega una URL',
+  'createLink.text': 'Texto del enlace', 'createLink.textTooltip': 'Texto que se mostrará en el enlace',
+  'createLink.title': 'Título del enlace', 'createLink.titleTooltip': 'Título que aparece al pasar el cursor',
+  'createLink.saveTooltip': 'Guardar URL', 'createLink.cancelTooltip': 'Cancelar cambio',
+  'linkPreview.edit': 'Editar URL del enlace', 'linkPreview.copyToClipboard': 'Copiar al portapapeles',
+  'linkPreview.copied': '¡Copiado!', 'linkPreview.remove': 'Quitar enlace',
+};
+function translateMarkdownEditor(key, fallback, values = {}) {
+  return (EDITOR_ES[key] ?? fallback).replace(/{{(\w+)}}/g, (match, name) => values[name] === undefined ? match : String(values[name]));
+}
+
 function EditorToolbar() {
   return (
     <>
@@ -87,6 +119,7 @@ export const MarkdownField = forwardRef(function MarkdownField(
     readOnly,
     readOnlyPlain = false,
     className,
+    translation = translateMarkdownEditor,
   },
   _ref,
 ) {
@@ -168,6 +201,7 @@ export const MarkdownField = forwardRef(function MarkdownField(
       >
         <MDXEditor
           ref={editorRef}
+          translation={translation}
           markdown={value ?? ""}
           readOnly
           plugins={PLUGINS}
@@ -199,6 +233,7 @@ export const MarkdownField = forwardRef(function MarkdownField(
       >
         <MDXEditor
           ref={editorRef}
+          translation={translation}
           markdown={value ?? ""}
           onChange={handleChange}
           onBlur={() => onBlur?.()}
