@@ -4,12 +4,8 @@
 // Colors are the same everywhere: alta green, propuesta amber (warning),
 // baja red, pendiente blue.
 
-export const ADMIN_STATUSES = [
-  { value: 'registration_pending', label: 'Pendiente de alta', color: '#2563eb' },
-  { value: 'registered', label: 'Alta', color: '#16a34a' },
-  { value: 'deregistration_proposed', label: 'Propuesta de baja', color: '#d97706' },
-  { value: 'deregistered', label: 'Baja', color: '#dc2626' },
-]
+import { ADMIN_STATUSES } from '@runly/ui/integration-blueprints'
+export { ADMIN_STATUSES }
 export const ADMIN_STATUS_BY_VALUE = Object.fromEntries(ADMIN_STATUSES.map((s) => [s.value, s]))
 
 export const DEREGISTRATION_REASONS = [

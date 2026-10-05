@@ -19,7 +19,7 @@ export const COMPILER_CONTRACT = Object.freeze({
 // ERP inventory and bounded preview availability; no backend execution in Hub.
 export const RUNTIME_CONTRACT = Object.freeze({
   schemaVersion: RUNTIME_CONTRACT_VERSION, runtimeId: RUNTIME_ID,
-  previewAvailable: true, previewScope: 'trusted-declarative-fixtures', previewContractVersion: 1, backendExecutionInHub: false,
+  previewAvailable: true, previewScope: 'trusted-declarative-fixtures', previewContractVersion: 2, backendExecutionInHub: false,
   packageVersions: Object.freeze({ engine: '0.1.0', compiler: '0.1.0', ui: '0.1.0', sdk: '0.1.0', validators: '0.1.0' }),
   libraries: Object.freeze(runtimeCatalog.libraries.map((library) => Object.freeze({ ...library }))),
   sharedExternals: Object.freeze([

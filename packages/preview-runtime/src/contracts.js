@@ -1,13 +1,14 @@
 export const PREVIEW_RUNTIME_CONTRACT = Object.freeze({
-  schemaVersion: 1,
-  implementation: 'rme3-preview-contract1',
+  schemaVersion: 2,
+  implementation: 'rme3-preview-contract2',
   scope: 'trusted-declarative-fixtures',
   transportContract: 'fetch-response-v1',
   views: Object.freeze(['TABLE', 'FORM', 'DETAIL', 'PAGE', 'DASHBOARD', 'KANBAN']),
   adapters: Object.freeze(['transport.fetch', 'preferences', 'resources']),
   customExecution: false,
   backendExecution: false,
-  unsupported: Object.freeze(['CUSTOM', 'relations', 'audit', 'attachments', 'files', 'services', 'automations']),
+  simulation: Object.freeze({ relations: 'declarative', connections: 'fields-related', services: 'official-simulator', events: 'deterministic', automations: 'pure-declarative' }),
+  unsupported: Object.freeze(['CUSTOM', 'audit', 'attachments', 'files', 'backend-handlers', 'SQL-transactions']),
 });
 export function unsupported(capability) {
   return Object.assign(new Error(`Capacidad no soportada: ${capability}`), { code: 'PREVIEW_UNSUPPORTED', capability });
@@ -19,7 +20,7 @@ export function diagnoseBlueprints(blueprints) {
   const advanced = new Set(['attachments', 'audit', 'audit-trail', 'parts', 'costs', 'custom-fields', 'component', 'relation-card', 'relation-list']);
   const inspect = (value, path) => {
     if (!value || typeof value !== 'object') return;
-    if (advanced.has(value.type) || ['relation', 'file', 'file-asset', 'image-asset'].includes(value.type)) diagnostics.push({ code: 'PREVIEW_UNSUPPORTED', path, capability: value.type });
+    if (advanced.has(value.type) || ['file', 'file-asset', 'image-asset'].includes(value.type)) diagnostics.push({ code: 'PREVIEW_UNSUPPORTED', path, capability: value.type });
     for (const [key, child] of Object.entries(value)) {
       if (['component', 'imageDocsPath', 'signedUrlPath', 'filesPath', 'imageField', 'cardMedia', 'avatarField', 'createPath', 'endpoint', 'hrefTemplate'].includes(key) && child) diagnostics.push({ code: 'PREVIEW_UNSUPPORTED', path: `${path}.${key}`, capability: key });
       inspect(child, `${path}.${key}`);

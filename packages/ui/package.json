@@ -11,7 +11,10 @@
     "./runtime-adapters": "./src/lib/module-runtime/RuntimeAdapters.jsx",
     "./renderer-adapters": "./src/runly-renderer/renderer-adapters.js",
     "./runtime.css": "./src/runtime.css",
-    "./preview": "./src/preview.js"
+    "./preview": "./src/preview.js",
+    "./integrations": "./src/integrations/index.js",
+    "./integration-blueprints": "./src/integrations/inventory/index.js",
+    "./connection-format": "./src/integrations/connectionFormat.js"
   },
   "dependencies": {
     "@atlas/core": "workspace:@runly/core@*",

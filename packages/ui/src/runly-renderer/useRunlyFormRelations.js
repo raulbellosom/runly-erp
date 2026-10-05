@@ -5,6 +5,7 @@
 // returned values are consumed inside renderFieldControl's "relation" case
 // and the inline-create <Dialog>.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRuntimeFetch } from "../lib/module-runtime/RuntimeAdapters.jsx";
 import { normalizeRelationDescriptor } from "./renderer-adapters.js";
 import { buildApiHeaders } from "../lib/apiHeaders.js";
 import {
@@ -16,8 +17,6 @@ import {
   buildInlineCreatePrefill,
 } from "./runly-form-utils.js";
 
-// Module-level cache for relation field options. Persists across modal open/close cycles.
-const _relationOptionsCache = new Map();
 const _RELATION_CACHE_TTL = 5 * 60 * 1000;
 
 export function useRunlyFormRelations({
@@ -36,6 +35,8 @@ export function useRunlyFormRelations({
   allowInlineCreate,
   inlineCreateDepth,
 }) {
+  const fetch = useRuntimeFetch();
+  const relationOptionsCache = useRef(new Map());
   const [relationState, setRelationState] = useState({});
   const [relationInlineErrors, setRelationInlineErrors] = useState({});
   const [inlineCreateState, setInlineCreateState] = useState({
@@ -55,6 +56,12 @@ export function useRunlyFormRelations({
   );
   const relationDebounceRef = useRef({});
 
+  useEffect(() => {
+    const cache = relationOptionsCache.current;
+    const timers = relationDebounceRef.current;
+    return () => { cache.clear(); Object.values(timers).forEach(clearTimeout); };
+  }, [companyId, token, fetch]);
+
   const clearRelationInlineError = useCallback((name) => {
     setRelationInlineErrors((prev) => ({ ...prev, [name]: "" }));
   }, []);
@@ -65,10 +72,11 @@ export function useRunlyFormRelations({
       url.searchParams.set(descriptor.pageParam, "1");
       url.searchParams.set(descriptor.pageSizeParam, String(descriptor.pageSize));
       if (search) url.searchParams.set(descriptor.searchParam, search);
-      const cacheKey = url.toString();
+      const requestUrl = url.toString();
+      const cacheKey = JSON.stringify([companyId, token, requestUrl]);
 
       if (!search) {
-        const cached = _relationOptionsCache.get(cacheKey);
+        const cached = relationOptionsCache.current.get(cacheKey);
         if (cached && Date.now() - cached.ts < _RELATION_CACHE_TTL) {
           setRelationState((prev) => ({
             ...prev,
@@ -83,7 +91,7 @@ export function useRunlyFormRelations({
         [fieldName]: { options: prev[fieldName]?.options ?? [], loading: true, error: null },
       }));
       try {
-        const res = await fetch(cacheKey, { headers: buildApiHeaders(token, companyId) });
+        const res = await fetch(requestUrl, { headers: buildApiHeaders(token, companyId) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         const rows = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
@@ -112,7 +120,8 @@ export function useRunlyFormRelations({
           })
           .filter((o) => o.value);
         if (!search) {
-          _relationOptionsCache.set(cacheKey, { options, ts: Date.now() });
+          if (relationOptionsCache.current.size >= 100) relationOptionsCache.current.clear();
+          relationOptionsCache.current.set(cacheKey, { options, ts: Date.now() });
         }
         setRelationState((prev) => {
           const currentOptions = prev[fieldName]?.options ?? [];
@@ -143,7 +152,7 @@ export function useRunlyFormRelations({
         return false;
       }
     },
-    [apiBaseUrl, token, companyId, formValuesRef],
+    [apiBaseUrl, token, companyId, formValuesRef, fetch],
   );
 
   useEffect(() => {
@@ -250,7 +259,7 @@ export function useRunlyFormRelations({
       });
       return found ?? null;
     },
-    [apiBaseUrl, blueprint?.moduleKey, blueprints, nestedBlueprintRows, resolveBlueprintByKey, token, companyId],
+    [apiBaseUrl, blueprint?.moduleKey, blueprints, nestedBlueprintRows, resolveBlueprintByKey, token, companyId, fetch],
   );
 
   const openInlineCreate = useCallback(
@@ -392,7 +401,7 @@ export function useRunlyFormRelations({
         setQuickCreatingField(null);
       }
     },
-    [apiBaseUrl, applyCreatedRelationResult, companyId, token, clearRelationInlineError],
+    [apiBaseUrl, applyCreatedRelationResult, companyId, token, clearRelationInlineError, fetch],
   );
 
   return {

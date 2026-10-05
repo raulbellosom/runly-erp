@@ -157,6 +157,9 @@ export default defineConfig({
       "@runly/module-engine": resolve(__dirname, "../../packages/module-engine/src/index.js"),
       "@runly/sdk": resolve(__dirname, "../../packages/sdk/src/index.js"),
       // Before "@runly/ui": aliases match by prefix, first entry wins.
+      "@runly/ui/integration-blueprints": resolve(__dirname, "../../packages/ui/src/integrations/inventory/index.js"),
+      "@runly/ui/connection-format": resolve(__dirname, "../../packages/ui/src/integrations/connectionFormat.js"),
+      "@runly/ui/integrations": resolve(__dirname, "../../packages/ui/src/integrations/index.js"),
       "@runly/ui/preview": resolve(__dirname, "../../packages/ui/src/preview.js"),
       "@runly/ui/runtime-adapters": resolve(__dirname, "../../packages/ui/src/lib/module-runtime/RuntimeAdapters.jsx"),
       "@runly/ui/renderer-adapters": resolve(__dirname, "../../packages/ui/src/runly-renderer/renderer-adapters.js"),

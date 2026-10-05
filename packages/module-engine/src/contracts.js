@@ -42,3 +42,5 @@ export const RME3_ENGINE_CONTRACT = Object.freeze({
   moduleKinds: Object.freeze(Object.values(MODULE_KINDS)),
   legacyAlias: '@atlas/module-engine',
 })
+
+export { isEmpty, matches, render, sourceValue, buildArgs } from './automation-runtime.js'

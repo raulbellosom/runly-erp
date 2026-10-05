@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { RunlyDetail, ErrorState, ConfirmDialog, DetailActionBar, Button, DetailSkeleton } from '@runly/ui'
+import { ErrorState, ConfirmDialog, DetailActionBar, Button, DetailSkeleton } from '@runly/ui'
+import { InventoryItemPresentation } from '@runly/ui/integrations'
 import { ArrowLeft, PowerOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../../auth/AuthProvider'
 import { useActiveCompany } from '../../../company/ActiveCompanyProvider'
 import { getApiUrl } from '../../../lib/runtimeConfig.js'
 import { useInventoryItem, useDeleteInventoryItem } from '../hooks/useInventoryItems.js'
-import { INVENTORY_ITEM_DETAIL } from '../blueprints/inventory-item-detail.blueprint.js'
 import { componentRegistry } from '../../../lib/moduleComponentRegistry.js'
 import { CanvasReferences } from '../../runly.canvas/components/CanvasReferences.jsx'
 import { ConnectionSections } from '../../../shell/connections/ConnectionSections.jsx'
@@ -58,8 +58,7 @@ export default function InventoryItemDetail() {
   return (
     <div className="p-4 md:p-6 space-y-6 min-h-dvh">
       <Button variant="outline" onClick={() => openMiraiSidebar()}><Sparkles className="mr-2 h-4 w-4" />Consultar este equipo con IA</Button>
-      <RunlyDetail
-        blueprint={INVENTORY_ITEM_DETAIL}
+      <InventoryItemPresentation
         data={item}
         token={token}
         companyId={activeCompanyId}

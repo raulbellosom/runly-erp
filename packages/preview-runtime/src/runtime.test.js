@@ -54,7 +54,8 @@ test('original longest PAGE route and entity selection support list, create, det
 
 test('Atlas presentation aliases and unsupported capabilities are explicit', () => {
   assert.equal(resolveBlueprintPresentation({ tableBlueprint: { schema: { layout: 'atlas.crudLayout' } } }).layoutKey, 'runly.crudLayout');
-  for (const type of ['attachments', 'audit', 'relation', 'file-asset', 'component']) assert.ok(diagnoseBlueprints([{ key: 'test', kind: 'DETAIL', schema: { sections: [{ type }] } }]).length);
+  for (const type of ['attachments', 'audit', 'relation-card', 'file-asset', 'component']) assert.ok(diagnoseBlueprints([{ key: 'test', kind: 'DETAIL', schema: { sections: [{ type }] } }]).length);
+  assert.equal(diagnoseBlueprints([{ key: 'test', kind: 'FORM', schema: { fields: [{ type: 'relation', relation: { apiPath: '/tasks' } }] } }]).length, 0);
   assert.ok(diagnoseBlueprints([{ key: 'test', kind: 'CUSTOM', schema: {} }]).length);
 });
 
