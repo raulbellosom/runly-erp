@@ -25,6 +25,7 @@ import { createMiraiRoutes } from "./mirai-routes.js";
 import { createMiraiActionsStack } from "./mirai-actions-wiring.js";
 import { createShowRecordsTool } from "./mirai-record-links.js";
 import { createVisionService } from "../../services/vision-service.js";
+import { createLinkPreviewService } from "../../services/link-preview-service.js";
 import { createChatExternalInboxService } from "./chat-external-inbox-service.js";
 import { createChatModerationService, ChatModerationServiceError } from "./chat-moderation-service.js";
 import { createModerationRoutes } from "./moderation-routes.js";
@@ -101,6 +102,7 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   const moderationService = createChatModerationService({ prisma });
   const chatSearchService = createChatSearchService({ prisma });
   const memberAvatarService = createChatMemberAvatarService({ prisma, supabaseAdmin });
+  const linkPreviewService = createLinkPreviewService();
 
   // MirAI (AI assistant) — Spec 1.
   const visionService = createVisionService();
@@ -210,6 +212,12 @@ export function createChatRouter({ prisma, supabaseAdmin, authMiddleware, requir
   // unrelated permission with this capability's real availability.
   internal.get("/tts/status", (c) => {
     return c.json({ data: { enabled: Boolean(miraiTtsService.isConfigured()) } });
+  });
+
+  internal.get("/link-preview", requirePermission("chat.conversations.read"), async (c) => {
+    const url = String(c.req.query("url") ?? "");
+    if (!/^https?:\/\//i.test(url) || url.length > 2048) return c.json({ error: "URL no valida." }, 422);
+    return c.json({ data: await linkPreviewService.getPreview(url) });
   });
 
   internal.get("/conversations", requirePermission("chat.conversations.read"), async (c) => {

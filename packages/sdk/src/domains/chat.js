@@ -488,6 +488,10 @@ export function createChatDomain(request, withAuthHeaders, toQueryString, reques
     // which is a historical implementation detail, not part of this
     // capability's own contract).
     // ----------------------------------------------------------------
+    // Open Graph preview of a URL pasted in a message ({ data: null } when the
+    // page has no usable metadata or can't be fetched).
+    linkPreview: (url, token) =>
+      request(`/chat/link-preview?url=${encodeURIComponent(url)}`, { headers: withAuthHeaders(token) }),
     tts: {
       status: (token) => request("/chat/tts/status", { headers: withAuthHeaders(token) }),
       // Returns a Blob (audio/wav), not JSON, hence requestBlob instead of request.

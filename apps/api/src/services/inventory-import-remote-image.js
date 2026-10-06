@@ -21,7 +21,7 @@ export function isPrivateAddress(address) {
   return v6 === '::' || v6 === '::1' || v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80');
 }
 
-async function assertPublicUrl(raw) {
+export async function assertPublicUrl(raw) {
   let url;
   try { url = new URL(raw); } catch { throw new Error('URL no válida'); }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Solo se aceptan enlaces http o https');

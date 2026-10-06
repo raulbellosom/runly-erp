@@ -188,7 +188,7 @@ export function RealtimeProvider({ children }) {
         const dupKey = convId ? `c:chat.message.new|${payload.senderName}|${convId}` : null
         if (!isOpenAndVisible && !isOnRoute && !isMuted && !alreadyReadElsewhere && claimNotification(dupKey)) {
           toast(payload.senderName, {
-            description: 'Nuevo mensaje',
+            description: payload.preview || (payload.hasAttachments ? 'Envió un archivo' : 'Nuevo mensaje'),
             duration: 5000,
             action: convId ? {
               label: 'Ver',

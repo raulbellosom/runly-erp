@@ -18,6 +18,7 @@ import { MiraiProposalCard } from "./MiraiProposalCard";
 import { AttachmentsBlock } from "./MessageAttachments";
 import { isMergeableMediaMessage } from "../lib/messageMedia";
 import { MessageQuote } from "./MessageQuote";
+import { LinkPreviewCard } from "./LinkPreviewCard";
 import { CallLogCard } from "./CallLogCard";
 import { getCallMeta, getRecordingMeta } from "./callLogMeta";
 import { RecordingReadyCard } from "./RecordingReadyCard";
@@ -729,6 +730,7 @@ export function ChatMessageBubble({
                     ) : (
                       renderRichText(message.body, { highlightQuery: isAssistant ? "" : searchQuery })
                     )}
+                    {!isDeleted && !isPending && <LinkPreviewCard body={message.body} isOwn />}
                   </div>
                 )}
                 {firstEntityRefAttached && (
@@ -951,6 +953,7 @@ export function ChatMessageBubble({
                   ) : (
                     renderRichText(message.body, { highlightQuery: isAssistant ? "" : searchQuery })
                   )}
+                  {!isDeleted && !isAssistant && <LinkPreviewCard body={message.body} isOwn={false} />}
                 </div>
               )}
               {firstEntityRefAttached && (

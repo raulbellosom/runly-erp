@@ -479,11 +479,16 @@ export function createChatMessageSendService({
 
     if (broadcaster) {
       const memberIds = await getConversationMemberIds(conversationId).catch(() => []);
+      // Short plain-text snippet for the recipient's toast (mention tokens
+      // flattened to "@Name", whitespace collapsed, capped at 120 chars).
+      const toastText = stripMentionTokens(body ?? "").replace(/\s+/g, " ").trim();
       broadcaster.broadcastToUsers(memberIds, "chat.message.new", {
         conversationId,
         messageId: msg.id,
         senderId: profileId.toString(),
         senderName: fullMsg?.sender?.displayName ?? null,
+        preview: toastText.length > 120 ? `${toastText.slice(0, 120)}…` : toastText,
+        hasAttachments: (fullMsg?.attachments?.length ?? 0) > 0,
         threadRootId: resolvedThreadRootId,
         replyToMessageId: resolvedReplyToId,
       }).catch(() => {});

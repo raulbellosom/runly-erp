@@ -18,6 +18,43 @@ const ORDERED_ITEM_RE = /^\s*\d+[.)]\s+(.*)$/;
 const QUOTE_ITEM_RE = /^\s*>\s?(.*)$/;
 const FENCE_RE = /```([\w+-]*)\n?([\s\S]*?)```/g;
 
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
+// Sentence punctuation right after a link ("ver https://x.com/a.") is not
+// part of it; a closing paren only counts when the URL opened one.
+const TRAILING_PUNCT_RE = /[.,;:!?'"]+$/;
+
+function trimUrl(raw) {
+  let url = raw.replace(TRAILING_PUNCT_RE, "");
+  while (url.endsWith(")") && (url.match(/\(/g)?.length ?? 0) < (url.match(/\)/g)?.length ?? 0)) {
+    url = url.slice(0, -1).replace(TRAILING_PUNCT_RE, "");
+  }
+  return url;
+}
+
+/** Splits text into [{ text }] and [{ text, url }] parts. */
+export function splitUrls(text) {
+  const parts = [];
+  let last = 0;
+  URL_RE.lastIndex = 0;
+  let m;
+  while ((m = URL_RE.exec(text)) !== null) {
+    const raw = trimUrl(m[0]);
+    if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+    parts.push({ text: raw, url: /^www\./i.test(raw) ? `https://${raw}` : raw });
+    last = m.index + raw.length;
+    URL_RE.lastIndex = last;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
+}
+
+/** First http(s) link in a message body, or null — drives the link preview card. */
+export function findFirstUrl(text) {
+  if (!text) return null;
+  const withoutCode = String(text).replace(/```[\s\S]*?```|`[^`\n]+`/g, " ");
+  return splitUrls(withoutCode).find((p) => p.url)?.url ?? null;
+}
+
 function buildHighlightRegex(query) {
   const trimmed = String(query ?? "").trim();
   if (!trimmed) return null;
@@ -65,9 +102,28 @@ function renderInlineText(text, highlightRe, codeClassName, keyPrefix) {
       );
       return;
     }
-    const pieces = seg.value.split(INLINE_TOKEN_RE).filter((p) => p !== "");
+    // URLs are split out BEFORE the *bold*/_italic_ tokens so an underscore
+    // inside a link never turns half of it into italics.
+    const pieces = splitUrls(seg.value).flatMap((part) =>
+      part.url ? [part] : part.text.split(INLINE_TOKEN_RE).filter((p) => p !== ""),
+    );
     pieces.forEach((piece, pi) => {
       const key = `${keyPrefix}-p${si}-${pi}`;
+      if (typeof piece === "object") {
+        nodes.push(
+          <a
+            key={key}
+            href={piece.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 wrap-anywhere hover:opacity-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {renderHighlighted(piece.text, highlightRe, key)}
+          </a>,
+        );
+        return;
+      }
       if (piece.length > 2 && piece.startsWith("*") && piece.endsWith("*")) {
         nodes.push(<strong key={key}>{renderHighlighted(piece.slice(1, -1), highlightRe, key)}</strong>);
       } else if (piece.length > 2 && piece.startsWith("_") && piece.endsWith("_")) {
