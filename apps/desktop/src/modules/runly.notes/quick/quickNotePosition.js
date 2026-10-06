@@ -20,6 +20,14 @@ export function defaultPosition(size, viewport) {
   );
 }
 
+// Bubble release: stick to the nearer side edge (like the chat bubble), keep
+// the vertical position.
+export function snapToEdge(pos, size, viewport, margin = QUICK_NOTE_MARGIN) {
+  const centerX = pos.x + size.width / 2;
+  const x = centerX > viewport.width / 2 ? viewport.width - size.width - margin : margin;
+  return clampToViewport({ x, y: pos.y }, size, viewport, margin);
+}
+
 // True once the pointer moved past the drag threshold (bigger on touch).
 export function passedDragThreshold(start, point, pointerType) {
   const threshold = pointerType === "touch" ? 10 : 4;

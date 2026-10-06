@@ -293,9 +293,10 @@ export { ChatAttachMenu } from "./components/ChatAttachMenu.jsx";
 export { ListLayout } from "./components/ListLayout.jsx";
 export { useAttachmentsController, resolveAttachmentFileType } from "./hooks/useAttachmentsController.js";
 export { useIsMobile } from "./hooks/useIsMobile.js";
-export { useKeyboardInset, useKeyboardViewport } from "./hooks/useKeyboardInset.js";
+export { useKeyboardInset, useKeyboardOpen, useKeyboardViewport } from "./hooks/useKeyboardInset.js";
 export {
   computeKeyboardInset,
+  isKeyboardOpen,
   isCaretHiddenByKeyboard,
   computeCaretScrollDelta,
 } from "./lib/keyboardInset.js";

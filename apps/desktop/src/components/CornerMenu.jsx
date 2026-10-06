@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Home, NotebookPen, Search } from "lucide-react";
-import { cn, useKeyboardInset } from "@runly/ui";
+import { cn, useKeyboardOpen } from "@runly/ui";
 import { useRuntimeModules } from "../app/useRuntimeModules";
 import { useModuleLauncher } from "../hooks/useModuleLauncher";
 import { useAppViewPrefs } from "../hooks/useAppViewPrefs";
@@ -74,28 +74,41 @@ function MenuItem({ item, pos, active, delay, onSelect }) {
   );
 }
 
+// The grip overlays the bottom-right corner, where screens often place a
+// primary action (chat send button). A tap on it is re-dispatched to the
+// element underneath so that action keeps working.
+function forwardTap(grip, point) {
+  grip.style.pointerEvents = "none";
+  const target = document.elementFromPoint(point.x, point.y);
+  grip.style.pointerEvents = "";
+  if (!target || grip.contains(target)) return;
+  const el = target.closest("button, a, input, textarea, select, [role='button'], [tabindex]") ?? target;
+  if (el.matches?.("input, textarea, select, [contenteditable='true']")) el.focus();
+  else el.click();
+}
+
 // Bottom-right corner (the left edge is the browser/OS back-swipe gesture):
 // the arc fans up and to the left.
 function mirror(p) {
   return { x: -p.x, y: p.y };
 }
 
-// Mobile corner menu: pull the grip in the bottom-right corner outward and an
+// Mobile corner menu: swipe the grip in the bottom-right corner outward and an
 // arc of options fans out. Inner ring = quick actions, outer ring = favorite
-// (then recent) apps. Release over an option runs it; a plain tap opens the
-// menu so options can be tapped instead.
+// (then recent) apps. Release over an option runs it; release elsewhere (or
+// tap the backdrop) closes it. A plain tap on the grip passes through.
 export function CornerMenu() {
   const isTouch = useIsTouchDevice();
   // Hidden while the on-screen keyboard is open (not merely on focus: some
   // screens autofocus a field without raising the keyboard).
-  const editing = useKeyboardInset() > 0;
+  const editing = useKeyboardOpen();
   const navigate = useNavigate();
   const { availableModules } = useRuntimeModules();
   const { launch, isOfflineBlocked } = useModuleLauncher(availableModules);
   const { favorites } = useAppViewPrefs();
   const gripRef = useRef(null);
   const gestureRef = useRef(null);
-  const [menu, setMenu] = useState(null); // { origin, mode: 'drag' | 'tap' }
+  const [menu, setMenu] = useState(null); // { origin }
   const [selection, setSelection] = useState(null);
   const [finger, setFinger] = useState(null);
 
@@ -132,40 +145,40 @@ export function CornerMenu() {
   }
 
   function onPointerDown(e) {
-    const rect = gripRef.current.getBoundingClientRect();
-    // Origin sits a little inside the corner so labels of the first/last
-    // items (nearly vertical / horizontal) never fall off the screen edge.
-    const origin = { x: rect.right - 30, y: rect.bottom - 44 };
-    gestureRef.current = { start: { x: e.clientX, y: e.clientY }, moved: false };
+    gestureRef.current = { start: { x: e.clientX, y: e.clientY }, origin: null };
     e.currentTarget.setPointerCapture(e.pointerId);
-    setMenu({ origin, mode: "drag" });
-    setFinger({ x: e.clientX, y: e.clientY });
-    vibrate(8);
   }
 
   function onPointerMove(e) {
     const g = gestureRef.current;
-    if (!g || !menu) return;
-    if (Math.hypot(e.clientX - g.start.x, e.clientY - g.start.y) > TAP_MAX_MOVE) g.moved = true;
+    if (!g) return;
+    if (!g.origin) {
+      // Only a swipe opens the menu; a tap must reach whatever sits under the
+      // grip (e.g. the chat composer's send button).
+      if (Math.hypot(e.clientX - g.start.x, e.clientY - g.start.y) <= TAP_MAX_MOVE) return;
+      const rect = gripRef.current.getBoundingClientRect();
+      // Origin sits a little inside the corner so labels of the first/last
+      // items (nearly vertical / horizontal) never fall off the screen edge.
+      g.origin = { x: rect.right - 30, y: rect.bottom - 44 };
+      setMenu({ origin: g.origin });
+      vibrate(8);
+    }
     setFinger({ x: e.clientX, y: e.clientY });
     // Bottom-right corner: mirror x so the shared geometry (which fans up and
     // to the right) fans up and to the left instead.
-    const next = pickCornerItem(menu.origin.x - e.clientX, e.clientY - menu.origin.y, counts);
+    const next = pickCornerItem(g.origin.x - e.clientX, e.clientY - g.origin.y, counts);
     setSelection((prev) => {
       if (next && (prev?.ring !== next.ring || prev?.index !== next.index)) vibrate(6);
       return next;
     });
   }
 
-  function onPointerUp() {
+  function onPointerUp(e) {
     const g = gestureRef.current;
     gestureRef.current = null;
-    if (!g || !menu) return;
-    if (!g.moved) {
-      // A tap: keep the menu open so options can be tapped.
-      setMenu((m) => (m ? { ...m, mode: "tap" } : m));
-      setSelection(null);
-      setFinger(null);
+    if (!g) return;
+    if (!g.origin) {
+      forwardTap(e.currentTarget, g.start);
       return;
     }
     const item = selection ? rings[selection.ring][selection.index] : null;
@@ -173,7 +186,7 @@ export function CornerMenu() {
     else close();
   }
 
-  // Back button / Escape closes an open tap-mode menu.
+  // Escape closes an open menu.
   useEffect(() => {
     if (!menu) return undefined;
     const onKey = (e) => e.key === "Escape" && close();
@@ -184,7 +197,7 @@ export function CornerMenu() {
   if (!isTouch) return null;
 
   const selected = selection ? rings[selection.ring][selection.index] : null;
-  const caption = selected?.label ?? (menu?.mode === "tap" ? "Toca una opción" : "Desliza hacia una opción y suelta");
+  const caption = selected?.label ?? "Desliza hacia una opción y suelta";
 
   return createPortal(
     <>
@@ -294,7 +307,7 @@ export function CornerMenu() {
               {/* Labels in their own layer, above every icon, so a neighbor
                   icon never covers them. */}
               {rings.map((items, ringIdx) =>
-                (menu.mode === "tap" || ringIdx === 0) &&
+                ringIdx === 0 &&
                 items.map((item, i) => {
                   const p = mirror(itemOffset(i, items.length, CORNER_RINGS[ringIdx].radius));
                   return (
@@ -314,7 +327,7 @@ export function CornerMenu() {
               )}
             </div>
 
-            {finger && menu.mode === "drag" && (
+            {finger && (
               <span
                 aria-hidden
                 className="pointer-events-none absolute -ml-3 -mt-3 h-6 w-6 rounded-full border-2 border-white/80 bg-white/20"

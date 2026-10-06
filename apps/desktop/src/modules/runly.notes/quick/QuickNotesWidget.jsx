@@ -28,7 +28,10 @@ import {
   defaultPosition,
   isQuickNoteShortcut,
   passedDragThreshold,
+  snapToEdge,
 } from "./quickNotePosition";
+import { BubbleDropZone } from "../../../components/BubbleDropZone";
+import { isInBubbleDropZone } from "../../../lib/bubbleDropZone";
 
 // The rich editor (TipTap + Y.js) is only downloaded once the panel opens.
 const NoteEditor = lazy(() =>
@@ -41,6 +44,8 @@ const Z_QUICK_NOTES = 48;
 const PANEL_SIZE = { width: 420, height: 480 };
 const PANEL_SIZE_EXPANDED = { width: 640, height: 640 };
 const BUBBLE_SIZE = { width: 48, height: 48 };
+// Lines the bubble's center up with the chat bubble's (56px at 16px).
+const BUBBLE_EDGE_MARGIN = 20;
 const NARROW_BREAKPOINT = 640;
 export const QUICK_NOTE_SHORTCUT_LABEL = "Ctrl+Alt+N";
 
@@ -50,7 +55,8 @@ function viewportSize() {
 
 // Pointer-drag for a fixed-position box. Clicks under the threshold are not
 // drags, so the bubble's tap-to-restore keeps working.
-function useDraggable({ pos, size, onMove, onTap }) {
+// `onEnd(pos, point)` runs on release after a real drag.
+function useDraggable({ pos, size, onMove, onTap, onEnd }) {
   const startRef = useRef(null);
   const [dragging, setDragging] = useState(false);
 
@@ -64,20 +70,21 @@ function useDraggable({ pos, size, onMove, onTap }) {
     if (!s) return;
     if (!s.moved && !passedDragThreshold(s, { x: e.clientX, y: e.clientY }, s.type)) return;
     s.moved = true;
-    setDragging(true);
-    onMove(
-      clampToViewport(
-        { x: s.origin.x + e.clientX - s.x, y: s.origin.y + e.clientY - s.y },
-        size,
-        viewportSize(),
-      ),
+    s.last = clampToViewport(
+      { x: s.origin.x + e.clientX - s.x, y: s.origin.y + e.clientY - s.y },
+      size,
+      viewportSize(),
     );
+    s.point = { x: e.clientX, y: e.clientY };
+    setDragging(true);
+    onMove(s.last, s.point);
   }
   function onPointerUp() {
     const s = startRef.current;
     startRef.current = null;
     setDragging(false);
     if (s && !s.moved) onTap?.();
+    else if (s?.last) onEnd?.(s.last, s.point);
   }
   return {
     dragging,
@@ -258,38 +265,64 @@ function EditorSkeleton() {
   );
 }
 
+// Behaves like the chat bubble: sticks to the nearer side edge on release,
+// and dropping it on the bottom-center target hides it (closes quick notes;
+// the note itself is already saved).
 function QuickNotesBubble() {
-  const { bubblePos, setBubblePos, restore } = useQuickNoteStore();
+  const { bubblePos, setBubblePos, restore, close } = useQuickNoteStore();
+  const [overDropZone, setOverDropZone] = useState(false);
   const vp = viewportSize();
   // Default: right edge, stacked just above the chat bubble (which sits at
   // 75% of the viewport height).
   const pos = clampToViewport(
-    bubblePos ?? { x: vp.width - BUBBLE_SIZE.width - 20, y: vp.height * 0.75 - 28 - BUBBLE_SIZE.height - 16 },
+    bubblePos ?? { x: vp.width - BUBBLE_SIZE.width - BUBBLE_EDGE_MARGIN, y: vp.height * 0.75 - 28 - BUBBLE_SIZE.height - 16 },
     BUBBLE_SIZE,
     vp,
   );
-  const { dragging, handlers } = useDraggable({ pos, size: BUBBLE_SIZE, onMove: setBubblePos, onTap: restore });
+  const { dragging, handlers } = useDraggable({
+    pos,
+    size: BUBBLE_SIZE,
+    onTap: restore,
+    onMove: (next, point) => {
+      setBubblePos(next);
+      setOverDropZone(isInBubbleDropZone(point, viewportSize()));
+    },
+    onEnd: (last, point) => {
+      setOverDropZone(false);
+      if (isInBubbleDropZone(point, viewportSize())) {
+        setBubblePos(null);
+        close();
+      } else {
+        setBubblePos(snapToEdge(last, BUBBLE_SIZE, viewportSize(), BUBBLE_EDGE_MARGIN));
+      }
+    },
+  });
 
   return (
-    <button
-      type="button"
-      {...handlers}
-      aria-label={`Abrir nota rápida (${QUICK_NOTE_SHORTCUT_LABEL})`}
-      title={`Nota rápida (${QUICK_NOTE_SHORTCUT_LABEL})`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          restore();
-        }
-      }}
-      className={cn(
-        "fixed flex touch-none select-none items-center justify-center rounded-full bg-amber-500 text-white shadow-lg ring-4 ring-amber-500/20 focus-visible:outline-none focus-visible:ring-[hsl(var(--ring))]",
-        dragging ? "scale-110 cursor-grabbing shadow-2xl" : "cursor-pointer transition-transform hover:scale-105 active:scale-95",
-      )}
-      style={{ left: pos.x, top: pos.y, width: BUBBLE_SIZE.width, height: BUBBLE_SIZE.height, zIndex: Z_QUICK_NOTES }}
-    >
-      <NotebookPen size={20} aria-hidden />
-    </button>
+    <>
+      {dragging && <BubbleDropZone active={overDropZone} label="Ocultar nota" zIndex={Z_QUICK_NOTES - 1} />}
+      <button
+        type="button"
+        {...handlers}
+        aria-label={`Abrir nota rápida (${QUICK_NOTE_SHORTCUT_LABEL})`}
+        title={`Nota rápida (${QUICK_NOTE_SHORTCUT_LABEL})`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            restore();
+          }
+        }}
+        className={cn(
+          "fixed flex touch-none select-none items-center justify-center rounded-full bg-amber-500 text-white shadow-lg ring-4 ring-amber-500/20 focus-visible:outline-none focus-visible:ring-[hsl(var(--ring))]",
+          dragging
+            ? "scale-110 cursor-grabbing shadow-2xl"
+            : "cursor-pointer transition-[left,top,transform] duration-200 hover:scale-105 active:scale-95",
+        )}
+        style={{ left: pos.x, top: pos.y, width: BUBBLE_SIZE.width, height: BUBBLE_SIZE.height, zIndex: Z_QUICK_NOTES }}
+      >
+        <NotebookPen size={20} aria-hidden />
+      </button>
+    </>
   );
 }
 

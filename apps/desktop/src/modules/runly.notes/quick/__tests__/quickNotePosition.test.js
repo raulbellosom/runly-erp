@@ -5,10 +5,23 @@ import {
   defaultPosition,
   passedDragThreshold,
   isQuickNoteShortcut,
+  snapToEdge,
 } from "../quickNotePosition.js";
+import { isInBubbleDropZone } from "../../../../lib/bubbleDropZone.js";
 
 const viewport = { width: 1000, height: 800 };
 const size = { width: 360, height: 420 };
+
+test("snapToEdge sticks the bubble to the nearer side edge", () => {
+  const bubble = { width: 48, height: 48 };
+  assert.deepEqual(snapToEdge({ x: 300, y: 200 }, bubble, viewport, 20), { x: 20, y: 200 });
+  assert.deepEqual(snapToEdge({ x: 700, y: 200 }, bubble, viewport, 20), { x: 932, y: 200 });
+});
+
+test("isInBubbleDropZone hits only near the bottom-center", () => {
+  assert.equal(isInBubbleDropZone({ x: 500, y: 750 }, viewport), true);
+  assert.equal(isInBubbleDropZone({ x: 500, y: 600 }, viewport), false);
+});
 
 test("clampToViewport keeps the box inside the viewport", () => {
   assert.deepEqual(clampToViewport({ x: -50, y: 900 }, size, viewport), { x: 12, y: 368 });

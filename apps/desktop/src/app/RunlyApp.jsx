@@ -2,7 +2,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { findModuleByKey, getLegacyModuleKey } from '@runly/core';
 import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react";
 import { useIsFetching, useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ModuleSidebar, BrandFooter } from "@runly/ui";
+import { ModuleSidebar, BrandFooter, useKeyboardViewport } from "@runly/ui";
 import { OfflineProvider } from "@runly/offline";
 import { useThemeStore } from "../stores/theme";
 import { useLauncherStore } from "../stores/launcher";
@@ -222,6 +222,14 @@ export function RunlyApp() {
   const trashProviders = useTrashProviders(activeModule?.key).data
   const sidebarModule = useMemo(() => withTrashNavigation(activeModule, trashProviders), [activeModule, trashProviders])
   const helpTip = useHelpTip()
+  // While the on-screen keyboard is up, pin the shell to the visible area
+  // (above the keyboard AND the iOS/Android suggestion/AutoFill bar). Without
+  // it iOS only pans until the focused field shows, so whatever sits below it
+  // (the chat composer's send button) stays hidden behind that bar.
+  const keyboard = useKeyboardViewport()
+  const shellViewportStyle = keyboard.open && keyboard.visibleHeight
+    ? { top: keyboard.offsetTop, height: keyboard.visibleHeight }
+    : undefined
 
   return (
     <OfflineProvider apiBaseUrl={apiBaseUrl} onTransportReady={handleTransportReady}
@@ -237,7 +245,10 @@ export function RunlyApp() {
             resolving in WebKit (full-height module screens — notes/chat/pfm —
             fall back to content height and make <main> double-scroll).
             With height set, `bottom:0` is ignored as over-constrained. */}
-        <div className="app-shell-root fixed inset-x-0 top-0 h-dvh overflow-hidden bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+        <div
+          className="app-shell-root fixed inset-x-0 top-0 h-dvh overflow-hidden bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+          style={shellViewportStyle}
+        >
       <TopbarWithNetworkStatus
         onLauncherOpen={openLauncher}
         onMobileMenuToggle={showSidebar ? () => setMobileOpen((o) => !o) : undefined}

@@ -4,7 +4,17 @@ import {
   computeKeyboardInset,
   isCaretHiddenByKeyboard,
   computeCaretScrollDelta,
+  isKeyboardOpen,
 } from '../keyboardInset.js'
+
+test('isKeyboardOpen: open even when iOS pans the viewport (inset reads 0)', () => {
+  assert.equal(computeKeyboardInset(800, 500, 300), 0)
+  assert.equal(isKeyboardOpen(800, 500), true)
+})
+
+test('isKeyboardOpen: a collapsing URL bar is not a keyboard', () => {
+  assert.equal(isKeyboardOpen(800, 720), false)
+})
 
 test('computeKeyboardInset: returns the gap between layout and visual viewport', () => {
   assert.equal(computeKeyboardInset(800, 500, 0), 300)

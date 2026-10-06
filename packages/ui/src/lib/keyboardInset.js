@@ -9,6 +9,19 @@ export function computeKeyboardInset(innerHeight, viewportHeight, viewportOffset
   return inset > 0 ? inset : 0
 }
 
+// Below this, a viewport height drop is browser chrome (URL bar collapse),
+// not a keyboard.
+export const KEYBOARD_MIN_HEIGHT = 150
+
+// Whether the on-screen keyboard is up. Not derived from the inset: iOS Safari
+// pans the visual viewport down to the focused field (offsetTop grows by the
+// same amount the keyboard takes), so the inset reads 0 while the keyboard is
+// open. `baselineHeight` is the tallest viewport seen at the current width,
+// which also covers webviews that shrink the layout viewport (adjustResize).
+export function isKeyboardOpen(baselineHeight, viewportHeight) {
+  return baselineHeight - viewportHeight > KEYBOARD_MIN_HEIGHT
+}
+
 // True when the caret's bottom edge (in viewport px, e.g. from
 // ProseMirror's view.coordsAtPos) is hidden behind the on-screen keyboard —
 // i.e. below the visible viewport height.

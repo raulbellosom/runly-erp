@@ -20,6 +20,12 @@ import { MiniChatWindow, AvatarCircle, getAvatarUrl, getAvatarEmoji } from "./Mi
 import { ConversationRowActions } from "./ConversationRowActions";
 import { useConversationActionHandler } from "../hooks/useChatConversations";
 import { ChatPreferencesProvider, useChatPreferences, chatPreferencesStyle } from "../hooks/useChatPreferences";
+import { BubbleDropZone } from "../../../components/BubbleDropZone";
+import { isInBubbleDropZone } from "../../../lib/bubbleDropZone";
+
+function viewportSize() {
+  return { width: window.innerWidth, height: window.innerHeight };
+}
 
 const BS = 56;     // bubble size px
 const BM = 16;     // margin from edge px
@@ -457,11 +463,6 @@ function FloatingChatHubInner() {
   const [overDropZone, setOverDropZone] = useState(false);
   const panelRef = useRef(null);
 
-  // Drop zone center — bottom-center of the viewport
-  const dropZoneCenterX = window.innerWidth / 2;
-  const dropZoneCenterY = window.innerHeight - 52;
-  const DROP_RADIUS = 44;
-
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => { if (e.key === "Escape") toggle(); };
@@ -497,17 +498,15 @@ function FloatingChatHubInner() {
     if (dx > threshold || dy > threshold) {
       isDragRef.current = true;
       setDragPos({ x: e.clientX, y: e.clientY });
-      const dist = Math.hypot(e.clientX - dropZoneCenterX, e.clientY - dropZoneCenterY);
-      setOverDropZone(dist < DROP_RADIUS);
+      setOverDropZone(isInBubbleDropZone({ x: e.clientX, y: e.clientY }, viewportSize()));
     }
-  }, [dropZoneCenterX, dropZoneCenterY]);
+  }, []);
 
   const handlePointerUp = useCallback(
     (e) => {
       if (!dragStartRef.current) return;
       if (isDragRef.current) {
-        const dist = Math.hypot(e.clientX - dropZoneCenterX, e.clientY - dropZoneCenterY);
-        if (dist < DROP_RADIUS) {
+        if (isInBubbleDropZone({ x: e.clientX, y: e.clientY }, viewportSize())) {
           hide();
         } else {
           const newEdge = e.clientX > window.innerWidth / 2 ? "right" : "left";
@@ -525,7 +524,7 @@ function FloatingChatHubInner() {
       isDragRef.current = false;
       dragStartRef.current = null;
     },
-    [setPosition, toggle, hide, dropZoneCenterX, dropZoneCenterY],
+    [setPosition, toggle, hide],
   );
 
   const handlePointerCancel = useCallback(() => {
@@ -607,33 +606,7 @@ function FloatingChatHubInner() {
       )}
 
       {/* Drag-to-close drop zone — appears at bottom-center while dragging */}
-      {dragPos && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 16,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: Z_BUBBLE - 1,
-            pointerEvents: "none",
-          }}
-          className="flex flex-col items-center gap-1"
-        >
-          <div
-            className={[
-              "flex items-center justify-center rounded-full transition-all duration-150",
-              overDropZone
-                ? "h-16 w-16 bg-red-500/90 shadow-lg shadow-red-500/40 scale-110"
-                : "h-12 w-12 bg-black/50 backdrop-blur-sm",
-            ].join(" ")}
-          >
-            <X className={["text-white transition-all duration-150", overDropZone ? "h-7 w-7" : "h-5 w-5"].join(" ")} />
-          </div>
-          <span className={["text-white text-[10px] font-medium drop-shadow transition-opacity duration-150", overDropZone ? "opacity-100" : "opacity-60"].join(" ")}>
-            Ocultar chat
-          </span>
-        </div>
-      )}
+      {dragPos && <BubbleDropZone active={overDropZone} label="Ocultar chat" zIndex={Z_BUBBLE - 1} />}
 
       <div style={bubbleStyle}>
         <button
