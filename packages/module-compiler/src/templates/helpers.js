@@ -98,7 +98,7 @@ export function zodFieldSchema(field, forCreate = true) {
 
   // Optional select fields must accept null so declarative Kanban can move a
   // record back to its explicit "Sin asignar" column.
-  if (type === 'relation' || type === 'file' || type === 'select') {
+  if (!required) {
     return base + '.nullable().optional()'
   }
   return base + '.optional()'
