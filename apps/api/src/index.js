@@ -52,6 +52,7 @@ import { createInventoryRouter } from "./routes/inventory/index.js";
 import { createPurchasesRouter } from "./routes/purchases/index.js";
 import { isPurchasesNavVisible } from "./services/purchases-service.js";
 import { createModulesRouter } from "./routes/modules.js";
+import { createModuleRuntimeRoutes } from "./routes/module-runtime-routes.js";
 import { createModulePublicLinksRoutes } from "./routes/module-public-links-routes.js";
 import { createModulePublicGateway } from "./routes/module-public-gateway.js";
 import { createModulePublicLinksService } from "./services/module-public-links-service.js";
@@ -2357,6 +2358,7 @@ const modulesRouter = createModulesRouter({
   bundlerSvc: bundlerService,
 });
 app.route("/modules", createModulePublicLinksRoutes({ prisma, authMiddleware, requirePermission, linksService: modulePublicLinksService }));
+app.route("/modules", createModuleRuntimeRoutes({ prisma, authMiddleware, requirePermission, moduleServices }));
 app.route("/modules", modulesRouter);
 
 // Dist-serve middleware — must be registered BEFORE mountWithAuth() calls.
