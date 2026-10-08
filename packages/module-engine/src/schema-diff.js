@@ -78,9 +78,16 @@ export function hashNormalizedSchema(schema) {
   return createHash('sha256').update(JSON.stringify(schema)).digest('hex')
 }
 
-function sameDefault(left, right) {
+function sameDefault(left, right, sqlType) {
   if (left === right) return true
-  const normalize = (value) => String(value ?? '').replaceAll('::character varying', '').replaceAll('::text', '').replace(/^'(.*)'$/, '$1').toLowerCase()
+  const normalize = value => {
+    let text = String(value ?? '').replace(/::(?:character varying|text(?:\[\])?|date|timestamp with time zone|uuid|boolean|integer|numeric(?:\(\d+,\d+\))?|jsonb)$/i, '').replace(/^'(.*)'$/, '$1').replaceAll("''", "'")
+    if (sqlType === 'TIMESTAMPTZ' && Number.isFinite(Date.parse(text))) return new Date(text).toISOString()
+    if (/^(INTEGER|NUMERIC)/.test(sqlType ?? '') && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {const negative=text.startsWith('-');const [integer,fraction='']=text.replace(/^[+-]/,'').split('.');const digits=(integer||'0').replace(/^0+(?=\d)/,'');const decimals=fraction.replace(/0+$/,'');return (negative&&(digits!=='0'||decimals)?'-':'')+digits+(decimals?'.'+decimals:'')}
+    if (sqlType === 'BOOLEAN' || sqlType === 'UUID' || /^(now|uuidv7)\(\)$/i.test(text)) return text.toLowerCase()
+    if (sqlType === 'JSONB') { try { return JSON.stringify(JSON.parse(text), (_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v) } catch { /* Nonliteral defaults retain exact comparison. */ } }
+    return text
+  }
   return normalize(left) === normalize(right)
 }
 
@@ -88,7 +95,7 @@ function compareColumn(expected, actual) {
   const mismatches = []
   if (expected.sqlType !== actual.sqlType) mismatches.push({ property: 'sqlType', expected: expected.sqlType, actual: actual.sqlType })
   if (expected.nullable !== actual.nullable) mismatches.push({ property: 'nullable', expected: expected.nullable, actual: actual.nullable })
-  if (!sameDefault(expected.default, actual.default)) mismatches.push({ property: 'default', expected: expected.default, actual: actual.default })
+  if (!sameDefault(expected.default, actual.default, expected.sqlType)) mismatches.push({ property: 'default', expected: expected.default, actual: actual.default })
   return mismatches
 }
 
@@ -115,7 +122,7 @@ function columnChangeOperations(table, from, to, rowCount) {
   } else if (!from.nullable && to.nullable) {
     operations.push({ id: opId('DROP_NOT_NULL', table, to.name), type: 'DROP_NOT_NULL', table, column: to.name, safety: 'SAFE' })
   }
-  if (!sameDefault(from.default, to.default) && from.sqlType === to.sqlType) {
+  if (!sameDefault(from.default, to.default, to.sqlType) && from.sqlType === to.sqlType) {
     operations.push({ id: opId('ALTER_COLUMN_DEFAULT', table, to.name), type: 'ALTER_COLUMN_DEFAULT', table, column: to.name, default: to.default, safety: 'SAFE' })
   }
   return operations

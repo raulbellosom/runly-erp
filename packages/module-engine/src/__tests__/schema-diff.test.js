@@ -21,6 +21,31 @@ function actualFrom(schema, { rowCount = 0 } = {}) {
   return { exists: true, rowCount, columns: schema.columns, indexes: schema.indexes }
 }
 
+test('date literal casts from PostgreSQL do not create false default drift', () => {
+  const desired = normalizeModelSchema(model([{ name: 'day', type: 'date', default: '2026-02-03' }]))
+  const actual = actualFrom(desired)
+  actual.columns = desired.columns.map(c => c.name === 'day' ? { ...c, default: "'2026-02-03'::date" } : c)
+  const result = diffModelSchemas({ previous: desired, desired, actual })
+  assert.deepEqual(result.drift, [])
+  assert.deepEqual(result.operations, [])
+})
+
+test('timestamp and UUID literal casts normalize, while text default case remains significant', () => {
+  for (const [type, expected, actualDefault] of [
+    ['datetime', '2026-02-03T12:00:00.000Z', "'2026-02-03 12:00:00+00'::timestamp with time zone"],
+    ['file', '12345678-1234-4234-8234-123456789abc', "'12345678-1234-4234-8234-123456789abc'::uuid"],
+  ]) {
+    const desired = normalizeModelSchema(model([{ name: 'value', type, default: expected }]))
+    const actual = actualFrom(desired)
+    actual.columns = desired.columns.map(c => c.name === 'value' ? { ...c, default: actualDefault } : c)
+    assert.deepEqual(diffModelSchemas({ previous: desired, desired, actual }).drift, [])
+  }
+  const previous = normalizeModelSchema(model([{ name: 'value', type: 'text', default: 'FIRST' }]))
+  const desired = normalizeModelSchema(model([{ name: 'value', type: 'text', default: 'first' }]))
+  const diff = diffModelSchemas({ previous, desired, actual: actualFrom(previous) })
+  assert.deepEqual(diff.operations.map(op => op.type), ['ALTER_COLUMN_DEFAULT'])
+})
+
 test('normalization ignores UI metadata and produces stable schema hashes', () => {
   const left = normalizeModelSchema(model([{ name: 'plate', type: 'text', label: 'Plate' }]))
   const right = normalizeModelSchema(model([{ name: 'plate', type: 'text', label: 'Matrícula', placeholder: 'ABC' }]))

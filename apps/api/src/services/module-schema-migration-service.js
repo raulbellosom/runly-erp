@@ -40,14 +40,17 @@ function normalizeDatabaseType(row) {
     ?? String(row.udt_name ?? row.data_type).toUpperCase()
 }
 
-function defaultsMatch(expected, actual) {
-  if (expected === actual) return true
-  const normalize = (value) => String(value ?? '')
-    .replaceAll('::character varying', '')
-    .replaceAll('::text', '')
-    .replace(/^'(.*)'$/, '$1')
-    .toLowerCase()
-  return normalize(expected) === normalize(actual)
+function defaultsMatch(left, right, sqlType) {
+  if (left === right) return true
+  const normalize = value => {
+    let text = String(value ?? '').replace(/::(?:character varying|text(?:\[\])?|date|timestamp with time zone|uuid|boolean|integer|numeric(?:\(\d+,\d+\))?|jsonb)$/i, '').replace(/^'(.*)'$/, '$1').replaceAll("''", "'")
+    if (sqlType === 'TIMESTAMPTZ' && Number.isFinite(Date.parse(text))) return new Date(text).toISOString()
+    if (/^(INTEGER|NUMERIC)/.test(sqlType ?? '') && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {const negative=text.startsWith('-');const [integer,fraction='']=text.replace(/^[+-]/,'').split('.');const digits=(integer||'0').replace(/^0+(?=\d)/,'');const decimals=fraction.replace(/0+$/,'');return (negative&&(digits!=='0'||decimals)?'-':'')+digits+(decimals?'.'+decimals:'')}
+    if (sqlType === 'BOOLEAN' || sqlType === 'UUID' || /^(now|uuidv7)\(\)$/i.test(text)) return text.toLowerCase()
+    if (sqlType === 'JSONB') { try { return JSON.stringify(JSON.parse(text), (_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v) } catch { /* Nonliteral defaults retain exact comparison. */ } }
+    return text
+  }
+  return normalize(left) === normalize(right)
 }
 
 export class ModuleSchemaMigrationError extends Error {
@@ -313,7 +316,7 @@ export function createModuleSchemaMigrationService({ prisma }) {
         return !found
           || found.sqlType !== column.sqlType
           || found.nullable !== column.nullable
-          || !defaultsMatch(column.default, found.default)
+          || !defaultsMatch(column.default, found.default, column.sqlType)
       })
       if (mismatch) throw new ModuleSchemaMigrationError('SCHEMA_VERIFICATION_FAILED', { details: { table: model.table, column: mismatch.name } })
       const actualIndexes = new Map(actual.indexes.map((index) => [index.name, index]))

@@ -111,3 +111,16 @@ test('required text to optional number drops NOT NULL before nulling failed conv
   const nulling = plan.sql.findIndex(sql => sql.startsWith('UPDATE'))
   assert.ok(drop >= 0 && drop < nulling, 'NULL conversion must follow the nullable transition')
 })
+
+test('applied date default is verified against PostgreSQL typed literal representation', async () => {
+  const { prisma, state } = makePrisma()
+  prisma.$executeRawUnsafe = async sql => {
+    if (sql.includes('ADD COLUMN') && sql.includes('"day"')) state.columns.push(column('day', 'date', { is_nullable: 'YES', column_default: "'2026-02-03'::date" }))
+    return 0
+  }
+  const service = createModuleSchemaMigrationService({ prisma })
+  const desired = { ...previousModel, fields: [...previousModel.fields, { name: 'day', type: 'date', default: '2026-02-03' }] }
+  const plan = await service.planModuleSchemaMigration({ moduleKey: 'custom.fleet', desiredModels: [desired], moduleRow: { status: 'INSTALLED' } })
+  assert.equal(plan.canAutoApply, true)
+  assert.equal((await service.applyModuleSchemaMigration({ plan })).applied, true)
+})
