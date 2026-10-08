@@ -199,7 +199,7 @@ export function createModuleSchemaMigrationService({ prisma }) {
           .find((level) => operations.some((operation) => operation.safety === level)) ?? 'SAFE',
       planHash,
       filename: `schema__${planHash.slice(0, 24)}.sql`,
-      sql: canAutoApply ? compileMigrationPlan({ operations }, decisions) : [],
+      sql: canAutoApply ? compileRuntimeSchemaPlan(operations, decisions) : [],
       baselineCreated: !required && warnings.some((warning) => warning.type === 'BASELINE_COLUMN'),
       versionFrom: moduleRow?.version ?? null,
       // Sources stay out of planHash/audit; only the apply step reads them.
@@ -286,6 +286,19 @@ export function createModuleSchemaMigrationService({ prisma }) {
       actorId,
       renames,
     })
+  }
+
+  // A nullable target may authorize failed values becoming NULL. The shared
+  // compiler orders type conversion before nullability; execute the runtime
+  // relaxation first, after renames, so the existing NOT NULL cannot reject
+  // the explicitly approved conversion. All statements remain transactional.
+  function compileRuntimeSchemaPlan(operations, decisions) {
+    const renames = operations.filter(op => op.type === 'RENAME_COLUMN')
+    const relax = operations.filter(op => op.type === 'DROP_NOT_NULL' && operations.some(change =>
+      change.type === 'ALTER_COLUMN_TYPE' && change.table === op.table && change.column === op.column && change.nullable))
+    const early = new Set([...renames, ...relax])
+    return [renames, relax, operations.filter(op => !early.has(op))]
+      .flatMap(part => compileMigrationPlan({ operations: part }, decisions))
   }
 
   async function applySchemaStatements(tx, plan) {

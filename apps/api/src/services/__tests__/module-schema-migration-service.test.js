@@ -93,3 +93,21 @@ test('uninstalled packages do not inspect or migrate database schema', async () 
   assert.equal(plan.required, false)
   assert.equal(inspected, false)
 })
+
+
+test('required text to optional number drops NOT NULL before nulling failed conversions', async () => {
+  const { prisma, state } = makePrisma()
+  const previous = { ...previousModel, fields: [{ name: 'plate', type: 'text', required: true }] }
+  state.columns.find(c => c.column_name === 'plate').is_nullable = 'NO'
+  prisma.runlyModel.findMany = async () => [{ name: 'vehicle', tableName: 'diff_vehicle', schema: previous }]
+  const service = createModuleSchemaMigrationService({ prisma })
+  const plan = await service.planModuleSchemaMigration({
+    moduleKey: 'custom.fleet', desiredModels: [{ ...previous, fields: [{ name: 'plate', type: 'number', required: false }] }],
+    moduleRow: { status: 'INSTALLED' },
+    decisions: { 'ALTER_COLUMN_TYPE:diff_vehicle:plate': { onConversionFailure: 'null' } },
+  })
+  assert.equal(plan.canAutoApply, true)
+  const drop = plan.sql.findIndex(sql => sql.includes('DROP NOT NULL'))
+  const nulling = plan.sql.findIndex(sql => sql.startsWith('UPDATE'))
+  assert.ok(drop >= 0 && drop < nulling, 'NULL conversion must follow the nullable transition')
+})
