@@ -82,7 +82,7 @@ export function zodFieldSchema(field, forCreate = true) {
       base = 'z.string().uuid()'
       break
     case 'json':
-      base = 'z.record(z.any())'
+      base = 'z.record(z.string(), z.any())'
       break
     default:
       base = 'z.string()'
@@ -93,11 +93,12 @@ export function zodFieldSchema(field, forCreate = true) {
     if (type === 'select') return base
     if (type === 'boolean') return base
     if (type === 'number' || type === 'decimal') return base
+    if (type === 'json') return base + '.refine(value => Object.keys(value).length > 0)'
     return base + '.min(1)'
   }
 
-  // Optional select fields must accept null so declarative Kanban can move a
-  // record back to its explicit "Sin asignar" column.
+  // Every optional persisted field accepts NULL; required PATCH fields may be
+  // omitted but cannot be explicitly cleared.
   if (!required) {
     return base + '.nullable().optional()'
   }
