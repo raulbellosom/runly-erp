@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { createModuleComponentWatcher } from './module-component-watcher.js'
 import fs from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -390,41 +391,25 @@ export function createModuleBundlerService({ prisma, supabaseAdmin }) {
     _devWatcher = true
     const debouncers = new Map()
 
-    import('node:fs').then(({ watch }) => {
-      resolveModuleRoots({ sourceDir: __dirname })
-        .then(({ customModulesDir }) => {
-          fs.access(customModulesDir)
-            .then(() => {
-              watch(customModulesDir, { recursive: true }, (_event, filename) => {
-                const normalized = filename?.replaceAll(path.sep, '/')
-                if (!normalized?.includes('/components/')) return
-                const parts = normalized.split('/')
-                const key = parts[0]
-                // Internal folders (.staging, .previews, .locks, .backups)
-                // are not modules: upload reviews write components there.
-                if (!key || key.startsWith('.')) return
-
-                clearTimeout(debouncers.get(key))
-                debouncers.set(
-                  key,
-                  setTimeout(async () => {
-                    try {
-                      const result = await buildModuleBundle(key, { force: true })
-                      if (result.built) console.log(`[bundler:watch] rebuilt ${key}`)
-                    } catch (err) {
-                      console.error(`[bundler:watch] rebuild failed for ${key}:`, err.message)
-                    } finally {
-                      debouncers.delete(key)
-                    }
-                  }, 200),
-                )
-              })
-              console.log(`[bundler] watching ${customModulesDir} for component changes`)
-            })
-            .catch(() => {})
-        })
-        .catch(() => {})
-    })
+    resolveModuleRoots({ sourceDir: __dirname }).then(async ({ customModulesDir }) => {
+      const watcher = createModuleComponentWatcher({
+        root: customModulesDir,
+        onError: error => console.warn('[bundler:watch] watcher error:', error.message),
+        onChange: key => {
+          clearTimeout(debouncers.get(key))
+          debouncers.set(key, setTimeout(async () => {
+            try {
+              const result = await buildModuleBundle(key, { force: true })
+              if (result.built) console.log(`[bundler:watch] rebuilt ${key}`)
+            } catch (error) {
+              console.error(`[bundler:watch] rebuild failed for ${key}:`, error.message)
+            } finally { debouncers.delete(key) }
+          }, 200))
+        },
+      })
+      await watcher.start()
+      console.log(`[bundler] watching installed components in ${customModulesDir}`)
+    }).catch(error => console.warn('[bundler:watch] startup failed:', error.message))
   }
 
   return {
