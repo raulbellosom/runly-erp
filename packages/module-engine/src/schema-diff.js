@@ -251,7 +251,7 @@ export function diffModelSchemas({ previous, desired, actual, rowCount = 0, mode
 // Count queries the API runs before deciding an operation's final safety.
 // Column names are the post-rename ones; renames run first, so preflight
 // queries use the column name that exists *now* (`from` for renamed columns).
-export function preflightQueries(operations) {
+export function preflightQueries(operations, decisions = {}) {
   const renamedFrom = new Map(operations.filter((op) => op.type === 'RENAME_COLUMN').map((op) => [`${op.table}.${op.column}`, op.from]))
   const current = (op) => identifier(renamedFrom.get(`${op.table}.${op.column}`) ?? op.column, 'column')
   const queries = []
@@ -265,8 +265,29 @@ export function preflightQueries(operations) {
       queries.push({ id: op.id, kind: 'nullRows', sql: `SELECT COUNT(*)::bigint AS count FROM "${table}" WHERE "${current(op)}" IS NULL` })
     }
     if (op.type === 'ADD_INDEX' && op.safety === 'NEEDS_CHECK') {
-      const fields = op.index.fields.map((field) => `"${identifier(renamedFrom.get(`${op.table}.${field}`) ?? field, 'index field')}"`).join(', ')
-      queries.push({ id: op.id, kind: 'duplicateGroups', sql: `SELECT COUNT(*)::bigint AS count FROM (SELECT 1 FROM "${table}" GROUP BY ${fields} HAVING COUNT(*) > 1) d` })
+      // Check the values that DDL/backfills will produce, without referencing a
+      // new column before it exists. PostgreSQL UNIQUE treats NULLs as distinct.
+      const projected = op.index.fields.map((field, index) => {
+        identifier(field, 'index field')
+        const added = operations.find(change => change.table === table && change.type === 'ADD_COLUMN' && change.column.name === field)
+        let value
+        if (added) {
+          const literal = added.safety === 'NEEDS_BACKFILL' ? decisions[added.id]?.backfill ?? null : added.column.default
+          value = literal == null ? 'NULL' : typedLiteral(literal, added.column.sqlType)
+        } else {
+          value = `"${identifier(renamedFrom.get(`${table}.${field}`) ?? field, 'index field')}"`
+          const changed = operations.find(change => change.table === table && change.type === 'ALTER_COLUMN_TYPE' && change.column === field)
+          const conversion = changed && columnConversion(changed.from, changed.to)
+          if (conversion) { const predicate = conversion.predicate(value); value = predicate ? `CASE WHEN ${predicate} THEN ${conversion.using(value)} ELSE NULL END` : conversion.using(value) }
+          const required = operations.find(change => change.table === table && change.type === 'SET_NOT_NULL' && change.column === field)
+          if (required && decisions[required.id]?.backfill != null) value = `COALESCE((${value}), ${typedLiteral(decisions[required.id].backfill, required.sqlType)})`
+        }
+        return { value, alias: `"unique_${index}"` }
+      })
+      const fields = projected.map(field => field.alias).join(', ')
+      const nonnull = projected.map(field => `${field.alias} IS NOT NULL`).join(' AND ')
+      const projection = projected.map(field => `${field.value} AS ${field.alias}`).join(', ')
+      queries.push({ id: op.id, kind: 'duplicateGroups', sql: `SELECT COUNT(*)::bigint AS count FROM (SELECT 1 FROM (SELECT ${projection} FROM "${table}") projected WHERE ${nonnull} GROUP BY ${fields} HAVING COUNT(*) > 1) d` })
     }
   }
   return queries

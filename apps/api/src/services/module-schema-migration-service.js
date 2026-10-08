@@ -115,9 +115,9 @@ export function createModuleSchemaMigrationService({ prisma }) {
 
   // Counts that decide whether type changes, NOT NULL and unique indexes can
   // run as is (schema-diff.js preflightQueries/classifyOperation).
-  async function classifyWithPreflight(operations, db = prisma) {
+  async function classifyWithPreflight(operations, decisions = {}, db = prisma) {
     const counts = new Map()
-    for (const query of preflightQueries(operations)) {
+    for (const query of preflightQueries(operations, decisions)) {
       const rows = await db.$queryRawUnsafe(query.sql)
       counts.set(query.id, { ...(counts.get(query.id) ?? {}), [query.kind]: Number(rows?.[0]?.count ?? 0) })
     }
@@ -162,7 +162,7 @@ export function createModuleSchemaMigrationService({ prisma }) {
         modelDefinition: entry.model,
         archivedColumns,
       })
-      operations.push(...await classifyWithPreflight(diff.operations))
+      operations.push(...await classifyWithPreflight(diff.operations, decisions))
       drift.push(...diff.drift)
       warnings.push(...diff.warnings)
       models.push({
