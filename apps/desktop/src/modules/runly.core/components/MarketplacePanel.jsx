@@ -60,9 +60,9 @@ export function MarketplacePanel({ token, canManage }) {
           {modules.map((entry) => {
             const action = availableAction(entry, { canManage, blocked });
             return (
-              <Card key={entry.key} data-testid={`v2-module-${entry.key}`} data-state={entry.state}>
-                <CardContent className="flex h-full flex-col gap-3 p-4">
-                  <button type="button" className="flex items-start gap-3 text-left" onClick={() => setSelected(entry)}>
+              <Card key={entry.key} className="min-w-0" data-testid={`v2-module-${entry.key}`} data-state={entry.state}>
+                <CardContent className="flex h-full min-w-0 flex-col gap-3 p-4">
+                  <button type="button" className="flex w-full min-w-0 items-start gap-3 text-left" onClick={() => setSelected(entry)}>
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${safeColor(entry.color)}1f`, color: safeColor(entry.color) }}><ModuleNavIcon name={entry.icon ?? "Boxes"} size={18} /></span>
                     <span className="min-w-0">
                       <span className="block truncate font-semibold hover:underline">{entry.name ?? entry.key}</span>
@@ -70,7 +70,7 @@ export function MarketplacePanel({ token, canManage }) {
                     </span>
                   </button>
                   <div className="flex flex-wrap items-center gap-1.5"><TrustBadge trust={entry.trust} /><Badge variant="secondary">{STATE_LABELS[entry.state] ?? entry.state}</Badge></div>
-                  <p className="line-clamp-3 flex-1 text-sm text-[hsl(var(--muted-foreground))]">{entry.description}</p>
+                  <p className="line-clamp-3 flex-1 break-words text-sm text-[hsl(var(--muted-foreground))]">{entry.description}</p>
                   <ModuleAlerts entry={entry} />
                   <div className="flex items-center justify-between gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setSelected(entry)}>Ver detalle</Button>

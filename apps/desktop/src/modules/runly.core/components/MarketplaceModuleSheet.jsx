@@ -78,7 +78,7 @@ export function MarketplaceModuleSheet({ entry, token, canManage, blocked, onOpe
         <div className="-mx-6 min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-2">
           <div className="flex flex-wrap items-center gap-1.5"><TrustBadge trust={entry.trust} /><Badge variant="secondary">{STATE_LABELS[entry.state] ?? entry.state}</Badge></div>
           <ModuleAlerts entry={entry} />
-          {entry.description && <p className="whitespace-pre-line text-sm">{entry.description}</p>}
+          {entry.description && <p className="whitespace-pre-line break-words text-sm">{entry.description}</p>}
           {entry.builtIn && <p className="text-sm text-[hsl(var(--muted-foreground))]">Este módulo forma parte de Runly y se actualiza con la plataforma; no se descarga desde el Marketplace.</p>}
           {(entry.state === "update" || entry.installedVersion) && <Section title="Versiones"><p className="text-sm">Instalada: v{entry.installedVersion ?? "—"} · Disponible: v{entry.version}</p></Section>}
           {entry.changelog && <Section title="Cambios"><p className="whitespace-pre-line text-sm text-[hsl(var(--muted-foreground))]">{entry.changelog}</p></Section>}
