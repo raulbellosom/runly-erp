@@ -56,7 +56,7 @@ import {
 import { ModuleDetailSheet } from "../components/ModuleDetailSheet";
 import { ModuleCatalogDialogs } from "../components/ModuleCatalogDialogs";
 import { CatalogAvailablePanel } from "../components/CatalogAvailablePanel";
-import { CommunityCatalogPanel } from "../components/CommunityCatalogPanel";
+import { MarketplacePanel } from "../components/MarketplacePanel";
 
 function getFirstFiniteNumber(...values) {
   for (const value of values) {
@@ -522,7 +522,7 @@ export default function ModuleCatalog() {
                 </TabsTrigger>
               ))}
               <TabsTrigger value="catalog" className="text-xs gap-1.5">Disponibles</TabsTrigger>
-              <TabsTrigger value="catalog-v2" className="text-xs gap-1.5">Catálogo v2</TabsTrigger>
+              <TabsTrigger value="catalog-v2" className="text-xs gap-1.5">Marketplace</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -530,7 +530,9 @@ export default function ModuleCatalog() {
         {activeTab === "catalog" ? (
           <CatalogAvailablePanel token={token} canManage={hasPermission("core.modules.manage")} />
         ) : activeTab === "catalog-v2" ? (
-          <CommunityCatalogPanel token={token} canManage={hasPermission("core.modules.manage")} />
+          // Installing from the Marketplace is instance-wide: the API also requires
+          // instance authority (system admin or company admin), not just the permission.
+          <MarketplacePanel token={token} canManage={isAdmin && hasPermission("core.modules.manage")} />
         ) : (<>
         {/* Toolbar: search + filters + view toggle */}
         <div className="flex flex-wrap items-center gap-2">
