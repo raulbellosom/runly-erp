@@ -56,7 +56,8 @@ Antes de confiar se validan el esquema estricto, la representación canónica, e
 - Revocada: alerta en la instancia, sin desinstalar ni borrar datos; bloquea instalar, reinstalar o actualizar hacia esa versión. Retirada: la instalación sigue registrada; no se ofrece para nuevas instalaciones.
 - Alcance: instancia completa, habilitado para todas las empresas (`CompanyModule` permite deshabilitarlo por empresa).
 - Autoridad: instalar, actualizar, preflight y configurar el origen (`GET/PUT /module-catalog/v2/source`) requieren `core.modules.manage` **y** administración de la instancia (sistema o empresa activa), validado en el servidor.
-- Sin conexión: se muestra la última copia verificada según `catalog.policy` (`allowCachedView`, `maxCacheAgeDays`), marcada como posiblemente desactualizada; nunca se instala desde caché.
+- Origen por defecto: instalaciones nuevas usan el catálogo de Runly (`catalog.source.mode` ausente ⇒ `runly`, feeds de `https://devs.runly.mx`); las instancias existentes quedan en `disabled` o `custom` por la migración `20261016000000_catalog_source_default` y la administración decide. URLs explícitas ⇒ `custom`.
+- Frescura sin conexión (`catalog.policy`): la última copia verificada permite instalar si tiene menos de `installFreshHours` (24 h), exige confirmación (`acceptStale`) hasta `installMaxAgeHours` (72 h) y después sólo se consulta hasta `maxCacheAgeDays` (30 d). Los paquetes siempre se descargan y verifican; los módulos instalados nunca dependen de la frescura.
 - Sólo URLs HTTPS o `file://` explícito.
 
 La publicación productiva sigue desactivada y no hay claves de producción fijadas para comunidad; el Marketplace se prueba con catálogos firmados con claves efímeras de prueba.
