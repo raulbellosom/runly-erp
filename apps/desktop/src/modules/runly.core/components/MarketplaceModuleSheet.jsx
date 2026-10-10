@@ -28,9 +28,10 @@ function Steps({ completed, running, failedPhase }) {
   );
 }
 
-export function MarketplaceModuleSheet({ entry, token, canManage, blocked, onOpenChange }) {
+export function MarketplaceModuleSheet({ entry, token, canManage, blocked, freshness = "fresh", onOpenChange }) {
   const queryClient = useQueryClient();
-  const action = availableAction(entry, { canManage, blocked });
+  const action = availableAction(entry, { canManage, blocked, freshness });
+  const [acceptStale, setAcceptStale] = useState(false);
   const isUpdate = action?.type === "update";
   const [grants, setGrants] = useState(() => new Set((entry.services ?? []).map((service) => service.key)));
   const [accepted, setAccepted] = useState(false);
@@ -52,7 +53,7 @@ export function MarketplaceModuleSheet({ entry, token, canManage, blocked, onOpe
   });
   const install = useMutation({
     mutationFn: () => {
-      const payload = { version: entry.version, confirmation: entry.confirmation, acceptCommunity: needsConsent && accepted, grants: [...grants], ...(plan ? { decisions } : {}) };
+      const payload = { version: entry.version, confirmation: entry.confirmation, acceptCommunity: needsConsent && accepted, acceptStale: freshness === "stale" && acceptStale, grants: [...grants], ...(plan ? { decisions } : {}) };
       return isUpdate ? runly.moduleCatalog.updateV2(entry.key, payload, token) : runly.moduleCatalog.installV2(entry.key, payload, token);
     },
     onMutate: () => setProgress((p) => ({ ...p, running: "installing", failedPhase: null, error: null })),
@@ -66,7 +67,7 @@ export function MarketplaceModuleSheet({ entry, token, canManage, blocked, onOpe
   const checked = progress.completed.includes("preflight");
   const finished = progress.completed.includes("enabled");
   const toggle = (key) => setGrants((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-  const installBlocked = !checked || (needsConsent && !accepted) || (plan && missingDecisions(plan.structure, decisions).length > 0) || install.isPending || finished;
+  const installBlocked = !checked || (needsConsent && !accepted) || (freshness === "stale" && !acceptStale) || (plan && missingDecisions(plan.structure, decisions).length > 0) || install.isPending || finished;
   const compatibility = entry.compatibility;
   return (
     <Sheet open onOpenChange={onOpenChange}>
@@ -120,6 +121,12 @@ export function MarketplaceModuleSheet({ entry, token, canManage, blocked, onOpe
                     <span>Acepto instalar <code className="break-all text-xs">{entry.confirmation}</code></span>
                   </label>
                 </div>
+              )}
+              {checked && freshness === "stale" && (
+                <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+                  <Checkbox checked={acceptStale} onCheckedChange={(value) => setAcceptStale(value === true)} aria-label="Entiendo que el catálogo puede estar desactualizado" disabled={finished} />
+                  <span>El catálogo no responde. Entiendo que la última copia verificada puede no incluir revocaciones recientes.</span>
+                </label>
               )}
               {plan && <StructureChangesTable rows={plan.structure} decisions={decisions} onChange={setDecisions} disabled={install.isPending} />}
             </section>

@@ -79,9 +79,9 @@ export function moduleAlerts(entry) {
 
 // What the administrator may do. Built-ins come with Runly; nothing is offered
 // from stale/offline/alerted data, revoked or untrusted releases.
-export function availableAction(entry, { canManage, blocked }) {
+export function availableAction(entry, { canManage, blocked, freshness = "fresh" }) {
   if (!canManage || entry.builtIn || entry.state === "built-in" || entry.state === "installed") return null;
-  if (blocked || entry.trust === "untrusted" || entry.revocation || entry.availability !== "available" || !entry.compatibility?.compatible) return { type: entry.state === "update" ? "update" : "install", disabled: true };
+  if (blocked || freshness === "expired" || entry.trust === "untrusted" || entry.revocation || entry.availability !== "available" || !entry.compatibility?.compatible) return { type: entry.state === "update" ? "update" : "install", disabled: true };
   return { type: entry.state === "update" ? "update" : "install", disabled: false };
 }
 
@@ -92,3 +92,23 @@ export function filterModules(modules, { query = "", trust = "all" } = {}) {
 }
 
 export const SCOPE_TEXT = "Se instala una vez para toda la instancia y queda habilitado para todas las empresas. Cada empresa puede deshabilitarlo después desde Módulos.";
+
+// Freshness of the verified catalog copy that backs an entry (per trust domain).
+export const domainOf = (entry) => (entry.source === "official" ? "official" : "community");
+export function freshnessOf(data, entry) {
+  return data?.catalogs?.[domainOf(entry)]?.freshness ?? "fresh";
+}
+export const FRESHNESS_TEXT = {
+  fresh: null,
+  stale: "El catálogo no responde: se usa la última copia verificada, que puede estar desactualizada. Instalar o actualizar requiere tu confirmación.",
+  expired: "El catálogo no responde y la última copia verificada es demasiado antigua: se puede consultar, pero no instalar ni actualizar.",
+};
+export const SOURCE_MODES = [
+  { id: "runly", label: "Catálogo de Runly" },
+  { id: "custom", label: "Personalizado" },
+  { id: "disabled", label: "Desactivado" },
+];
+export const ERROR_TEXT = {
+  catalog_unreachable: "No se pudo conectar con el catálogo. Si el catálogo de Runly aún no está publicado o no responde, inténtalo más tarde; los módulos instalados siguen funcionando.",
+  catalog_url_rejected: "La URL del catálogo no es HTTPS ni un archivo local permitido.",
+};

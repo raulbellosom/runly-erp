@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge, Button, Card, CardContent, EmptyState, ErrorState, ModuleNavIcon, SearchInput, Skeleton } from "@runly/ui";
 import { AlertTriangle, Clock, CloudOff, PackageSearch, Settings2, ShieldAlert } from "lucide-react";
 import { runly } from "../../../lib/runly";
-import { STATE_LABELS, TRUST_FILTERS, alertMessage, availableAction, filterModules } from "../lib/marketplace";
+import { ERROR_TEXT, FRESHNESS_TEXT, STATE_LABELS, TRUST_FILTERS, alertMessage, availableAction, filterModules, freshnessOf } from "../lib/marketplace";
 import { ModuleAlerts, TrustBadge, date, safeColor } from "./MarketplaceBadges";
 import { MarketplaceModuleSheet } from "./MarketplaceModuleSheet";
 import { MarketplaceSourceDialog } from "./MarketplaceSourceDialog";
@@ -21,10 +21,10 @@ function CatalogStatus({ data }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[hsl(var(--muted-foreground))]">
         {domains.map(([id, label]) => {
           const domain = data.catalogs[id];
-          return <span key={id} className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" />{label}: {domain.error ? `no disponible (${domain.error})` : `secuencia ${domain.sequence} · sincronizado ${date(domain.lastSync)}${domain.validUntil ? ` · vigente hasta ${date(domain.validUntil)}` : ""}`}</span>;
+          return <span key={id} className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" />{label}: {domain.error ? `no disponible (${domain.error})` : `secuencia ${domain.sequence} · verificado ${date(domain.verifiedAt ?? domain.lastSync)}${domain.validUntil ? ` · vigente hasta ${date(domain.validUntil)}` : ""}`}</span>;
         })}
       </div>
-      {data.offline && <p className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"><CloudOff className="h-4 w-4 shrink-0" /> Sin conexión: se muestra la última copia verificada y puede estar desactualizada. Las revocaciones posteriores no se conocen hasta volver a sincronizar; no se instala nada mientras tanto.</p>}
+      {domains.map(([id, label]) => FRESHNESS_TEXT[data.catalogs[id].freshness] && <p key={id} data-freshness={data.catalogs[id].freshness} className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"><CloudOff className="h-4 w-4 shrink-0" /> {label}: {FRESHNESS_TEXT[data.catalogs[id].freshness]} Los módulos instalados siguen funcionando.</p>)}
       {data.stale && <p className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"><Clock className="h-4 w-4 shrink-0" /> La información del catálogo está vencida; no se instalarán módulos hasta sincronizar un catálogo vigente.</p>}
       {data.alert && <p role="alert" className="flex items-center gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300"><ShieldAlert className="h-4 w-4 shrink-0" /> {alertMessage(data.alert)} Se conserva la última copia verificada.</p>}
     </div>
@@ -41,10 +41,11 @@ export function MarketplacePanel({ token, canManage }) {
   const settingsButton = canManage && <Button variant="outline" size="sm" onClick={() => setSettings(true)}><Settings2 className="mr-1.5 h-4 w-4" /> Origen del catálogo</Button>;
   const dialogs = <>{settings && <MarketplaceSourceDialog token={token} onOpenChange={(open) => !open && setSettings(false)} />}</>;
   if (catalog.isLoading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}</div>;
-  if (catalog.isError) return <div className="space-y-3"><ErrorState title="No se pudo cargar el Marketplace" description={alertMessage(catalog.error?.details?.error) ?? catalog.error?.details?.message ?? catalog.error?.message} onRetry={() => catalog.refetch()} />{settingsButton}{dialogs}</div>;
+  if (catalog.isError) return <div className="space-y-3"><ErrorState title="No se pudo cargar el Marketplace" description={ERROR_TEXT[catalog.error?.details?.error] ?? alertMessage(catalog.error?.details?.error) ?? catalog.error?.details?.message ?? catalog.error?.message} onRetry={() => catalog.refetch()} />{settingsButton}{dialogs}</div>;
   const data = catalog.data;
-  if (!data?.enabled) return <div className="space-y-3"><EmptyState icon={PackageSearch} title="Marketplace no configurado" description="La administración de la instancia puede conectar el catálogo oficial de Runly o un catálogo administrado. Sólo se usan catálogos firmados con claves de confianza." />{settingsButton}{dialogs}</div>;
-  const blocked = data.offline || data.stale || Boolean(data.alert);
+  if (!data?.enabled) return <div className="space-y-3"><EmptyState icon={PackageSearch} title={data?.sourceMode === "disabled" ? "Marketplace desactivado" : "Marketplace no configurado"} description="La administración de la instancia puede activar el catálogo de Runly o un catálogo administrado desde «Origen del catálogo». Sólo se usan catálogos firmados con claves de confianza." />{settingsButton}{dialogs}</div>;
+  // Offline alone does not block: a verified copy serves within the freshness policy.
+  const blocked = data.stale || Boolean(data.alert);
   return (
     <div className="space-y-4">
       <CatalogStatus data={data} />
@@ -58,7 +59,7 @@ export function MarketplacePanel({ token, canManage }) {
       {!modules.length ? <EmptyState icon={PackageSearch} title="Sin módulos" description={data.modules.length ? "Ningún módulo coincide con la búsqueda." : "No hay módulos publicados en este catálogo."} /> : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((entry) => {
-            const action = availableAction(entry, { canManage, blocked });
+            const action = availableAction(entry, { canManage, blocked, freshness: freshnessOf(data, entry) });
             return (
               <Card key={entry.key} className="min-w-0" data-testid={`v2-module-${entry.key}`} data-state={entry.state}>
                 <CardContent className="flex h-full min-w-0 flex-col gap-3 p-4">
@@ -83,7 +84,7 @@ export function MarketplacePanel({ token, canManage }) {
           })}
         </div>
       )}
-      {selected && <MarketplaceModuleSheet key={selected.key} entry={selected} token={token} canManage={canManage} blocked={blocked} onOpenChange={(open) => !open && setSelected(null)} />}
+      {selected && <MarketplaceModuleSheet key={selected.key} entry={selected} token={token} canManage={canManage} blocked={blocked} freshness={freshnessOf(data, selected)} onOpenChange={(open) => !open && setSelected(null)} />}
       {dialogs}
     </div>
   );

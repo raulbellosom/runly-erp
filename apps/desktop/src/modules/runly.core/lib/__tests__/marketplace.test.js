@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { alertMessage, availableAction, filterModules, moduleAlerts, stepStatuses } from "../marketplace.js";
+import { alertMessage, availableAction, filterModules, freshnessOf, moduleAlerts, stepStatuses } from "../marketplace.js";
 
 const base = { key: "custom.notes", name: "Notas", trust: "community-verified", official: false, state: "available", availability: "available", compatibility: { compatible: true, reasons: [] }, publisher: { displayName: "Acme Labs" } };
 
@@ -35,4 +35,13 @@ test("filters use structured trust and alerts map per domain codes", () => {
   assert.deepEqual(filterModules(modules, { query: "acme" }).map((m) => m.key), ["custom.notes"]);
   assert.equal(alertMessage("catalog_official_rollback"), alertMessage("catalog_v2_rollback"));
   assert.equal(alertMessage(null), null);
+});
+
+test("freshness per trust domain: expired blocks install/update, stale stays possible with confirmation", () => {
+  const data = { catalogs: { official: { freshness: "expired" }, community: { freshness: "stale" } } };
+  const official = { ...base, trust: "official", source: "official" };
+  assert.equal(freshnessOf(data, official), "expired");
+  assert.equal(freshnessOf(data, base), "stale");
+  assert.equal(availableAction(official, { canManage: true, freshness: freshnessOf(data, official) }).disabled, true);
+  assert.equal(availableAction(base, { canManage: true, freshness: freshnessOf(data, base) }).disabled, false);
 });
