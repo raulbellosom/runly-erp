@@ -69,7 +69,7 @@ function fixture({ trust = { official: [official.publicKey], community: [communi
   const configs = new Map(Object.entries(urls).filter(([, v]) => v)), cache = new Map(), feeds = new Map(), modules = new Map(rows.map((r) => [r.key, r]))
   const files = new Map([billing, billing2, notes, notes2].map(({ zip }) => [sha256Of(zip), zip]))
   files.set(sha256Of(evil), evil)
-  let offline = false, published = 0, installed = 0
+  let offline = false, feedDown = false, published = 0, installed = 0
   const grant = { deleteMany: async () => {}, findMany: async () => [], create: async () => {} }
   const prisma = {
     instanceConfig: { findUnique: async ({ where }) => configs.has(where.key) ? { value: configs.get(where.key) } : null, upsert: async ({ where, update }) => { configs.set(where.key, update.value) } },
@@ -83,13 +83,13 @@ function fixture({ trust = { official: [official.publicKey], community: [communi
   const requested = []
   const service = createCatalogV2Service({ prisma, trust, now: () => clock, readBytes: async (url) => {
     requested.push(url)
-    if (offline) throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })
+    if (offline || (feedDown && feeds.has(url))) throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })
     if (feeds.has(url)) return { status: 200, buffer: Buffer.from(JSON.stringify(feeds.get(url))) }
     const sha = /\/packages\/([a-f0-9]{64})\.zip$/.exec(url)?.[1]
     if (!sha || !files.has(sha)) throw Object.assign(new Error('not found'), { code: 'CATALOG_UNREACHABLE' })
     return { status: 200, buffer: files.get(sha) }
   }, packageWiring: { packageSvc: { publishZip: publishZip ?? (async ({ fileBuffer }) => { published++; const m = inspectModuleZip(fileBuffer).manifest; const prev = modules.get(m.key); modules.set(m.key, { key: m.key, version: m.version, status: prev?.status === 'INSTALLED' ? 'INSTALLED' : 'PUBLISHED', manifest: m }); return { outcome: 'published' } }) }, lifecycleSvc: { installModule: async ({ manifest }) => { installed++; modules.get(manifest.key).status = 'INSTALLED' } } } })
-  return { service, configs, files, modules, requested, feed: (url, value) => feeds.set(url, value), offline: (value) => { offline = value }, tick: (ms) => { clock += ms }, counts: () => ({ published, installed }) }
+  return { service, configs, files, modules, requested, feed: (url, value) => feeds.set(url, value), offline: (value) => { offline = value }, feedDown: (value) => { feedDown = value }, tick: (ms) => { clock += ms }, counts: () => ({ published, installed }) }
 }
 const consent = (m) => ({ acceptCommunity: true, confirmation: m.confirmation })
 
@@ -309,15 +309,30 @@ test('preflight shows phases without side effects; install failures report the f
   await assert.rejects(failing.service.install({ key: m.key, version: m.version, ...consent(m) }), (e) => e.code === 'MODULE_SCHEMA_DECISIONS_REQUIRED' && e.status === 409 && e.details.phase === 'preflight' && e.details.structure.length === 1)
 })
 
-test('offline and cache policy: verified cache is shown flagged, never used to install', async () => {
+test('freshness: a verified copy serves installs while fresh, needs acknowledgement when stale, never when too old', async () => {
+  const HOUR = 3600000
   const f = fixture({ urls: { 'catalog.v2.url': COMMUNITY_URL } })
-  f.feed(COMMUNITY_URL, communityEnvelope({ entries: [communityEntry(notes)] }))
+  f.feed(COMMUNITY_URL, communityEnvelope({ entries: [communityEntry(notes), communityEntry(notes2), communityEntry(billing)] }))
   await f.service.list()
-  f.offline(true)
+  f.feedDown(true)
   const cached = await f.service.list()
-  assert.deepEqual([cached.offline, cached.catalogs.community.cachedView, cached.modules.length], [true, true, 1])
-  const m = cached.modules[0]
-  await assert.rejects(f.service.install({ key: m.key, version: m.version, ...consent(m) }), (e) => e.code === 'catalog_offline')
+  assert.deepEqual([cached.offline, cached.catalogs.community.cachedView, cached.catalogs.community.freshness, cached.modules.length], [true, true, 'fresh', 2])
+  const notesModule = cached.modules.find((m) => m.key === 'custom.notes')
+  assert.equal((await f.service.install({ key: 'custom.notes', version: '0.1.0', ...consent({ confirmation: `acme-labs/custom.notes@0.1.0:${sha256Of(notes.zip)}` }) })).phases.at(-1), 'enabled', 'fresh verified copy: install allowed, bytes still verified')
+  assert.ok(notesModule)
+  f.tick(30 * HOUR)
+  const billingModule = (await f.service.list()).modules.find((m) => m.key === 'custom.billing')
+  assert.equal((await f.service.list()).catalogs.community.freshness, 'stale')
+  await assert.rejects(f.service.install({ key: 'custom.billing', version: '0.1.0', ...consent(billingModule) }), (e) => e.code === 'catalog_stale_confirmation_required' && e.status === 428 && Boolean(e.details.verifiedAt))
+  assert.equal((await f.service.install({ key: 'custom.billing', version: '0.1.0', ...consent(billingModule), acceptStale: true })).phases.at(-1), 'enabled')
+  f.tick(50 * HOUR)
+  const expired = await f.service.list()
+  assert.equal(expired.catalogs.community.freshness, 'expired', 'still visible (maxCacheAgeDays) but marked')
+  const update = expired.modules.find((m) => m.key === 'custom.notes')
+  assert.equal(update.state, 'update')
+  await assert.rejects(f.service.update({ key: 'custom.notes', version: '0.2.0', ...consent(update), acceptStale: true }), (e) => e.code === 'catalog_too_old')
+  assert.equal(f.modules.get('custom.notes').status, 'INSTALLED', 'installed modules never depend on catalog freshness')
+  f.feedDown(false); f.offline(true)
   await f.service.configureSource({ policy: { allowCachedView: false } })
   await assert.rejects(f.service.list(), (e) => e.code === 'catalog_unreachable')
   await f.service.configureSource({ policy: { allowCachedView: true, maxCacheAgeDays: 1 } })
@@ -335,4 +350,24 @@ test('marketplace metadata is data: markup in names and descriptions is returned
   f.feed(COMMUNITY_URL, communityEnvelope({ entries: [communityEntry(notes, { patch: { name: payload, description: payload, changelog: payload } })] }))
   const m = (await f.service.list()).modules[0]
   assert.deepEqual([m.name, m.description, m.changelog], [payload, payload, payload])
+})
+
+test('default source: new installations use the Runly catalog; existing ones keep their behaviour; changes are explicit', async () => {
+  // New installation: no instance_config rows → Runly feeds, still fully verified (fail closed).
+  const fresh = fixture({ urls: {} })
+  await assert.rejects(fresh.service.list(), (e) => e.code === 'catalog_unreachable')
+  assert.deepEqual([...new Set(fresh.requested)].sort(), ['https://devs.runly.mx/api/v1/marketplace/catalog/community', 'https://devs.runly.mx/api/v1/marketplace/catalog/official'])
+  assert.equal((await fresh.service.source()).mode, 'runly')
+  // Existing instance pinned by migration to 'disabled': no outbound catalog request.
+  const existing = fixture({ urls: { 'catalog.source.mode': 'disabled' } })
+  assert.deepEqual(await existing.service.list(), { enabled: false, sourceMode: 'disabled', modules: [] })
+  assert.equal(existing.requested.length, 0)
+  // Opting in to the Runly catalog clears custom URLs; explicit URLs mean custom.
+  const custom = fixture({ urls: { 'catalog.official.url': OFFICIAL_URL } })
+  assert.equal((await custom.service.source()).mode, 'custom')
+  const switched = await custom.service.configureSource({ mode: 'runly' })
+  assert.deepEqual([switched.mode, switched.officialUrl, switched.effective.officialUrl], ['runly', null, 'https://devs.runly.mx/api/v1/marketplace/catalog/official'])
+  assert.equal((await custom.service.configureSource({ officialUrl: OFFICIAL_URL })).mode, 'custom')
+  await assert.rejects(custom.service.configureSource({ mode: 'anything' }), (e) => e.code === 'catalog_source_invalid')
+  await assert.rejects(custom.service.configureSource({ policy: { installFreshHours: 80, installMaxAgeHours: 24 } }), (e) => e.code === 'catalog_policy_invalid')
 })

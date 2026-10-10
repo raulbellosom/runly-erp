@@ -74,6 +74,7 @@ export function createCatalogRouter({ prisma, requirePermission, bundlerSvc = nu
       version: typeof data?.version === "string" ? data.version : "",
       confirmation: typeof data?.confirmation === "string" ? data.confirmation : "",
       acceptCommunity: data?.acceptCommunity === true,
+      acceptStale: data?.acceptStale === true,
       grants: Array.isArray(data?.grants) ? data.grants.map(String) : [],
       decisions: data?.decisions && typeof data.decisions === "object" && !Array.isArray(data.decisions) ? data.decisions : {},
     };
@@ -114,7 +115,7 @@ export function createCatalogRouter({ prisma, requirePermission, bundlerSvc = nu
     try {
       const data = await c.req.json().catch(() => null);
       if (!data || typeof data !== "object" || Array.isArray(data)) return c.json({ error: "catalog_source_invalid", message: "Configuración inválida." }, 422);
-      const allowed = ["communityUrl", "officialUrl", "policy", "managedKeys", "revokeKeyIds"];
+      const allowed = ["mode", "communityUrl", "officialUrl", "policy", "managedKeys", "revokeKeyIds"];
       return c.json({ data: await catalogV2.configureSource(Object.fromEntries(Object.entries(data).filter(([key]) => allowed.includes(key)))) });
     } catch (error) {
       return fail(c, error, "No se pudo guardar la configuración del catálogo.");

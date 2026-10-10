@@ -28,8 +28,19 @@ import rootPackage from '../../../../../package.json' with { type: 'json' }
 
 const STATE_KEY = 'catalog.v2.state'
 const OFFICIAL_STATE_KEY = 'catalog.official.state'
-export const CONFIG_KEYS = Object.freeze({ communityUrl: 'catalog.v2.url', officialUrl: 'catalog.official.url', managedKeys: 'catalog.v2.managedKeys', revokedKeyIds: 'catalog.trust.revokedKeyIds', policy: 'catalog.policy' })
-export const DEFAULT_POLICY = Object.freeze({ allowCachedView: true, maxCacheAgeDays: 30 })
+export const CONFIG_KEYS = Object.freeze({ sourceMode: 'catalog.source.mode', communityUrl: 'catalog.v2.url', officialUrl: 'catalog.official.url', managedKeys: 'catalog.v2.managedKeys', revokedKeyIds: 'catalog.trust.revokedKeyIds', policy: 'catalog.policy' })
+// Freshness of the signed catalog used for installation, measured from the last
+// successful verification of the cached copy (official snapshots have no
+// validUntil; community snapshots also expire at their signed validUntil):
+//   fresh  < installFreshHours       → install/update allowed from the verified copy
+//   stale  < installMaxAgeHours      → allowed only after explicit acknowledgement
+//   older                            → view only (up to maxCacheAgeDays), never install
+// Installed modules are never blocked by catalog freshness.
+export const DEFAULT_POLICY = Object.freeze({ allowCachedView: true, maxCacheAgeDays: 30, installFreshHours: 24, installMaxAgeHours: 72 })
+// Source modes. New installations default to the Runly catalog (no instance_config
+// row); instances that existed before this release were pinned by migration to
+// their previous behaviour ('disabled' or 'custom'). Explicit URLs always win.
+export const SOURCE_MODES = Object.freeze(['runly', 'custom', 'disabled'])
 // Future default source. Never enabled implicitly: an administrator opts in, and
 // until production keys are pinned in a Runly release these feeds fail closed.
 export const RUNLY_CATALOG_SOURCE = Object.freeze({ officialUrl: 'https://devs.runly.mx/api/v1/marketplace/catalog/official', communityUrl: 'https://devs.runly.mx/api/v1/marketplace/catalog/community' })
@@ -68,7 +79,15 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
   const jsonConfig = async (key, fallback) => { try { const value = JSON.parse((await config(key)) ?? 'null'); return value ?? fallback } catch { return fallback } }
   async function policy() {
     const value = await jsonConfig(CONFIG_KEYS.policy, {})
-    return { allowCachedView: typeof value.allowCachedView === 'boolean' ? value.allowCachedView : DEFAULT_POLICY.allowCachedView, maxCacheAgeDays: Number.isSafeInteger(value.maxCacheAgeDays) && value.maxCacheAgeDays >= 1 && value.maxCacheAgeDays <= 365 ? value.maxCacheAgeDays : DEFAULT_POLICY.maxCacheAgeDays }
+    const int = (name, min, max) => Number.isSafeInteger(value[name]) && value[name] >= min && value[name] <= max ? value[name] : DEFAULT_POLICY[name]
+    const installFreshHours = int('installFreshHours', 1, 168)
+    return { allowCachedView: typeof value.allowCachedView === 'boolean' ? value.allowCachedView : DEFAULT_POLICY.allowCachedView, maxCacheAgeDays: int('maxCacheAgeDays', 1, 365), installFreshHours, installMaxAgeHours: Math.max(installFreshHours, int('installMaxAgeHours', 1, 720)) }
+  }
+  async function sourceUrls() {
+    const [mode, community, official] = await Promise.all([config(CONFIG_KEYS.sourceMode), config(CONFIG_KEYS.communityUrl), config(CONFIG_KEYS.officialUrl)])
+    const effective = SOURCE_MODES.includes(mode) ? mode : community || official ? 'custom' : 'runly'
+    const fallback = effective === 'runly' ? RUNLY_CATALOG_SOURCE : { communityUrl: null, officialUrl: null }
+    return { mode: effective, communityUrl: community || fallback.communityUrl, officialUrl: official || fallback.officialUrl }
   }
   async function trustStore() {
     const managed = await jsonConfig(CONFIG_KEYS.managedKeys, [])
@@ -93,7 +112,9 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
         if (alert) throw new CatalogError('El catálogo no superó la verificación y no hay una copia confiable previa.', 422, alert)
         throw new CatalogError('No se pudo conectar con el catálogo.', 502, 'catalog_unreachable')
       }
-      return { url, envelope: cached.payload, state, offline, alert, cachedView: true }
+      const age = now() - Date.parse(state.fetchedAt)
+      const freshness = age < rules.installFreshHours * 3600000 ? 'fresh' : age < rules.installMaxAgeHours * 3600000 ? 'stale' : 'expired'
+      return { url, envelope: cached.payload, state, offline, alert, cachedView: true, freshness }
     }
     const urlProblem = catalogUrlProblem(url)
     if (urlProblem) throw new CatalogError('La URL del catálogo no es de un origen permitido (HTTPS o archivo local).', 422, urlProblem)
@@ -121,11 +142,11 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
     const next = { url, domain, sequence: signed.sequence, sha256, generatedAt: signed.generatedAt, validUntil: signed.validUntil ?? null, fetchedAt: new Date(now()).toISOString(), signer: signer.category, keyId: signer.keyId }
     await prisma.moduleCatalogCache.upsert({ where: { url }, update: { payload: envelope, etag: sha256, fetchedAt: new Date(now()) }, create: { url, payload: envelope, etag: sha256 } })
     await highWater.accept(domain, next)
-    return { url, envelope, state: next, offline: false, alert: null, cachedView: false, persist: (extra) => setConfig(stateKey, JSON.stringify({ ...next, ...extra })), store }
+    return { url, envelope, state: next, offline: false, alert: null, cachedView: false, freshness: 'fresh', persist: (extra) => setConfig(stateKey, JSON.stringify({ ...next, ...extra })), store }
   }
 
   async function loadCommunity(store, rules) {
-    const url = await config(CONFIG_KEYS.communityUrl)
+    const url = (await sourceUrls()).communityUrl
     if (!url) return null
     const previous = await jsonConfig(STATE_KEY, null)
     const revokedKeyIds = new Set(previous?.url === url ? previous.revokedKeyIds ?? [] : [])
@@ -143,7 +164,7 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
     return { ...result, store }
   }
   async function loadOfficial(store, rules) {
-    const url = await config(CONFIG_KEYS.officialUrl)
+    const url = (await sourceUrls()).officialUrl
     if (!url) return null
     const result = await loadDomain({ url, stateKey: OFFICIAL_STATE_KEY, prefix: 'catalog_official', validate: validateOfficialEnvelope, digestOf: officialSnapshotDigest, verify: (envelope) => store.verifyOfficialSnapshot(envelope), catalogId: OFFICIAL_CATALOG_ID, store, rules })
     if (result.persist) await result.persist({})
@@ -248,11 +269,11 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
     if (snapshots.community) for (const e of snapshots.community.envelope.signed.entries) add({ ...e, source: 'community', feedUrl: snapshots.community.url })
     return byKey
   }
-  const domainStatus = (domain, error) => domain ? { configured: true, sequence: domain.state.sequence, sha256: domain.state.sha256, generatedAt: domain.state.generatedAt, validUntil: domain.state.validUntil, lastSync: domain.state.fetchedAt, offline: domain.offline, alert: domain.alert, cachedView: domain.cachedView, stale: stale(domain), signer: domain.state.signer } : error ? { configured: true, error: error.code, message: error.message } : { configured: false }
+  const domainStatus = (domain, error) => domain ? { configured: true, sequence: domain.state.sequence, sha256: domain.state.sha256, generatedAt: domain.state.generatedAt, validUntil: domain.state.validUntil, lastSync: domain.state.fetchedAt, offline: domain.offline, alert: domain.alert, cachedView: domain.cachedView, freshness: domain.freshness, verifiedAt: domain.state.fetchedAt, stale: stale(domain), signer: domain.state.signer } : error ? { configured: true, error: error.code, message: error.message } : { configured: false }
 
   async function list({ key = null } = {}) {
-    const [communityUrl, officialUrl] = await Promise.all([config(CONFIG_KEYS.communityUrl), config(CONFIG_KEYS.officialUrl)])
-    if (!communityUrl && !officialUrl) return { enabled: false, modules: [] }
+    const source = await sourceUrls()
+    if (!source.communityUrl && !source.officialUrl) return { enabled: false, sourceMode: source.mode, modules: [] }
     const snapshots = await loadSnapshots()
     // Without any verified data there is nothing safe to show; surface the error.
     if (!snapshots.community && !snapshots.official) throw snapshots.errors.community ?? snapshots.errors.official
@@ -291,7 +312,7 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
     const community = snapshots.community, official = snapshots.official
     const primary = community ?? official
     return {
-      enabled: true, sequence: community?.state.sequence ?? null, generatedAt: primary.state.generatedAt, validUntil: community?.state.validUntil ?? null, lastSync: primary.state.fetchedAt,
+      enabled: true, sourceMode: (await sourceUrls()).mode, sequence: community?.state.sequence ?? null, generatedAt: primary.state.generatedAt, validUntil: community?.state.validUntil ?? null, lastSync: primary.state.fetchedAt,
       stale: stale(community), offline: Boolean(community?.offline || official?.offline), alert: community?.alert ?? official?.alert ?? null, catalogSigner: community?.state.signer ?? null,
       catalogs: { community: domainStatus(community, snapshots.errors.community), official: domainStatus(official, snapshots.errors.official) },
       modules,
@@ -308,7 +329,7 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
 
   // Resolve → gate (trust, revocation, compatibility, consent) → download →
   // verify bytes and surface. Shared by preflight and install; never installs.
-  async function resolveVerified({ key, version, confirmation, acceptCommunity, phases, requireConsent = true }) {
+  async function resolveVerified({ key, version, confirmation, acceptCommunity, acceptStale = false, phases, requireConsent = true }) {
     const snapshots = await loadSnapshots()
     const entries = candidates(snapshots).get(key) ?? []
     const entry = entries.find((e) => e.version === version && e.trust === 'official') ?? entries.find((e) => e.version === version)
@@ -317,9 +338,10 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
     if (!snapshots.community && !snapshots.official) throw snapshots.errors.community ?? snapshots.errors.official ?? new CatalogError('El Marketplace no está habilitado en esta instancia.', 409, 'catalog_v2_disabled')
     if (isBuiltInKey(key)) fail('Este módulo forma parte de Runly y no se instala desde el catálogo.', 409, 'catalog_builtin_module')
     if (!entry) fail('La versión no está publicada en el catálogo.', 404, 'not_in_catalog')
-    if (domain.offline) fail('Sin conexión con el catálogo: se muestra la última sincronización; no se puede instalar.', 503, 'catalog_offline')
     if (domain.alert) fail('El catálogo no superó la verificación de secuencia/firma.', 409, domain.alert)
-    if (domain.cachedView) fail('Sólo hay una copia en caché del catálogo; no se instala desde datos no verificados ahora.', 503, 'catalog_offline')
+    // A previously verified copy may serve while the Hub is unavailable, within the policy window.
+    if (domain.cachedView && domain.freshness === 'expired') fail('La última copia verificada del catálogo es demasiado antigua para instalar o actualizar; espera a que el catálogo vuelva a estar disponible.', 409, 'catalog_too_old', { verifiedAt: domain.state.fetchedAt })
+    if (domain.cachedView && domain.freshness === 'stale' && acceptStale !== true) fail('El catálogo no responde y la copia verificada puede estar desactualizada (revocaciones recientes desconocidas). Confirma para continuar.', 428, 'catalog_stale_confirmation_required', { verifiedAt: domain.state.fetchedAt })
     if (stale(domain)) fail('La información del catálogo está vencida; no se puede confirmar el estado de revocaciones.', 409, 'catalog_v2_stale')
     if (entry.status === 'withdrawn') fail('El publicador retiró esta versión; no está disponible para nuevas instalaciones.', 410, 'catalog_release_withdrawn')
     if (entry.status !== 'published') fail('La versión no está publicada en el catálogo.', 404, 'not_in_catalog')
@@ -331,7 +353,12 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
 
     phases.push('downloading')
     // Resolved strictly relative to the verified feed; content-addressed path.
-    const { buffer } = await getBytes(new URL(entry.packageUrl, domain.url).toString(), domain.url, 25 * 1024 * 1024)
+    let buffer
+    try { ({ buffer } = await getBytes(new URL(entry.packageUrl, domain.url).toString(), domain.url, 25 * 1024 * 1024)) }
+    catch (error) {
+      if (error instanceof CatalogDownloadError && error.code !== 'CATALOG_UNREACHABLE') throw new CatalogError('La descarga del paquete fue bloqueada por seguridad.', 422, 'catalog_package_rejected')
+      throw new CatalogError('No se pudo descargar el paquete del catálogo. Inténtalo cuando el catálogo esté disponible.', 503, 'catalog_package_unreachable')
+    }
     phases.push('verifying')
     if (buffer.length !== entry.size || sha256Of(buffer) !== entry.sha256) fail('El paquete no coincide con la huella firmada.', 422, 'package_not_authentic')
     const report = inspectModuleZip(buffer)
@@ -354,19 +381,19 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
     const phases = []
     return withPhases(phases, async () => {
       const current = await prisma.runlyModule.findUnique({ where: { key }, select: { status: true, version: true } })
-      const { described } = await resolveVerified({ key, version, confirmation, acceptCommunity, phases, requireConsent: false })
+      const { described } = await resolveVerified({ key, version, confirmation, acceptCommunity, acceptStale: true, phases, requireConsent: false })
       return { key, version, phases, module: described, action: current?.status === 'INSTALLED' ? 'update' : 'install', installedVersion: current?.status === 'INSTALLED' ? current.version : null, scope: 'instance', requestedGrants: described.services.map((s) => s.key) }
     })
   }
 
-  async function apply({ key, version, confirmation, acceptCommunity = false, grants = [], decisions = {}, actorId = null, expect }) {
+  async function apply({ key, version, confirmation, acceptCommunity = false, acceptStale = false, grants = [], decisions = {}, actorId = null, expect }) {
     const phases = []
     return withPhases(phases, async () => {
       const current = await prisma.runlyModule.findUnique({ where: { key }, select: { status: true, version: true } })
       const installed = current?.status === 'INSTALLED'
       if (expect === 'install' && installed) throw new CatalogError('El módulo ya está instalado.', 409, 'already_installed')
       if (expect === 'update' && (!installed || compareVersions(version, current.version) <= 0)) throw new CatalogError('No hay una versión más nueva para actualizar.', 409, 'no_update')
-      const { entry, described, buffer, domain } = await resolveVerified({ key, version, confirmation, acceptCommunity, phases })
+      const { entry, described, buffer, domain } = await resolveVerified({ key, version, confirmation, acceptCommunity, acceptStale, phases })
       const requested = new Set(consumedServiceKeys(entry))
       if (!Array.isArray(grants) || new Set(grants).size !== grants.length || grants.some((grant) => !requested.has(grant))) throw new CatalogError('Grant no solicitado por el ZIP verificado.', 422, 'catalog_unexpected_grant')
       const modulesDir = await resolveModulesDir()
@@ -397,7 +424,8 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
   async function source() {
     const [store, rules, communityUrl, officialUrl, marks] = await Promise.all([trustStore(), policy(), config(CONFIG_KEYS.communityUrl), config(CONFIG_KEYS.officialUrl), highWater.read()])
     const managed = await jsonConfig(CONFIG_KEYS.managedKeys, [])
-    return { communityUrl: communityUrl ?? null, officialUrl: officialUrl ?? null, policy: rules, defaults: RUNLY_CATALOG_SOURCE, managedKeys: Array.isArray(managed) ? managed : [], trust: store.describeKeys(), highWater: marks }
+    const effective = await sourceUrls()
+    return { mode: effective.mode, effective: { communityUrl: effective.communityUrl, officialUrl: effective.officialUrl }, communityUrl: communityUrl || null, officialUrl: officialUrl || null, policy: rules, defaults: RUNLY_CATALOG_SOURCE, managedKeys: Array.isArray(managed) ? managed : [], trust: store.describeKeys(), highWater: marks }
   }
   async function configureSource(input = {}) {
     const fail = (code, message) => { throw new CatalogError(message, 422, code) }
@@ -410,9 +438,16 @@ export function createCatalogV2Service({ prisma, bundlerSvc = null, routeLoader 
       if (problem) fail(problem, 'Sólo se admiten catálogos HTTPS o un archivo local explícito (file://).')
       updates.push([CONFIG_KEYS[field], value])
     }
+    // Mode: 'runly' (default Runly catalog), 'disabled', or 'custom' implied by explicit URLs.
+    if ('mode' in input) {
+      if (!SOURCE_MODES.includes(input.mode)) fail('catalog_source_invalid', 'Origen inválido.')
+      updates.push([CONFIG_KEYS.sourceMode, input.mode])
+      if (input.mode !== 'custom') updates.push([CONFIG_KEYS.communityUrl, ''], [CONFIG_KEYS.officialUrl, ''])
+    } else if (('communityUrl' in input && input.communityUrl) || ('officialUrl' in input && input.officialUrl)) updates.push([CONFIG_KEYS.sourceMode, 'custom'])
     if ('policy' in input) {
       const p = input.policy
-      if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).some((k) => !['allowCachedView', 'maxCacheAgeDays'].includes(k)) || ('allowCachedView' in p && typeof p.allowCachedView !== 'boolean') || ('maxCacheAgeDays' in p && (!Number.isSafeInteger(p.maxCacheAgeDays) || p.maxCacheAgeDays < 1 || p.maxCacheAgeDays > 365))) fail('catalog_policy_invalid', 'Política inválida.')
+      const bounds = { maxCacheAgeDays: [1, 365], installFreshHours: [1, 168], installMaxAgeHours: [1, 720] }
+      if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).some((k) => !['allowCachedView', ...Object.keys(bounds)].includes(k)) || ('allowCachedView' in p && typeof p.allowCachedView !== 'boolean') || Object.entries(bounds).some(([k, [min, max]]) => k in p && (!Number.isSafeInteger(p[k]) || p[k] < min || p[k] > max)) || ((p.installFreshHours ?? 0) > (p.installMaxAgeHours ?? Infinity))) fail('catalog_policy_invalid', 'Política inválida.')
       updates.push([CONFIG_KEYS.policy, JSON.stringify({ ...(await policy()), ...p })])
     }
     if ('managedKeys' in input) {

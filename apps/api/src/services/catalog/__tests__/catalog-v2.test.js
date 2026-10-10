@@ -139,7 +139,7 @@ test('replay, rollback, equivocation, broken chain and v2→v1 downgrade keep th
   f.set(tampered); assert.equal((await f.service.list()).alert, 'catalog_v2_signature_untrusted')
 })
 
-test('stale metadata and offline mode show the last sync and block installs', async () => {
+test('offline shows the last verified sync; installs still need the signed bytes; expired snapshots block', async () => {
   const f = fixture()
   const e1 = entryFor(communityZip)
   f.set(envelope({ entries: [e1] }))
@@ -148,7 +148,7 @@ test('stale metadata and offline mode show the last sync and block installs', as
   f.offline(true)
   const offline = await f.service.list()
   assert.equal(offline.offline, true); assert.equal(offline.lastSync, fresh.lastSync); assert.equal(offline.modules.length, 1)
-  await assert.rejects(f.service.install({ key: e1.key, version: e1.version, acceptCommunity: true, confirmation: confirmationOf(e1) }), (e) => e.code === 'catalog_offline')
+  await assert.rejects(f.service.install({ key: e1.key, version: e1.version, acceptCommunity: true, confirmation: confirmationOf(e1) }), (e) => e.code === 'catalog_package_unreachable' && e.details.phase === 'downloading')
   f.offline(false); f.tick(8 * DAY)
   const stale = await f.service.list()
   assert.equal(stale.stale, true)

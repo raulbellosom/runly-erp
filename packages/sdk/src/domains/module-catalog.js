@@ -10,7 +10,7 @@ export function createModuleCatalogDomain({ request, withAuthHeaders }) {
     headers: withAuthHeaders(token),
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
   })
-  const v2Payload = ({ version, confirmation = '', acceptCommunity = false, grants = [], decisions } = {}) => ({ version, confirmation, acceptCommunity, grants, decisions })
+  const v2Payload = ({ version, confirmation = '', acceptCommunity = false, acceptStale = false, grants = [], decisions } = {}) => ({ version, confirmation, acceptCommunity, acceptStale, grants, decisions })
   return {
     list: (token) => send('GET', '/module-catalog', undefined, token),
     install: (key, { grants = [], decisions } = {}, token) => send('POST', `/module-catalog/${id(key)}/install`, { grants, decisions }, token),
